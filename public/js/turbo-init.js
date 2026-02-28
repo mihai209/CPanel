@@ -83,6 +83,35 @@
         document.dispatchEvent(new Event('cpanel:before-cache'));
     }
 
+    function shouldIsolateInlineScript(script) {
+        if (!script || script.src) return false;
+        if (script.dataset && script.dataset.turboEval === 'false') return false;
+        if (script.dataset && script.dataset.cpanelIsolate === 'false') return false;
+
+        const type = String(script.type || '').trim().toLowerCase();
+        if (!type) return true;
+        if (type === 'text/javascript' || type === 'application/javascript') return true;
+        return false;
+    }
+
+    function isolateInlineScriptScopesInBody(bodyEl) {
+        if (!bodyEl) return;
+        const scripts = bodyEl.querySelectorAll('script');
+        scripts.forEach((script) => {
+            if (!shouldIsolateInlineScript(script)) return;
+            if (script.dataset && script.dataset.cpanelIsolated === '1') return;
+
+            const source = String(script.textContent || '');
+            if (!source.trim()) return;
+
+            // Prevent global const/let collisions across Turbo page visits.
+            script.textContent = `(function(){\n${source}\n})();`;
+            if (script.dataset) {
+                script.dataset.cpanelIsolated = '1';
+            }
+        });
+    }
+
     function applyFormTurboCompatibility() {
         // Turbo is great for page navigation, but legacy forms can violate Turbo redirect rules.
         // Keep forms native by default. Explicitly opt-in with data-turbo="true" where needed.
@@ -104,6 +133,11 @@
     document.addEventListener('turbo:before-cache', () => {
         cleanupTrackedResources();
         dispatchBeforeCache();
+    });
+
+    document.addEventListener('turbo:before-render', (event) => {
+        const newBody = event && event.detail ? event.detail.newBody : null;
+        isolateInlineScriptScopesInBody(newBody);
     });
 
     // Non-Turbo fallback for direct loads or pages with data-turbo disabled.

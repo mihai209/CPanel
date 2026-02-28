@@ -454,195 +454,204 @@
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
         <script>
-            // Checkbox logic
-            const selectAll = document.getElementById('selectAll');
-            const checks = document.querySelectorAll('.alloc-check');
-            const bulkBtn = document.getElementById('bulkDeleteBtn');
-            const bulkForm = document.getElementById('bulkDeleteForm');
+            (() => {
+                // Checkbox logic
+                const selectAll = document.getElementById('selectAll');
+                const checks = document.querySelectorAll('.alloc-check');
+                const bulkBtn = document.getElementById('bulkDeleteBtn');
+                const bulkForm = document.getElementById('bulkDeleteForm');
 
-            function updateBulkBtn() {
-                const anyChecked = Array.from(checks).some(c => c.checked);
-                bulkBtn.disabled = !anyChecked;
-            }
+                function updateBulkBtn() {
+                    if (!bulkBtn) return;
+                    const anyChecked = Array.from(checks).some(c => c.checked);
+                    bulkBtn.disabled = !anyChecked;
+                }
 
-            if (selectAll) {
-                selectAll.addEventListener('change', function () {
-                    checks.forEach(c => c.checked = this.checked);
-                    updateBulkBtn();
-                });
-            }
+                if (selectAll) {
+                    selectAll.addEventListener('change', function () {
+                        checks.forEach(c => c.checked = this.checked);
+                        updateBulkBtn();
+                    });
+                }
 
-            checks.forEach(c => {
-                c.addEventListener('change', updateBulkBtn);
-            });
-
-            // Inject IDs into bulk form on submit
-            bulkForm.addEventListener('submit', function (e) {
-                // Remove old hidden inputs
-                const oldInputs = this.querySelectorAll('input[name="ids[]"]');
-                oldInputs.forEach(i => i.remove());
-
-                // Add new ones
                 checks.forEach(c => {
-                    if (c.checked) {
-                        const input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = 'ids[]';
-                        input.value = c.value;
-                        this.appendChild(input);
-                    }
-                });
-            });
-
-            // Inline alias editing
-            document.querySelectorAll('.alias-display').forEach(span => {
-                span.addEventListener('click', function () {
-                    const id = this.dataset.id;
-                    const form = document.querySelector(`.alias-edit[data-id="${id}"]`);
-                    this.classList.add('d-none');
-                    form.classList.remove('d-none');
-                    form.querySelector('input').focus();
-                });
-            });
-
-            document.querySelectorAll('.alias-edit').forEach(form => {
-                const id = form.dataset.id;
-                const span = document.querySelector(`.alias-display[data-id="${id}"]`);
-                const input = form.querySelector('input');
-
-                // Handle cancel
-                form.querySelector('.alias-cancel').addEventListener('click', function () {
-                    form.classList.add('d-none');
-                    span.classList.remove('d-none');
+                    c.addEventListener('change', updateBulkBtn);
                 });
 
-                // Handle submit
-                form.addEventListener('submit', async function (e) {
-                    e.preventDefault();
-                    const newAlias = input.value.trim();
+                // Inject IDs into bulk form on submit
+                if (bulkForm) {
+                    bulkForm.addEventListener('submit', function () {
+                        // Remove old hidden inputs
+                        const oldInputs = this.querySelectorAll('input[name="ids[]"]');
+                        oldInputs.forEach(i => i.remove());
 
-                    try {
-                        const res = await fetch(`/admin/connectors/<%= connector.id %>/allocations/${id}/alias`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ alias: newAlias })
+                        // Add new ones
+                        checks.forEach(c => {
+                            if (c.checked) {
+                                const input = document.createElement('input');
+                                input.type = 'hidden';
+                                input.name = 'ids[]';
+                                input.value = c.value;
+                                this.appendChild(input);
+                            }
                         });
+                    });
+                }
 
-                        const data = await res.json();
-                        if (data.success) {
-                            // Update display
-                            span.childNodes[0].textContent = data.alias || '-';
+                // Inline alias editing
+                document.querySelectorAll('.alias-display').forEach(span => {
+                    span.addEventListener('click', function () {
+                        const id = this.dataset.id;
+                        const form = document.querySelector(`.alias-edit[data-id="${id}"]`);
+                        if (!form) return;
+                        this.classList.add('d-none');
+                        form.classList.remove('d-none');
+                        const input = form.querySelector('input');
+                        if (input) input.focus();
+                    });
+                });
+
+                document.querySelectorAll('.alias-edit').forEach(form => {
+                    const id = form.dataset.id;
+                    const span = document.querySelector(`.alias-display[data-id="${id}"]`);
+                    const input = form.querySelector('input');
+                    const cancelBtn = form.querySelector('.alias-cancel');
+
+                    if (cancelBtn && span) {
+                        // Handle cancel
+                        cancelBtn.addEventListener('click', function () {
                             form.classList.add('d-none');
                             span.classList.remove('d-none');
+                        });
+                    }
+
+                    // Handle submit
+                    form.addEventListener('submit', async function (e) {
+                        e.preventDefault();
+                        const newAlias = input ? input.value.trim() : '';
+
+                        try {
+                            const res = await fetch(`/admin/connectors/<%= connector.id %>/allocations/${id}/alias`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ alias: newAlias })
+                            });
+
+                            const data = await res.json();
+                            if (data.success && span) {
+                                // Update display
+                                span.childNodes[0].textContent = data.alias || '-';
+                                form.classList.add('d-none');
+                                span.classList.remove('d-none');
+                            } else {
+                                alert('Failed to update alias');
+                            }
+                        } catch (err) {
+                            alert('Error updating alias');
+                        }
+                    });
+                });
+
+                // Configuration tab - Token visibility toggle
+                const toggleToken = document.getElementById('toggleToken');
+                const tokenInput = document.getElementById('tokenInput');
+                const toggleIcon = document.getElementById('toggleIcon');
+
+                if (toggleToken && tokenInput && toggleIcon) {
+                    toggleToken.addEventListener('click', function () {
+                        if (tokenInput.type === 'password') {
+                            tokenInput.type = 'text';
+                            toggleIcon.classList.remove('bi-eye');
+                            toggleIcon.classList.add('bi-eye-slash');
                         } else {
-                            alert('Failed to update alias');
+                            tokenInput.type = 'password';
+                            toggleIcon.classList.remove('bi-eye-slash');
+                            toggleIcon.classList.add('bi-eye');
                         }
-                    } catch (err) {
-                        alert('Error updating alias');
-                    }
-                });
-            });
-
-            // Configuration tab - Token visibility toggle
-            const toggleToken = document.getElementById('toggleToken');
-            const tokenInput = document.getElementById('tokenInput');
-            const toggleIcon = document.getElementById('toggleIcon');
-
-            if (toggleToken) {
-                toggleToken.addEventListener('click', function () {
-                    if (tokenInput.type === 'password') {
-                        tokenInput.type = 'text';
-                        toggleIcon.classList.remove('bi-eye');
-                        toggleIcon.classList.add('bi-eye-slash');
-                    } else {
-                        tokenInput.type = 'password';
-                        toggleIcon.classList.remove('bi-eye-slash');
-                        toggleIcon.classList.add('bi-eye');
-                    }
-                });
-            }
-
-
-            // Configuration tab - Copy config to clipboard
-            const copyConfig = document.getElementById('copyConfig');
-            const configDisplay = document.getElementById('configDisplay');
-            const copyToast = document.getElementById('copyToast');
-
-            if (copyConfig && configDisplay) {
-                copyConfig.addEventListener('click', async function () {
-                    try {
-                        await navigator.clipboard.writeText(configDisplay.innerText);
-
-                        // Show Toast
-                        if (copyToast) {
-                            const toast = new bootstrap.Toast(copyToast);
-                            toast.show();
-                        }
-
-                        const icon = this.querySelector('i');
-                        const text = this.childNodes[this.childNodes.length - 1];
-                        const originalText = text.textContent;
-
-                        icon.classList.remove('bi-clipboard');
-                        icon.classList.add('bi-check');
-                        text.textContent = ' Copied!';
-
-                        setTimeout(() => {
-                            icon.classList.remove('bi-check');
-                            icon.classList.add('bi-clipboard');
-                            text.textContent = originalText;
-                        }, 2000);
-                    } catch (err) {
-                        alert('Failed to copy configuration');
-                    }
-                });
-            }
-
-            // Configuration tab - Web server template selector
-            const webTemplateType = document.getElementById('webTemplateType');
-            const webTemplateDisplay = document.getElementById('webTemplateDisplay');
-            const webTemplateDownload = document.getElementById('webTemplateDownload');
-            const copyWebTemplate = document.getElementById('copyWebTemplate');
-
-            async function loadWebTemplate(type) {
-                if (!webTemplateDisplay) return;
-
-                webTemplateDisplay.textContent = 'Loading template...';
-                try {
-                    const response = await fetch(`/admin/connectors/<%= connector.id %>/webserver-template?type=${encodeURIComponent(type)}`);
-                    const data = await response.json();
-                    if (!response.ok || !data.success) {
-                        throw new Error(data.error || 'Failed loading template');
-                    }
-
-                    webTemplateDisplay.textContent = data.content || '';
-                    if (webTemplateDownload) {
-                        webTemplateDownload.href = `/admin/connectors/<%= connector.id %>/webserver-template?type=${encodeURIComponent(type)}&download=1`;
-                    }
-                } catch (err) {
-                    webTemplateDisplay.textContent = `Failed to load template: ${err.message}`;
+                    });
                 }
-            }
 
-            if (webTemplateType) {
-                webTemplateType.addEventListener('change', function () {
-                    loadWebTemplate(this.value);
-                });
-            }
+                // Configuration tab - Copy config to clipboard
+                const copyConfig = document.getElementById('copyConfig');
+                const configDisplay = document.getElementById('configDisplay');
+                const copyToast = document.getElementById('copyToast');
 
-            if (copyWebTemplate && webTemplateDisplay) {
-                copyWebTemplate.addEventListener('click', async function () {
+                if (copyConfig && configDisplay) {
+                    copyConfig.addEventListener('click', async function () {
+                        try {
+                            await navigator.clipboard.writeText(configDisplay.innerText);
+
+                            // Show Toast
+                            if (copyToast) {
+                                const toast = new bootstrap.Toast(copyToast);
+                                toast.show();
+                            }
+
+                            const icon = this.querySelector('i');
+                            const text = this.childNodes[this.childNodes.length - 1];
+                            const originalText = text.textContent;
+
+                            icon.classList.remove('bi-clipboard');
+                            icon.classList.add('bi-check');
+                            text.textContent = ' Copied!';
+
+                            setTimeout(() => {
+                                icon.classList.remove('bi-check');
+                                icon.classList.add('bi-clipboard');
+                                text.textContent = originalText;
+                            }, 2000);
+                        } catch (err) {
+                            alert('Failed to copy configuration');
+                        }
+                    });
+                }
+
+                // Configuration tab - Web server template selector
+                const webTemplateType = document.getElementById('webTemplateType');
+                const webTemplateDisplay = document.getElementById('webTemplateDisplay');
+                const webTemplateDownload = document.getElementById('webTemplateDownload');
+                const copyWebTemplate = document.getElementById('copyWebTemplate');
+
+                async function loadWebTemplate(type) {
+                    if (!webTemplateDisplay) return;
+
+                    webTemplateDisplay.textContent = 'Loading template...';
                     try {
-                        await navigator.clipboard.writeText(webTemplateDisplay.innerText || '');
-                        if (copyToast) {
-                            const toast = new bootstrap.Toast(copyToast);
-                            toast.show();
+                        const response = await fetch(`/admin/connectors/<%= connector.id %>/webserver-template?type=${encodeURIComponent(type)}`);
+                        const data = await response.json();
+                        if (!response.ok || !data.success) {
+                            throw new Error(data.error || 'Failed loading template');
+                        }
+
+                        webTemplateDisplay.textContent = data.content || '';
+                        if (webTemplateDownload) {
+                            webTemplateDownload.href = `/admin/connectors/<%= connector.id %>/webserver-template?type=${encodeURIComponent(type)}&download=1`;
                         }
                     } catch (err) {
-                        alert('Failed to copy template');
+                        webTemplateDisplay.textContent = `Failed to load template: ${err.message}`;
                     }
-                });
-            }
+                }
+
+                if (webTemplateType) {
+                    webTemplateType.addEventListener('change', function () {
+                        loadWebTemplate(this.value);
+                    });
+                }
+
+                if (copyWebTemplate && webTemplateDisplay) {
+                    copyWebTemplate.addEventListener('click', async function () {
+                        try {
+                            await navigator.clipboard.writeText(webTemplateDisplay.innerText || '');
+                            if (copyToast) {
+                                const toast = new bootstrap.Toast(copyToast);
+                                toast.show();
+                            }
+                        } catch (err) {
+                            alert('Failed to copy template');
+                        }
+                    });
+                }
+            })();
         </script>
 
         <!-- Regenerate Token Modal -->
