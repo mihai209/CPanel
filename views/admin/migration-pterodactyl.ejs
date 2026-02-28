@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= (settings.brandName || 'CPanel').toUpperCase() %> - Pterodactyl Migration</title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include ('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3">
+                    <h4 class="mb-0 text-light fw-normal">Pterodactyl Migration Wizard</h4>
+                    <small class="text-muted">Fetch remote server data, validate, then import directly.</small>
+                </div>
+                <div class="breadcrumb-admin">
+                    <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span class="text-light">Migrations</span>
+                </div>
+            </div>
+
+            <div class="container-fluid py-4 px-lg-4">
+                <% if (success) { %>
+                    <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
+                        <i class="bi bi-check-circle-fill me-2"></i><%= success %>
+                    </div>
+                <% } %>
+                <% if (warning) { %>
+                    <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i><%= warning %>
+                    </div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
+                        <i class="bi bi-exclamation-octagon-fill me-2"></i><%= error %>
+                    </div>
+                <% } %>
+                <% if (typeof jobId !== 'undefined' && jobId) { %>
+                    <div class="alert border-0 bg-info bg-opacity-10 text-info d-flex justify-content-between align-items-center" id="migrationJobAlert">
+                        <div>
+                            <i class="bi bi-hourglass-split me-2"></i>
+                            Tracking deployment job <strong>#<%= jobId %></strong>...
+                            <% if (typeof fileImport !== 'undefined' && String(fileImport) === '1') { %>
+                                <span class="ms-2">SFTP file import will begin automatically after install success.</span>
+                            <% } %>
+                        </div>
+                        <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25" id="migrationJobBadge">queued</span>
+                    </div>
+                <% } %>
+                <% if (typeof serverId !== 'undefined' && serverId && typeof fileImport !== 'undefined' && String(fileImport) === '1') { %>
+                    <div class="alert border-0 bg-secondary bg-opacity-10 text-light d-flex justify-content-between align-items-start gap-3" id="migrationImportAlert">
+                        <div>
+                            <i class="bi bi-arrow-left-right me-2"></i>
+                            Tracking file transfer for server <strong>#<%= serverId %></strong>...
+                            <div class="small text-muted mt-1" id="migrationImportDetails">Waiting for import state...</div>
+                        </div>
+                        <span class="badge bg-secondary bg-opacity-10 text-light border border-secondary border-opacity-25" id="migrationImportBadge">queued</span>
+                    </div>
+                <% } %>
+
+                <div class="row g-4">
+                    <div class="col-lg-5">
+                        <div class="card border-0 shadow-sm" style="background-color: #141419;">
+                            <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                                <div class="d-flex align-items-center justify-content-between gap-2">
+                                    <h5 class="card-title mb-0 fs-6 fw-bold text-light">
+                                        <i class="bi bi-cloud-arrow-down me-2"></i>Step 1: Fetch Remote Server
+                                    </h5>
+                                    <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#migrationTutorialModal">
+                                        <i class="bi bi-book-half me-1"></i>Tutorial
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST" action="/admin/migrations/pterodactyl/fetch">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Panel URL</label>
+                                        <input type="url" class="form-control" name="remotePanelUrl" required
+                                               placeholder="https://panel.example.com"
+                                               value="<%= remotePanelUrl || '' %>"
+                                               style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Application API Key</label>
+                                        <input type="password" class="form-control" name="remoteApiKey" required
+                                               placeholder="ptla_..."
+                                               style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                        <small class="text-muted">Needs <code>application.servers.read</code> permission.</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Server Reference</label>
+                                        <input type="text" class="form-control" name="remoteServerRef" required
+                                               placeholder="ID / external_id / UUID / identifier"
+                                               value="<%= remoteServerRef || '' %>"
+                                               style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                    </div>
+                                    <button class="btn btn-primary w-100 fw-bold" type="submit">
+                                        <i class="bi bi-search me-2"></i>Fetch & Validate
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <% if (migrationSnapshot) { %>
+                            <div class="card border-0 shadow-sm mt-4" style="background-color: #141419;">
+                                <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                                    <h5 class="card-title mb-0 fs-6 fw-bold text-light">
+                                        <i class="bi bi-clipboard-check me-2"></i>Remote Snapshot
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="small text-muted mb-2">Name</div>
+                                    <div class="text-light fw-semibold mb-3"><%= migrationSnapshot.name %></div>
+                                    <div class="row g-3 small">
+                                        <div class="col-6">
+                                            <div class="text-muted">Memory</div>
+                                            <div class="text-light"><%= migrationSnapshot.memory %> MB</div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="text-muted">CPU</div>
+                                            <div class="text-light"><%= migrationSnapshot.cpu %>%</div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="text-muted">Disk</div>
+                                            <div class="text-light"><%= migrationSnapshot.disk %> MB</div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="text-muted">Suspended</div>
+                                            <div class="<%= migrationSnapshot.suspended ? 'text-warning' : 'text-success' %>">
+                                                <%= migrationSnapshot.suspended ? 'Yes' : 'No' %>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <hr class="border-secondary border-opacity-25">
+                                    <div class="small text-muted mb-1">Docker Image</div>
+                                    <code class="text-info"><%= migrationSnapshot.dockerImage || 'Not provided' %></code>
+                                    <div class="small text-muted mt-3">Environment Variables</div>
+                                    <div class="text-light"><%= Object.keys(migrationSnapshot.environment || {}).length %> keys detected</div>
+                                </div>
+                            </div>
+                        <% } %>
+                    </div>
+
+                    <div class="col-lg-7">
+                        <div class="card border-0 shadow-sm" style="background-color: #141419;">
+                            <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                                <h5 class="card-title mb-0 fs-6 fw-bold text-light">
+                                    <i class="bi bi-box-arrow-in-right me-2"></i>Step 2: Import Into CPanel
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <% if (!migrationSnapshot) { %>
+                                    <div class="text-muted">Fetch remote data first, then import form becomes available.</div>
+                                <% } else { %>
+                                    <% const migrationMatrix = migrationPrecheck && Array.isArray(migrationPrecheck.rows) ? migrationPrecheck.rows : []; %>
+                                    <% if (migrationMatrix.length > 0) { %>
+                                        <div class="alert border-0 bg-secondary bg-opacity-10 text-light mb-3">
+                                            <div class="fw-semibold mb-1">
+                                                <i class="bi bi-clipboard-data me-2"></i>Pre-check matrix generated
+                                            </div>
+                                            <div class="small">
+                                                Recommended image:
+                                                <strong><%= migrationPrecheck.recommendedImageName || 'N/A' %></strong>
+                                                <% if (typeof migrationPrecheck.remoteVariableCount !== 'undefined') { %>
+                                                    | Remote vars: <strong><%= migrationPrecheck.remoteVariableCount %></strong>
+                                                <% } %>
+                                            </div>
+                                        </div>
+                                        <div class="table-responsive mb-4">
+                                            <table class="table table-dark table-sm align-middle mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Image</th>
+                                                        <th>Score</th>
+                                                        <th>Status</th>
+                                                        <th>Vars</th>
+                                                        <th>Docker</th>
+                                                        <th>Notes</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <% migrationMatrix.slice(0, 12).forEach((row) => { %>
+                                                        <tr>
+                                                            <td>
+                                                                <div class="fw-semibold text-light"><%= row.imageName %></div>
+                                                                <div class="small text-muted"><code><%= row.dockerImage || '-' %></code></div>
+                                                            </td>
+                                                            <td><strong><%= row.score %></strong>/100</td>
+                                                            <td>
+                                                                <span class="badge <%= row.status === 'recommended' ? 'bg-success' : (row.status === 'compatible' ? 'bg-info' : (row.status === 'warning' ? 'bg-warning text-dark' : 'bg-danger')) %>">
+                                                                    <%= row.status.toUpperCase() %>
+                                                                </span>
+                                                            </td>
+                                                            <td class="small">
+                                                                <span class="text-success"><%= row.supportedVariableCount %> ok</span>
+                                                                <% if (row.unsupportedVariableCount > 0) { %>
+                                                                    <span class="text-warning"> / <%= row.unsupportedVariableCount %> ignored</span>
+                                                                <% } %>
+                                                            </td>
+                                                            <td class="small"><%= row.dockerMatch || '-' %></td>
+                                                            <td class="small text-muted">
+                                                                <%= row.warnings && row.warnings.length ? row.warnings[0] : '-' %>
+                                                            </td>
+                                                        </tr>
+                                                    <% }) %>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    <% } %>
+
+                                    <form method="POST" action="/admin/migrations/pterodactyl/import">
+                                        <input type="hidden" name="migrationToken" value="<%= migrationToken %>">
+
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Server Name</label>
+                                                <input type="text" class="form-control" name="name" required
+                                                       value="<%= migrationSnapshot.name %>"
+                                                       style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Owner</label>
+                                                <select class="form-select" name="ownerId" required
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                                    <option value="" disabled selected>Select owner...</option>
+                                                    <% users.forEach(localUser => { %>
+                                                        <option value="<%= localUser.id %>"><%= localUser.username %> (<%= localUser.email %>)</option>
+                                                    <% }) %>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Image</label>
+                                                <select class="form-select" name="imageId" required
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                                    <option value="" disabled <%= !(migrationPrecheck && migrationPrecheck.recommendedImageId) ? 'selected' : '' %>>Select image...</option>
+                                                    <% images.forEach(img => { %>
+                                                        <option value="<%= img.id %>" <%= migrationPrecheck && migrationPrecheck.recommendedImageId === img.id ? 'selected' : '' %>><%= img.name %></option>
+                                                    <% }) %>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Allocation</label>
+                                                <select class="form-select" name="allocationId" required
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                                    <option value="" disabled selected>Select allocation...</option>
+                                                    <% allocations.forEach(alloc => {
+                                                        const nodeState = connectorStatus && connectorStatus[alloc.connectorId];
+                                                        const isOnline = nodeState && nodeState.status === 'online';
+                                                    %>
+                                                        <option value="<%= alloc.id %>">
+                                                            <%= alloc.ip %>:<%= alloc.port %> | <%= alloc.connector ? alloc.connector.name : ('Connector #' + alloc.connectorId) %> | <%= isOnline ? 'online' : 'offline' %>
+                                                        </option>
+                                                    <% }) %>
+                                                </select>
+                                            </div>
+
+                                            <div class="col-md-4">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Memory (MB)</label>
+                                                <input type="number" class="form-control" name="memory" min="64" required
+                                                       value="<%= migrationSnapshot.memory %>"
+                                                       style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">CPU (%)</label>
+                                                <input type="number" class="form-control" name="cpu" min="10" required
+                                                       value="<%= migrationSnapshot.cpu %>"
+                                                       style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Disk (MB)</label>
+                                                <input type="number" class="form-control" name="disk" min="512" required
+                                                       value="<%= migrationSnapshot.disk %>"
+                                                       style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                            </div>
+
+                                            <div class="col-12">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Docker Override (Optional)</label>
+                                                <input type="text" class="form-control" name="dockerImage"
+                                                       value="<%= migrationSnapshot.dockerImage || '' %>"
+                                                       placeholder="Leave empty to use selected image default"
+                                                       style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                            </div>
+
+                                            <div class="col-12">
+                                                <div class="alert border-0 bg-primary bg-opacity-10 text-primary mb-0">
+                                                    <div class="form-check form-switch mb-2">
+                                                        <input class="form-check-input" type="checkbox" id="importFiles" name="importFiles" value="1">
+                                                        <label class="form-check-label fw-semibold" for="importFiles">Also import files/content from source server (SFTP)</label>
+                                                    </div>
+                                                    <small class="d-block">When enabled, CPanel will pull files from source SFTP after install completes.</small>
+                                                </div>
+                                            </div>
+
+                                            <div class="col-md-5 sftp-import-field d-none">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Source SFTP Host</label>
+                                                <input type="text" class="form-control" name="sourceSftpHost"
+                                                       value="<%= remoteSftpHost || '' %>"
+                                                       placeholder="cp.voxcorp.qzz.io"
+                                                       style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                            </div>
+                                            <div class="col-md-2 sftp-import-field d-none">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Port</label>
+                                                <input type="number" class="form-control" name="sourceSftpPort" min="1" max="65535"
+                                                       value="<%= remoteSftpPort || 2022 %>"
+                                                       style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                            </div>
+                                            <div class="col-md-5 sftp-import-field d-none">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Source Path</label>
+                                                <input type="text" class="form-control" name="sourceSftpPath"
+                                                       value="<%= remoteSftpPath || '/' %>"
+                                                       placeholder="/"
+                                                       style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                            </div>
+                                            <div class="col-md-6 sftp-import-field d-none">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Source SFTP Username</label>
+                                                <input type="text" class="form-control" name="sourceSftpUsername"
+                                                       placeholder="SFTP username from source panel"
+                                                       style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                            </div>
+                                            <div class="col-md-6 sftp-import-field d-none">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Source SFTP Password</label>
+                                                <input type="password" class="form-control" name="sourceSftpPassword"
+                                                       placeholder="SFTP password"
+                                                       style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                            </div>
+                                            <div class="col-12 sftp-import-field d-none">
+                                                <div class="form-check form-switch">
+                                                    <input class="form-check-input" type="checkbox" id="sourceCleanTarget" name="sourceCleanTarget" value="1">
+                                                    <label class="form-check-label" for="sourceCleanTarget">Clean destination before import (dangerous)</label>
+                                                </div>
+                                                <small class="text-muted">If enabled, existing files on destination server are removed before pulling from source.</small>
+                                            </div>
+                                        </div>
+
+                                        <div class="alert alert-info border-0 bg-info bg-opacity-10 text-info mt-4 mb-3">
+                                            <i class="bi bi-shield-check me-2"></i>
+                                            Wizard checks: owner/allocation/image required, connector online, resource over-allocation, startup placeholders, and variable compatibility.
+                                        </div>
+
+                                        <button class="btn btn-success w-100 fw-bold" type="submit">
+                                            <i class="bi bi-cloud-upload me-2"></i>Import Server
+                                        </button>
+                                    </form>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="migrationTutorialModal" tabindex="-1" aria-labelledby="migrationTutorialLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content" style="background-color: #141419; border: 1px solid #2d2d35; color: #e5e7eb;">
+                <div class="modal-header border-secondary border-opacity-25">
+                    <h5 class="modal-title" id="migrationTutorialLabel">
+                        <i class="bi bi-book-half me-2"></i>Migrating from Pterodactyl to CPanel
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <h6 class="text-info">Step by step</h6>
+                    <ol class="small ps-3">
+                        <li class="mb-2">Open your Pterodactyl Panel as admin and create an <strong>Application API key</strong> with server read access.</li>
+                        <li class="mb-2">In this wizard, enter the remote panel URL (example: <code>https://panel.example.com</code>).</li>
+                        <li class="mb-2">Paste the Application API key and set server reference:
+                            ID, <code>external_id</code>, UUID, or identifier.</li>
+                        <li class="mb-2">Click <strong>Fetch & Validate</strong>. The wizard pulls remote limits and environment variables.</li>
+                        <li class="mb-2">Map local fields: owner, image, allocation, and adjust memory/cpu/disk if needed.</li>
+                        <li class="mb-2">Optional: enable <strong>import files/content</strong> and fill source SFTP host/user/password/path.</li>
+                        <li class="mb-2">Click <strong>Import Server</strong>. CPanel creates the server and starts deployment on the selected connector.</li>
+                        <li class="mb-2">If file import is enabled, content sync starts automatically right after install success.</li>
+                    </ol>
+
+                    <h6 class="text-warning mt-4">Common errors and fixes</h6>
+                    <ul class="small ps-3 mb-0">
+                        <li class="mb-2"><strong>Server not found</strong>: check server reference and panel URL (must be exact).</li>
+                        <li class="mb-2"><strong>401 Unauthorized</strong>: API key is invalid, expired, or missing required permissions.</li>
+                        <li class="mb-2"><strong>Connector offline</strong>: start connector-go first, then retry import.</li>
+                        <li class="mb-2"><strong>Not enough resources</strong>: pick another connector/allocation or lower limits.</li>
+                        <li class="mb-2"><strong>Ignored variables warning</strong>: selected local image does not define those remote variables; import still continues safely.</li>
+                        <li class="mb-2"><strong>Startup unresolved placeholders</strong>: open Startup page and set missing variables, then reinstall.</li>
+                        <li class="mb-2"><strong>SFTP import failed</strong>: verify source SFTP credentials and path (usually <code>/</code> in Pterodactyl SFTP chroot).</li>
+                    </ul>
+                </div>
+                <div class="modal-footer border-secondary border-opacity-25">
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (() => {
+            let migrationPageState = null;
+
+            function initMigrationPage() {
+                const pageRoot = document.body;
+                if (!pageRoot) return;
+                if (pageRoot.dataset.cpanelMigrationInit === '1') return;
+                pageRoot.dataset.cpanelMigrationInit = '1';
+
+                const state = {
+                    pollTimers: [],
+                    importFilesToggle: null,
+                    importFilesToggleHandler: null,
+                    pageRoot
+                };
+
+                const importFilesToggle = document.getElementById('importFiles');
+                const fields = Array.from(document.querySelectorAll('.sftp-import-field'));
+
+                function renderSftpImportFields() {
+                    const enabled = importFilesToggle && importFilesToggle.checked;
+                    fields.forEach((field) => {
+                        field.classList.toggle('d-none', !enabled);
+                        field.querySelectorAll('input').forEach((input) => {
+                            if (input.name === 'sourceSftpHost' || input.name === 'sourceSftpUsername' || input.name === 'sourceSftpPassword') {
+                                input.required = Boolean(enabled);
+                            }
+                        });
+                    });
+                }
+
+                if (importFilesToggle) {
+                    const importFilesToggleHandler = () => renderSftpImportFields();
+                    importFilesToggle.addEventListener('change', importFilesToggleHandler);
+                    renderSftpImportFields();
+                    state.importFilesToggle = importFilesToggle;
+                    state.importFilesToggleHandler = importFilesToggleHandler;
+                }
+
+                const trackedJobId = <%- JSON.stringify(jobId || null) %>;
+                const trackedServerId = <%- JSON.stringify(serverId || null) %>;
+                const trackedFileImport = <%- JSON.stringify(String(fileImport || '0') === '1') %>;
+                const migrationJobBadge = document.getElementById('migrationJobBadge');
+                const migrationImportBadge = document.getElementById('migrationImportBadge');
+                const migrationImportDetails = document.getElementById('migrationImportDetails');
+
+                if (trackedJobId && migrationJobBadge) {
+                    const refreshStatus = async () => {
+                        try {
+                            const response = await fetch(`/api/admin/jobs/${encodeURIComponent(trackedJobId)}`);
+                            if (!response.ok) return false;
+                            const payload = await response.json();
+                            const status = String((payload.job && payload.job.status) || 'unknown').toLowerCase();
+                            migrationJobBadge.textContent = status;
+                            migrationJobBadge.className = 'badge border border-opacity-25';
+                            if (status === 'completed') {
+                                migrationJobBadge.classList.add('bg-success', 'bg-opacity-10', 'text-success', 'border-success');
+                                return true;
+                            }
+                            if (status === 'failed' || status === 'cancelled') {
+                                migrationJobBadge.classList.add('bg-danger', 'bg-opacity-10', 'text-danger', 'border-danger');
+                                return true;
+                            }
+                            if (status === 'running') {
+                                migrationJobBadge.classList.add('bg-primary', 'bg-opacity-10', 'text-primary', 'border-primary');
+                            } else if (status === 'retrying') {
+                                migrationJobBadge.classList.add('bg-warning', 'bg-opacity-10', 'text-warning', 'border-warning');
+                            } else {
+                                migrationJobBadge.classList.add('bg-info', 'bg-opacity-10', 'text-info', 'border-info');
+                            }
+                            return false;
+                        } catch {
+                            return false;
+                        }
+                    };
+
+                    refreshStatus().then((done) => {
+                        if (done) return;
+                        const poll = setInterval(async () => {
+                            const finished = await refreshStatus();
+                            if (finished) clearInterval(poll);
+                        }, 3000);
+                        state.pollTimers.push(poll);
+                    });
+                }
+
+                if (trackedServerId && trackedFileImport && migrationImportBadge) {
+                    const formatBytes = (input) => {
+                        const value = Number(input) || 0;
+                        if (value <= 0) return '0 B';
+                        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+                        const index = Math.min(units.length - 1, Math.floor(Math.log(value) / Math.log(1024)));
+                        const scaled = value / Math.pow(1024, index);
+                        return `${scaled >= 100 ? scaled.toFixed(0) : scaled.toFixed(1)} ${units[index]}`;
+                    };
+
+                    const renderImportState = (fileImportState) => {
+                        if (!fileImportState) return false;
+                        const status = String(fileImportState.status || 'queued').toLowerCase();
+                        migrationImportBadge.textContent = status;
+                        migrationImportBadge.className = 'badge border border-opacity-25';
+                        if (status === 'completed') {
+                            migrationImportBadge.classList.add('bg-success', 'bg-opacity-10', 'text-success', 'border-success');
+                        } else if (status === 'failed') {
+                            migrationImportBadge.classList.add('bg-danger', 'bg-opacity-10', 'text-danger', 'border-danger');
+                        } else if (status === 'running') {
+                            migrationImportBadge.classList.add('bg-primary', 'bg-opacity-10', 'text-primary', 'border-primary');
+                        } else {
+                            migrationImportBadge.classList.add('bg-secondary', 'bg-opacity-10', 'text-light', 'border-secondary');
+                        }
+
+                        const summary = `${Number(fileImportState.files || 0)} files, ${Number(fileImportState.directories || 0)} dirs, ${formatBytes(fileImportState.bytes || 0)}`;
+                        const message = String(fileImportState.message || '').trim();
+                        const error = String(fileImportState.error || '').trim();
+                        if (migrationImportDetails) {
+                            migrationImportDetails.textContent = [summary, message, error].filter(Boolean).join(' | ') || 'No transfer details yet.';
+                        }
+                        return status === 'completed' || status === 'failed' || status === 'skipped';
+                    };
+
+                    const pollImport = async () => {
+                        try {
+                            const query = new URLSearchParams();
+                            query.set('serverId', String(trackedServerId));
+                            if (trackedJobId) query.set('jobId', String(trackedJobId));
+                            const response = await fetch(`/api/admin/migrations/pterodactyl/status?${query.toString()}`);
+                            if (!response.ok) return false;
+                            const payload = await response.json();
+                            return renderImportState(payload.fileImport || null);
+                        } catch {
+                            return false;
+                        }
+                    };
+
+                    pollImport().then((done) => {
+                        if (done) return;
+                        const timer = setInterval(async () => {
+                            const finished = await pollImport();
+                            if (finished) clearInterval(timer);
+                        }, 3000);
+                        state.pollTimers.push(timer);
+                    });
+                }
+
+                migrationPageState = state;
+            }
+
+            function cleanupMigrationPage() {
+                if (!migrationPageState) return;
+                migrationPageState.pollTimers.forEach((timer) => {
+                    clearInterval(timer);
+                });
+                migrationPageState.pollTimers = [];
+                if (migrationPageState.importFilesToggle && migrationPageState.importFilesToggleHandler) {
+                    migrationPageState.importFilesToggle.removeEventListener('change', migrationPageState.importFilesToggleHandler);
+                }
+                if (migrationPageState.pageRoot) {
+                    migrationPageState.pageRoot.dataset.cpanelMigrationInit = '0';
+                }
+                migrationPageState = null;
+            }
+
+            document.addEventListener('turbo:load', initMigrationPage);
+            document.addEventListener('turbo:before-cache', cleanupMigrationPage);
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initMigrationPage, { once: true });
+            } else {
+                initMigrationPage();
+            }
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= (settings.brandName || 'CPanel').toUpperCase() %> - Platform Ops</title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .ops-card {
+            background-color: #141419;
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+        .ops-metric {
+            border: 1px solid rgba(255,255,255,0.06);
+            background: rgba(255,255,255,0.02);
+            border-radius: .75rem;
+            padding: .9rem;
+        }
+        .ops-table-wrapper {
+            max-height: 320px;
+            overflow: auto;
+        }
+        .ops-table-wrapper table {
+            margin-bottom: 0;
+        }
+        .code-input {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: .82rem;
+        }
+        .muted-small {
+            color: #9ca3af;
+            font-size: .85rem;
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3">
+                    <h4 class="mb-0 text-light fw-normal">Platform Ops</h4>
+                    <small class="text-muted">Jobs, audit trail, RBAC and backup operations in one place.</small>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <a href="/admin/incidents" class="btn btn-sm btn-outline-warning">
+                        <i class="bi bi-exclamation-triangle me-1"></i> Incident Center
+                    </a>
+                    <a href="/admin/platform/diagnostics/download" class="btn btn-sm btn-outline-info">
+                        <i class="bi bi-download me-1"></i> Diagnostics Bundle
+                    </a>
+                    <div class="breadcrumb-admin mb-0">
+                        <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span class="text-light">Platform Ops</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="container-fluid py-4 px-lg-4">
+                <% if (success) { %>
+                    <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
+                        <i class="bi bi-check-circle-fill me-2"></i><%= success %>
+                    </div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
+                        <i class="bi bi-exclamation-octagon-fill me-2"></i><%= error %>
+                    </div>
+                <% } %>
+
+                <div class="row g-3 mb-4" id="metricsGrid">
+                    <div class="col-sm-6 col-xl-3">
+                        <div class="ops-metric">
+                            <div class="text-muted small text-uppercase">Servers</div>
+                            <div class="h4 mb-0 text-light" id="metricServers">-</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-3">
+                        <div class="ops-metric">
+                            <div class="text-muted small text-uppercase">Users</div>
+                            <div class="h4 mb-0 text-light" id="metricUsers">-</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-3">
+                        <div class="ops-metric">
+                            <div class="text-muted small text-uppercase">Queued Jobs</div>
+                            <div class="h4 mb-0 text-light" id="metricQueued">-</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-3">
+                        <div class="ops-metric">
+                            <div class="text-muted small text-uppercase">Backups</div>
+                            <div class="h4 mb-0 text-light" id="metricBackups">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-xl-7">
+                        <div class="card ops-card shadow-sm mb-4">
+                            <div class="card-header bg-transparent border-secondary border-opacity-25 d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0 fs-6 fw-bold text-light"><i class="bi bi-diagram-3 me-2"></i>Jobs</h5>
+                                <div class="d-flex align-items-center gap-2">
+                                    <input id="jobTrackerId" type="number" class="form-control form-control-sm" placeholder="Job ID" style="width: 110px;">
+                                    <button class="btn btn-sm btn-outline-info" id="btnTrackJob"><i class="bi bi-search"></i></button>
+                                    <button class="btn btn-sm btn-outline-light" id="btnRefreshJobs"><i class="bi bi-arrow-clockwise"></i></button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div id="jobTrackerState" class="small mb-2 text-muted">Use tracker to monitor a specific deployment/reinstall/import job.</div>
+                                <div class="ops-table-wrapper">
+                                    <table class="table table-dark table-sm align-middle" style="--bs-table-bg: transparent;">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Type</th>
+                                                <th>Status</th>
+                                                <th>Attempts</th>
+                                                <th>Created</th>
+                                                <th>Error</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="jobsTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card ops-card shadow-sm mb-4">
+                            <div class="card-header bg-transparent border-secondary border-opacity-25">
+                                <h5 class="mb-0 fs-6 fw-bold text-light"><i class="bi bi-shield-check me-2"></i>RBAC (Users)</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3 align-items-end mb-3">
+                                    <div class="col-md-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="rbacV2Enabled" <%= rbacState && rbacState.enabled ? 'checked' : '' %>>
+                                            <label class="form-check-label text-light" for="rbacV2Enabled">Enable RBAC v2 for admins</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="rbacV2StrictEnabled" <%= rbacState && rbacState.strict ? 'checked' : '' %>>
+                                            <label class="form-check-label text-light" for="rbacV2StrictEnabled">Strict mode (no admin fallback)</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 text-md-end">
+                                        <button class="btn btn-sm btn-outline-light" id="btnSaveRbacSettings"><i class="bi bi-save me-1"></i>Save RBAC Settings</button>
+                                    </div>
+                                </div>
+                                <div class="muted-small mb-3">One permission per line. Default user fallback: <code><%= defaultUserPermissions.join(', ') %></code>. Admin fallback (RBAC v2 non-strict): <code><%= defaultAdminPermissions.join(', ') %></code></div>
+                                <div class="ops-table-wrapper" style="max-height: 380px;">
+                                    <table class="table table-dark table-sm align-middle" style="--bs-table-bg: transparent;">
+                                        <thead>
+                                            <tr>
+                                                <th>User</th>
+                                                <th>Email</th>
+                                                <th>Permissions</th>
+                                                <th class="text-end">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="rbacTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card ops-card shadow-sm">
+                            <div class="card-header bg-transparent border-secondary border-opacity-25 d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0 fs-6 fw-bold text-light"><i class="bi bi-journal-text me-2"></i>Audit Logs</h5>
+                                <button class="btn btn-sm btn-outline-light" id="btnRefreshAudit"><i class="bi bi-arrow-clockwise"></i></button>
+                            </div>
+                            <div class="card-body">
+                                <div class="ops-table-wrapper" style="max-height: 300px;">
+                                    <table class="table table-dark table-sm align-middle" style="--bs-table-bg: transparent;">
+                                        <thead>
+                                            <tr>
+                                                <th>When</th>
+                                                <th>Actor</th>
+                                                <th>Action</th>
+                                                <th>Target</th>
+                                                <th>IP</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="auditTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-5">
+                        <div class="card ops-card shadow-sm mb-4">
+                            <div class="card-header bg-transparent border-secondary border-opacity-25">
+                                <h5 class="mb-0 fs-6 fw-bold text-light"><i class="bi bi-plus-circle me-2"></i>Create Job</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="jobCreateForm" class="d-grid gap-3">
+                                    <div>
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Type</label>
+                                        <input type="text" id="jobType" class="form-control code-input" placeholder="server.backup.create" required>
+                                    </div>
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <label class="form-label text-muted small text-uppercase fw-bold">Priority</label>
+                                            <input type="number" id="jobPriority" class="form-control" value="0">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label text-muted small text-uppercase fw-bold">Max Attempts</label>
+                                            <input type="number" id="jobMaxAttempts" class="form-control" value="3" min="1" max="10">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Payload (JSON)</label>
+                                        <textarea id="jobPayload" rows="5" class="form-control code-input" placeholder='{"serverId":1}'></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary fw-bold"><i class="bi bi-lightning-charge me-2"></i>Queue Job</button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="card ops-card shadow-sm mb-4">
+                            <div class="card-header bg-transparent border-secondary border-opacity-25 d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0 fs-6 fw-bold text-light"><i class="bi bi-archive me-2"></i>Backup Policies</h5>
+                                <button class="btn btn-sm btn-outline-light" id="btnRefreshPolicies"><i class="bi bi-arrow-clockwise"></i></button>
+                            </div>
+                            <div class="card-body">
+                                <form id="backupPolicyForm" class="d-grid gap-3 mb-3">
+                                    <div>
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Server</label>
+                                        <select id="policyServerId" class="form-select" required>
+                                            <option value="" selected disabled>Select server...</option>
+                                            <% servers.forEach((srv) => { %>
+                                                <option value="<%= srv.id %>"><%= srv.name %> (#<%= srv.id %>, <%= srv.containerId %>)</option>
+                                            <% }) %>
+                                        </select>
+                                    </div>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="policyEnabled" checked>
+                                        <label class="form-check-label" for="policyEnabled">Enabled</label>
+                                    </div>
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <label class="form-label text-muted small text-uppercase fw-bold">Interval (min)</label>
+                                            <input type="number" id="policyInterval" class="form-control" min="5" value="720" required>
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label text-muted small text-uppercase fw-bold">Retention</label>
+                                            <input type="number" id="policyRetention" class="form-control" min="1" value="5" required>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Destination Path</label>
+                                        <input type="text" id="policyDestination" class="form-control code-input" value="./backups" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-success fw-bold"><i class="bi bi-save me-2"></i>Save Policy</button>
+                                </form>
+
+                                <div class="ops-table-wrapper" style="max-height: 280px;">
+                                    <table class="table table-dark table-sm align-middle" style="--bs-table-bg: transparent;">
+                                        <thead>
+                                            <tr>
+                                                <th>Server</th>
+                                                <th>Interval</th>
+                                                <th>Retention</th>
+                                                <th class="text-end">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="backupPoliciesBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="backupHistoryModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content" style="background-color: #141419; border: 1px solid #2d2d35; color: #e5e7eb;">
+                <div class="modal-header border-secondary border-opacity-25">
+                    <h5 class="modal-title" id="backupHistoryTitle">Backup History</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="ops-table-wrapper" style="max-height: 430px;">
+                        <table class="table table-dark table-sm align-middle" style="--bs-table-bg: transparent;">
+                            <thead>
+                                <tr>
+                                    <th>Created</th>
+                                    <th>Status</th>
+                                    <th>File</th>
+                                    <th>Size</th>
+                                    <th>Checksum</th>
+                                </tr>
+                            </thead>
+                            <tbody id="backupHistoryBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (function () {
+            const initialUsers = <%- JSON.stringify(users).replace(/</g, '\\u003c') %>;
+            const state = {
+                users: Array.isArray(initialUsers) ? initialUsers : [],
+                policies: [],
+                rbacV2: {
+                    enabled: <%= rbacState && rbacState.enabled ? 'true' : 'false' %>,
+                    strict: <%= rbacState && rbacState.strict ? 'true' : 'false' %>
+                }
+            };
+
+            const el = {
+                metricServers: document.getElementById('metricServers'),
+                metricUsers: document.getElementById('metricUsers'),
+                metricQueued: document.getElementById('metricQueued'),
+                metricBackups: document.getElementById('metricBackups'),
+                jobsTableBody: document.getElementById('jobsTableBody'),
+                auditTableBody: document.getElementById('auditTableBody'),
+                rbacTableBody: document.getElementById('rbacTableBody'),
+                backupPoliciesBody: document.getElementById('backupPoliciesBody'),
+                backupHistoryBody: document.getElementById('backupHistoryBody'),
+                backupHistoryTitle: document.getElementById('backupHistoryTitle'),
+                jobTrackerState: document.getElementById('jobTrackerState'),
+                rbacV2Enabled: document.getElementById('rbacV2Enabled'),
+                rbacV2StrictEnabled: document.getElementById('rbacV2StrictEnabled')
+            };
+
+            const historyModal = new bootstrap.Modal(document.getElementById('backupHistoryModal'));
+
+            function escapeHtml(value) {
+                return String(value == null ? '' : value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            async function api(url, options) {
+                const response = await fetch(url, options || {});
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(data.error || ('Request failed: ' + response.status));
+                }
+                return data;
+            }
+
+            function formatBytes(bytes) {
+                const value = Number.parseInt(bytes, 10);
+                if (!Number.isFinite(value) || value <= 0) return '-';
+                if (value < 1024) return value + ' B';
+                if (value < 1024 * 1024) return (value / 1024).toFixed(1) + ' KB';
+                if (value < 1024 * 1024 * 1024) return (value / (1024 * 1024)).toFixed(1) + ' MB';
+                return (value / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+            }
+
+            function formatDate(iso) {
+                if (!iso) return '-';
+                const date = new Date(iso);
+                if (Number.isNaN(date.getTime())) return '-';
+                return date.toLocaleString();
+            }
+
+            function statusBadge(status) {
+                const normalized = String(status || '').toLowerCase();
+                let cls = 'secondary';
+                if (normalized === 'completed') cls = 'success';
+                else if (normalized === 'failed' || normalized === 'cancelled') cls = 'danger';
+                else if (normalized === 'running') cls = 'primary';
+                else if (normalized === 'retrying') cls = 'warning';
+                else if (normalized === 'queued') cls = 'info';
+                return '<span class="badge bg-' + cls + ' bg-opacity-10 text-' + cls + ' border border-' + cls + ' border-opacity-25">' + escapeHtml(normalized || 'unknown') + '</span>';
+            }
+
+            async function loadMetrics() {
+                const data = await api('/api/admin/metrics');
+                el.metricServers.textContent = String(data.totals && data.totals.servers || 0);
+                el.metricUsers.textContent = String(data.totals && data.totals.users || 0);
+                el.metricBackups.textContent = String(data.totals && data.totals.backups || 0);
+                const queued = (data.queue && data.queue.stats && data.queue.stats.queued || 0) + (data.queue && data.queue.stats && data.queue.stats.retrying || 0);
+                el.metricQueued.textContent = String(queued);
+            }
+
+            async function loadJobs() {
+                const data = await api('/api/admin/jobs?limit=80');
+                const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+                el.jobsTableBody.innerHTML = jobs.map((job) => {
+                    return '<tr>'
+                        + '<td class="fw-semibold">#' + job.id + '</td>'
+                        + '<td><code>' + escapeHtml(job.type) + '</code></td>'
+                        + '<td>' + statusBadge(job.status) + '</td>'
+                        + '<td>' + escapeHtml(job.attempts) + ' / ' + escapeHtml(job.maxAttempts) + '</td>'
+                        + '<td class="small text-muted">' + escapeHtml(formatDate(job.createdAt)) + '</td>'
+                        + '<td class="small text-danger">' + escapeHtml(job.lastError || '') + '</td>'
+                        + '</tr>';
+                }).join('') || '<tr><td colspan="6" class="text-muted text-center">No jobs found.</td></tr>';
+            }
+
+            async function trackJob(jobId) {
+                const id = Number.parseInt(jobId, 10);
+                if (!Number.isInteger(id) || id <= 0) {
+                    el.jobTrackerState.textContent = 'Invalid job id.';
+                    return;
+                }
+
+                const data = await api('/api/admin/jobs/' + id);
+                const job = data.job || {};
+                el.jobTrackerState.innerHTML = 'Job <strong>#' + id + '</strong> status: ' + statusBadge(job.status) + (job.lastError ? (' <span class="text-danger">' + escapeHtml(job.lastError) + '</span>') : '');
+            }
+
+            async function loadAudit() {
+                const data = await api('/api/admin/audit-logs?limit=120');
+                const logs = Array.isArray(data.logs) ? data.logs : [];
+                el.auditTableBody.innerHTML = logs.map((log) => {
+                    const actor = log.actor ? log.actor.username + ' (#' + log.actor.id + ')' : 'system';
+                    const target = [log.targetType || '', log.targetId || ''].filter(Boolean).join(' / ');
+                    return '<tr>'
+                        + '<td class="small text-muted">' + escapeHtml(formatDate(log.createdAt)) + '</td>'
+                        + '<td>' + escapeHtml(actor) + '</td>'
+                        + '<td><code>' + escapeHtml(log.action || '') + '</code></td>'
+                        + '<td>' + escapeHtml(target || '-') + '</td>'
+                        + '<td class="small text-muted">' + escapeHtml(log.ipAddress || '-') + '</td>'
+                        + '</tr>';
+                }).join('') || '<tr><td colspan="5" class="text-muted text-center">No logs found.</td></tr>';
+            }
+
+            async function loadRbac() {
+                const data = await api('/api/admin/rbac/users');
+                state.users = Array.isArray(data.users) ? data.users : [];
+                if (data.rbacV2 && typeof data.rbacV2 === 'object') {
+                    state.rbacV2.enabled = Boolean(data.rbacV2.enabled);
+                    state.rbacV2.strict = Boolean(data.rbacV2.strict);
+                }
+                if (el.rbacV2Enabled) el.rbacV2Enabled.checked = state.rbacV2.enabled;
+                if (el.rbacV2StrictEnabled) el.rbacV2StrictEnabled.checked = state.rbacV2.strict;
+                renderRbac();
+            }
+
+            function renderRbac() {
+                el.rbacTableBody.innerHTML = state.users.map((entry) => {
+                    const disabled = entry.isAdmin && !state.rbacV2.enabled ? 'disabled' : '';
+                    const permissions = Array.isArray(entry.permissions)
+                        ? entry.permissions
+                        : (typeof entry.permissions === 'string' ? entry.permissions.split(/[\n,; ]+/g).filter(Boolean) : []);
+                    return '<tr>'
+                        + '<td class="fw-semibold">' + escapeHtml(entry.username) + (entry.isAdmin ? ' <span class="badge bg-primary bg-opacity-10 text-primary">Admin</span>' : '') + '</td>'
+                        + '<td class="small text-muted">' + escapeHtml(entry.email || '-') + '</td>'
+                        + '<td><textarea class="form-control form-control-sm code-input" data-role="perm-input" data-user-id="' + entry.id + '" rows="3" ' + disabled + '>' + escapeHtml(permissions.join('\n')) + '</textarea></td>'
+                        + '<td class="text-end"><button class="btn btn-sm btn-outline-success" data-role="perm-save" data-user-id="' + entry.id + '" ' + disabled + '><i class="bi bi-save"></i></button></td>'
+                        + '</tr>';
+                }).join('') || '<tr><td colspan="4" class="text-muted text-center">No users.</td></tr>';
+            }
+
+            async function loadPolicies() {
+                try {
+                    const data = await api('/api/admin/backups/policies');
+                    state.policies = Array.isArray(data.policies) ? data.policies : [];
+                    el.backupPoliciesBody.innerHTML = state.policies.map((policy) => {
+                        const serverLabel = policy.server ? (policy.server.name + ' (#' + policy.server.id + ')') : ('Server #' + policy.serverId);
+                        return '<tr>'
+                            + '<td>' + escapeHtml(serverLabel) + '</td>'
+                            + '<td>' + escapeHtml(policy.intervalMinutes) + ' min</td>'
+                            + '<td>' + escapeHtml(policy.retentionCount) + '</td>'
+                            + '<td class="text-end">'
+                            + '<button class="btn btn-sm btn-outline-info me-1" data-role="run-backup" data-server-id="' + policy.serverId + '"><i class="bi bi-play"></i></button>'
+                            + '<button class="btn btn-sm btn-outline-light" data-role="show-history" data-server-id="' + policy.serverId + '" data-server-name="' + escapeHtml(serverLabel) + '"><i class="bi bi-clock-history"></i></button>'
+                            + '</td>'
+                            + '</tr>';
+                    }).join('') || '<tr><td colspan="4" class="text-muted text-center">No policies yet.</td></tr>';
+                } catch (error) {
+                    state.policies = [];
+                    const message = String(error && error.message || '');
+                    if (message.includes('disabled') || message.includes('SFTP')) {
+                        el.backupPoliciesBody.innerHTML = '<tr><td colspan=\"4\" class=\"text-warning text-center\">Built-in backups are disabled. Use the server SFTP Backup page.</td></tr>';
+                        return;
+                    }
+                    throw error;
+                }
+            }
+
+            async function loadBackupHistory(serverId, serverName) {
+                const data = await api('/api/admin/backups/history/' + serverId + '?limit=80').catch((error) => {
+                    const message = String(error && error.message || '');
+                    if (message.includes('disabled') || message.includes('SFTP')) {
+                        return { backups: [] };
+                    }
+                    throw error;
+                });
+                const rows = Array.isArray(data.backups) ? data.backups : [];
+                el.backupHistoryTitle.textContent = 'Backup History - ' + serverName;
+                el.backupHistoryBody.innerHTML = rows.map((entry) => {
+                    return '<tr>'
+                        + '<td class="small text-muted">' + escapeHtml(formatDate(entry.createdAt)) + '</td>'
+                        + '<td>' + statusBadge(entry.status) + '</td>'
+                        + '<td class="small"><code>' + escapeHtml(entry.filePath || '-') + '</code></td>'
+                        + '<td>' + escapeHtml(formatBytes(entry.sizeBytes)) + '</td>'
+                        + '<td class="small"><code>' + escapeHtml(entry.checksum || '-') + '</code></td>'
+                        + '</tr>';
+                }).join('') || '<tr><td colspan="5" class="text-warning text-center">Built-in backups are disabled. Use SFTP backup workflow.</td></tr>';
+                historyModal.show();
+            }
+
+            document.getElementById('btnRefreshJobs').addEventListener('click', () => {
+                loadJobs().catch((err) => alert(err.message));
+            });
+            document.getElementById('btnRefreshAudit').addEventListener('click', () => {
+                loadAudit().catch((err) => alert(err.message));
+            });
+            document.getElementById('btnRefreshPolicies').addEventListener('click', () => {
+                loadPolicies().catch((err) => alert(err.message));
+            });
+            document.getElementById('btnTrackJob').addEventListener('click', () => {
+                const id = document.getElementById('jobTrackerId').value;
+                trackJob(id).catch((err) => {
+                    el.jobTrackerState.textContent = err.message;
+                });
+            });
+
+            document.getElementById('jobCreateForm').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const type = document.getElementById('jobType').value.trim();
+                const priority = Number.parseInt(document.getElementById('jobPriority').value, 10) || 0;
+                const maxAttempts = Number.parseInt(document.getElementById('jobMaxAttempts').value, 10) || 3;
+                let payload = {};
+                const rawPayload = document.getElementById('jobPayload').value.trim();
+
+                if (rawPayload) {
+                    try {
+                        payload = JSON.parse(rawPayload);
+                    } catch {
+                        alert('Payload must be valid JSON.');
+                        return;
+                    }
+                }
+
+                const data = await api('/api/admin/jobs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, priority, maxAttempts, payload })
+                });
+                document.getElementById('jobTrackerId').value = data.job.id;
+                await Promise.all([loadJobs(), loadMetrics(), trackJob(data.job.id)]);
+            });
+
+            el.rbacTableBody.addEventListener('click', async (event) => {
+                const button = event.target.closest('[data-role="perm-save"]');
+                if (!button) return;
+                const userId = button.getAttribute('data-user-id');
+                const textarea = el.rbacTableBody.querySelector('textarea[data-role="perm-input"][data-user-id="' + userId + '"]');
+                const permissions = textarea ? textarea.value : '';
+
+                await api('/api/admin/rbac/users/' + userId, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ permissions })
+                });
+                await loadRbac();
+            });
+
+            const btnSaveRbacSettings = document.getElementById('btnSaveRbacSettings');
+            if (btnSaveRbacSettings) {
+                btnSaveRbacSettings.addEventListener('click', async () => {
+                    await api('/api/admin/rbac/settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            featureAdminRbacV2Enabled: el.rbacV2Enabled && el.rbacV2Enabled.checked,
+                            featureAdminRbacV2StrictEnabled: el.rbacV2StrictEnabled && el.rbacV2StrictEnabled.checked
+                        })
+                    });
+                    await loadRbac();
+                });
+            }
+
+            document.getElementById('backupPolicyForm').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                alert('Built-in backup policies are disabled. Use SFTP backup workflow.');
+            });
+
+            el.backupPoliciesBody.addEventListener('click', async (event) => {
+                const runButton = event.target.closest('[data-role="run-backup"]');
+                if (runButton) {
+                    alert('Built-in backup run is disabled. Use SFTP backup workflow.');
+                    return;
+                }
+
+                const historyButton = event.target.closest('[data-role="show-history"]');
+                if (historyButton) {
+                    const serverId = historyButton.getAttribute('data-server-id');
+                    const serverName = historyButton.getAttribute('data-server-name') || ('Server #' + serverId);
+                    await loadBackupHistory(serverId, serverName);
+                }
+            });
+
+            Promise.all([loadMetrics(), loadJobs(), loadAudit(), loadRbac(), loadPolicies()]).catch((error) => {
+                console.error('Failed to load platform ops data:', error);
+            });
+
+            setInterval(() => {
+                loadMetrics().catch(() => {});
+                loadJobs().catch(() => {});
+            }, 15000);
+        })();
+    </script>
+</body>
+</html>

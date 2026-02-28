@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        Edit File | <%= server.name %> | <%= settings.brandName.toUpperCase() %>
+    </title>
+    <%- include('../partials/favicon') %>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+        <style>
+            :root {
+                --bg-dark: #0f0f12;
+                --bg-darker: #0a0a0c;
+                --bg-sidebar: #121216;
+                --border-color: #2d2d35;
+                --text-primary: #e1e1e6;
+                --text-secondary: #8b8b9a;
+                --accent-blue: #3b82f6;
+                --accent-green: #10b981;
+                --accent-red: #ef4444;
+                --accent-yellow: #f59e0b;
+            }
+
+            body {
+                background-color: var(--bg-dark);
+                color: var(--text-primary);
+                font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                overflow: hidden;
+                height: 100vh;
+                margin: 0;
+            }
+
+            .wrapper {
+                display: flex;
+                height: 100vh;
+                overflow: hidden;
+            }
+
+            .sidebar {
+                width: 260px;
+                background: var(--bg-sidebar);
+                border-right: 1px solid var(--border-color);
+                transition: all 0.3s ease;
+                display: flex;
+                flex-direction: column;
+                flex-shrink: 0;
+                overflow-y: auto;
+            }
+
+            .sidebar.collapsed {
+                margin-left: -260px;
+            }
+
+            .sidebar .sidebar-content {
+                padding: 1.5rem 0.75rem;
+            }
+
+            .sidebar-item {
+                display: flex;
+                align-items: center;
+                padding: 0.75rem 1rem;
+                color: var(--text-secondary);
+                text-decoration: none;
+                border-radius: 8px;
+                transition: all 0.2s ease;
+                font-weight: 500;
+                font-size: 0.9rem;
+                margin-bottom: 0.25rem;
+            }
+
+            .sidebar-item:hover {
+                background: rgba(255, 255, 255, 0.03);
+                color: var(--text-primary);
+            }
+
+            .sidebar-item.active {
+                background: rgba(59, 130, 246, 0.1);
+                color: var(--accent-blue);
+            }
+
+            .sidebar-icon {
+                margin-right: 12px;
+                font-size: 1.1rem;
+                width: 24px;
+                text-align: center;
+            }
+
+            .content {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                background: var(--bg-dark);
+            }
+
+            .top-navbar {
+                background: var(--bg-sidebar);
+                border-bottom: 1px solid var(--border-color);
+                padding: 0.75rem 1.5rem;
+                display: flex;
+                align-items: center;
+                flex-shrink: 0;
+                justify-content: space-between;
+            }
+
+            .navbar-left {
+                display: flex;
+                align-items: center;
+            }
+
+            .navbar-toggle {
+                background: transparent;
+                border: none;
+                color: var(--text-secondary);
+                font-size: 1.5rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-right: 1rem;
+                cursor: pointer;
+                padding: 0;
+            }
+
+            .navbar-toggle:hover {
+                color: var(--text-primary);
+            }
+
+            .file-info {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            .file-name {
+                font-size: 1.1rem;
+                font-weight: 600;
+                margin: 0;
+                font-family: 'JetBrains Mono', monospace;
+            }
+
+            .navbar-right {
+                display: flex;
+                gap: 0.5rem;
+            }
+
+            .btn-action {
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid var(--border-color);
+                color: var(--text-primary);
+                padding: 0.4rem 1rem;
+                border-radius: 6px;
+                font-size: 0.85rem;
+                font-weight: 500;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                transition: all 0.2s ease;
+                text-decoration: none;
+            }
+
+            .btn-action:hover {
+                background: rgba(255, 255, 255, 0.08);
+                color: white;
+            }
+
+            .btn-action-primary {
+                background: var(--accent-blue);
+                border-color: var(--accent-blue);
+                color: white;
+            }
+
+            .btn-action-primary:hover {
+                background: #2563eb;
+                border-color: #2563eb;
+            }
+
+            .editor-container {
+                flex: 1;
+                position: relative;
+                width: 100%;
+                height: 100%;
+            }
+
+            #monaco-editor-container {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+            }
+
+            #monaco-diff-container {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+            }
+
+            .loading-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: var(--bg-dark);
+                z-index: 10;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                transition: opacity 0.3s ease;
+            }
+
+            /* Monaco overrides */
+            .monaco-editor,
+            .monaco-editor .margin,
+            .monaco-editor-background {
+                background-color: var(--bg-dark) !important;
+            }
+        </style>
+</head>
+
+<body data-turbo="false">
+    <%- include ('../partials/error-modal') %>
+        <div class="wrapper">
+            <!-- Sidebar -->
+            <nav id="sidebar" class="sidebar">
+                <div class="sidebar-content">
+                    <%- include('../partials/server-sidebar', { server, active: 'files' , settings }) %>
+                </div>
+            </nav>
+
+            <!-- Main Content -->
+            <div class="content">
+                <!-- Top Navbar -->
+                <div class="top-navbar">
+                    <div class="navbar-left">
+                        <button id="sidebarToggle" class="navbar-toggle">
+                            <i class="bi bi-list"></i>
+                        </button>
+                        <div class="file-info">
+                            <a href="/server/<%= server.containerId %>/files"
+                                class="text-secondary text-decoration-none hover-white">
+                                <i class="bi bi-arrow-left me-1"></i> Files
+                            </a>
+                            <span class="text-secondary opacity-50 mx-2">/</span>
+                            <span class="file-name" id="displayFileName">Loading...</span>
+                            <span class="badge bg-warning text-dark ms-2 d-none" id="unsavedBadge">UNSAVED</span>
+                        </div>
+                    </div>
+                    <div class="navbar-right">
+                        <select id="versionSelect" class="form-select form-select-sm"
+                            style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); min-width: 220px;">
+                            <option value="">No snapshots</option>
+                        </select>
+                        <button type="button" class="btn-action" id="btnSafeModeToggle">
+                            <i class="bi bi-shield-lock"></i>
+                            Safe Mode Off
+                        </button>
+                        <button type="button" class="btn-action d-none" id="btnRestoreSafeSnapshot">
+                            <i class="bi bi-clock-history"></i>
+                            Restore Draft
+                        </button>
+                        <button type="button" class="btn-action" id="btnDiffToggle">
+                            <i class="bi bi-columns-gap"></i>
+                            Diff Off
+                        </button>
+                        <button type="button" class="btn-action" id="btnReturn">
+                            Return
+                        </button>
+                        <button type="button" class="btn-action btn-action-primary px-4 fw-bold" id="btnSave">
+                            <span class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true"
+                                id="saveSpinner"></span>
+                            <i class="bi bi-save me-2" id="saveIcon"></i>Save File
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Editor Area -->
+                <div class="editor-container">
+                    <div class="loading-overlay" id="loadingOverlay">
+                        <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                        </div>
+                        <h5 class="text-secondary fw-medium">Loading File Contents...</h5>
+                    </div>
+                    <div id="monaco-editor-container"></div>
+                    <div id="monaco-diff-container" class="d-none"></div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+
+        <script>
+            // Parse Hash for file path
+            function getFilePathFromHash() {
+                const hash = window.location.hash;
+                if (hash.startsWith('#file=')) {
+                    return decodeURIComponent(hash.substring(6));
+                }
+                return null;
+            }
+
+            const filePath = getFilePathFromHash();
+            if (!filePath) {
+                window.location.href = `/server/<%= server.containerId %>/files`;
+            }
+
+            document.getElementById('displayFileName').textContent = filePath.split('/').pop() || filePath;
+
+            // Return Button
+            document.getElementById('btnReturn').addEventListener('click', () => {
+                const parentDir = filePath.substring(0, filePath.lastIndexOf('/')) || '/';
+                window.location.href = `/server/<%= server.containerId %>/files?path=${encodeURIComponent(parentDir)}`;
+            });
+
+            // Handle Ctrl+S
+            document.addEventListener('keydown', e => {
+                if (e.ctrlKey && e.key === 's') {
+                    e.preventDefault();
+                    document.getElementById('btnSave').click();
+                }
+            });
+
+            // WebSocket & Editor Init
+            const serverId = '<%= server.containerId %>';
+            const wsToken = '<%= wsToken %>';
+            const wsUrl = window.location.protocol.replace('http', 'ws') + '//' + window.location.host + '/ws/server/' + serverId + '?token=' + encodeURIComponent(wsToken);
+
+            let ws;
+            let editor;
+            let diffEditor;
+            let currentContent = '';
+            let isUnsaved = false;
+            let isDiffMode = false;
+            let monacoReady = false;
+            let fileLanguage = 'plaintext';
+            let currentVersionContent = '';
+            let currentVersionId = '';
+            let pendingDiffVersionId = '';
+            const safeSnapshotKey = `cpanel_safe_edit_${serverId}_${filePath}`;
+            const safeModeSettingKey = `${safeSnapshotKey}:enabled`;
+            const safeAutosaveIntervalMs = 15000;
+            let safeModeEnabled = localStorage.getItem(safeModeSettingKey) === '1';
+            let safeAutosaveTimer = null;
+
+            function guessLanguage(fileExtension) {
+                const ext = String(fileExtension || '').toLowerCase();
+                if (['json'].includes(ext)) return 'json';
+                if (['js', 'jsx', 'ts', 'tsx'].includes(ext)) return 'javascript';
+                if (['html', 'htm'].includes(ext)) return 'html';
+                if (['css', 'scss', 'less'].includes(ext)) return 'css';
+                if (['yml', 'yaml'].includes(ext)) return 'yaml';
+                if (['xml'].includes(ext)) return 'xml';
+                if (['md', 'markdown'].includes(ext)) return 'markdown';
+                if (['sh', 'bash'].includes(ext)) return 'shell';
+                if (['py'].includes(ext)) return 'python';
+                if (['php'].includes(ext)) return 'php';
+                return 'plaintext';
+            }
+
+            function setSaveLoadingState(isLoading) {
+                const saveBtn = document.getElementById('btnSave');
+                const saveIcon = document.getElementById('saveIcon');
+                const saveSpinner = document.getElementById('saveSpinner');
+                if (isLoading) {
+                    saveBtn.classList.add('disabled');
+                    saveIcon.classList.add('d-none');
+                    saveSpinner.classList.remove('d-none');
+                } else {
+                    saveSpinner.classList.add('d-none');
+                    saveIcon.classList.remove('d-none');
+                    saveBtn.classList.remove('disabled');
+                }
+            }
+
+            function setUnsavedState(value) {
+                isUnsaved = Boolean(value);
+                document.getElementById('unsavedBadge').classList.toggle('d-none', !isUnsaved);
+            }
+
+            function getSafeSnapshot() {
+                try {
+                    const raw = localStorage.getItem(safeSnapshotKey);
+                    if (!raw) return null;
+                    const parsed = JSON.parse(raw);
+                    if (!parsed || typeof parsed !== 'object') return null;
+                    if (String(parsed.filePath || '') !== String(filePath || '')) return null;
+                    if (typeof parsed.content !== 'string') return null;
+                    return parsed;
+                } catch {
+                    return null;
+                }
+            }
+
+            function setSafeSnapshot(content, source = 'auto') {
+                if (!safeModeEnabled) return;
+                if (typeof content !== 'string') return;
+                if (!content.length) return;
+                try {
+                    localStorage.setItem(safeSnapshotKey, JSON.stringify({
+                        filePath,
+                        content,
+                        source,
+                        language: fileLanguage,
+                        savedAt: new Date().toISOString()
+                    }));
+                } catch {
+                    // Ignore localStorage write failures.
+                }
+                updateSafeSnapshotButton();
+            }
+
+            function clearSafeSnapshot() {
+                try {
+                    localStorage.removeItem(safeSnapshotKey);
+                } catch {
+                    // ignore
+                }
+                updateSafeSnapshotButton();
+            }
+
+            function updateSafeSnapshotButton() {
+                const restoreButton = document.getElementById('btnRestoreSafeSnapshot');
+                if (!restoreButton) return;
+                const snapshot = getSafeSnapshot();
+                const shouldShow = Boolean(snapshot && snapshot.content && snapshot.content !== currentContent);
+                restoreButton.classList.toggle('d-none', !shouldShow);
+                if (shouldShow && snapshot.savedAt) {
+                    restoreButton.title = `Snapshot: ${new Date(snapshot.savedAt).toLocaleString()}`;
+                } else {
+                    restoreButton.title = '';
+                }
+            }
+
+            function startSafeAutosaveLoop() {
+                if (!safeModeEnabled || safeAutosaveTimer) return;
+                safeAutosaveTimer = setInterval(() => {
+                    if (!editor) return;
+                    const value = editor.getValue();
+                    if (!value || value === currentContent) return;
+                    setSafeSnapshot(value, 'interval');
+                }, safeAutosaveIntervalMs);
+            }
+
+            function stopSafeAutosaveLoop() {
+                if (!safeAutosaveTimer) return;
+                clearInterval(safeAutosaveTimer);
+                safeAutosaveTimer = null;
+            }
+
+            function setSafeMode(nextValue) {
+                safeModeEnabled = Boolean(nextValue);
+                try {
+                    localStorage.setItem(safeModeSettingKey, safeModeEnabled ? '1' : '0');
+                } catch {
+                    // ignore
+                }
+                const toggleBtn = document.getElementById('btnSafeModeToggle');
+                if (toggleBtn) {
+                    toggleBtn.innerHTML = safeModeEnabled
+                        ? '<i class="bi bi-shield-check"></i> Safe Mode On'
+                        : '<i class="bi bi-shield-lock"></i> Safe Mode Off';
+                }
+                if (safeModeEnabled) {
+                    startSafeAutosaveLoop();
+                } else {
+                    stopSafeAutosaveLoop();
+                }
+                updateSafeSnapshotButton();
+            }
+
+            function populateVersionSelect(versions) {
+                const select = document.getElementById('versionSelect');
+                const previous = select.value;
+                select.innerHTML = '';
+
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = versions && versions.length > 0
+                    ? 'Select snapshot...'
+                    : 'No snapshots';
+                select.appendChild(placeholder);
+
+                (versions || []).forEach((version) => {
+                    const option = document.createElement('option');
+                    option.value = version.id;
+                    const date = version.mtime ? new Date(version.mtime).toLocaleString() : version.name;
+                    option.textContent = `${date} (${Math.max(1, Math.round((Number(version.size) || 0) / 1024))} KB)`;
+                    select.appendChild(option);
+                });
+
+                if (previous && Array.from(select.options).some((opt) => opt.value === previous)) {
+                    select.value = previous;
+                } else if (versions && versions.length > 0) {
+                    select.value = versions[0].id;
+                }
+            }
+
+            function requestFileVersions() {
+                if (!ws || ws.readyState !== WebSocket.OPEN) return;
+                ws.send(JSON.stringify({
+                    type: 'list_file_versions',
+                    filePath: filePath
+                }));
+            }
+
+            function requestVersionContent(versionId) {
+                if (!versionId || !ws || ws.readyState !== WebSocket.OPEN) return;
+                ws.send(JSON.stringify({
+                    type: 'read_file_version',
+                    filePath: filePath,
+                    versionId: versionId
+                }));
+            }
+
+            function disableDiffMode() {
+                isDiffMode = false;
+                pendingDiffVersionId = '';
+                document.getElementById('btnDiffToggle').innerHTML = '<i class="bi bi-columns-gap"></i> Diff Off';
+                document.getElementById('monaco-diff-container').classList.add('d-none');
+                document.getElementById('monaco-editor-container').classList.remove('d-none');
+                if (editor) setTimeout(() => editor.layout(), 80);
+            }
+
+            function renderDiffMode() {
+                if (!monacoReady || !editor || !currentVersionContent) return;
+
+                const diffContainer = document.getElementById('monaco-diff-container');
+                const editorContainer = document.getElementById('monaco-editor-container');
+                editorContainer.classList.add('d-none');
+                diffContainer.classList.remove('d-none');
+
+                if (!diffEditor) {
+                    diffEditor = monaco.editor.createDiffEditor(diffContainer, {
+                        theme: 'cpanel-dark',
+                        readOnly: true,
+                        renderSideBySide: true,
+                        automaticLayout: true,
+                        minimap: { enabled: false }
+                    });
+                }
+
+                const previousModel = diffEditor.getModel();
+                if (previousModel) {
+                    previousModel.original.dispose();
+                    previousModel.modified.dispose();
+                }
+
+                const originalModel = monaco.editor.createModel(currentVersionContent, fileLanguage);
+                const modifiedModel = monaco.editor.createModel(editor.getValue(), fileLanguage);
+                diffEditor.setModel({
+                    original: originalModel,
+                    modified: modifiedModel
+                });
+
+                isDiffMode = true;
+                document.getElementById('btnDiffToggle').innerHTML = '<i class="bi bi-columns-gap"></i> Diff On';
+            }
+
+            function initMonaco(content, fileExtension) {
+                require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+                require(['vs/editor/editor.main'], function () {
+                    monacoReady = true;
+                    monaco.editor.defineTheme('cpanel-dark', {
+                        base: 'vs-dark',
+                        inherit: true,
+                        rules: [],
+                        colors: {
+                            'editor.background': '#0f0f12',
+                            'editor.lineHighlightBackground': '#1a1a20',
+                            'editorLineNumber.foreground': '#4b5563',
+                            'editorLineNumber.activeForeground': '#9ca3af',
+                            'editorIndentGuide.background': '#1f2937'
+                        }
+                    });
+
+                    fileLanguage = guessLanguage(fileExtension);
+                    if (!editor) {
+                        editor = monaco.editor.create(document.getElementById('monaco-editor-container'), {
+                            value: content,
+                            language: fileLanguage,
+                            theme: 'cpanel-dark',
+                            automaticLayout: true,
+                            minimap: { enabled: true },
+                            fontSize: 14,
+                            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                            scrollBeyondLastLine: false,
+                            wordWrap: 'on',
+                            padding: { top: 16 }
+                        });
+
+                        editor.onDidChangeModelContent(() => {
+                            setUnsavedState(editor.getValue() !== currentContent);
+                        });
+                    } else {
+                        editor.setValue(content);
+                    }
+
+                    setUnsavedState(false);
+                    updateSafeSnapshotButton();
+                    if (safeModeEnabled) {
+                        startSafeAutosaveLoop();
+                    }
+                    requestFileVersions();
+
+                    // Hide Loading
+                    setTimeout(() => {
+                        const overlay = document.getElementById('loadingOverlay');
+                        overlay.style.opacity = '0';
+                        setTimeout(() => overlay.remove(), 300);
+                    }, 100);
+                });
+            }
+
+            function connect() {
+                ws = new WebSocket(wsUrl);
+
+                ws.onopen = () => {
+                    console.log('WS Connected');
+                    // Request file content
+                    ws.send(JSON.stringify({
+                        type: 'read_file',
+                        filePath: filePath
+                    }));
+                    requestFileVersions();
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+
+                        if (data.type === 'file_content') {
+                            if (data.filePath === filePath) {
+                                currentContent = data.content || '';
+                                const ext = filePath.split('.').pop() || '';
+                                initMonaco(currentContent, ext);
+                            }
+                        } else if (data.type === 'write_success') {
+                            if (data.filePath === filePath) {
+                                currentContent = editor.getValue();
+                                setUnsavedState(false);
+                                setSaveLoadingState(false);
+                                clearSafeSnapshot();
+                                requestFileVersions();
+                                if (isDiffMode) disableDiffMode();
+
+                                if (window.showStatusModal) {
+                                    window.showStatusModal('File saved successfully.', 'success');
+                                }
+                            }
+                        } else if (data.type === 'file_versions') {
+                            if (data.filePath === filePath) {
+                                populateVersionSelect(Array.isArray(data.versions) ? data.versions : []);
+                            }
+                        } else if (data.type === 'file_version_content') {
+                            if (data.filePath === filePath) {
+                                currentVersionId = data.versionId || '';
+                                currentVersionContent = data.content || '';
+                                if (isDiffMode) {
+                                    renderDiffMode();
+                                }
+                                if (pendingDiffVersionId && currentVersionId === pendingDiffVersionId) {
+                                    pendingDiffVersionId = '';
+                                }
+                            }
+                        } else if (data.type === 'error') {
+                            if (window.showStatusModal) {
+                                window.showStatusModal(data.message, 'error');
+                            } else {
+                                alert(data.message);
+                            }
+
+                            // Reset save button if saving failed
+                            setSaveLoadingState(false);
+
+                            // If load failed, go back
+                            if (!editor) {
+                                setTimeout(() => {
+                                    document.getElementById('btnReturn').click();
+                                }, 2000);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('WS Parse Error', e);
+                    }
+                };
+
+                ws.onclose = () => {
+                    console.log('WS Disconnected');
+                    setTimeout(connect, 2000);
+                };
+            }
+
+            // Save File Action
+            document.getElementById('btnSave').addEventListener('click', () => {
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    if (window.showStatusModal) window.showStatusModal('Not connected to server.', 'error');
+                    return;
+                }
+
+                if (editor) {
+                    setSaveLoadingState(true);
+
+                    ws.send(JSON.stringify({
+                        type: 'write_file',
+                        filePath: filePath,
+                        content: editor.getValue()
+                    }));
+                }
+            });
+
+            const safeModeToggleBtn = document.getElementById('btnSafeModeToggle');
+            if (safeModeToggleBtn) {
+                safeModeToggleBtn.addEventListener('click', () => {
+                    setSafeMode(!safeModeEnabled);
+                    if (window.showStatusModal) {
+                        window.showStatusModal(
+                            safeModeEnabled
+                                ? 'Safe edit mode enabled. Draft snapshots are saved locally.'
+                                : 'Safe edit mode disabled.',
+                            safeModeEnabled ? 'success' : 'error'
+                        );
+                    }
+                });
+            }
+
+            const restoreSafeSnapshotBtn = document.getElementById('btnRestoreSafeSnapshot');
+            if (restoreSafeSnapshotBtn) {
+                restoreSafeSnapshotBtn.addEventListener('click', () => {
+                    const snapshot = getSafeSnapshot();
+                    if (!snapshot || !editor) return;
+                    editor.setValue(snapshot.content || '');
+                    if (window.showStatusModal) {
+                        window.showStatusModal('Draft snapshot restored.', 'success');
+                    }
+                });
+            }
+
+            // Prevent closing unsaved changes
+            window.addEventListener('beforeunload', (e) => {
+                if (safeModeEnabled && editor) {
+                    setSafeSnapshot(editor.getValue(), 'beforeunload');
+                }
+                if (isUnsaved) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                }
+            });
+
+            window.addEventListener('pagehide', () => {
+                if (safeModeEnabled && editor) {
+                    setSafeSnapshot(editor.getValue(), 'pagehide');
+                }
+                stopSafeAutosaveLoop();
+            });
+
+            // Start connection
+            setSafeMode(safeModeEnabled);
+            connect();
+
+            document.getElementById('btnDiffToggle').addEventListener('click', () => {
+                if (isDiffMode) {
+                    disableDiffMode();
+                    return;
+                }
+
+                const selectedVersion = document.getElementById('versionSelect').value;
+                if (!selectedVersion) {
+                    if (window.showStatusModal) {
+                        window.showStatusModal('Select a snapshot from Installed Versions first.', 'error');
+                    }
+                    return;
+                }
+
+                isDiffMode = true;
+                if (currentVersionId === selectedVersion && currentVersionContent) {
+                    renderDiffMode();
+                    return;
+                }
+                pendingDiffVersionId = selectedVersion;
+                requestVersionContent(selectedVersion);
+            });
+
+            document.getElementById('versionSelect').addEventListener('change', (event) => {
+                const versionId = event.target.value;
+                if (!versionId) {
+                    currentVersionContent = '';
+                    currentVersionId = '';
+                    if (isDiffMode) disableDiffMode();
+                    return;
+                }
+                requestVersionContent(versionId);
+                pendingDiffVersionId = versionId;
+            });
+
+            // Sidebar toggle
+            const sidebarBtn = document.getElementById('sidebarToggle');
+            if (sidebarBtn) {
+                sidebarBtn.addEventListener('click', () => {
+                    document.getElementById('sidebar').classList.toggle('collapsed');
+                    if (editor) setTimeout(() => editor.layout(), 350);
+                    if (diffEditor) setTimeout(() => diffEditor.layout(), 350);
+                });
+            }
+
+            // Layout editor strictly on window resize
+            window.addEventListener('resize', () => {
+                if (editor) editor.layout();
+                if (diffEditor) diffEditor.layout();
+            });
+        </script>
+</body>
+
+</html>

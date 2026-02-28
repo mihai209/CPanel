@@ -1,0 +1,599 @@
+<%- include('partials/header') %>
+<%- include('partials/navbar') %>
+<%- include('partials/error-modal') %>
+<%
+const imagesList = Array.isArray(images) ? images : [];
+const allocationsList = Array.isArray(allocations) ? allocations : [];
+const locationsList = Array.isArray(locations) ? locations : [];
+const connectorsList = Array.isArray(connectors) ? connectors : [];
+const inventoryEnabled = Boolean(featureInventoryEnabled);
+const quotaForecastingEnabled = Boolean(featureQuotaForecastingEnabled);
+const revenueModeEnabled = Boolean(featureRevenueModeEnabled);
+const inventory = inventoryState || {
+    ramMb: 0,
+    cpuPercent: 0,
+    diskMb: 0,
+    swapMb: 0,
+    allocations: 0,
+    images: 0,
+    packages: 0
+};
+const revenueProfileData = revenueProfile || { status: 'inactive', planId: '' };
+const revenuePlan = revenueActivePlan || null;
+const revenueUsageData = revenueUsage || { serverCount: 0, memory: 0, cpu: 0, disk: 0 };
+const quota = quotaForecast || {
+    enabled: false,
+    modelVersion: 2,
+    runwayText: 'N/A',
+    totalDailyBurn: 0,
+    projectedDailyBurn: 0,
+    observedDailyBurn30: 0,
+    trendPercent: 0,
+    confidencePercent: 0
+};
+const hasAnyImages = imagesList.length > 0;
+const hasOnlineAllocations = allocationsList.some((allocation) => allocation && allocation.isOnline);
+const canSubmitCreate = hasAnyImages && hasOnlineAllocations && (!revenueModeEnabled || Boolean(revenueProvisioningAllowed));
+const smartDefault = smartAllocationDefault || null;
+const mbToGb = (value) => {
+    const num = Number(value || 0) / 1024;
+    if (!Number.isFinite(num)) return '0';
+    return num.toFixed(num % 1 === 0 ? 0 : 2);
+};
+const statusBadgeClass = (() => {
+    const status = String(revenueProfileData.status || '').toLowerCase();
+    if (status === 'active') return 'bg-success';
+    if (status === 'trial') return 'bg-info text-dark';
+    if (status === 'past_due') return 'bg-warning text-dark';
+    if (status === 'expired') return 'bg-danger';
+    return 'bg-secondary';
+})();
+%>
+
+<style>
+    .create-shell { max-width: 1080px; margin: 0 auto; }
+    .create-card { border: 1px solid #2e3036; background: linear-gradient(180deg, rgba(31, 32, 35, 0.95), rgba(31, 32, 35, 0.72)); border-radius: 14px; padding: 1.25rem; }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="create-shell">
+        <div class="create-card mb-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h1 class="h4 fw-bold mb-1">Create Server</h1>
+                    <p class="text-muted mb-0 small">Build your server and see estimated cost before deploy.</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/store" class="btn btn-outline-primary btn-sm">Store</a>
+                    <a href="/" class="btn btn-outline-light btn-sm">Back to Dashboard</a>
+                </div>
+            </div>
+        </div>
+
+        <% if (success) { %>
+            <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success"><i class="bi bi-check-circle-fill me-2"></i><%= success %></div>
+        <% } %>
+        <% if (error) { %>
+            <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i><%= error %></div>
+        <% } %>
+        <% if (!hasAnyImages) { %>
+            <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>No images available. Ask an admin to add at least one image.
+            </div>
+        <% } %>
+        <% if (hasAnyImages && !hasOnlineAllocations) { %>
+            <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>No online free allocations available right now.
+            </div>
+        <% } %>
+        <% if (revenueModeEnabled) { %>
+            <div class="alert border-0 <%= revenueProvisioningAllowed ? 'bg-success bg-opacity-10 text-success' : 'bg-warning bg-opacity-10 text-warning' %>">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <i class="bi bi-wallet2 me-2"></i>
+                        Revenue plan status:
+                        <span class="badge <%= statusBadgeClass %>"><%= String(revenueProfileData.status || 'inactive').toUpperCase() %></span>
+                        <% if (revenuePlan) { %>
+                            <span class="ms-2">Plan: <strong><%= revenuePlan.name %></strong></span>
+                        <% } else { %>
+                            <span class="ms-2">No active plan selected.</span>
+                        <% } %>
+                    </div>
+                    <% if (!revenueProvisioningAllowed) { %>
+                        <a href="/store" class="btn btn-sm btn-outline-warning">Open Store Revenue</a>
+                    <% } %>
+                </div>
+            </div>
+        <% } %>
+
+        <div class="create-card">
+            <form method="POST" action="/user/create" class="row g-3" id="createForm">
+                <div class="col-md-6">
+                    <label class="form-label text-muted small text-uppercase fw-bold">Server Name</label>
+                    <input type="text" class="form-control" name="name" maxlength="100" required style="background-color:#1a1a20;border-color:#2d2d35;">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label text-muted small text-uppercase fw-bold">Image</label>
+                    <select class="form-select" name="imageId" id="imageId" required style="background-color:#1a1a20;border-color:#2d2d35;" <%= hasAnyImages ? '' : 'disabled' %>>
+                        <% imagesList.forEach((img) => { %>
+                            <option value="<%= img.id %>" data-package="<%= img.packageId ? '1' : '0' %>"><%= img.name %><%= img.package ? ' (' + img.package.name + ')' : '' %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label text-muted small text-uppercase fw-bold">Location</label>
+                    <select class="form-select" name="locationId" id="locationId" style="background-color:#1a1a20;border-color:#2d2d35;">
+                        <option value="">Any Location</option>
+                        <% locationsList.forEach((location) => { %>
+                            <option value="<%= location.id %>"><%= location.shortName %><%= location.description ? ' - ' + location.description : '' %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label text-muted small text-uppercase fw-bold">Connector</label>
+                    <select class="form-select" name="connectorId" id="connectorId" style="background-color:#1a1a20;border-color:#2d2d35;">
+                        <option value="">Any Connector</option>
+                        <% connectorsList.forEach((connector) => { %>
+                            <option value="<%= connector.id %>" data-location-id="<%= connector.locationId || '' %>" data-online="<%= connector.online ? '1' : '0' %>"><%= connector.name %><%= connector.online ? '' : ' (offline)' %></option>
+                        <% }) %>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label text-muted small text-uppercase fw-bold">Allocation</label>
+                    <select class="form-select" name="allocationId" id="allocationId" required style="background-color:#1a1a20;border-color:#2d2d35;" <%= hasOnlineAllocations ? '' : 'disabled' %>>
+                        <% allocationsList.forEach((alloc) => { %>
+                            <option value="<%= alloc.id %>" data-connector-id="<%= alloc.connectorId || '' %>" data-location-id="<%= alloc.locationId || '' %>" data-online="<%= alloc.isOnline ? '1' : '0' %>" <%= alloc.isOnline ? '' : 'disabled' %>>
+                                <%= alloc.ip %>:<%= alloc.port %> - <%= alloc.connector ? alloc.connector.name : 'N/A' %><%= alloc.connector && alloc.connector.location ? ' [' + alloc.connector.location.shortName + ']' : '' %><%= alloc.isOnline ? '' : ' (offline)' %>
+                            </option>
+                        <% }) %>
+                    </select>
+                    <div class="d-flex align-items-center justify-content-between mt-2">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" id="smartAllocation" name="smartAllocation" value="1" checked>
+                            <label class="form-check-label text-muted small" for="smartAllocation">Smart Allocation Engine</label>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-info" id="smartPickBtn">Auto Pick</button>
+                    </div>
+                    <div class="small text-muted mt-1" id="smartAllocationHint">
+                        Smart engine picks best online node based on free RAM/Disk, connector load and selected filters.
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label text-muted small text-uppercase fw-bold">Memory (MB)</label>
+                    <input type="number" class="form-control" name="memory" id="memory" value="1024" required style="background-color:#1a1a20;border-color:#2d2d35;">
+                    <div class="form-text text-muted">Recommended: 64 MB+</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label text-muted small text-uppercase fw-bold">CPU (%)</label>
+                    <input type="number" class="form-control" name="cpu" id="cpu" value="100" required style="background-color:#1a1a20;border-color:#2d2d35;">
+                    <div class="form-text text-muted">Recommended: 10%+</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label text-muted small text-uppercase fw-bold">Disk (MB)</label>
+                    <input type="number" class="form-control" name="disk" id="disk" value="10240" required style="background-color:#1a1a20;border-color:#2d2d35;">
+                    <div class="form-text text-muted">Recommended: 512 MB+</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label text-muted small text-uppercase fw-bold">Swap (MB)</label>
+                    <input type="number" class="form-control" name="swapLimit" id="swapLimit" value="0" style="background-color:#1a1a20;border-color:#2d2d35;">
+                    <div class="form-text text-muted">Optional, can be 0 MB</div>
+                </div>
+
+                <% if (inventoryEnabled) { %>
+                    <div class="col-12">
+                        <div class="p-3 rounded" style="background:#1a1a20;border:1px solid #2d2d35;">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                                <h2 class="h6 mb-0 text-uppercase fw-bold">Available Inventory</h2>
+                                <span class="text-muted small">Buy more from <a href="/store" class="text-decoration-none">Store</a></span>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-6 col-md-3"><div class="text-muted small">RAM</div><div class="fw-semibold"><%= mbToGb(inventory.ramMb) %> GB</div></div>
+                                <div class="col-6 col-md-3"><div class="text-muted small">CPU</div><div class="fw-semibold"><%= Number(inventory.cpuPercent || 0) / 100 %> cores</div></div>
+                                <div class="col-6 col-md-3"><div class="text-muted small">Disk</div><div class="fw-semibold"><%= mbToGb(inventory.diskMb) %> GB</div></div>
+                                <div class="col-6 col-md-3"><div class="text-muted small">Swap</div><div class="fw-semibold"><%= mbToGb(inventory.swapMb) %> GB</div></div>
+                                <div class="col-4 col-md-2"><div class="text-muted small">Alloc tokens</div><div class="fw-semibold"><%= Number(inventory.allocations || 0) %></div></div>
+                                <div class="col-4 col-md-2"><div class="text-muted small">Image tokens</div><div class="fw-semibold"><%= Number(inventory.images || 0) %></div></div>
+                                <div class="col-4 col-md-2"><div class="text-muted small">Package tokens</div><div class="fw-semibold"><%= Number(inventory.packages || 0) %></div></div>
+                            </div>
+                        </div>
+                    </div>
+                <% } %>
+
+                <% if (revenueModeEnabled && revenuePlan) { %>
+                    <div class="col-12">
+                        <div class="p-3 rounded" style="background:#1a1a20;border:1px solid #2d2d35;">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                <h2 class="h6 mb-0 text-uppercase fw-bold">Revenue Plan Quotas</h2>
+                                <span class="badge <%= statusBadgeClass %>"><%= String(revenueProfileData.status || 'inactive').toUpperCase() %></span>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-6 col-md-3"><div class="text-muted small">Servers</div><div class="fw-semibold"><span id="quotaServerUsage"><%= Number(revenueUsageData.serverCount || 0) %></span><% if (Number(revenuePlan.maxServers || 0) > 0) { %> / <%= Number(revenuePlan.maxServers || 0) %><% } %></div></div>
+                                <div class="col-6 col-md-3"><div class="text-muted small">RAM</div><div class="fw-semibold"><span id="quotaMemoryUsage"><%= mbToGb(revenueUsageData.memory || 0) %></span> GB<% if (Number(revenuePlan.maxMemoryMb || 0) > 0) { %> / <%= mbToGb(revenuePlan.maxMemoryMb || 0) %> GB<% } %></div></div>
+                                <div class="col-6 col-md-3"><div class="text-muted small">CPU</div><div class="fw-semibold"><span id="quotaCpuUsage"><%= Number(revenueUsageData.cpu || 0) / 100 %></span> cores<% if (Number(revenuePlan.maxCpuPercent || 0) > 0) { %> / <%= Number(revenuePlan.maxCpuPercent || 0) / 100 %> cores<% } %></div></div>
+                                <div class="col-6 col-md-3"><div class="text-muted small">Disk</div><div class="fw-semibold"><span id="quotaDiskUsage"><%= mbToGb(revenueUsageData.disk || 0) %></span> GB<% if (Number(revenuePlan.maxDiskMb || 0) > 0) { %> / <%= mbToGb(revenuePlan.maxDiskMb || 0) %> GB<% } %></div></div>
+                            </div>
+                            <div class="small text-muted mt-2" id="quotaProjectedInfo">Projected usage after create will be calculated live.</div>
+                        </div>
+                    </div>
+                <% } %>
+
+                <% if (quotaForecastingEnabled) { %>
+                    <div class="col-12">
+                        <div class="p-3 rounded" style="background:#1a1a20;border:1px solid #2d2d35;">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div>
+                                    <div class="text-muted small">Current Runway</div>
+                                    <div class="fw-semibold" id="runwayCurrent"><%= quota.runwayText || 'N/A' %></div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small">Projected Runway After Create</div>
+                                    <div class="fw-semibold" id="runwayProjected"><%= quota.runwayText || 'N/A' %></div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small">Current Daily Burn (Projected)</div>
+                                    <div class="fw-semibold" id="dailyBurnCurrent"><%= Number(quota.projectedDailyBurn || quota.totalDailyBurn || 0).toFixed(2) %> <%= economyUnit %></div>
+                                </div>
+                                <div>
+                                    <div class="text-muted small">Projected Daily Burn</div>
+                                    <div class="fw-semibold" id="dailyBurnProjected"><%= Number(quota.projectedDailyBurn || quota.totalDailyBurn || 0).toFixed(2) %> <%= economyUnit %></div>
+                                </div>
+                            </div>
+                            <div class="small text-muted mt-2">
+                                Observed burn 30d: <strong><%= Number(quota.observedDailyBurn30 || 0).toFixed(2) %> <%= economyUnit %></strong>
+                                | Trend: <strong><%= Number(quota.trendPercent || 0).toFixed(1) %>%</strong>
+                                | Confidence: <strong><%= Number(quota.confidencePercent || 0) %>%</strong>
+                                | Model: <strong>v<%= Number(quota.modelVersion || 2) %></strong>
+                            </div>
+                        </div>
+                    </div>
+                <% } %>
+
+                <div class="col-12">
+                    <div class="p-3 rounded" style="background:#1a1a20;border:1px solid #2d2d35;">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <div class="text-muted small">One-time Create Cost</div>
+                                <div class="h5 mb-0" id="oneTimeCost">0 <%= economyUnit %></div>
+                            </div>
+                            <div>
+                                <div class="text-muted small">Recurring Renew Cost / <%= renewDays %> days</div>
+                                <div class="h5 mb-0" id="renewCost">0 <%= economyUnit %></div>
+                            </div>
+                            <div>
+                                <div class="text-muted small">Total Charged Now</div>
+                                <div class="h4 mb-0 fw-bold" id="totalCost">0 <%= economyUnit %></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 text-end">
+                    <button type="submit" class="btn btn-primary px-4 fw-semibold" <%= canSubmitCreate ? '' : 'disabled' %>>Create and Deploy</button>
+                    <% if (revenueModeEnabled && !revenueProvisioningAllowed) { %>
+                        <div class="text-warning small mt-2">Create is locked until your revenue plan is active or trial.</div>
+                    <% } %>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(() => {
+    const pricing = <%- JSON.stringify(pricing || {}) %>;
+    const economyUnit = <%- JSON.stringify(economyUnit || 'Coins') %>;
+    const inventoryEnabled = <%- JSON.stringify(Boolean(featureInventoryEnabled)) %>;
+    const inventoryState = <%- JSON.stringify(inventoryState || {}) %>;
+    const quotaForecastingEnabled = <%- JSON.stringify(Boolean(featureQuotaForecastingEnabled)) %>;
+    const revenueModeEnabled = <%- JSON.stringify(Boolean(featureRevenueModeEnabled)) %>;
+    const revenuePlan = <%- JSON.stringify(revenueActivePlan || null) %>;
+    const revenueUsage = <%- JSON.stringify(revenueUsage || { serverCount: 0, memory: 0, cpu: 0, disk: 0 }) %>;
+    const quotaForecast = <%- JSON.stringify(quotaForecast || { totalDailyBurn: 0, projectedDailyBurn: 0, runwayDays: null, runwayText: 'N/A' }) %>;
+    const smartDefault = <%- JSON.stringify(smartAllocationDefault || null) %>;
+    const renewDays = Math.max(1, Number.parseInt(<%- JSON.stringify(renewDays || 30) %>, 10) || 30);
+    const walletCoins = Number(<%- JSON.stringify(user && Number.isFinite(Number(user.coins)) ? Number(user.coins) : 0) %>) || 0;
+    const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
+
+    const $memory = document.getElementById('memory');
+    const $cpu = document.getElementById('cpu');
+    const $disk = document.getElementById('disk');
+    const $swap = document.getElementById('swapLimit');
+    const $image = document.getElementById('imageId');
+    const $location = document.getElementById('locationId');
+    const $connector = document.getElementById('connectorId');
+    const $allocation = document.getElementById('allocationId');
+    const $oneTime = document.getElementById('oneTimeCost');
+    const $renew = document.getElementById('renewCost');
+    const $total = document.getElementById('totalCost');
+    const $quotaProjectedInfo = document.getElementById('quotaProjectedInfo');
+    const $runwayCurrent = document.getElementById('runwayCurrent');
+    const $runwayProjected = document.getElementById('runwayProjected');
+    const $dailyBurnCurrent = document.getElementById('dailyBurnCurrent');
+    const $dailyBurnProjected = document.getElementById('dailyBurnProjected');
+    const $smartToggle = document.getElementById('smartAllocation');
+    const $smartPickBtn = document.getElementById('smartPickBtn');
+    const $smartHint = document.getElementById('smartAllocationHint');
+
+    const toNum = (node, fallback = 0) => {
+        const parsed = Number.parseFloat(node && node.value ? node.value : fallback);
+        return Number.isFinite(parsed) ? parsed : fallback;
+    };
+    const toFixedSmart = (value) => {
+        const num = Number(value || 0);
+        if (!Number.isFinite(num)) return '0';
+        return num % 1 === 0 ? String(num) : num.toFixed(2);
+    };
+    const runwayToText = (days) => {
+        const num = Number(days);
+        if (days === null || days === undefined || !Number.isFinite(num)) return 'Stable (no recurring burn).';
+        if (num <= 0) return 'Out of funds now';
+        if (num < 1) return `${(num * 24).toFixed(1)}h`;
+        if (num < 7) return `${num.toFixed(1)} days`;
+        if (num < 30) return `${Math.round(num)} days`;
+        return `${(num / 30).toFixed(1)} months`;
+    };
+
+    const allAllocationOptions = $allocation ? Array.from($allocation.querySelectorAll('option')).map((option) => ({
+        value: option.value,
+        text: option.textContent,
+        connectorId: String(option.getAttribute('data-connector-id') || ''),
+        locationId: String(option.getAttribute('data-location-id') || ''),
+        online: option.getAttribute('data-online') === '1'
+    })) : [];
+    const allConnectorOptions = $connector ? Array.from($connector.querySelectorAll('option')).map((option) => ({
+        value: option.value,
+        text: option.textContent,
+        locationId: String(option.getAttribute('data-location-id') || ''),
+        online: option.getAttribute('data-online') === '1',
+        isAny: String(option.value || '') === ''
+    })) : [];
+
+    const rebuildConnectorOptions = () => {
+        if (!$connector) return;
+        const selectedLocation = $location ? String($location.value || '') : '';
+        const previousValue = String($connector.value || '');
+        const allowed = allConnectorOptions.filter((entry) => {
+            if (entry.isAny) return true;
+            if (selectedLocation && entry.locationId !== selectedLocation) return false;
+            return true;
+        });
+
+        $connector.innerHTML = '';
+        allowed.forEach((entry) => {
+            const option = document.createElement('option');
+            option.value = entry.value;
+            option.textContent = entry.text;
+            if (entry.locationId) option.setAttribute('data-location-id', entry.locationId);
+            option.setAttribute('data-online', entry.online ? '1' : '0');
+            $connector.appendChild(option);
+        });
+
+        const canKeepPrevious = allowed.some((entry) => entry.value === previousValue);
+        if (canKeepPrevious) {
+            $connector.value = previousValue;
+        } else if (allowed.length > 0) {
+            $connector.value = allowed[0].value;
+        }
+    };
+
+    const rebuildAllocationOptions = () => {
+        if (!$allocation) return;
+        const selectedConnector = $connector ? String($connector.value || '') : '';
+        const selectedLocation = $location ? String($location.value || '') : '';
+
+        const allowed = allAllocationOptions.filter((entry) => {
+            if (!entry.online) return false;
+            if (selectedConnector && entry.connectorId !== selectedConnector) return false;
+            if (selectedLocation && entry.locationId !== selectedLocation) return false;
+            return true;
+        });
+
+        $allocation.innerHTML = '';
+        if (allowed.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No allocation available for this filter';
+            option.disabled = true;
+            option.selected = true;
+            $allocation.appendChild(option);
+            $allocation.disabled = true;
+            return;
+        }
+
+        allowed.forEach((entry, index) => {
+            const option = document.createElement('option');
+            option.value = entry.value;
+            option.textContent = entry.text;
+            option.selected = index === 0;
+            $allocation.appendChild(option);
+        });
+        $allocation.disabled = false;
+    };
+
+    const applySmartSuggestionToForm = (payload) => {
+        if (!payload || !payload.allocation || !$allocation) return;
+        const suggested = payload.allocation;
+        if ($location && String($location.value || '') === '' && suggested.locationId) {
+            $location.value = String(suggested.locationId);
+            rebuildConnectorOptions();
+        }
+        if ($connector && suggested.connectorId) {
+            $connector.value = String(suggested.connectorId);
+        }
+        rebuildAllocationOptions();
+        if ($allocation && !$allocation.disabled) {
+            $allocation.value = String(suggested.id || '');
+        }
+        if ($smartHint) {
+            const score = Number(suggested.score || 0).toFixed(2);
+            $smartHint.textContent = `Picked ${suggested.ip}:${suggested.port} on ${suggested.connectorName} (score ${score}).`;
+            $smartHint.classList.remove('text-warning');
+            $smartHint.classList.add('text-info');
+        }
+    };
+
+    const runSmartAllocationPick = async () => {
+        if (!$smartToggle || !$smartToggle.checked) return;
+        if (!$allocation) return;
+
+        const params = new URLSearchParams({
+            memory: String(Math.max(1, toNum($memory, 1024))),
+            disk: String(Math.max(1, toNum($disk, 10240)))
+        });
+        if ($connector && $connector.value) params.set('connectorId', String($connector.value));
+        if ($location && $location.value) params.set('locationId', String($location.value));
+
+        try {
+            if ($smartPickBtn) $smartPickBtn.disabled = true;
+            const response = await fetch(`/user/create/smart-allocation?${params.toString()}`);
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data && data.error ? data.error : `Smart allocation request failed (${response.status}).`);
+            }
+            applySmartSuggestionToForm(data);
+        } catch (error) {
+            if ($smartHint) {
+                $smartHint.textContent = String(error && error.message ? error.message : 'Smart allocation failed.');
+                $smartHint.classList.remove('text-info');
+                $smartHint.classList.add('text-warning');
+            }
+        } finally {
+            if ($smartPickBtn) $smartPickBtn.disabled = false;
+        }
+    };
+
+    const applyInventoryInputCaps = () => {};
+
+    const update = () => {
+        const memoryMb = Math.max(0, toNum($memory, 1024));
+        const cpuPercent = Math.max(0, toNum($cpu, 100));
+        const diskMb = Math.max(0, toNum($disk, 10240));
+        const memoryGb = memoryMb / 1024;
+        const cpuCores = cpuPercent / 100;
+        const diskGb = diskMb / 1024;
+        const swapGb = Math.max(0, toNum($swap, 0)) / 1024;
+        const hasPackage = $image && $image.selectedOptions && $image.selectedOptions[0]
+            ? ($image.selectedOptions[0].getAttribute('data-package') === '1')
+            : false;
+
+        const oneTimeRaw =
+            (memoryGb * Number(pricing.storeRamPerGbCoins || 0)) +
+            (cpuCores * Number(pricing.storeCpuPerCoreCoins || 0)) +
+            (swapGb * Number(pricing.storeSwapPerGbCoins || 0)) +
+            (diskGb * Number(pricing.storeDiskPerGbCoins || 0)) +
+            Number(pricing.storeAllocationCoins || 0) +
+            Number(pricing.storeImageCoins || 0) +
+            (hasPackage ? Number(pricing.storePackageCoins || 0) : 0);
+
+        const renewRaw = pricing.recurringEnabled
+            ? (
+                Number(pricing.recurringBase || 0) +
+                (memoryGb * Number(pricing.recurringRam || 0)) +
+                (cpuCores * Number(pricing.recurringCpu || 0)) +
+                (diskGb * Number(pricing.recurringDisk || 0))
+            )
+            : 0;
+
+        const oneTime = inventoryEnabled ? 0 : Math.max(0, Math.ceil(oneTimeRaw));
+        const renew = Math.max(0, Math.ceil(renewRaw));
+        const total = oneTime + renew;
+
+        if ($oneTime) $oneTime.textContent = `${compact.format(oneTime)} ${economyUnit}`;
+        if ($renew) $renew.textContent = `${compact.format(renew)} ${economyUnit}`;
+        if ($total) $total.textContent = `${compact.format(total)} ${economyUnit}`;
+
+        if (quotaForecastingEnabled) {
+            const currentDailyBurn = Number(quotaForecast.projectedDailyBurn || quotaForecast.totalDailyBurn || 0);
+            const projectedDailyBurn = currentDailyBurn + (pricing.recurringEnabled ? (renew / renewDays) : 0);
+            const currentRunwayText = String(quotaForecast.runwayText || runwayToText(quotaForecast.runwayDays));
+            const projectedRunwayText = runwayToText(projectedDailyBurn > 0 ? (walletCoins / projectedDailyBurn) : null);
+
+            if ($runwayCurrent) $runwayCurrent.textContent = currentRunwayText;
+            if ($runwayProjected) $runwayProjected.textContent = projectedRunwayText;
+            if ($dailyBurnCurrent) $dailyBurnCurrent.textContent = `${toFixedSmart(currentDailyBurn)} ${economyUnit}`;
+            if ($dailyBurnProjected) $dailyBurnProjected.textContent = `${toFixedSmart(projectedDailyBurn)} ${economyUnit}`;
+        }
+
+        if (revenueModeEnabled && revenuePlan && $quotaProjectedInfo) {
+            const nextServers = Number(revenueUsage.serverCount || 0) + 1;
+            const nextMemory = Number(revenueUsage.memory || 0) + memoryMb;
+            const nextCpu = Number(revenueUsage.cpu || 0) + cpuPercent;
+            const nextDisk = Number(revenueUsage.disk || 0) + diskMb;
+
+            const exceeded = [];
+            if (Number(revenuePlan.maxServers || 0) > 0 && nextServers > Number(revenuePlan.maxServers || 0)) exceeded.push('servers');
+            if (Number(revenuePlan.maxMemoryMb || 0) > 0 && nextMemory > Number(revenuePlan.maxMemoryMb || 0)) exceeded.push('RAM');
+            if (Number(revenuePlan.maxCpuPercent || 0) > 0 && nextCpu > Number(revenuePlan.maxCpuPercent || 0)) exceeded.push('CPU');
+            if (Number(revenuePlan.maxDiskMb || 0) > 0 && nextDisk > Number(revenuePlan.maxDiskMb || 0)) exceeded.push('Disk');
+
+            const summary = `Projected after create: ${nextServers} server(s), ${(nextMemory / 1024).toFixed(2)} GB RAM, ${(nextCpu / 100).toFixed(2)} cores CPU, ${(nextDisk / 1024).toFixed(2)} GB Disk.`;
+            if (exceeded.length > 0) {
+                $quotaProjectedInfo.textContent = `${summary} Limit exceeded: ${exceeded.join(', ')}.`;
+                $quotaProjectedInfo.classList.remove('text-muted');
+                $quotaProjectedInfo.classList.add('text-warning');
+            } else {
+                $quotaProjectedInfo.textContent = `${summary} All plan limits are within range.`;
+                $quotaProjectedInfo.classList.remove('text-warning');
+                $quotaProjectedInfo.classList.add('text-muted');
+            }
+        }
+    };
+
+    [$memory, $cpu, $disk, $swap, $image].forEach((node) => {
+        if (node) node.addEventListener('input', update);
+        if (node) node.addEventListener('change', update);
+    });
+    if ($location) {
+        $location.addEventListener('change', () => {
+            rebuildConnectorOptions();
+            rebuildAllocationOptions();
+            update();
+        });
+    }
+    if ($connector) {
+        $connector.addEventListener('change', () => {
+            rebuildAllocationOptions();
+            update();
+        });
+    }
+    if ($smartPickBtn) {
+        $smartPickBtn.addEventListener('click', () => {
+            runSmartAllocationPick();
+        });
+    }
+    if ($smartToggle) {
+        $smartToggle.addEventListener('change', () => {
+            if ($smartToggle.checked) {
+                runSmartAllocationPick();
+            } else if ($smartHint) {
+                $smartHint.textContent = 'Smart allocation disabled. Manual allocation selection is active.';
+                $smartHint.classList.remove('text-info');
+                $smartHint.classList.add('text-muted');
+            }
+        });
+    }
+    [$memory, $disk, $connector, $location].forEach((node) => {
+        if (!node) return;
+        node.addEventListener('change', () => {
+            if ($smartToggle && $smartToggle.checked) {
+                runSmartAllocationPick();
+            }
+        });
+    });
+    applyInventoryInputCaps();
+    rebuildConnectorOptions();
+    rebuildAllocationOptions();
+    if (smartDefault) {
+        applySmartSuggestionToForm({ allocation: smartDefault });
+    }
+    if ($smartToggle && $smartToggle.checked && !smartDefault) {
+        runSmartAllocationPick();
+    }
+    update();
+})();
+</script>
+
+<%- include('partials/footer') %>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        Smart Alerts <%= server.name %> | <%= settings.brandName.toUpperCase() %>
+    </title>
+    <%- include('../partials/favicon') %>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+        <style>
+            :root {
+                --bg-dark: #0f0f12;
+                --bg-sidebar: #121216;
+                --border-color: #2d2d35;
+                --text-primary: #e1e1e6;
+                --text-secondary: #8b8b9a;
+                --accent-blue: #3b82f6;
+                --accent-green: #10b981;
+            }
+
+            body {
+                background-color: var(--bg-dark);
+                color: var(--text-primary);
+                font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                overflow: hidden;
+                height: 100vh;
+                margin: 0;
+            }
+
+            .wrapper {
+                display: flex;
+                height: 100vh;
+                overflow: hidden;
+            }
+
+            .sidebar {
+                width: 260px;
+                background: var(--bg-sidebar);
+                border-right: 1px solid var(--border-color);
+                transition: all 0.3s ease;
+                display: flex;
+                flex-direction: column;
+                flex-shrink: 0;
+                overflow-y: auto;
+            }
+
+            .sidebar.collapsed {
+                margin-left: -260px;
+            }
+
+            .sidebar .sidebar-content {
+                padding: 1.5rem 0.75rem;
+            }
+
+            .sidebar-item {
+                display: flex;
+                align-items: center;
+                padding: 0.75rem 1rem;
+                color: var(--text-secondary);
+                text-decoration: none;
+                border-radius: 8px;
+                transition: all 0.2s ease;
+                font-weight: 500;
+                font-size: 0.9rem;
+                margin-bottom: 0.25rem;
+            }
+
+            .sidebar-item:hover {
+                background: rgba(255, 255, 255, 0.03);
+                color: var(--text-primary);
+            }
+
+            .sidebar-item.active {
+                background: rgba(59, 130, 246, 0.1);
+                color: var(--accent-blue);
+            }
+
+            .sidebar-icon {
+                margin-right: 12px;
+                font-size: 1.1rem;
+                width: 24px;
+                text-align: center;
+            }
+
+            .content {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                background: var(--bg-dark);
+            }
+
+            .top-navbar {
+                background: var(--bg-sidebar);
+                border-bottom: 1px solid var(--border-color);
+                padding: 0.75rem 1.5rem;
+                display: flex;
+                align-items: center;
+                flex-shrink: 0;
+            }
+
+            .navbar-toggle {
+                background: transparent;
+                border: none;
+                color: var(--text-secondary);
+                font-size: 1.5rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-right: 1rem;
+                cursor: pointer;
+                padding: 0;
+            }
+
+            .navbar-toggle:hover {
+                color: var(--text-primary);
+            }
+
+            .server-info {
+                display: flex;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 1rem;
+            }
+
+            .server-name {
+                font-size: 1.25rem;
+                font-weight: 600;
+                margin: 0;
+            }
+
+            .scroll-area {
+                flex: 1;
+                overflow-y: auto;
+                padding: 1.5rem;
+            }
+
+            .settings-card {
+                background: var(--bg-sidebar);
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                margin-bottom: 1.25rem;
+            }
+
+            .settings-card-header {
+                border-bottom: 1px solid var(--border-color);
+                background: rgba(255, 255, 255, 0.02);
+                padding: 1rem 1.25rem;
+                font-weight: 600;
+            }
+
+            .settings-card-body {
+                padding: 1.25rem;
+            }
+
+            .form-control,
+            .form-check-input {
+                background: rgba(255, 255, 255, 0.02);
+                border: 1px solid var(--border-color);
+                color: var(--text-primary);
+            }
+
+            .form-control:focus {
+                background: rgba(255, 255, 255, 0.04);
+                border-color: var(--accent-blue);
+                color: var(--text-primary);
+                box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+            }
+
+            .form-check-input:checked {
+                background-color: var(--accent-blue);
+                border-color: var(--accent-blue);
+            }
+
+            .hint {
+                color: var(--text-secondary);
+                font-size: 0.85rem;
+                margin-top: 0.5rem;
+            }
+
+            .btn-action {
+                border-radius: 8px;
+                font-weight: 600;
+                padding: 0.6rem 1rem;
+            }
+
+            .btn-primary-soft {
+                background: var(--accent-blue);
+                border: 1px solid var(--accent-blue);
+                color: #fff;
+            }
+
+            .btn-outline-soft {
+                border: 1px solid var(--border-color);
+                color: var(--text-primary);
+                background: rgba(255, 255, 255, 0.02);
+            }
+
+            .btn-outline-soft:hover {
+                border-color: var(--accent-blue);
+                color: #fff;
+                background: rgba(59, 130, 246, 0.15);
+            }
+
+            .tutorial-panel {
+                background: rgba(255, 255, 255, 0.02);
+                border: 1px solid var(--border-color);
+                border-radius: 10px;
+                padding: 1rem;
+            }
+
+            .tutorial-list {
+                margin: 0;
+                padding-left: 1.1rem;
+            }
+
+            .tutorial-list li {
+                margin-bottom: 0.45rem;
+                color: var(--text-primary);
+            }
+
+            .tutorial-code {
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+                background: rgba(0, 0, 0, 0.35);
+                border: 1px solid var(--border-color);
+                border-radius: 6px;
+                padding: 0.25rem 0.45rem;
+                font-size: 0.85rem;
+            }
+
+            @media (max-width: 768px) {
+                .sidebar {
+                    margin-left: -260px;
+                    position: fixed;
+                    top: 0;
+                    bottom: 0;
+                    z-index: 1050;
+                    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+                }
+
+                .sidebar.show {
+                    margin-left: 0;
+                }
+
+                .content {
+                    width: 100%;
+                }
+
+                .scroll-area {
+                    padding: 1rem;
+                }
+            }
+        </style>
+</head>
+
+<body>
+    <%- include ('../partials/error-modal') %>
+        <div class="wrapper">
+            <nav id="sidebar" class="sidebar">
+                <div class="sidebar-content">
+                    <%- include('../partials/server-sidebar', { server, active: 'smartalerts' , settings }) %>
+                </div>
+            </nav>
+
+            <div class="content">
+                <div class="top-navbar">
+                    <button id="sidebarToggle" class="navbar-toggle">
+                        <i class="bi bi-list"></i>
+                    </button>
+                    <div class="server-info">
+                        <h1 class="server-name">Smart Alerts</h1>
+                        <span class="text-secondary opacity-50 mx-2">/</span>
+                        <span class="text-secondary">
+                            <%= server.name %>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="scroll-area">
+                    <form method="POST" action="/server/<%= server.containerId %>/smartalerts" id="smartAlertsForm">
+                        <div class="settings-card">
+                            <div class="settings-card-header">General</div>
+                            <div class="settings-card-body">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="enabled" name="enabled"
+                                        value="1" <%=smartAlerts && smartAlerts.enabled ? 'checked' : '' %>>
+                                    <label class="form-check-label ms-1" for="enabled">Enable Smart Alerts</label>
+                                </div>
+                                <div class="hint">Supports Discord webhook and Telegram bot notifications.</div>
+                            </div>
+                        </div>
+
+                        <div class="settings-card">
+                            <div class="settings-card-header">Discord</div>
+                            <div class="settings-card-body">
+                                <label class="form-label text-secondary small text-uppercase fw-bold">Webhook
+                                    URL</label>
+                                <input class="form-control" type="url" name="discordWebhook"
+                                    placeholder="https://discord.com/api/webhooks/..."
+                                    value="<%= smartAlerts ? smartAlerts.discordWebhook : '' %>">
+                            </div>
+                        </div>
+
+                        <div class="settings-card">
+                            <div class="settings-card-header">Telegram</div>
+                            <div class="settings-card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label text-secondary small text-uppercase fw-bold">Bot
+                                            Token</label>
+                                        <input class="form-control" type="text" name="telegramBotToken"
+                                            placeholder="123456:ABC..."
+                                            value="<%= smartAlerts ? smartAlerts.telegramBotToken : '' %>">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label text-secondary small text-uppercase fw-bold">Chat
+                                            ID</label>
+                                        <input class="form-control" type="text" name="telegramChatId"
+                                            placeholder="-1001234567890"
+                                            value="<%= smartAlerts ? smartAlerts.telegramChatId : '' %>">
+                                    </div>
+                                </div>
+                                <div class="hint mt-2">Pentru Telegram trebuie completate ambele câmpuri.</div>
+                            </div>
+                        </div>
+
+                        <div class="settings-card">
+                            <div class="settings-card-header">Events</div>
+                            <div class="settings-card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="eventStarted"
+                                                name="eventStarted" value="1" <%=smartAlerts && smartAlerts.events &&
+                                                smartAlerts.events.started ? 'checked' : '' %>>
+                                            <label class="form-check-label ms-1" for="eventStarted">Server
+                                                started</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="eventStopped"
+                                                name="eventStopped" value="1" <%=smartAlerts && smartAlerts.events &&
+                                                smartAlerts.events.stopped ? 'checked' : '' %>>
+                                            <label class="form-check-label ms-1" for="eventStopped">Server
+                                                stopped</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="eventCrashed"
+                                                name="eventCrashed" value="1" <%=smartAlerts && smartAlerts.events &&
+                                                smartAlerts.events.crashed ? 'checked' : '' %>>
+                                            <label class="form-check-label ms-1" for="eventCrashed">Server
+                                                crashed</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="eventReinstallSuccess"
+                                                name="eventReinstallSuccess" value="1" <%=smartAlerts &&
+                                                smartAlerts.events && smartAlerts.events.reinstallSuccess ? 'checked'
+                                                : '' %>>
+                                            <label class="form-check-label ms-1" for="eventReinstallSuccess">Reinstall
+                                                success</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="eventReinstallFailed"
+                                                name="eventReinstallFailed" value="1" <%=smartAlerts &&
+                                                smartAlerts.events && smartAlerts.events.reinstallFailed ? 'checked'
+                                                : '' %>>
+                                            <label class="form-check-label ms-1" for="eventReinstallFailed">Reinstall
+                                                failed</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="eventSuspended"
+                                                name="eventSuspended" value="1" <%=smartAlerts && smartAlerts.events &&
+                                                smartAlerts.events.suspended ? 'checked' : '' %>>
+                                            <label class="form-check-label ms-1" for="eventSuspended">Suspended</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="eventUnsuspended"
+                                                name="eventUnsuspended" value="1" <%=smartAlerts && smartAlerts.events
+                                                && smartAlerts.events.unsuspended ? 'checked' : '' %>>
+                                            <label class="form-check-label ms-1"
+                                                for="eventUnsuspended">Unsuspended</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="eventResourceAnomaly"
+                                                name="eventResourceAnomaly" value="1" <%=smartAlerts && smartAlerts.events
+                                                && smartAlerts.events.resourceAnomaly ? 'checked' : '' %>>
+                                            <label class="form-check-label ms-1" for="eventResourceAnomaly">Resource
+                                                anomaly</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="eventPluginConflict"
+                                                name="eventPluginConflict" value="1" <%=smartAlerts && smartAlerts.events
+                                                && smartAlerts.events.pluginConflict ? 'checked' : '' %>>
+                                            <label class="form-check-label ms-1" for="eventPluginConflict">Plugin/Mod
+                                                conflict</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-card">
+                            <div class="settings-card-header">Resource Anomaly Detection</div>
+                            <div class="settings-card-body">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="anomalyEnabled"
+                                        name="anomalyEnabled" value="1" <%=smartAlerts && smartAlerts.anomaly &&
+                                        smartAlerts.anomaly.enabled ? 'checked' : '' %>>
+                                    <label class="form-check-label ms-1" for="anomalyEnabled">Enable spike detection
+                                        (CPU/RAM)</label>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-3">
+                                        <label class="form-label text-secondary small text-uppercase fw-bold">CPU %</label>
+                                        <input class="form-control" type="number" min="1" max="1000"
+                                            name="anomalyCpuThreshold" value="<%= smartAlerts && smartAlerts.anomaly ? smartAlerts.anomaly.cpuThreshold : 95 %>">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label text-secondary small text-uppercase fw-bold">RAM %</label>
+                                        <input class="form-control" type="number" min="1" max="1000"
+                                            name="anomalyMemoryThreshold" value="<%= smartAlerts && smartAlerts.anomaly ? smartAlerts.anomaly.memoryThreshold : 90 %>">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label text-secondary small text-uppercase fw-bold">Samples</label>
+                                        <input class="form-control" type="number" min="1" max="20"
+                                            name="anomalyDurationSamples" value="<%= smartAlerts && smartAlerts.anomaly ? smartAlerts.anomaly.durationSamples : 3 %>">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label text-secondary small text-uppercase fw-bold">Cooldown (s)</label>
+                                        <input class="form-control" type="number" min="10" max="86400"
+                                            name="anomalyCooldownSeconds" value="<%= smartAlerts && smartAlerts.anomaly ? smartAlerts.anomaly.cooldownSeconds : 300 %>">
+                                    </div>
+                                </div>
+                                <div class="hint mt-2">Alert is sent only when thresholds are exceeded for consecutive samples.</div>
+                            </div>
+                        </div>
+
+                        <div class="settings-card">
+                            <div class="settings-card-header">Auto Log Rotation & Cleanup</div>
+                            <div class="settings-card-body">
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="logCleanupEnabled"
+                                        name="logCleanupEnabled" value="1" <%=smartAlerts && smartAlerts.logCleanup &&
+                                        smartAlerts.logCleanup.enabled ? 'checked' : '' %>>
+                                    <label class="form-check-label ms-1" for="logCleanupEnabled">Enable automatic log cleanup</label>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label text-secondary small text-uppercase fw-bold">Directory</label>
+                                        <input class="form-control" type="text" name="logCleanupDirectory"
+                                            value="<%= smartAlerts && smartAlerts.logCleanup ? smartAlerts.logCleanup.directory : '/logs' %>"
+                                            placeholder="/logs">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label text-secondary small text-uppercase fw-bold">Max MB</label>
+                                        <input class="form-control" type="number" min="1" max="1024" name="logCleanupMaxFileSizeMB"
+                                            value="<%= smartAlerts && smartAlerts.logCleanup ? smartAlerts.logCleanup.maxFileSizeMB : 25 %>">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label text-secondary small text-uppercase fw-bold">Keep Files</label>
+                                        <input class="form-control" type="number" min="0" max="500" name="logCleanupKeepFiles"
+                                            value="<%= smartAlerts && smartAlerts.logCleanup ? smartAlerts.logCleanup.keepFiles : 20 %>">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label text-secondary small text-uppercase fw-bold">Max Days</label>
+                                        <input class="form-control" type="number" min="0" max="3650" name="logCleanupMaxAgeDays"
+                                            value="<%= smartAlerts && smartAlerts.logCleanup ? smartAlerts.logCleanup.maxAgeDays : 14 %>">
+                                    </div>
+                                </div>
+                                <div class="form-check form-switch mt-3">
+                                    <input class="form-check-input" type="checkbox" id="logCleanupCompressOld"
+                                        name="logCleanupCompressOld" value="1" <%=smartAlerts && smartAlerts.logCleanup
+                                        && smartAlerts.logCleanup.compressOld ? 'checked' : '' %>>
+                                    <label class="form-check-label ms-1" for="logCleanupCompressOld">Compress rotated logs (.gz)</label>
+                                </div>
+                                <div class="hint mt-2">Cleanup runs periodically from panel and immediately after save.</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 mb-4">
+                            <button class="btn btn-action btn-outline-soft" type="button" data-bs-toggle="modal" data-bs-target="#smartAlertsTutorialModal">
+                                <i class="bi bi-question-circle me-1"></i> Tutorial
+                            </button>
+                            <button class="btn btn-action btn-primary-soft" type="submit">
+                                <i class="bi bi-save me-1"></i> Save Smart Alerts
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="smartAlertsTutorialModal" tabindex="-1" aria-labelledby="smartAlertsTutorialLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content" style="background:#141419;border:1px solid var(--border-color);color:var(--text-primary);">
+                    <div class="modal-header border-bottom" style="border-color:var(--border-color) !important;">
+                        <h5 class="modal-title" id="smartAlertsTutorialLabel"><i class="bi bi-life-preserver me-2"></i>Smart Alerts Tutorial</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <ul class="nav nav-pills mb-3" id="tutorialTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="discord-tab" data-bs-toggle="pill" data-bs-target="#discord-pane" type="button" role="tab" aria-controls="discord-pane" aria-selected="true">
+                                    <i class="bi bi-discord me-1"></i> Discord
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="telegram-tab" data-bs-toggle="pill" data-bs-target="#telegram-pane" type="button" role="tab" aria-controls="telegram-pane" aria-selected="false">
+                                    <i class="bi bi-telegram me-1"></i> Telegram
+                                </button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content">
+                            <div class="tab-pane fade show active" id="discord-pane" role="tabpanel" aria-labelledby="discord-tab">
+                                <div class="tutorial-panel mb-3">
+                                    <div class="fw-semibold mb-2">Setup Discord (pas cu pas)</div>
+                                    <ol class="tutorial-list">
+                                        <li>Intra pe serverul tau Discord, canalul dorit, apoi <span class="tutorial-code">Edit Channel -> Integrations -> Webhooks</span>.</li>
+                                        <li>Apasa <span class="tutorial-code">New Webhook</span>, seteaza nume/avatar, apoi <span class="tutorial-code">Copy Webhook URL</span>.</li>
+                                        <li>In panel, la campul <span class="tutorial-code">Discord Webhook URL</span> lipeste link-ul complet.</li>
+                                        <li>Activeaza <span class="tutorial-code">Enable Smart Alerts</span> + evenimentele dorite, apoi <span class="tutorial-code">Save Smart Alerts</span>.</li>
+                                    </ol>
+                                </div>
+                                <div class="tutorial-panel">
+                                    <div class="fw-semibold mb-2">Erori comune Discord</div>
+                                    <ul class="tutorial-list">
+                                        <li><span class="tutorial-code">Invalid webhook URL</span>: URL incomplet sau fara <span class="tutorial-code">https://</span>.</li>
+                                        <li><span class="tutorial-code">403 Forbidden</span>: webhook-ul a fost sters sau canalul nu mai permite trimitere.</li>
+                                        <li><span class="tutorial-code">404 Unknown Webhook</span>: webhook regenerat/invalid, creeaza unul nou.</li>
+                                        <li><span class="tutorial-code">No notifications</span>: ai uitat sa activezi event-urile in sectiunea <span class="tutorial-code">Events</span>.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="tab-pane fade" id="telegram-pane" role="tabpanel" aria-labelledby="telegram-tab">
+                                <div class="tutorial-panel mb-3">
+                                    <div class="fw-semibold mb-2">Setup Telegram (pas cu pas)</div>
+                                    <ol class="tutorial-list">
+                                        <li>Deschide Telegram si cauta <span class="tutorial-code">@BotFather</span>.</li>
+                                        <li>Ruleaza <span class="tutorial-code">/newbot</span> si copiaza token-ul primit (format: <span class="tutorial-code">123456:ABC...</span>).</li>
+                                        <li>Adauga bot-ul in grup/canal sau trimite-i un mesaj direct, apoi ia chat id-ul.</li>
+                                        <li>Completeaza in panel ambele campuri: <span class="tutorial-code">Bot Token</span> si <span class="tutorial-code">Chat ID</span>.</li>
+                                        <li>Apasa <span class="tutorial-code">Save Smart Alerts</span>.</li>
+                                    </ol>
+                                </div>
+                                <div class="tutorial-panel">
+                                    <div class="fw-semibold mb-2">Erori comune Telegram</div>
+                                    <ul class="tutorial-list">
+                                        <li><span class="tutorial-code">chat not found</span>: bot-ul nu este in chat sau chat id-ul este gresit.</li>
+                                        <li><span class="tutorial-code">bot was blocked by the user</span>: userul a blocat bot-ul.</li>
+                                        <li><span class="tutorial-code">401 Unauthorized</span>: token invalid sau regenerat.</li>
+                                        <li><span class="tutorial-code">No notifications</span>: trebuie completate obligatoriu <b>ambele</b> campuri Telegram.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top" style="border-color:var(--border-color) !important;">
+                        <small class="text-secondary me-auto">Tip: salveaza setarile, apoi testeaza un event rapid (start/stop) pentru verificare.</small>
+                        <button type="button" class="btn btn-outline-soft" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        <script>
+            const initSmartAlertsPage = () => {
+                if (window.__smartAlertsPageInitialized) return;
+                window.__smartAlertsPageInitialized = true;
+
+                const sidebarToggle = document.getElementById('sidebarToggle');
+                if (sidebarToggle) {
+                    sidebarToggle.addEventListener('click', () => {
+                        const sidebar = document.getElementById('sidebar');
+                        sidebar.classList.toggle('show');
+                        sidebar.classList.toggle('collapsed');
+                    });
+                }
+
+                // Handle SweetAlert rendering safely
+                const urlParams = new URLSearchParams(window.location.search);
+                const successMsg = urlParams.get('success');
+                const errorMsg = urlParams.get('error');
+
+                if (successMsg) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success!',
+                        text: successMsg,
+                        background: '#1a1a20',
+                        color: '#fff',
+                        confirmButtonColor: '#3b82f6',
+                        position: 'bottom-end',
+                        backdrop: false,
+                        toast: true,
+                        showConfirmButton: false,
+                        timer: 3000
+                    });
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+
+                if (errorMsg) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Oops...',
+                        text: errorMsg,
+                        background: '#1a1a20',
+                        color: '#fff',
+                        confirmButtonColor: '#ef4444'
+                    });
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
+            };
+
+            const cleanupSmartAlertsPage = () => {
+                window.__smartAlertsPageInitialized = false;
+            };
+
+            document.addEventListener('turbo:load', initSmartAlertsPage);
+            document.addEventListener('turbo:before-cache', cleanupSmartAlertsPage);
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initSmartAlertsPage, { once: true });
+            } else {
+                initSmartAlertsPage();
+            }
+        </script>
+</body>
+
+</html>

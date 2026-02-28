@@ -1,0 +1,511 @@
+<%- include('partials/header') %>
+<%- include('partials/navbar') %>
+<%- include('partials/error-modal') %>
+
+<%
+const compactCoins = (value) => {
+    const num = Number(value || 0);
+    if (!Number.isFinite(num)) return '0';
+    return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(num);
+};
+const inventory = inventoryState || {
+    ramMb: 0,
+    cpuPercent: 0,
+    diskMb: 0,
+    swapMb: 0,
+    allocations: 0,
+    images: 0,
+    packages: 0
+};
+const unitCosts = inventoryUnitCosts || {
+    ramGb: 0,
+    cpuCore: 0,
+    diskGb: 0,
+    swapGb: 0,
+    allocation: 0,
+    image: 0,
+    package: 0
+};
+const billingAuditRows = Array.isArray(billingLogs) ? billingLogs : [];
+const quota = quotaForecast || {
+    enabled: false,
+    modelVersion: 2,
+    recurringDailyBurn: 0,
+    revenueDailyBurn: 0,
+    totalDailyBurn: 0,
+    observedDailyBurn30: 0,
+    observedDailyBurn7: 0,
+    projectedDailyBurn: 0,
+    projectedMonthlyBurn: 0,
+    trendPercent: 0,
+    confidencePercent: 0,
+    runwayDays: null,
+    runwayText: 'N/A'
+};
+const revenueProfileData = revenueProfile || { status: 'inactive', planId: '', nextRenewAtMs: 0, graceEndsAtMs: 0, trial: false };
+const revenueCatalog = Array.isArray(revenuePlans) ? revenuePlans : [];
+const revenueCurrentPlan = activeRevenuePlan || null;
+const usage = aggregateUsage || { serverCount: 0, memory: 0, cpu: 0, disk: 0 };
+const hasRevenuePlan = Boolean(revenueCurrentPlan);
+const formatMbToGb = (mb) => {
+    const val = Number(mb || 0) / 1024;
+    if (!Number.isFinite(val)) return '0';
+    return val.toFixed(val % 1 === 0 ? 0 : 2);
+};
+const formatAuditDate = (value) => {
+    const dt = value ? new Date(value) : null;
+    if (!dt || Number.isNaN(dt.getTime())) return '-';
+    return dt.toLocaleString();
+};
+const formatRuntimeDate = (value) => {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isInteger(parsed) || parsed <= 0) return '-';
+    const dt = new Date(parsed);
+    if (Number.isNaN(dt.getTime())) return '-';
+    return dt.toLocaleString();
+};
+const revenueBadgeClass = (() => {
+    const status = String(revenueProfileData.status || '').toLowerCase();
+    if (status === 'active') return 'bg-success';
+    if (status === 'trial') return 'bg-info text-dark';
+    if (status === 'past_due') return 'bg-warning text-dark';
+    if (status === 'expired') return 'bg-danger';
+    return 'bg-secondary';
+})();
+const getEventBadgeClass = (action) => {
+    const normalized = String(action || '').trim().toLowerCase();
+    if (normalized.includes('auto_delete')) return 'bg-danger-subtle text-danger-emphasis border border-danger border-opacity-25';
+    if (normalized.includes('auto_suspend')) return 'bg-warning-subtle text-warning-emphasis border border-warning border-opacity-25';
+    if (normalized.includes('inventory.sell')) return 'bg-info-subtle text-info-emphasis border border-info border-opacity-25';
+    if (normalized.includes('inventory.purchase')) return 'bg-primary-subtle text-primary-emphasis border border-primary border-opacity-25';
+    return 'bg-success-subtle text-success-emphasis border border-success border-opacity-25';
+};
+const formatAuditSummary = (row) => {
+    const meta = row && row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+    const parts = [];
+    if (meta.serverName) parts.push(`Server: ${meta.serverName}`);
+    if (meta.dealName) parts.push(`Deal: ${meta.dealName}${meta.quantity ? ` x${Number(meta.quantity) || 0}` : ''}`);
+    if (meta.resourceType) parts.push(`Resource: ${meta.resourceType} x${Number(meta.quantity || 0) || 0}`);
+    if (meta.reason) parts.push(`Reason: ${meta.reason}`);
+    if (meta.containerId) parts.push(`Container: /${meta.containerId}`);
+    if (meta.walletBefore !== undefined && meta.walletAfter !== undefined) {
+        parts.push(`Wallet: ${compactCoins(meta.walletBefore)} -> ${compactCoins(meta.walletAfter)}`);
+    }
+    return parts.length > 0 ? parts.join(' | ') : '-';
+};
+%>
+
+<style>
+    .store-shell { max-width: 1200px; margin: 0 auto; }
+    .store-card { border: 1px solid #2e3036; background: linear-gradient(180deg, rgba(31, 32, 35, 0.95), rgba(31, 32, 35, 0.72)); border-radius: 14px; padding: 1.25rem; }
+    .store-table th, .store-table td { border-color: rgba(255,255,255,0.08) !important; vertical-align: middle; }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="store-shell">
+        <div class="store-card mb-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h1 class="h4 fw-bold mb-1">Server Store</h1>
+                    <p class="text-muted mb-0 small">Renew serverele tale și urmărește countdown-ul de billing.</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/user/create" class="btn btn-primary btn-sm">Create Server</a>
+                    <a href="/" class="btn btn-outline-light btn-sm">Back to Dashboard</a>
+                </div>
+            </div>
+        </div>
+
+        <% if (success) { %>
+            <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success"><i class="bi bi-check-circle-fill me-2"></i><%= success %></div>
+        <% } %>
+        <% if (error) { %>
+            <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i><%= error %></div>
+        <% } %>
+
+        <div class="store-card mb-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="text-muted small">Wallet</div>
+                <div class="h5 mb-0 fw-bold"><%= compactCoins(user.coins || 0) %> <%= economyUnit %></div>
+            </div>
+            <div class="text-muted small mt-2">Renew period: <strong><%= renewDays %> days</strong>. Delete grace after overdue suspend: <strong><%= deleteGraceDays %> days</strong>.</div>
+        </div>
+
+        <% if (featureQuotaForecastingEnabled) { %>
+            <div class="store-card mb-3">
+                <h2 class="h6 mb-2 text-uppercase fw-bold">Quota Forecasting V2</h2>
+                <div class="row g-2">
+                    <div class="col-6 col-md-3"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">Baseline Daily Burn</div><div class="fw-semibold"><%= compactCoins(quota.totalDailyBurn || 0) %> <%= economyUnit %></div></div></div>
+                    <div class="col-6 col-md-3"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">Observed Burn (30d)</div><div class="fw-semibold"><%= compactCoins(quota.observedDailyBurn30 || 0) %> <%= economyUnit %></div></div></div>
+                    <div class="col-6 col-md-3"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">Projected Daily Burn</div><div class="fw-semibold"><%= compactCoins(quota.projectedDailyBurn || 0) %> <%= economyUnit %></div></div></div>
+                    <div class="col-6 col-md-3"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">Runway</div><div class="fw-semibold"><%= quota.runwayText || 'N/A' %></div></div></div>
+                </div>
+                <div class="text-muted small mt-2">
+                    Projected 30-day burn: <strong><%= compactCoins(quota.projectedMonthlyBurn || 0) %> <%= economyUnit %></strong>
+                    | Trend: <strong><%= Number(quota.trendPercent || 0).toFixed(1) %>%</strong>
+                    | Confidence: <strong><%= Number(quota.confidencePercent || 0) %>%</strong>
+                    | Model: <strong>v<%= Number(quota.modelVersion || 2) %></strong>
+                </div>
+            </div>
+        <% } %>
+
+        <% if (featureRevenueModeEnabled) { %>
+            <div class="store-card mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                    <h2 class="h6 mb-0 text-uppercase fw-bold">Revenue Mode</h2>
+                    <span class="badge <%= revenueBadgeClass %>"><%= String(revenueProfileData.status || 'inactive').toUpperCase() %></span>
+                </div>
+                <div class="text-muted small mb-3">
+                    Current plan:
+                    <strong><%= hasRevenuePlan ? revenueCurrentPlan.name : (revenueProfileData.planNameSnapshot || 'None') %></strong>
+                    | Next renew: <strong><%= formatRuntimeDate(revenueProfileData.nextRenewAtMs) %></strong>
+                    <% if (String(revenueProfileData.status || '').toLowerCase() === 'past_due') { %>
+                        | Grace until: <strong><%= formatRuntimeDate(revenueProfileData.graceEndsAtMs) %></strong>
+                    <% } %>
+                </div>
+                <% if (hasRevenuePlan) { %>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6 col-md-3"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">Servers</div><div class="fw-semibold"><%= Number(usage.serverCount || 0) %><% if (Number(revenueCurrentPlan.maxServers || 0) > 0) { %> / <%= Number(revenueCurrentPlan.maxServers || 0) %><% } %></div></div></div>
+                        <div class="col-6 col-md-3"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">RAM</div><div class="fw-semibold"><%= formatMbToGb(usage.memory || 0) %> GB<% if (Number(revenueCurrentPlan.maxMemoryMb || 0) > 0) { %> / <%= formatMbToGb(revenueCurrentPlan.maxMemoryMb || 0) %> GB<% } %></div></div></div>
+                        <div class="col-6 col-md-3"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">CPU</div><div class="fw-semibold"><%= Number(usage.cpu || 0) / 100 %> cores<% if (Number(revenueCurrentPlan.maxCpuPercent || 0) > 0) { %> / <%= Number(revenueCurrentPlan.maxCpuPercent || 0) / 100 %> cores<% } %></div></div></div>
+                        <div class="col-6 col-md-3"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">Disk</div><div class="fw-semibold"><%= formatMbToGb(usage.disk || 0) %> GB<% if (Number(revenueCurrentPlan.maxDiskMb || 0) > 0) { %> / <%= formatMbToGb(revenueCurrentPlan.maxDiskMb || 0) %> GB<% } %></div></div></div>
+                    </div>
+                <% } %>
+                <div class="row g-2">
+                    <% revenueCatalog.filter((plan) => plan.enabled).forEach((plan) => { %>
+                        <div class="col-12 col-lg-6">
+                            <div class="p-3 rounded border border-secondary border-opacity-25 h-100">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div>
+                                        <div class="fw-semibold"><%= plan.name %></div>
+                                        <div class="text-muted small"><%= plan.description || 'No description' %></div>
+                                    </div>
+                                    <span class="badge bg-primary"><%= compactCoins(plan.priceCoins || 0) %> <%= economyUnit %> / <%= Number(plan.periodDays || 30) %>d</span>
+                                </div>
+                                <div class="small text-muted mb-2">
+                                    Limits:
+                                    Servers <strong><%= Number(plan.maxServers || 0) > 0 ? Number(plan.maxServers || 0) : 'unlimited' %></strong>,
+                                    RAM <strong><%= Number(plan.maxMemoryMb || 0) > 0 ? formatMbToGb(plan.maxMemoryMb || 0) + ' GB' : 'unlimited' %></strong>,
+                                    CPU <strong><%= Number(plan.maxCpuPercent || 0) > 0 ? (Number(plan.maxCpuPercent || 0) / 100) + ' cores' : 'unlimited' %></strong>,
+                                    Disk <strong><%= Number(plan.maxDiskMb || 0) > 0 ? formatMbToGb(plan.maxDiskMb || 0) + ' GB' : 'unlimited' %></strong>
+                                </div>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <form method="POST" action="/store/revenue/subscribe">
+                                        <input type="hidden" name="planId" value="<%= plan.id %>">
+                                        <button type="submit" class="btn btn-sm btn-primary">Subscribe / Renew</button>
+                                    </form>
+                                    <% if (revenueCanStartTrial) { %>
+                                        <form method="POST" action="/store/revenue/start-trial">
+                                            <input type="hidden" name="planId" value="<%= plan.id %>">
+                                            <button type="submit" class="btn btn-sm btn-outline-info">Start Trial</button>
+                                        </form>
+                                    <% } %>
+                                </div>
+                            </div>
+                        </div>
+                    <% }) %>
+                    <% if (!revenueCatalog.filter((plan) => plan.enabled).length) { %>
+                        <div class="text-muted small">No enabled revenue plans configured by admin.</div>
+                    <% } %>
+                </div>
+            </div>
+        <% } %>
+
+        <% if (featureStoreDealsEnabled) { %>
+            <div class="store-card mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <div>
+                        <h2 class="h6 mb-1 text-uppercase fw-bold">Deals</h2>
+                        <div class="text-muted small">Am separat pagina de Deals pentru listări lungi și mai multe pachete.</div>
+                        <div class="text-muted small">
+                            Active: <strong><%= Number(storeDealsActiveCount || 0) %></strong> / Total: <strong><%= Number(storeDealsCount || 0) %></strong>
+                        </div>
+                    </div>
+                    <a href="/store/deals" class="btn btn-outline-light btn-sm">Open Deals Page</a>
+                </div>
+                <div class="text-muted small">Purchase flow is now handled on <code>/store/deals</code>.</div>
+            </div>
+        <% } %>
+
+        <% if (featureStoreRedeemCodesEnabled) { %>
+            <div class="store-card mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <h2 class="h6 mb-1 text-uppercase fw-bold">Redeem Codes</h2>
+                        <div class="text-muted small">Redeem promo codes for coins and/or inventory resources.</div>
+                    </div>
+                    <a href="/store/redeem" class="btn btn-outline-light btn-sm">Open Redeem Page</a>
+                </div>
+            </div>
+        <% } %>
+
+        <% if (featureInventoryEnabled) { %>
+            <div class="store-card mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                    <div>
+                        <h2 class="h6 mb-1 text-uppercase fw-bold">Inventory</h2>
+                        <div class="text-muted small">Buy stackable resources and consume them on server create.</div>
+                    </div>
+                    <div class="text-muted small">Sell rate: <strong>50%</strong> of buy cost (rounded down).</div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6 col-md-3"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">RAM</div><div class="fw-semibold"><%= formatMbToGb(inventory.ramMb) %> GB</div></div></div>
+                    <div class="col-6 col-md-3"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">CPU</div><div class="fw-semibold"><%= Number(inventory.cpuPercent || 0) / 100 %> cores</div></div></div>
+                    <div class="col-6 col-md-3"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">Disk</div><div class="fw-semibold"><%= formatMbToGb(inventory.diskMb) %> GB</div></div></div>
+                    <div class="col-6 col-md-3"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">Swap</div><div class="fw-semibold"><%= formatMbToGb(inventory.swapMb) %> GB</div></div></div>
+                    <div class="col-4 col-md-2"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">Allocations</div><div class="fw-semibold"><%= Number(inventory.allocations || 0) %></div></div></div>
+                    <div class="col-4 col-md-2"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">Images</div><div class="fw-semibold"><%= Number(inventory.images || 0) %></div></div></div>
+                    <div class="col-4 col-md-2"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">Packages</div><div class="fw-semibold"><%= Number(inventory.packages || 0) %></div></div></div>
+                </div>
+                <div class="row g-2">
+                    <%
+                    const buyItems = [
+                        { type: 'ram_gb', label: 'RAM GB', cost: unitCosts.ramGb },
+                        { type: 'cpu_core', label: 'CPU Core', cost: unitCosts.cpuCore },
+                        { type: 'disk_gb', label: 'Disk GB', cost: unitCosts.diskGb },
+                        { type: 'swap_gb', label: 'Swap GB', cost: unitCosts.swapGb },
+                        { type: 'allocation', label: 'Allocation Token', cost: unitCosts.allocation },
+                        { type: 'image', label: 'Image Token', cost: unitCosts.image },
+                        { type: 'package', label: 'Package Token', cost: unitCosts.package }
+                    ];
+                    %>
+                    <% buyItems.forEach((item) => { %>
+                        <div class="col-12 col-lg-6">
+                            <div class="d-flex align-items-end gap-2 p-2 rounded border border-secondary border-opacity-25">
+                                <div class="flex-grow-1">
+                                    <label class="form-label text-muted small mb-1"><%= item.label %></label>
+                                    <div class="text-muted small mb-1">
+                                        Buy: <strong><%= compactCoins(item.cost || 0) %> <%= economyUnit %></strong> / unit
+                                        <span class="mx-1">|</span>
+                                        Sell: <strong><%= compactCoins((Number(item.cost || 0) / 2)) %> <%= economyUnit %></strong> / unit
+                                    </div>
+                                    <input type="number" name="quantity" min="1" max="10000" value="1" class="form-control form-control-sm inventory-qty" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                </div>
+                                <form method="POST" action="/store/inventory/buy" class="d-inline">
+                                    <input type="hidden" name="resourceType" value="<%= item.type %>">
+                                    <input type="hidden" name="quantity" value="1" class="inventory-qty-hidden">
+                                    <button type="submit" class="btn btn-sm btn-primary">Buy</button>
+                                </form>
+                                <form method="POST" action="/store/inventory/sell" class="d-inline">
+                                    <input type="hidden" name="resourceType" value="<%= item.type %>">
+                                    <input type="hidden" name="quantity" value="1" class="inventory-qty-hidden">
+                                    <button type="submit" class="btn btn-sm btn-outline-warning">Sell</button>
+                                </form>
+                            </div>
+                        </div>
+                    <% }) %>
+                </div>
+            </div>
+        <% } %>
+
+
+
+        <div class="store-card">
+            <% if (!storeRows || storeRows.length === 0) { %>
+                <div class="text-muted">No servers found.</div>
+            <% } else { %>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm store-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Server</th>
+                                <th>Status</th>
+                                <th>Recurring Cost</th>
+                                <th>Countdown</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% storeRows.forEach((row) => { %>
+                                <% const status = row.billing ? row.billing.status : 'no_billing'; %>
+                                <% const statusLabel = status === 'suspended_due' ? 'suspended_due' : (status === 'active' ? 'active' : 'disabled'); %>
+                                <% const canRenew = featureCostPerServerEnabled && row.billing; %>
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold"><%= row.server.name %></div>
+                                        <div class="text-muted small">/<%= row.server.containerId %></div>
+                                    </td>
+                                    <td>
+                                        <span class="badge <%= statusLabel === 'active' ? 'bg-success' : (statusLabel === 'suspended_due' ? 'bg-warning text-dark' : 'bg-secondary') %>">
+                                            <%= statusLabel %>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <% if (featureCostPerServerEnabled) { %>
+                                            <strong><%= compactCoins(row.recurringCoins || 0) %> <%= economyUnit %></strong>
+                                        <% } else { %>
+                                            <span class="text-muted">Disabled</span>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <% if (row.billing) { %>
+                                            <span class="billing-countdown" data-seconds="<%= Number(row.billing.remainingSeconds || 0) %>" data-mode="<%= row.billing.status === 'suspended_due' ? 'delete' : 'renew' %>"></span>
+                                        <% } else { %>
+                                            <span class="text-muted">-</span>
+                                        <% } %>
+                                    </td>
+                                    <td class="text-end">
+                                        <a href="/server/<%= row.server.containerId %>" class="btn btn-sm btn-outline-light">Manage</a>
+                                        <% if (canRenew) { %>
+                                            <form method="POST" action="/store/renew/<%= row.server.containerId %>" class="d-inline">
+                                                <button type="submit" class="btn btn-sm btn-primary">Renew</button>
+                                            </form>
+                                        <% } else { %>
+                                            <span class="text-muted small ms-1">-</span>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } %>
+        </div>
+
+        <div class="store-card mt-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <div>
+                    <h2 class="h6 mb-1 text-uppercase fw-bold">Billing History & Audit</h2>
+                    <div class="text-muted small">Store and billing events for your account and servers.</div>
+                </div>
+            </div>
+            <% if (!billingAuditRows.length) { %>
+                <div class="text-muted">No billing events yet.</div>
+            <% } else { %>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm store-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Event</th>
+                                <th>Amount</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% billingAuditRows.forEach((row) => { %>
+                                <tr>
+                                    <td class="text-nowrap"><%= formatAuditDate(row.createdAt) %></td>
+                                    <td>
+                                        <span class="badge <%= getEventBadgeClass(row.action) %>"><%= row.actionLabel %></span>
+                                    </td>
+                                    <td>
+                                        <% if (row.amount !== null && row.amount !== undefined) { %>
+                                            <strong><%= compactCoins(row.amount) %> <%= row.currency || economyUnit %></strong>
+                                        <% } else { %>
+                                            <span class="text-muted">-</span>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <div class="small"><%= formatAuditSummary(row) %></div>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<script>
+(() => {
+    if (window.__cpanelStoreLifecycleBound) return;
+    window.__cpanelStoreLifecycleBound = true;
+
+    let storePageState = null;
+
+    const wireInventoryQtySync = () => {
+        const cleanupFns = [];
+        const rows = Array.from(document.querySelectorAll('.inventory-qty'));
+        rows.forEach((qtyInput) => {
+            const container = qtyInput.closest('.d-flex');
+            if (!container) return;
+            const hiddenInputs = Array.from(container.querySelectorAll('.inventory-qty-hidden'));
+            const sync = () => {
+                const parsed = Number.parseInt(qtyInput.value || '1', 10);
+                const value = Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+                hiddenInputs.forEach((input) => {
+                    input.value = String(value);
+                });
+            };
+            qtyInput.addEventListener('input', sync);
+            qtyInput.addEventListener('change', sync);
+            cleanupFns.push(() => qtyInput.removeEventListener('input', sync));
+            cleanupFns.push(() => qtyInput.removeEventListener('change', sync));
+            sync();
+        });
+        return cleanupFns;
+    };
+
+    const formatDuration = (secondsInput) => {
+        let seconds = Math.max(0, Number.parseInt(String(secondsInput), 10) || 0);
+        const d = Math.floor(seconds / 86400);
+        seconds -= d * 86400;
+        const h = Math.floor(seconds / 3600);
+        seconds -= h * 3600;
+        const m = Math.floor(seconds / 60);
+        seconds -= m * 60;
+        const s = seconds;
+        if (d > 0) return `${d}d ${h}h ${m}m`;
+        if (h > 0) return `${h}h ${m}m ${s}s`;
+        if (m > 0) return `${m}m ${s}s`;
+        return `${s}s`;
+    };
+
+    const initStorePage = () => {
+        const root = document.querySelector('.store-shell');
+        if (!root) return;
+        if (root.dataset.cpanelStoreInit === '1') return;
+        root.dataset.cpanelStoreInit = '1';
+
+        const cleanupFns = wireInventoryQtySync();
+        const nodes = Array.from(document.querySelectorAll('.billing-countdown'));
+        const tick = () => {
+            nodes.forEach((node) => {
+                const current = Math.max(0, Number.parseInt(node.getAttribute('data-seconds') || '0', 10) || 0);
+                const mode = node.getAttribute('data-mode') || 'renew';
+                if (current <= 0) {
+                    node.textContent = mode === 'delete' ? 'Delete due now' : 'Renew due now';
+                    return;
+                }
+                node.textContent = `${mode === 'delete' ? 'Delete in' : 'Renew in'} ${formatDuration(current)}`;
+                node.setAttribute('data-seconds', String(current - 1));
+            });
+        };
+
+        tick();
+        const tickTimer = window.setInterval(tick, 1000);
+
+        storePageState = { root, cleanupFns, tickTimer };
+    };
+
+    const cleanupStorePage = () => {
+        if (!storePageState) return;
+        if (storePageState.tickTimer) {
+            clearInterval(storePageState.tickTimer);
+        }
+        (storePageState.cleanupFns || []).forEach((cleanup) => {
+            try { cleanup(); } catch { }
+        });
+        if (storePageState.root) {
+            storePageState.root.dataset.cpanelStoreInit = '0';
+        }
+        storePageState = null;
+    };
+
+    document.addEventListener('turbo:load', initStorePage);
+    document.addEventListener('turbo:before-cache', cleanupStorePage);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initStorePage, { once: true });
+    } else {
+        initStorePage();
+    }
+})();
+</script>
+
+<%- include('partials/footer') %>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

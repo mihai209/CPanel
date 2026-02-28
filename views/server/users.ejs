@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Users <%= server.name %> | <%= settings.brandName.toUpperCase() %></title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        :root { --bg:#0f0f12; --panel:#121216; --border:#2d2d35; --text:#e1e1e6; --muted:#8b8b9a; --accent:#3b82f6; }
+        body { background: var(--bg); color: var(--text); margin: 0; font-family: Inter, system-ui, -apple-system, sans-serif; height: 100vh; overflow: hidden; }
+        .wrapper { display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 260px; background: var(--panel); border-right: 1px solid var(--border); overflow-y: auto; }
+        .sidebar.collapsed { margin-left: -260px; }
+        .content { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        .top-navbar { background: var(--panel); border-bottom: 1px solid var(--border); padding: .75rem 1rem; display: flex; align-items: center; gap: .75rem; }
+        .scroll-area { flex: 1; overflow-y: auto; padding: 1.25rem; }
+        .cardx { background: var(--panel); border: 1px solid var(--border); border-radius: .8rem; }
+        .text-muted-2 { color: var(--muted); }
+        .btn-icon { background: transparent; border: 0; color: var(--muted); font-size: 1.2rem; }
+        .table-dark { --bs-table-bg: transparent; }
+        .permission-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: .4rem; }
+        code { color: #93c5fd; }
+    </style>
+</head>
+<body>
+<div class="wrapper">
+    <nav class="sidebar" id="sidebar">
+        <div class="p-3">
+            <%- include('../partials/server-sidebar', { server, active: 'users' }) %>
+        </div>
+    </nav>
+
+    <main class="content">
+        <header class="top-navbar">
+            <button class="btn-icon" id="sidebarToggle"><i class="bi bi-list"></i></button>
+            <h1 class="h5 mb-0">Users / <span class="text-muted-2"><%= server.name %></span></h1>
+        </header>
+
+        <section class="scroll-area">
+            <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+            <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+
+            <div class="cardx p-3 mb-3">
+                <div class="small text-muted-2 text-uppercase mb-1">Owner</div>
+                <div class="fw-semibold"><%= owner ? owner.username : 'Unknown' %></div>
+                <div class="text-muted-2"><%= owner ? owner.email : '-' %></div>
+            </div>
+
+            <div class="cardx p-3 mb-3">
+                <h2 class="h6 mb-3">Subusers</h2>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Permissions</th>
+                                <th>Invited By</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        <% if (!memberships || memberships.length === 0) { %>
+                            <tr><td colspan="4" class="text-muted-2">No subusers yet.</td></tr>
+                        <% } else { memberships.forEach((entry) => { %>
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold"><%= entry.user ? entry.user.username : ('#' + entry.userId) %></div>
+                                    <div class="small text-muted-2"><%= entry.user ? entry.user.email : '' %></div>
+                                </td>
+                                <td><code><%= Array.isArray(entry.permissions) ? entry.permissions.join(', ') : '' %></code></td>
+                                <td><%= entry.invitedBy ? entry.invitedBy.username : '-' %></td>
+                                <td class="text-end">
+                                    <% if (canManageUsers) { %>
+                                    <form method="POST" action="/server/<%= server.containerId %>/users/<%= entry.id %>/delete" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                    </form>
+                                    <% } else { %>
+                                        <span class="text-muted-2">-</span>
+                                    <% } %>
+                                </td>
+                            </tr>
+                        <% }) } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <% if (canManageUsers) { %>
+            <div class="cardx p-3">
+                <h2 class="h6 mb-3">Invite / Update Subuser</h2>
+                <form method="POST" action="/server/<%= server.containerId %>/users">
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small text-uppercase text-muted-2">User</label>
+                            <select name="userId" class="form-select" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                                <option value="">Select existing user</option>
+                                <% (candidateUsers || []).forEach((u) => { %>
+                                    <option value="<%= u.id %>"><%= u.username %> (<%= u.email %>)</option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small text-uppercase text-muted-2">Or Identifier</label>
+                            <input name="identifier" class="form-control" placeholder="username or email" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                        </div>
+                    </div>
+
+                    <label class="form-label small text-uppercase text-muted-2">Permissions</label>
+                    <div class="permission-grid mb-3">
+                        <% (permissionCatalog || []).forEach((perm) => { %>
+                        <label class="form-check" style="padding:.4rem .5rem;border:1px solid #2d2d35;border-radius:.5rem;background:#16161b;">
+                            <input class="form-check-input" type="checkbox" name="permissions" value="<%= perm %>" <%= perm === 'server.view' ? 'checked' : '' %>>
+                            <span class="form-check-label"><%= perm %></span>
+                        </label>
+                        <% }) %>
+                    </div>
+
+                    <button class="btn btn-primary" type="submit">Save Subuser</button>
+                </form>
+            </div>
+            <% } %>
+        </section>
+    </main>
+</div>
+
+<script>
+    document.getElementById('sidebarToggle')?.addEventListener('click', function () {
+        document.getElementById('sidebar')?.classList.toggle('collapsed');
+    });
+</script>
+</body>
+</html>

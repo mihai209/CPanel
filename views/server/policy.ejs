@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Policy Engine <%= server.name %> | <%= settings.brandName.toUpperCase() %></title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --bg-dark: #0f0f12;
+            --bg-sidebar: #121216;
+            --border-color: #2d2d35;
+            --text-primary: #e1e1e6;
+            --text-secondary: #8b8b9a;
+            --accent-blue: #3b82f6;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .wrapper {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 260px;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            overflow-y: auto;
+        }
+
+        .sidebar.collapsed {
+            margin-left: -260px;
+        }
+
+        .sidebar .sidebar-content {
+            padding: 1.5rem 0.75rem;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--bg-dark);
+        }
+
+        .top-navbar {
+            background: var(--bg-sidebar);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .navbar-toggle {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 1rem;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .navbar-toggle:hover {
+            color: var(--text-primary);
+        }
+
+        .server-info {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .server-name {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .settings-card {
+            background: var(--bg-sidebar);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 1.25rem;
+        }
+
+        .settings-card-header {
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.02);
+            padding: 1rem 1.25rem;
+            font-weight: 600;
+        }
+
+        .settings-card-body {
+            padding: 1.25rem;
+        }
+
+        .form-control,
+        .form-select,
+        .form-check-input {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: var(--accent-blue);
+            color: var(--text-primary);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        .form-check-input:checked {
+            background-color: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .hint {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                margin-left: -260px;
+                position: fixed;
+                top: 0;
+                bottom: 0;
+                z-index: 1050;
+            }
+
+            .sidebar.show {
+                margin-left: 0;
+            }
+
+            .content {
+                width: 100%;
+            }
+
+            .scroll-area {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <%- include ('../partials/error-modal') %>
+    <div class="wrapper">
+        <nav id="sidebar" class="sidebar">
+            <div class="sidebar-content">
+                <%- include('../partials/server-sidebar', { server, active: 'policy', settings }) %>
+            </div>
+        </nav>
+
+        <div class="content">
+            <div class="top-navbar">
+                <button id="sidebarToggle" class="navbar-toggle">
+                    <i class="bi bi-list"></i>
+                </button>
+                <div class="server-info">
+                    <h1 class="server-name">Policy Engine</h1>
+                    <span class="text-secondary opacity-50 mx-2">/</span>
+                    <span class="text-secondary"><%= server.name %></span>
+                </div>
+            </div>
+
+            <div class="scroll-area">
+                <% if (success) { %>
+                    <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
+                        <i class="bi bi-check-circle-fill me-2"></i><%= success %>
+                    </div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i><%= error %>
+                    </div>
+                <% } %>
+
+                <form method="POST" action="/server/<%= server.containerId %>/policy">
+                    <div class="settings-card">
+                        <div class="settings-card-header">General</div>
+                        <div class="settings-card-body">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="enabled" name="enabled" value="1" <%= policyConfig && policyConfig.enabled ? 'checked' : '' %>>
+                                <label class="form-check-label ms-1" for="enabled">Enable Policy Engine for this server</label>
+                            </div>
+                            <div class="hint">Global toggles in Admin Settings must also be enabled.</div>
+                        </div>
+                    </div>
+
+                    <div class="settings-card">
+                        <div class="settings-card-header">Crash Remediation</div>
+                        <div class="settings-card-body">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="restartOnCrash" name="restartOnCrash" value="1" <%= policyConfig && policyConfig.restartOnCrash ? 'checked' : '' %>>
+                                <label class="form-check-label ms-1" for="restartOnCrash">Auto-start server if crash is detected</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-card">
+                        <div class="settings-card-header">Anomaly Remediation</div>
+                        <div class="settings-card-body row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Action</label>
+                                <select class="form-select" name="anomalyAction">
+                                    <option value="none" <%= policyConfig.anomalyAction === 'none' ? 'selected' : '' %>>None</option>
+                                    <option value="restart" <%= policyConfig.anomalyAction === 'restart' ? 'selected' : '' %>>Restart</option>
+                                    <option value="stop" <%= policyConfig.anomalyAction === 'stop' ? 'selected' : '' %>>Stop</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small text-uppercase fw-bold">CPU Threshold (%)</label>
+                                <input type="number" min="1" max="1000" name="anomalyCpuThreshold" class="form-control" value="<%= policyConfig.anomalyCpuThreshold %>">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small text-uppercase fw-bold">RAM Threshold (%)</label>
+                                <input type="number" min="1" max="1000" name="anomalyMemoryThreshold" class="form-control" value="<%= policyConfig.anomalyMemoryThreshold %>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Duration Samples</label>
+                                <input type="number" min="1" max="20" name="anomalyDurationSamples" class="form-control" value="<%= policyConfig.anomalyDurationSamples %>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Max Remediations / Hour</label>
+                                <input type="number" min="1" max="100" name="maxRemediationsPerHour" class="form-control" value="<%= policyConfig.maxRemediationsPerHour %>">
+                            </div>
+                            <div class="col-12">
+                                <div class="hint">When threshold is exceeded for required samples, configured action is sent to connector.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-end">
+                        <button type="submit" class="btn btn-primary px-4 fw-medium">
+                            Save Policy
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('show');
+            });
+        }
+    </script>
+</body>
+</html>

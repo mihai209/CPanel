@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= (settings.brandName || 'CPanel').toUpperCase() %>
+        <%= locals.title ? ' - ' + title.toUpperCase() : '' %> - Admin API
+    </title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include ('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3">
+                    <h4 class="mb-0 text-light fw-normal">Admin API Keys</h4>
+                    <small class="text-muted">Create scoped keys, rotate and audit usage.</small>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <a href="/admin/api/swagger" class="btn btn-outline-info btn-sm">
+                        <i class="bi bi-file-earmark-code me-1"></i>Swagger
+                    </a>
+                    <div class="breadcrumb-admin mb-0">
+                        <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span>
+                        <span class="text-light">API Keys</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="container-fluid py-4 px-lg-4">
+                <% if (success) { %>
+                    <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
+                        <i class="bi bi-check-circle-fill me-2"></i><%= success %>
+                    </div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i><%= error %>
+                    </div>
+                <% } %>
+
+                <% if (freshToken && freshToken.token) { %>
+                    <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning">
+                        <div class="fw-semibold mb-2">
+                            <i class="bi bi-key-fill me-2"></i>
+                            API key <%= freshToken.action === 'rotated' ? 'rotated' : 'created' %>: <strong><%= freshToken.name %></strong>
+                        </div>
+                        <div class="small mb-2">Copy this token now. It is shown only once.</div>
+                        <code class="d-block p-2 rounded" style="background-color:#101017;color:#fff;word-break:break-all;"><%= freshToken.token %></code>
+                    </div>
+                <% } %>
+
+                <div class="row g-4">
+                    <div class="col-12 col-xl-4">
+                        <div class="card border-0 shadow-sm h-100" style="background-color:#141419;">
+                            <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                                <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i class="bi bi-plus-circle me-2"></i>Create API Key</h5>
+                            </div>
+                            <div class="card-body p-4">
+                                <form method="POST" action="/admin/api" class="d-grid gap-3">
+                                    <div>
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Key Name</label>
+                                        <input type="text" name="name" maxlength="120" required class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                    </div>
+
+                                    <div>
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Permissions</label>
+                                        <div class="d-grid gap-2">
+                                            <label class="d-flex gap-2 align-items-center text-light small">
+                                                <input class="form-check-input m-0" type="checkbox" name="permissions" value="<%= wildcardPermission %>">
+                                                <span><code><%= wildcardPermission %></code> (all permissions)</span>
+                                            </label>
+                                            <% (permissionCatalog || []).forEach((perm) => { %>
+                                                <label class="d-flex gap-2 align-items-center text-light small">
+                                                    <input class="form-check-input m-0" type="checkbox" name="permissions" value="<%= perm %>">
+                                                    <span><code><%= perm %></code></span>
+                                                </label>
+                                            <% }) %>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="form-label text-muted small text-uppercase fw-bold">IP Allowlist (optional)</label>
+                                        <textarea name="allowedIps" rows="3" class="form-control" placeholder="203.0.113.10&#10;198.51.100.0/24"
+                                                  style="background-color:#1a1a20;border-color:#2d2d35;"></textarea>
+                                        <small class="text-muted">Leave empty for any IP.</small>
+                                    </div>
+
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <label class="form-label text-muted small text-uppercase fw-bold">Expires At (optional)</label>
+                                            <input type="datetime-local" name="expiresAt" class="form-control"
+                                                   style="background-color:#1a1a20;border-color:#2d2d35;">
+                                        </div>
+                                        <div class="col-6">
+                                            <label class="form-label text-muted small text-uppercase fw-bold">Rotate Every (days)</label>
+                                            <input type="number" min="0" max="3650" step="1" name="rotationIntervalDays" value="0" class="form-control"
+                                                   style="background-color:#1a1a20;border-color:#2d2d35;">
+                                            <small class="text-muted">0 = disabled.</small>
+                                        </div>
+                                    </div>
+
+                                    <div class="text-end">
+                                        <button type="submit" class="btn btn-primary px-4 fw-medium">Generate Key</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-xl-8">
+                        <div class="card border-0 shadow-sm h-100" style="background-color:#141419;">
+                            <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                                <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i class="bi bi-list-check me-2"></i>Existing Admin API Keys</h5>
+                            </div>
+                            <div class="card-body p-0">
+                                <% if (!keys || !keys.length) { %>
+                                    <div class="p-4 text-muted">No admin API keys created yet.</div>
+                                <% } else { %>
+                                    <div class="table-responsive">
+                                        <table class="table table-dark table-hover mb-0 align-middle">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Prefix</th>
+                                                    <th>Permissions</th>
+                                                    <th>Hardening</th>
+                                                    <th>Rate Plan</th>
+                                                    <th>Created</th>
+                                                    <th>Last Used</th>
+                                                    <th>Status</th>
+                                                    <th class="text-end">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <% keys.forEach((key) => { %>
+                                                    <tr>
+                                                        <td>
+                                                            <div class="fw-semibold text-light"><%= key.name %></div>
+                                                            <% if (key.creator) { %>
+                                                                <div class="small text-muted">by <%= key.creator.username %></div>
+                                                            <% } %>
+                                                        </td>
+                                                        <td><code><%= key.keyPrefixMasked %></code></td>
+                                                        <td class="small">
+                                                            <% if (key.permissions && key.permissions.length) { %>
+                                                                <%= key.permissions.join(', ') %>
+                                                            <% } else { %>
+                                                                <span class="text-muted">none</span>
+                                                            <% } %>
+                                                        </td>
+                                                        <td class="small">
+                                                            <div class="mb-2">
+                                                                <div>IPs:
+                                                                    <% if (key.allowedIps && key.allowedIps.length) { %>
+                                                                        <code><%= key.allowedIps.join(', ') %></code>
+                                                                    <% } else { %>
+                                                                        <span class="text-muted">any</span>
+                                                                    <% } %>
+                                                                </div>
+                                                                <div>Expires: <%= key.expiresAt ? new Date(key.expiresAt).toLocaleString() : '-' %></div>
+                                                                <div>Rotate: <%= Number(key.rotationIntervalDays || 0) > 0 ? `${Number(key.rotationIntervalDays)} days` : '-' %></div>
+                                                                <div>Rotated: <%= key.rotatedAt ? new Date(key.rotatedAt).toLocaleString() : '-' %></div>
+                                                            </div>
+                                                            <form method="POST" action="/admin/api/<%= encodeURIComponent(key.name) %>/hardening" class="row g-1">
+                                                                <div class="col-12">
+                                                                    <textarea name="allowedIps" rows="2" class="form-control form-control-sm" placeholder="203.0.113.10, 198.51.100.0/24"
+                                                                              style="background-color:#1a1a20;border-color:#2d2d35;"><%= (key.allowedIps || []).join('\n') %></textarea>
+                                                                </div>
+                                                                <div class="col-6">
+                                                                    <input type="datetime-local" name="expiresAt"
+                                                                           value="<%= key.expiresAt ? new Date(key.expiresAt).toISOString().slice(0, 16) : '' %>"
+                                                                           class="form-control form-control-sm"
+                                                                           style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                                </div>
+                                                                <div class="col-4">
+                                                                    <input type="number" min="0" max="3650" step="1" name="rotationIntervalDays"
+                                                                           value="<%= Number(key.rotationIntervalDays || 0) %>"
+                                                                           class="form-control form-control-sm"
+                                                                           style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                                </div>
+                                                                <div class="col-2 text-end">
+                                                                    <button type="submit" class="btn btn-outline-primary btn-sm">Save</button>
+                                                                </div>
+                                                            </form>
+                                                        </td>
+                                                        <td class="small">
+                                                            <% if (ratePlansEnabled) { %>
+                                                                <% const rp = key.ratePlan || {}; %>
+                                                                <div class="text-muted mb-2">
+                                                                    <span class="badge <%= rp.enabled ? 'bg-success' : 'bg-secondary' %>"><%= rp.enabled ? 'ON' : 'OFF' %></span>
+                                                                    <span class="ms-2">m:<strong><%= Number(rp.perMinute || 0) %></strong></span>
+                                                                    <span class="ms-2">h:<strong><%= Number(rp.perHour || 0) %></strong></span>
+                                                                    <span class="ms-2">d:<strong><%= Number(rp.perDay || 0) %></strong></span>
+                                                                </div>
+                                                                <form method="POST" action="/admin/api/<%= encodeURIComponent(key.name) %>/rate-plan" class="row g-1">
+                                                                    <div class="col-12">
+                                                                        <div class="form-check form-switch mb-1">
+                                                                            <input class="form-check-input" type="checkbox" id="rp-enabled-<%= key.id %>" name="enabled" value="1" <%= rp.enabled ? 'checked' : '' %>>
+                                                                            <label class="form-check-label small text-light" for="rp-enabled-<%= key.id %>">Enable</label>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="col-4">
+                                                                        <input type="number" min="0" step="1" name="perMinute" value="<%= Number(rp.perMinute || 120) %>" class="form-control form-control-sm" title="Per minute" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                                    </div>
+                                                                    <div class="col-4">
+                                                                        <input type="number" min="0" step="1" name="perHour" value="<%= Number(rp.perHour || 3600) %>" class="form-control form-control-sm" title="Per hour" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                                    </div>
+                                                                    <div class="col-4">
+                                                                        <input type="number" min="0" step="1" name="perDay" value="<%= Number(rp.perDay || 50000) %>" class="form-control form-control-sm" title="Per day" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                                    </div>
+                                                                    <div class="col-12 text-end">
+                                                                        <button type="submit" class="btn btn-outline-primary btn-sm mt-1">Save</button>
+                                                                    </div>
+                                                                </form>
+                                                            <% } else { %>
+                                                                <span class="text-muted">Disabled from Let User Create.</span>
+                                                            <% } %>
+                                                        </td>
+                                                        <td class="small"><%= key.createdAt ? new Date(key.createdAt).toLocaleString() : '-' %></td>
+                                                        <td class="small">
+                                                            <div><%= key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleString() : '-' %></div>
+                                                            <% if (key.lastUsedIp) { %>
+                                                                <div class="text-muted"><%= key.lastUsedIp %></div>
+                                                            <% } %>
+                                                            <% if (key.lastUsedGeo) { %>
+                                                                <div class="text-muted"><%= key.lastUsedGeo %></div>
+                                                            <% } %>
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge <%= key.active ? 'bg-success' : 'bg-secondary' %>">
+                                                                <%= key.active ? 'ACTIVE' : 'INACTIVE' %>
+                                                            </span>
+                                                            <% if (!key.active && key.inactiveReason) { %>
+                                                                <div class="small text-warning text-uppercase mt-1"><%= key.inactiveReason %></div>
+                                                            <% } %>
+                                                        </td>
+                                                        <td>
+                                                            <div class="d-flex justify-content-end gap-2">
+                                                                <a class="btn btn-outline-info btn-sm" href="/admin/api/<%= encodeURIComponent(key.name) %>/audit">Audit</a>
+                                                                <form method="POST" action="/admin/api/<%= encodeURIComponent(key.name) %>/rotate">
+                                                                    <button type="submit" class="btn btn-outline-warning btn-sm">Rotate</button>
+                                                                </form>
+                                                                <form method="POST" action="/admin/api/<%= encodeURIComponent(key.name) %>/delete">
+                                                                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                                                                </form>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                <% }) %>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <%- include('../partials/footer') %>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

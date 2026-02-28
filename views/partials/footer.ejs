@@ -1,0 +1,98 @@
+<style>
+    .copyright-footer {
+        text-align: center;
+        padding: 2rem 0;
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+
+    .copyright-footer a {
+        color: #9ca3af;
+        text-decoration: none;
+        font-weight: 600;
+        transition: color 0.2s;
+    }
+
+    .copyright-footer a:hover {
+        color: #ffffff;
+    }
+
+    .copyright-info-btn {
+        background: none;
+        border: none;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+        padding: 0;
+        text-decoration: underline;
+    }
+
+    .copyright-info-btn:hover {
+        color: #ffffff;
+    }
+</style>
+
+<div class="copyright-footer">
+    <p>
+        <a href="https://cpanel-rocky.netlify.app" target="_blank">CPANEL</a> &copy; 2026
+        All rights reserved. Developed by
+        <a href="https://github.com/mihai209" target="_blank">Mihai209</a>.
+        <br>
+        <button type="button" class="copyright-info-btn" data-bs-toggle="modal" data-bs-target="#copyrightInfoModal">
+            Licensing & Support Information
+        </button>
+    </p>
+</div>
+
+<!-- Copyright Info Modal -->
+<div class="modal fade" id="copyrightInfoModal" tabindex="-1" aria-labelledby="copyrightInfoModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg text-start"
+            style="background-color: #1a1a20; border: 1px solid #2d2d35 !important;">
+            <div class="modal-header border-bottom border-secondary border-opacity-10">
+                <h5 class="modal-title fs-6 fw-bold text-light" id="copyrightInfoModalLabel">Licensing & Support</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <h6 class="text-light fw-bold mb-2">MIT License</h6>
+                <p class="text-muted small mb-4">
+                    CPanel is distributed under the MIT License. You are free to use, copy, modify, merge, publish,
+                    distribute, sublicense, and/or sell copies of the software, subject to the conditions of the
+                    license.
+                </p>
+
+                <h6 class="text-light fw-bold mb-2">Disclaimer</h6>
+                <p class="text-muted small mb-4">
+                    CPanel is <strong>not associated</strong> with <a href="https://pterodactyl.io" target="_blank"
+                        class="text-info text-decoration-none">pterodactyl.io</a> or the Pterodactyl Panel. This
+                    software
+                    is merely inspired by its design and concepts, but remains an independent project.
+                </p>
+
+                <hr class="border-secondary border-opacity-10 mb-4">
+
+                <h6 class="text-warning fw-bold mb-2">Support & Modification Policy</h6>
+                <div class="text-light small opacity-75">
+                    <p class="mb-3">
+                        You are free to <strong>modify any assets, styles, and logic</strong> within the panel and
+                        connector to suit your needs.
+                    </p>
+                    <p class="mb-3">
+                        However, please be advised that <strong>removing or modifying the copyright notices in the
+                            footer</strong> will result in the <strong>immediate and automatic termination of
+                            support</strong> from the developer.
+                    </p>
+                    <p class="mb-0">
+                        Support is provided solely by Mihai209 to users who maintain the original branding in the
+                        footer. By using this software, you agree to keep the copyright links visible.
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer border-top border-secondary border-opacity-10">
+                <button type="button" class="btn btn-secondary px-4 fw-bold" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>

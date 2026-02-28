@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= (settings.brandName || 'CPanel').toUpperCase() %>
+        <%= locals.title ? ' - ' + title.toUpperCase() : '' %> - Store Deals
+    </title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include ('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3">
+                    <h4 class="mb-0 text-light fw-normal">Store Deals</h4>
+                    <small class="text-muted">Bundles with stock, price and custom image.</small>
+                </div>
+                <div class="breadcrumb-admin">
+                    <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span>
+                    <a href="/admin/let-user-create">Let User Create</a> <span class="mx-2">&gt;</span>
+                    <span class="text-light">Deals</span>
+                </div>
+            </div>
+
+            <div class="container-fluid py-4 px-lg-4">
+                <% if (success) { %>
+                    <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
+                        <i class="bi bi-check-circle-fill me-2"></i><%= success %>
+                    </div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i><%= error %>
+                    </div>
+                <% } %>
+
+                <div class="card border-0 shadow-sm mb-4" style="background-color:#141419;">
+                    <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i class="bi bi-stars me-2"></i>Create Deal</h5>
+                        <a href="/admin/let-user-create" class="btn btn-outline-light btn-sm">Back to Let User Create</a>
+                    </div>
+                    <div class="card-body p-4">
+                        <form method="POST" action="/admin/store/deals" class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Name</label>
+                                <input type="text" name="name" maxlength="120" required class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Price (<%= economyUnit %>)</label>
+                                <input type="number" name="priceCoins" min="0" step="1" value="0" required class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Stock Total</label>
+                                <input type="number" name="stockTotal" min="1" step="1" value="25" required class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Description</label>
+                                <textarea name="description" rows="2" maxlength="1200" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;"></textarea>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Image URL (optional)</label>
+                                <input type="url" name="imageUrl" placeholder="https://..." class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-12">
+                                <h6 class="text-light mb-2">Resources in this Deal</h6>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">RAM GB</label>
+                                <input type="number" name="resourceRamGb" min="0" step="0.1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">CPU Cores</label>
+                                <input type="number" name="resourceCpuCores" min="0" step="0.1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Disk GB</label>
+                                <input type="number" name="resourceDiskGb" min="0" step="0.1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Swap GB</label>
+                                <input type="number" name="resourceSwapGb" min="0" step="0.1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Alloc Tokens</label>
+                                <input type="number" name="resourceAllocations" min="0" step="1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Image Tokens</label>
+                                <input type="number" name="resourceImages" min="0" step="1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Package Tokens</label>
+                                <input type="number" name="resourcePackages" min="0" step="1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-3 d-flex align-items-center">
+                                <div class="form-check form-switch mt-3">
+                                    <input class="form-check-input" type="checkbox" id="dealEnabledNew" name="enabled" value="1" checked>
+                                    <label class="form-check-label text-light" for="dealEnabledNew">Enabled</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 d-flex align-items-center">
+                                <div class="form-check form-switch mt-3">
+                                    <input class="form-check-input" type="checkbox" id="dealFeaturedNew" name="featured" value="1">
+                                    <label class="form-check-label text-light" for="dealFeaturedNew">Featured</label>
+                                </div>
+                            </div>
+                            <div class="col-12 text-end">
+                                <button type="submit" class="btn btn-primary px-4 fw-medium">Create Deal</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm" style="background-color:#141419;">
+                    <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                        <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i class="bi bi-card-checklist me-2"></i>Existing Deals</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <% if (!deals || !deals.length) { %>
+                            <div class="text-muted">No deals created yet.</div>
+                        <% } else { %>
+                            <div class="row g-3">
+                                <% deals.forEach((deal) => { %>
+                                    <div class="col-12">
+                                        <div class="p-3 rounded border border-secondary border-opacity-25">
+                                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                                                <div>
+                                                    <h6 class="text-light mb-1"><%= deal.name %></h6>
+                                                    <div class="small text-muted">
+                                                        ID: <code><%= deal.id %></code> |
+                                                        Status:
+                                                        <span class="badge <%= deal.status === 'active' ? 'bg-success' : (deal.status === 'sold_out' ? 'bg-warning text-dark' : 'bg-secondary') %>"><%= deal.status %></span>
+                                                        | Remaining: <strong><%= deal.remainingStock %></strong>/<%= deal.stockTotal %>
+                                                    </div>
+                                                </div>
+                                                <% if (deal.imageUrl) { %>
+                                                    <img src="<%= deal.imageUrl %>" alt="Deal Image" style="width:88px;height:88px;object-fit:cover;border-radius:10px;border:1px solid rgba(255,255,255,0.12);">
+                                                <% } %>
+                                            </div>
+
+                                            <form method="POST" action="/admin/store/deals/<%= deal.id %>/update" class="row g-2">
+                                                <div class="col-md-4">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Name</label>
+                                                    <input type="text" name="name" maxlength="120" required value="<%= deal.name %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Price</label>
+                                                    <input type="number" name="priceCoins" min="0" step="1" required value="<%= deal.priceCoins %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Stock Total</label>
+                                                    <input type="number" name="stockTotal" min="<%= deal.stockSold %>" step="1" required value="<%= deal.stockTotal %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Image URL</label>
+                                                    <input type="url" name="imageUrl" value="<%= deal.imageUrl || '' %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Description</label>
+                                                    <textarea name="description" rows="2" maxlength="1200" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;"><%= deal.description || '' %></textarea>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">RAM GB</label>
+                                                    <input type="number" name="resourceRamGb" min="0" step="0.1" value="<%= ((deal.resources && deal.resources.ramMb) ? (deal.resources.ramMb / 1024) : 0) %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">CPU Cores</label>
+                                                    <input type="number" name="resourceCpuCores" min="0" step="0.1" value="<%= ((deal.resources && deal.resources.cpuPercent) ? (deal.resources.cpuPercent / 100) : 0) %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Disk GB</label>
+                                                    <input type="number" name="resourceDiskGb" min="0" step="0.1" value="<%= ((deal.resources && deal.resources.diskMb) ? (deal.resources.diskMb / 1024) : 0) %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Swap GB</label>
+                                                    <input type="number" name="resourceSwapGb" min="0" step="0.1" value="<%= ((deal.resources && deal.resources.swapMb) ? (deal.resources.swapMb / 1024) : 0) %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Alloc</label>
+                                                    <input type="number" name="resourceAllocations" min="0" step="1" value="<%= deal.resources && deal.resources.allocations ? deal.resources.allocations : 0 %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-1">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Img</label>
+                                                    <input type="number" name="resourceImages" min="0" step="1" value="<%= deal.resources && deal.resources.images ? deal.resources.images : 0 %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-1">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Pkg</label>
+                                                    <input type="number" name="resourcePackages" min="0" step="1" value="<%= deal.resources && deal.resources.packages ? deal.resources.packages : 0 %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-3 d-flex align-items-center">
+                                                    <div class="form-check form-switch mt-3">
+                                                        <input class="form-check-input" type="checkbox" id="dealEnabled-<%= deal.id %>" name="enabled" value="1" <%= deal.enabled ? 'checked' : '' %>>
+                                                        <label class="form-check-label text-light" for="dealEnabled-<%= deal.id %>">Enabled</label>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-3 d-flex align-items-center">
+                                                    <div class="form-check form-switch mt-3">
+                                                        <input class="form-check-input" type="checkbox" id="dealFeatured-<%= deal.id %>" name="featured" value="1" <%= deal.featured ? 'checked' : '' %>>
+                                                        <label class="form-check-label text-light" for="dealFeatured-<%= deal.id %>">Featured</label>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6 d-flex align-items-end justify-content-end">
+                                                    <button type="submit" class="btn btn-outline-primary btn-sm">Save Deal</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                <% }) %>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+
+            <%- include('../partials/footer') %>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

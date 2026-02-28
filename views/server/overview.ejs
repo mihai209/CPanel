@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= title %> | <%= settings.brandName.toUpperCase() %>
+    </title>
+    <%- include('../partials/favicon') %>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+        <style>
+            :root {
+                --bg-dark: #0f0f12;
+                --bg-darker: #0a0a0c;
+                --bg-sidebar: #121216;
+                --border-color: #2d2d35;
+                --text-primary: #e1e1e6;
+                --text-secondary: #8b8b9a;
+                --accent-blue: #3b82f6;
+                --accent-green: #10b981;
+                --accent-red: #ef4444;
+                --accent-yellow: #f59e0b;
+            }
+
+            body {
+                background-color: var(--bg-dark);
+                color: var(--text-primary);
+                font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                overflow: hidden;
+                height: 100vh;
+            }
+
+            /* Wrapper for sidebar + content */
+            .wrapper {
+                display: flex;
+                height: 100vh;
+                overflow: hidden;
+            }
+
+            /* Sidebar styles (Pterodactyl-like) */
+            .sidebar {
+                width: 260px;
+                background: var(--bg-sidebar);
+                border-right: 1px solid var(--border-color);
+                transition: all 0.3s ease;
+                display: flex;
+                flex-direction: column;
+                flex-shrink: 0;
+                overflow-y: auto;
+            }
+
+            .sidebar.collapsed {
+                margin-left: -260px;
+            }
+
+            .sidebar .sidebar-content {
+                padding: 1.5rem 0.75rem;
+            }
+
+            .sidebar-item {
+                display: flex;
+                align-items: center;
+                padding: 0.75rem 1rem;
+                color: var(--text-secondary);
+                text-decoration: none;
+                border-radius: 8px;
+                transition: all 0.2s ease;
+                font-weight: 500;
+                font-size: 0.9rem;
+                margin-bottom: 0.25rem;
+            }
+
+            .sidebar-item:hover {
+                background: rgba(255, 255, 255, 0.03);
+                color: var(--text-primary);
+            }
+
+            .sidebar-item.active {
+                background: rgba(59, 130, 246, 0.1);
+                color: var(--accent-blue);
+            }
+
+            .sidebar-icon {
+                margin-right: 12px;
+                font-size: 1.1rem;
+                width: 24px;
+                text-align: center;
+            }
+
+            /* Main content area */
+            .content {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                background: var(--bg-dark);
+            }
+
+            /* Top navbar */
+            .top-navbar {
+                background: var(--bg-sidebar);
+                border-bottom: 1px solid var(--border-color);
+                padding: 0.75rem 1.5rem;
+                display: flex;
+                align-items: center;
+                flex-shrink: 0;
+            }
+
+            .navbar-toggle {
+                background: transparent;
+                border: none;
+                color: var(--text-secondary);
+                font-size: 1.5rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-right: 1rem;
+                cursor: pointer;
+                padding: 0;
+            }
+
+            .navbar-toggle:hover {
+                color: var(--text-primary);
+            }
+
+            .server-info {
+                display: flex;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 1rem;
+            }
+
+            .server-name {
+                font-size: 1.25rem;
+                font-weight: 600;
+                margin: 0;
+            }
+
+            .server-address {
+                color: var(--text-secondary);
+                font-size: 0.85rem;
+            }
+
+            /* Status Badge */
+            .status-badge {
+                padding: 0.4rem 1rem;
+                border-radius: 20px;
+                font-size: 0.75rem;
+                font-weight: 600;
+                display: inline-flex;
+                align-items: center;
+            }
+
+            .status-dot {
+                display: inline-block;
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                margin-right: 8px;
+            }
+
+            .status-running .status-dot {
+                background: #10b981;
+                animation: pulse 2s infinite;
+            }
+
+            .status-running {
+                background: rgba(16, 185, 129, 0.15);
+                color: #10b981;
+                border: 1px solid rgba(16, 185, 129, 0.3);
+            }
+
+            .status-stopped .status-dot {
+                background: #ef4444;
+            }
+
+            .status-stopped {
+                background: rgba(239, 68, 68, 0.15);
+                color: #ef4444;
+                border: 1px solid rgba(239, 68, 68, 0.3);
+            }
+
+            .status-starting .status-dot {
+                background: #3b82f6;
+                animation: pulse 2s infinite;
+            }
+
+            .status-starting {
+                background: rgba(59, 130, 246, 0.15);
+                color: #3b82f6;
+                border-color: rgba(59, 130, 246, 0.3);
+            }
+
+            @keyframes pulse {
+
+                0%,
+                100% {
+                    opacity: 1;
+                }
+
+                50% {
+                    opacity: 0.5;
+                }
+            }
+
+            /* Stat Cards */
+            .stat-card {
+                background: #1a1a20;
+                border: 1px solid #2d2d35;
+                border-radius: 12px;
+                padding: 20px;
+                transition: all 0.3s ease;
+            }
+
+            .stat-card:hover {
+                transform: translateY(-2px);
+                border-color: #3d3d45;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            }
+
+            .stat-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 12px;
+            }
+
+            .stat-label {
+                color: #8b8b9a;
+                font-size: 0.8rem;
+                text-transform: uppercase;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+            }
+
+            .stat-value {
+                font-size: 1.5rem;
+                font-weight: 700;
+                transition: all 0.3s ease;
+            }
+
+            .progress {
+                height: 6px;
+                border-radius: 3px;
+                background: #0f0f12;
+            }
+
+            .progress-bar {
+                border-radius: 3px;
+                transition: all 0.5s ease;
+            }
+
+            .progress-bar-green {
+                background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+            }
+
+            .progress-bar-yellow {
+                background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+            }
+
+            .progress-bar-red {
+                background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
+            }
+
+            /* Details Panel */
+            .details-panel {
+                background: #1a1a20;
+                border: 1px solid #2d2d35;
+                border-radius: 12px;
+                padding: 24px;
+            }
+
+            .details-title {
+                color: #8b8b9a;
+                font-size: 0.8rem;
+                text-transform: uppercase;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+                margin-bottom: 20px;
+            }
+
+            .detail-item {
+                margin-bottom: 20px;
+                border-bottom: 1px solid #2d2d35;
+                padding-bottom: 15px;
+            }
+
+            .detail-item:last-child {
+                margin-bottom: 0;
+                border-bottom: none;
+                padding-bottom: 0;
+            }
+
+            .detail-label {
+                color: #8b8b9a;
+                font-size: 0.75rem;
+                margin-bottom: 4px;
+            }
+
+            .detail-value {
+                font-weight: 600;
+                font-size: 0.95rem;
+            }
+
+            .code-block {
+                background: #121216;
+                border: 1px solid #2d2d35;
+                border-radius: 8px;
+                padding: 12px;
+                font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+                font-size: 0.85rem;
+                color: #e1e1e6;
+                margin-top: 6px;
+                display: block;
+                white-space: pre-wrap;
+                word-break: break-all;
+            }
+
+            /* Scrollable content area */
+            .scroll-area {
+                flex: 1;
+                overflow-y: auto;
+                padding: 1.5rem;
+            }
+
+            @media (max-width: 768px) {
+                .sidebar {
+                    margin-left: -260px;
+                    position: fixed;
+                    top: 0;
+                    bottom: 0;
+                    z-index: 1050;
+                    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+                }
+
+                .sidebar.show {
+                    margin-left: 0;
+                }
+
+                .content {
+                    width: 100%;
+                }
+
+                .scroll-area {
+                    padding: 1rem;
+                }
+            }
+        </style>
+</head>
+
+<body> <%- include ('../partials/error-modal') %>
+        <div class="wrapper">
+            <!-- Sidebar -->
+            <nav id="sidebar" class="sidebar">
+                <div class="sidebar-content">
+                    <%- include('../partials/server-sidebar', { server, active: 'overview' , settings }) %>
+                </div>
+            </nav>
+
+            <!-- Main Content -->
+            <div class="content">
+                <!-- Top Navbar -->
+                <div class="top-navbar">
+                    <button id="sidebarToggle" class="navbar-toggle">
+                        <i class="bi bi-list"></i>
+                    </button>
+                    <div class="server-info">
+                        <h1 class="server-name">
+                            <%= server.name %>
+                        </h1>
+                        <span id="statusBadge" class="status-badge status-<%= server.status %>">
+                            <span class="status-dot"></span>
+                            <span id="statusText">
+                                <%= server.status.toUpperCase() %>
+                            </span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Scroll Area -->
+                <div class="scroll-area">
+                    <!-- Back Button -->
+                    <div class="mb-3">
+                        <a href="/admin/servers" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-arrow-left"></i> Back to Servers
+                        </a>
+                    </div>
+
+                    <!-- Server Header -->
+                    <div class="server-header">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                            <div>
+                                <h1 class="server-name">
+                                    <%= server.name %>
+                                </h1>
+                                <% const alias=server.allocation.alias?.trim(); %>
+                                    <% const ipPort=server.allocation.ip + ':' + server.allocation.port; %>
+                                        <% const domainPort=alias ? alias + ':' + server.allocation.port : null; %>
+
+                                            <div class="d-flex align-items-center gap-2">
+                                                <p id="serverAddress" class="server-address mb-0 font-monospace">
+                                                    <% if (alias) { %>
+                                                        <span class="text-info">
+                                                            <%= domainPort %>
+                                                        </span>
+                                                        <% } else { %>
+                                                            <%= ipPort %>
+                                                                <% } %>
+                                                </p>
+                                                <button id="copyBtn"
+                                                    class="btn btn-outline-secondary btn-sm rounded-circle p-1"
+                                                    style="width: 28px; height: 28px;" title="Copy Address">
+                                                    <i class="bi bi-clipboard"></i>
+                                                </button>
+                                            </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Resource Stats -->
+                    <div class="row g-3 mb-4">
+                        <div class="<%= serverCost ? 'col-md-3' : 'col-md-4' %>">
+                            <div class="stat-card">
+                                <div class="stat-header">
+                                    <span class="stat-label">CPU Usage</span>
+                                    <span id="cpuValue" class="stat-value">0%</span>
+                                </div>
+                                <div class="progress">
+                                    <div id="cpuProgress" class="progress-bar progress-bar-green" role="progressbar"
+                                        style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="<%= serverCost ? 'col-md-3' : 'col-md-4' %>">
+                            <div class="stat-card">
+                                <div class="stat-header">
+                                    <span class="stat-label">Memory</span>
+                                    <span id="memValue" class="stat-value">0 / <%= server.memory %> MB</span>
+                                </div>
+                                <div class="progress">
+                                    <div id="memProgress" class="progress-bar progress-bar-green" role="progressbar"
+                                        style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="<%= serverCost ? 'col-md-3' : 'col-md-4' %>">
+                            <div class="stat-card">
+                                <div class="stat-header">
+                                    <span class="stat-label">Disk</span>
+                                    <span id="diskValue" class="stat-value">0 / <%= server.disk %> MB</span>
+                                </div>
+                                <div class="progress">
+                                    <div id="diskProgress" class="progress-bar progress-bar-green" role="progressbar"
+                                        style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <% if (serverCost) { %>
+                            <div class="col-md-3">
+                                <div class="stat-card">
+                                    <div class="stat-header">
+                                        <span class="stat-label">Estimated Coin Cost</span>
+                                        <span class="stat-value"><%= serverCost.currency %> <%= Number(serverCost.monthly || 0).toFixed(2) %></span>
+                                    </div>
+                                    <div class="small text-secondary">
+                                        Monthly estimate
+                                    </div>
+                                    <div class="small text-secondary mt-1">
+                                        Hourly: <%= serverCost.currency %> <%= Number(serverCost.hourly || 0).toFixed(4) %>
+                                    </div>
+                                </div>
+                            </div>
+                        <% } %>
+                    </div>
+
+                    <!-- Health + Drift -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-lg-6">
+                            <div class="stat-card">
+                                <div class="stat-header">
+                                    <span class="stat-label">Server Health Score (24h)</span>
+                                    <span class="badge <%= healthScore && healthScore.badgeClass ? healthScore.badgeClass : 'bg-secondary' %>">
+                                        <%= healthScore && healthScore.grade ? healthScore.grade : 'Unknown' %>
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="h4 mb-0"><%= healthScore && Number.isFinite(Number(healthScore.score)) ? Number(healthScore.score) : 0 %>/100</div>
+                                    <div class="small text-secondary">
+                                        Crashes: <%= healthScore && healthScore.incidents ? Number(healthScore.incidents.crashCount || 0) : 0 %>,
+                                        Install Fail: <%= healthScore && healthScore.incidents ? Number(healthScore.incidents.installFailCount || 0) : 0 %>,
+                                        Connector: <%= healthScore && healthScore.incidents ? Number(healthScore.incidents.connectorErrorCount || 0) : 0 %>
+                                    </div>
+                                </div>
+                                <div class="progress mb-2">
+                                    <div class="progress-bar <%= (healthScore && Number(healthScore.score) >= 75) ? 'progress-bar-green' : (healthScore && Number(healthScore.score) >= 55) ? 'progress-bar-yellow' : 'progress-bar-red' %>"
+                                        role="progressbar"
+                                        style="width: <%= Math.max(0, Math.min(100, Number(healthScore && healthScore.score || 0))) %>%"></div>
+                                </div>
+                                <div class="small text-secondary">
+                                    <% if (healthScore && Array.isArray(healthScore.factors) && healthScore.factors.length) { %>
+                                        <%= healthScore.factors.join(' | ') %>
+                                    <% } else { %>
+                                        No critical incidents detected in last 24 hours.
+                                    <% } %>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="stat-card">
+                                <div class="stat-header">
+                                    <span class="stat-label">Config Drift Detection</span>
+                                    <% if (configDrift && configDrift.hasBaseline) { %>
+                                        <span class="badge <%= configDrift.drifted ? 'bg-warning text-dark' : 'bg-success' %>"><%= configDrift.drifted ? 'Drift Detected' : 'In Sync' %></span>
+                                    <% } else { %>
+                                        <span class="badge bg-secondary">No Baseline</span>
+                                    <% } %>
+                                </div>
+                                <% if (configDrift && configDrift.hasBaseline) { %>
+                                    <div class="small text-secondary mb-2">
+                                        Baseline captured: <%= configDrift.baseline && configDrift.baseline.updatedAtMs ? new Date(configDrift.baseline.updatedAtMs).toLocaleString() : '-' %>
+                                    </div>
+                                    <% if (configDrift.changedFields && configDrift.changedFields.length) { %>
+                                        <ul class="small mb-2 ps-3">
+                                            <% configDrift.changedFields.slice(0, 5).forEach((entry) => { %>
+                                                <li><strong><%= entry.label %>:</strong> <code><%= entry.baseline %></code> -> <code><%= entry.current %></code></li>
+                                            <% }) %>
+                                        </ul>
+                                        <% if (configDrift.changedFields.length > 5) { %>
+                                            <div class="small text-secondary mb-2">+ <%= configDrift.changedFields.length - 5 %> more changes</div>
+                                        <% } %>
+                                    <% } else { %>
+                                        <div class="small text-secondary mb-2">Current server config matches baseline.</div>
+                                    <% } %>
+                                <% } else { %>
+                                    <div class="small text-secondary mb-2">Create a baseline to start detecting drift for startup, limits, image and variables.</div>
+                                <% } %>
+                                <% if (canManageConfigDrift) { %>
+                                    <form method="POST" action="/server/<%= server.containerId %>/config-drift/baseline">
+                                        <button type="submit" class="btn btn-sm btn-outline-light">
+                                            <i class="bi bi-shield-check me-1"></i>
+                                            <%= configDrift && configDrift.hasBaseline ? 'Refresh Baseline' : 'Set Baseline' %>
+                                        </button>
+                                    </form>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Details -->
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <div class="details-panel">
+                                <h6 class="details-title">Server Details</h6>
+                                <div class="row g-4">
+                                    <div class="col-md-6">
+                                        <div class="detail-item">
+                                            <div class="detail-label">
+                                                <%= server.allocation.alias ? 'Domain Address' : 'IP Address' %>
+                                            </div>
+                                            <div class="detail-value font-monospace">
+                                                <%= alias ? domainPort : ipPort %>
+                                            </div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <div class="detail-label">Port</div>
+                                            <div class="detail-value font-monospace">
+                                                <%= server.allocation.port %>
+                                            </div>
+                                        </div>
+                                        <div class="detail-item">
+                                            <div class="detail-label">Connector</div>
+                                            <div class="detail-value d-flex align-items-center"
+                                                title="Location: <%= server.allocation.connector.location ? server.allocation.connector.location.shortName : 'N/A' %>">
+                                                <% if (server.allocation.connector.location &&
+                                                    server.allocation.connector.location.imageUrl) { %>
+                                                    <img src="<%= server.allocation.connector.location.imageUrl %>"
+                                                        alt="" width="16" height="16"
+                                                        class="rounded-circle me-2 shadow-sm">
+                                                    <% } else { %>
+                                                        <i class="bi bi-geo-alt-fill me-2 text-secondary"></i>
+                                                        <% } %>
+                                                            <%= server.allocation.connector.name %>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="detail-item">
+                                            <div class="detail-label">Docker Image</div>
+                                            <code class="code-block"><%= server.dockerImage %></code>
+                                        </div>
+                                        <div class="detail-item">
+                                            <div class="detail-label">Startup Command</div>
+                                            <code class="code-block"><%= resolvedStartup %></code>
+
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
+            <div id="copyToast" class="toast align-items-center text-bg-dark border-0" role="alert">
+                <div class="d-flex">
+                    <div class="toast-body" id="copyToastBody">
+                        Copied!
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                        data-bs-dismiss="toast"></button>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            (() => {
+                let overviewState = null;
+
+                function initOverviewPage() {
+                    const pageRoot = document.body;
+                    if (!pageRoot) return;
+                    if (pageRoot.dataset.cpanelOverviewInit === '1') return;
+                    pageRoot.dataset.cpanelOverviewInit = '1';
+
+                    const sidebar = document.getElementById('sidebar');
+                    const sidebarToggle = document.getElementById('sidebarToggle');
+                    const alias = '<%= server.allocation.alias || "" %>';
+                    const ipPort = '<%= server.allocation.ip %>:<%= server.allocation.port %>';
+                    const domainPort = alias ? alias + ':<%= server.allocation.port %>' : null;
+                    const addressToCopy = domainPort || ipPort;
+                    const serverMemory = <%= server.memory %>;
+                    const serverDisk = <%= server.disk %>;
+
+                    const sidebarToggleHandler = () => {
+                        if (sidebar) sidebar.classList.toggle('show');
+                    };
+                    const sidebarOutsideClickHandler = (e) => {
+                        if (window.innerWidth <= 768 && sidebar && sidebarToggle) {
+                            if (!sidebar.contains(e.target) && !sidebarToggle.contains(e.target)) {
+                                sidebar.classList.remove('show');
+                            }
+                        }
+                    };
+
+                    if (sidebarToggle) {
+                        sidebarToggle.addEventListener('click', sidebarToggleHandler);
+                    }
+                    document.addEventListener('click', sidebarOutsideClickHandler);
+
+                    const copyBtn = document.getElementById('copyBtn');
+                    const copyHandler = async function () {
+                        const toastElement = document.getElementById('copyToast');
+                        const toastBody = document.getElementById('copyToastBody');
+                        if (!toastElement || !toastBody) return;
+                        const toast = new bootstrap.Toast(toastElement);
+
+                        try {
+                            await navigator.clipboard.writeText(addressToCopy);
+                            toastBody.textContent = 'Address copied to clipboard!';
+                            toastElement.classList.remove('text-bg-danger');
+                            toastElement.classList.add('text-bg-dark');
+                        } catch (err) {
+                            toastBody.textContent = 'Failed to copy address.';
+                            toastElement.classList.remove('text-bg-dark');
+                            toastElement.classList.add('text-bg-danger');
+                        }
+                        toast.show();
+                    };
+                    if (copyBtn) {
+                        copyBtn.addEventListener('click', copyHandler);
+                    }
+
+                    function updateStatus(status) {
+                        const badge = document.getElementById('statusBadge');
+                        const text = document.getElementById('statusText');
+                        if (badge && text) {
+                            const normalized = String(status || 'offline').toLowerCase();
+                            badge.className = `status-badge status-${normalized}`;
+                            text.textContent = normalized.toUpperCase();
+                        }
+                    }
+
+                    function updateStats(cpu, memory, disk = '0') {
+                        const cpuPercent = Number.isFinite(Number.parseFloat(cpu)) ? Number.parseFloat(cpu) : 0;
+                        const cpuVal = document.getElementById('cpuValue');
+                        const cpuProg = document.getElementById('cpuProgress');
+                        if (cpuVal) cpuVal.textContent = `${cpuPercent.toFixed(1)}%`;
+                        if (cpuProg) {
+                            cpuProg.style.width = `${Math.min(cpuPercent, 100)}%`;
+                            cpuProg.className = 'progress-bar ' + (cpuPercent < 60 ? 'progress-bar-green' : cpuPercent < 80 ? 'progress-bar-yellow' : 'progress-bar-red');
+                        }
+
+                        const memUsed = Number.isFinite(Number.parseFloat(memory)) ? Number.parseFloat(memory) : 0;
+                        const memPercent = serverMemory > 0 ? (memUsed / serverMemory) * 100 : 0;
+                        const memVal = document.getElementById('memValue');
+                        const memProg = document.getElementById('memProgress');
+                        if (memVal) memVal.textContent = `${Math.round(memUsed)} / ${serverMemory} MB`;
+                        if (memProg) {
+                            memProg.style.width = `${Math.min(memPercent, 100)}%`;
+                            memProg.className = 'progress-bar ' + (memPercent < 60 ? 'progress-bar-green' : memPercent < 80 ? 'progress-bar-yellow' : 'progress-bar-red');
+                        }
+
+                        const diskUsed = Number.isFinite(Number.parseFloat(disk)) ? Number.parseFloat(disk) : 0;
+                        const diskPercent = serverDisk > 0 ? (diskUsed / serverDisk) * 100 : 0;
+                        const diskVal = document.getElementById('diskValue');
+                        const diskProg = document.getElementById('diskProgress');
+                        if (diskVal) diskVal.textContent = `${Math.round(diskUsed)} / ${serverDisk} MB`;
+                        if (diskProg) {
+                            diskProg.style.width = `${Math.min(diskPercent, 100)}%`;
+                            diskProg.className = 'progress-bar ' + (diskPercent < 60 ? 'progress-bar-green' : diskPercent < 80 ? 'progress-bar-yellow' : 'progress-bar-red');
+                        }
+                    }
+
+                    class StatsClient {
+                        constructor(url) {
+                            this.url = url;
+                            this.ws = null;
+                            this.destroyed = false;
+                            this.reconnectInterval = 1000;
+                            this.maxReconnectInterval = 5000;
+                            this.reconnectTimer = null;
+                            this.heartbeatTimer = null;
+                        }
+
+                        connect() {
+                            if (this.destroyed) return;
+                            this.ws = new WebSocket(this.url);
+
+                            this.ws.onopen = () => {
+                                if (this.destroyed) return;
+                                this.reconnectInterval = 1000;
+                                this.startHeartbeat();
+                            };
+
+                            this.ws.onmessage = (event) => {
+                                if (this.destroyed) return;
+                                try {
+                                    const data = JSON.parse(event.data);
+                                    if (data.type === 'server_stats') {
+                                        updateStats(data.cpu, data.memory, data.disk);
+                                    } else if (data.type === 'server_status_update') {
+                                        updateStatus(data.status);
+                                    }
+                                } catch {
+                                    // ignore malformed frame
+                                }
+                            };
+
+                            this.ws.onclose = () => {
+                                this.stopHeartbeat();
+                                if (this.destroyed) return;
+                                this.reconnectTimer = setTimeout(() => {
+                                    this.reconnectInterval = Math.min(this.reconnectInterval * 1.5, this.maxReconnectInterval);
+                                    this.connect();
+                                }, this.reconnectInterval);
+                            };
+                        }
+
+                        send(type, payload = {}) {
+                            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                                this.ws.send(JSON.stringify({ type, ...payload }));
+                            }
+                        }
+
+                        startHeartbeat() {
+                            this.stopHeartbeat();
+                            this.heartbeatTimer = setInterval(() => {
+                                this.send('ping');
+                            }, 30000);
+                        }
+
+                        stopHeartbeat() {
+                            if (this.heartbeatTimer) {
+                                clearInterval(this.heartbeatTimer);
+                                this.heartbeatTimer = null;
+                            }
+                        }
+
+                        disconnect() {
+                            this.destroyed = true;
+                            this.stopHeartbeat();
+                            if (this.reconnectTimer) {
+                                clearTimeout(this.reconnectTimer);
+                                this.reconnectTimer = null;
+                            }
+                            if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+                                this.ws.close(1000, 'Turbo navigation');
+                            }
+                        }
+                    }
+
+                    const wsToken = '<%= wsToken || "" %>';
+                    const finalWsUrl = window.location.protocol.replace('http', 'ws') + '//' + window.location.host + '/ws/server/<%= server.containerId %>?token=' + encodeURIComponent(wsToken);
+                    const client = new StatsClient(finalWsUrl);
+                    client.connect();
+
+                    overviewState = {
+                        client,
+                        sidebarToggle,
+                        sidebarToggleHandler,
+                        sidebarOutsideClickHandler,
+                        copyBtn,
+                        copyHandler,
+                        pageRoot
+                    };
+                }
+
+                function cleanupOverviewPage() {
+                    if (!overviewState) return;
+                    const state = overviewState;
+                    if (state.sidebarToggle && state.sidebarToggleHandler) {
+                        state.sidebarToggle.removeEventListener('click', state.sidebarToggleHandler);
+                    }
+                    if (state.copyBtn && state.copyHandler) {
+                        state.copyBtn.removeEventListener('click', state.copyHandler);
+                    }
+                    if (state.sidebarOutsideClickHandler) {
+                        document.removeEventListener('click', state.sidebarOutsideClickHandler);
+                    }
+                    if (state.client) {
+                        state.client.disconnect();
+                    }
+                    if (state.pageRoot) {
+                        state.pageRoot.dataset.cpanelOverviewInit = '0';
+                    }
+                    overviewState = null;
+                }
+
+                document.addEventListener('turbo:load', initOverviewPage);
+                document.addEventListener('turbo:before-cache', cleanupOverviewPage);
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', initOverviewPage, { once: true });
+                } else {
+                    initOverviewPage();
+                }
+            })();
+        </script>
+</body>
+
+</html>

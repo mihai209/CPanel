@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= (settings.brandName || 'CPanel').toUpperCase() %>
+        <%= locals.title ? ' - ' + title.toUpperCase() : '' %> - API Key Audit
+    </title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include ('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3">
+                    <h4 class="mb-0 text-light fw-normal">API Key Audit</h4>
+                    <small class="text-muted"><%= key ? key.name : '' %></small>
+                </div>
+                <div class="breadcrumb-admin">
+                    <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span>
+                    <a href="/admin/api">API Keys</a> <span class="mx-2">&gt;</span>
+                    <span class="text-light">Audit</span>
+                </div>
+            </div>
+
+            <div class="container-fluid py-4 px-lg-4">
+                <% if (success) { %>
+                    <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
+                        <i class="bi bi-check-circle-fill me-2"></i><%= success %>
+                    </div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i><%= error %>
+                    </div>
+                <% } %>
+
+                <div class="card border-0 shadow-sm mb-4" style="background-color:#141419;">
+                    <div class="card-body p-4">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="text-muted small text-uppercase fw-bold">Key Name</div>
+                                <div class="text-light fw-semibold"><%= key.name %></div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="text-muted small text-uppercase fw-bold">Prefix</div>
+                                <div><code><%= key.keyPrefixMasked %></code></div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-muted small text-uppercase fw-bold">Status</div>
+                                <span class="badge <%= key.active ? 'bg-success' : 'bg-secondary' %>">
+                                    <%= key.active ? 'ACTIVE' : 'INACTIVE' %>
+                                </span>
+                                <% if (!key.active && key.inactiveReason) { %>
+                                    <div class="small text-warning mt-1 text-uppercase"><%= key.inactiveReason %></div>
+                                <% } %>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-muted small text-uppercase fw-bold">Created</div>
+                                <div class="small text-light"><%= key.createdAt ? new Date(key.createdAt).toLocaleString() : '-' %></div>
+                            </div>
+                            <div class="col-12">
+                                <div class="text-muted small text-uppercase fw-bold mb-1">Permissions</div>
+                                <div class="small text-light"><%= key.permissions && key.permissions.length ? key.permissions.join(', ') : 'none' %></div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="text-muted small text-uppercase fw-bold">Allowlist</div>
+                                <div class="small text-light">
+                                    <% if (key.allowedIps && key.allowedIps.length) { %>
+                                        <code><%= key.allowedIps.join(', ') %></code>
+                                    <% } else { %>
+                                        any
+                                    <% } %>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="text-muted small text-uppercase fw-bold">Expiry / Rotation</div>
+                                <div class="small text-light">
+                                    Expires: <%= key.expiresAt ? new Date(key.expiresAt).toLocaleString() : '-' %><br>
+                                    Rotate: <%= Number(key.rotationIntervalDays || 0) > 0 ? `${Number(key.rotationIntervalDays)} days` : '-' %><br>
+                                    Rotated: <%= key.rotatedAt ? new Date(key.rotatedAt).toLocaleString() : '-' %>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm" style="background-color:#141419;">
+                    <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i class="bi bi-clock-history me-2"></i>Usage Audit</h5>
+                        <a href="/admin/api" class="btn btn-outline-light btn-sm">Back</a>
+                    </div>
+                    <div class="card-body p-0">
+                        <% if (!logs || !logs.length) { %>
+                            <div class="p-4 text-muted">No usage recorded for this key yet.</div>
+                        <% } else { %>
+                            <div class="table-responsive">
+                                <table class="table table-dark table-hover mb-0 align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>When</th>
+                                            <th>Method</th>
+                                            <th>Path</th>
+                                            <th>Permission</th>
+                                            <th>Status</th>
+                                            <th>IP</th>
+                                            <th>Geo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% logs.forEach((entry) => { %>
+                                            <tr>
+                                                <td class="small"><%= entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '-' %></td>
+                                                <td><code><%= entry.method || '-' %></code></td>
+                                                <td class="small"><code><%= entry.path || '-' %></code></td>
+                                                <td class="small"><%= entry.permission || '-' %></td>
+                                                <td>
+                                                    <span class="badge <%= Number(entry.statusCode) >= 400 ? 'bg-danger' : 'bg-success' %>">
+                                                        <%= entry.statusCode || '-' %>
+                                                    </span>
+                                                </td>
+                                                <td class="small"><%= entry.ip || '-' %></td>
+                                                <td class="small"><%= (entry.metadata && entry.metadata.geo) ? entry.metadata.geo : '-' %></td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+
+            <%- include('../partials/footer') %>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= (settings.brandName || 'CPanel' ).toUpperCase() %>
+            <%= locals.title ? ' - ' + title.toUpperCase() : '' %> - Captcha
+    </title>
+    <!-- Favicon -->
+    <%- include('../partials/favicon') %>
+        <!-- Bootstrap CSS -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <!-- Bootstrap Icons -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+        <!-- Google Fonts -->
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+            rel="stylesheet">
+        <!-- Custom CSS -->
+        <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <%- include ('../partials/error-modal') %>
+        <div class="admin-wrapper">
+            <!-- Sidebar -->
+            <%- include('../partials/admin-sidebar') %>
+
+                <!-- Content -->
+                <div class="admin-content">
+                    <!-- Admin Top Header -->
+                    <div class="admin-header">
+                        <div class="d-flex align-items-baseline gap-3">
+                            <h4 class="mb-0 text-light fw-normal">Captcha Settings</h4>
+                            <small class="text-muted">Enhance your panel's security with built-in captcha.</small>
+                        </div>
+                        <div class="breadcrumb-admin">
+                            <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span
+                                class="text-light">Captcha</span>
+                        </div>
+                    </div>
+
+                    <div class="container-fluid py-4 px-lg-4">
+                        <div class="row g-4 justify-content-center">
+                            <div class="col-lg-8">
+                                <div class="card border-0 shadow-sm" style="background-color: #141419;">
+                                    <div
+                                        class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                                        <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i
+                                                class="bi bi-shield-lock me-2"></i>Security Configuration</h5>
+                                    </div>
+                                    <div class="card-body p-4">
+                                        <% if (success) { %>
+                                            <div
+                                                class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
+                                                <i class="bi bi-check-circle-fill me-2"></i>
+                                                <%= success %>
+                                            </div>
+                                            <% } %>
+                                                <% if (error) { %>
+                                                    <div
+                                                        class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
+                                                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                                        <%= error %>
+                                                    </div>
+                                                    <% } %>
+
+                                                        <form method="POST" action="/admin/captcha" class="row g-3">
+                                                            <div class="col-12">
+                                                                <div class="form-check form-switch custom-switch">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                        name="captchastatus" id="captchastatus"
+                                                                        <%=captchastatus ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light fw-medium"
+                                                                        for="captchastatus">
+                                                                        Enable Login & 2FA Captcha
+                                                                    </label>
+                                                                </div>
+                                                                <div class="form-text text-muted mt-2">
+                                                                    When enabled, users will be required to solve a
+                                                                    captcha challenge during the login process and 2FA
+                                                                    verification. This helps protect against automated
+                                                                    brute-force attacks.
+                                                                </div>
+                                                            </div>
+
+                                                            <div
+                                                                class="col-12 mt-4 pt-3 border-top border-secondary border-opacity-10">
+                                                                <div class="d-flex align-items-start gap-3">
+                                                                    <div class="bg-primary bg-opacity-10 p-2 rounded">
+                                                                        <i class="bi bi-info-circle text-primary"></i>
+                                                                    </div>
+                                                                    <div>
+                                                                        <h6 class="text-light mb-1">Built-in Captcha
+                                                                        </h6>
+                                                                        <p class="text-muted small mb-0">
+                                                                            This feature uses a built-in SVG-based
+                                                                            captcha system that doesn't require any
+                                                                            external services like Google reCAPTCHA. It
+                                                                            works completely offline and respects user
+                                                                            privacy.
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="col-12 text-end mt-4">
+                                                                <button type="submit"
+                                                                    class="btn btn-primary px-4 fw-medium">
+                                                                    Save Changes
+                                                                </button>
+                                                            </div>
+                                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <%- include('../partials/footer') %>
+                </div>
+        </div>
+
+        <!-- Bootstrap JS -->
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <style>
+            .custom-switch .form-check-input {
+                width: 3rem;
+                height: 1.5rem;
+                cursor: pointer;
+            }
+
+            .custom-switch .form-check-label {
+                padding-left: 0.5rem;
+                padding-top: 0.15rem;
+                cursor: pointer;
+            }
+        </style>
+</body>
+
+</html>

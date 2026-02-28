@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= (settings.brandName || 'CPanel' ).toUpperCase() %>
+            <%= locals.title ? ' - ' + title.toUpperCase() : '' %> - User Management
+    </title>
+    <!-- Favicon -->
+    <%- include('../partials/favicon') %>
+        <!-- Bootstrap CSS -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <!-- Bootstrap Icons -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+        <!-- Google Fonts -->
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+            rel="stylesheet">
+        <!-- Custom CSS -->
+        <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <%- include ('../partials/error-modal') %>
+        <div class="admin-wrapper">
+            <!-- Sidebar -->
+            <%- include('../partials/admin-sidebar') %>
+
+                <!-- Content -->
+                <div class="admin-content">
+                    <!-- Admin Top Header -->
+                    <div class="admin-header">
+                        <div class="d-flex align-items-baseline gap-3">
+                            <h4 class="mb-0 text-light fw-normal">User Management</h4>
+                            <small class="text-muted">Control who can access your panel.</small>
+                        </div>
+                        <div class="breadcrumb-admin">
+                            <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span
+                                class="text-light">Users</span>
+                        </div>
+                    </div>
+
+                    <div class="container-fluid py-4 px-lg-4">
+                        <div class="row g-4">
+                            <!-- List of Users -->
+                            <div class="col-lg-12">
+                                <div class="card border-0 shadow-sm" style="background-color: #141419;">
+                                    <div
+                                        class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent d-flex justify-content-between align-items-center">
+                                        <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i
+                                                class="bi bi-people me-2"></i>System Users</h5>
+                                        <button class="btn btn-sm btn-primary px-3 fw-bold" data-bs-toggle="modal"
+                                            data-bs-target="#createUserModal">
+                                            <i class="bi bi-plus-lg me-1"></i> Create User
+                                        </button>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <% if (success) { %>
+                                            <div
+                                                class="alert alert-success m-3 border-0 bg-success bg-opacity-10 text-success">
+                                                <i class="bi bi-check-circle-fill me-2"></i>
+                                                <%= success %>
+                                            </div>
+                                            <% } %>
+                                                <% if (error) { %>
+                                                    <div
+                                                        class="alert alert-danger m-3 border-0 bg-danger bg-opacity-10 text-danger">
+                                                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                                        <%= error %>
+                                                    </div>
+                                                    <% } %>
+
+                                                        <div class="table-responsive">
+                                                            <table class="table table-dark table-hover mb-0"
+                                                                style="--bs-table-bg: transparent;">
+                                                                <thead class="text-muted small text-uppercase">
+                                                                    <tr>
+                                                                        <th class="ps-4 py-3 fw-bold"
+                                                                            style="letter-spacing: 0.05em;">User</th>
+                                                                        <th class="py-3 fw-bold"
+                                                                            style="letter-spacing: 0.05em;">Email</th>
+                                                                        <th class="py-3 text-center fw-bold"
+                                                                            style="letter-spacing: 0.05em;">Role</th>
+                                                                        <th class="py-3 text-center fw-bold"
+                                                                            style="letter-spacing: 0.05em;">Since</th>
+                                                                        <th class="pe-4 py-3 text-end fw-bold"
+                                                                            style="letter-spacing: 0.05em;">Actions</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody class="border-top-0">
+                                                                    <% if (users && users.length> 0) { %>
+                                                                        <% users.forEach(u=> {
+                                                                            const emailHash =
+                                                                            md5(u.email.toLowerCase().trim());
+                                                                            const avatar = (u.avatarProvider === 'url'
+                                                                            &&
+                                                                            u.avatarUrl) ? u.avatarUrl :
+                                                                            `https://www.gravatar.com/avatar/${emailHash}?s=200&d=identicon`;
+                                                                            const isCurrent = parseInt(u.id) ===
+                                                                            user.id;
+                                                                            %>
+                                                                            <tr
+                                                                                class="align-middle border-bottom border-secondary border-opacity-10">
+                                                                                <td class="ps-4 py-3">
+                                                                                    <div
+                                                                                        class="d-flex align-items-center">
+                                                                                        <img src="<%= avatar %>" alt=""
+                                                                                            width="32" height="32"
+                                                                                            class="rounded-circle me-3 shadow-sm border border-secondary border-opacity-25">
+                                                                                        <div>
+                                                                                            <div
+                                                                                                class="fw-bold text-light">
+                                                                                                <%= u.username %>
+                                                                                            </div>
+                                                                                            <div
+                                                                                                class="text-muted small">
+                                                                                                ID: #<%= u.id %>
+                                                                                            </div>
+                                                                                            <div
+                                                                                                class="mt-1 d-flex gap-1 justify-content-center justify-content-lg-start">
+                                                                                                <% if (u.linkedAccounts
+                                                                                                    &&
+                                                                                                    u.linkedAccounts.length>
+                                                                                                    0) { %>
+                                                                                                    <%
+                                                                                                        u.linkedAccounts.forEach(link=>
+                                                                                                        {
+                                                                                                        const p = [
+                                                                                                        { id: 'discord',
+                                                                                                        icon:
+                                                                                                        'bi-discord',
+                                                                                                        color: '#5865F2'
+                                                                                                        },
+                                                                                                        { id: 'google',
+                                                                                                        icon:
+                                                                                                        'bi-google',
+                                                                                                        color: '#DB4437'
+                                                                                                        },
+                                                                                                        { id: 'reddit',
+                                                                                                        icon:
+                                                                                                        'bi-reddit',
+                                                                                                        color: '#FF4500'
+                                                                                                        },
+                                                                                                        { id: 'github',
+                                                                                                        icon:
+                                                                                                        'bi-github',
+                                                                                                        color: '#333' }
+                                                                                                        ].find(x => x.id
+                                                                                                        ===
+                                                                                                        link.provider);
+                                                                                                        %>
+                                                                                                        <i class="bi <%= p ? p.icon : 'bi-link-45deg' %> small"
+                                                                                                            style="color: <%= p ? p.color : '#888' %>;"
+                                                                                                            title="<%= link.provider.charAt(0).toUpperCase() + link.provider.slice(1) %> linked"></i>
+                                                                                                        <% }) %>
+                                                                                                            <% } %>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td class="text-muted small">
+                                                                                    <%= u.email %>
+                                                                                </td>
+                                                                                <td class="text-center">
+                                                                                    <% if (u.isSuspended) { %>
+                                                                                        <span
+                                                                                            class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 me-1">SUSPENDED</span>
+                                                                                        <% } %>
+                                                                                            <% if (u.isAdmin) { %>
+                                                                                                <span
+                                                                                                    class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25">
+                                                                                                    ADMIN
+                                                                                                </span>
+                                                                                                <% } else { %>
+                                                                                                    <span
+                                                                                                        class="badge bg-secondary bg-opacity-10 text-muted border border-secondary border-opacity-25">
+                                                                                                        USER
+                                                                                                    </span>
+                                                                                                    <% } %>
+                                                                                                        <% if
+                                                                                                            (u.twoFactorEnabled)
+                                                                                                            { %>
+                                                                                                            <span
+                                                                                                                class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 ms-1"
+                                                                                                                title="2FA Enabled">
+                                                                                                                <i
+                                                                                                                    class="bi bi-shield-check"></i>
+                                                                                                                2FA
+                                                                                                            </span>
+                                                                                                            <% } %>
+                                                                                </td>
+                                                                                <td
+                                                                                    class="text-center text-muted small">
+                                                                                    <%= new
+                                                                                        Date(u.createdAt).toLocaleDateString()
+                                                                                        %>
+                                                                                </td>
+                                                                                <td class="pe-4 text-end">
+                                                                                    <div
+                                                                                        class="d-flex justify-content-end gap-2">
+                                                                                        <button
+                                                                                            class="btn btn-sm btn-outline-primary"
+                                                                                            data-bs-toggle="modal"
+                                                                                            data-bs-target="#editUserModal<%= u.id %>">
+                                                                                            <i
+                                                                                                class="bi bi-pencil-square"></i>
+                                                                                        </button>
+                                                                                        <% if (!isCurrent) { %>
+                                                                                            <button
+                                                                                                class="btn btn-sm btn-outline-danger"
+                                                                                                data-bs-toggle="modal"
+                                                                                                data-bs-target="#deleteUserModal<%= u.id %>">
+                                                                                                <i
+                                                                                                    class="bi bi-trash"></i>
+                                                                                            </button>
+                                                                                            <% } %>
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+
+                                                                            <!-- Edit User Modal -->
+                                                                            <div class="modal fade"
+                                                                                id="editUserModal<%= u.id %>"
+                                                                                tabindex="-1" aria-hidden="true">
+                                                                                <div
+                                                                                    class="modal-dialog modal-dialog-centered">
+                                                                                    <div class="modal-content border-0 shadow-lg"
+                                                                                        style="background-color: #1a1a20; border: 1px solid #2d2d35 !important;">
+                                                                                        <div
+                                                                                            class="modal-header border-bottom border-secondary border-opacity-10">
+                                                                                            <h5
+                                                                                                class="modal-title fs-6 fw-bold text-light">
+                                                                                                Edit User: <%=
+                                                                                                    u.username %>
+                                                                                            </h5>
+                                                                                            <button type="button"
+                                                                                                class="btn-close btn-close-white"
+                                                                                                data-bs-dismiss="modal"></button>
+                                                                                        </div>
+                                                                                        <form method="POST"
+                                                                                            action="/admin/users/edit/<%= u.id %>">
+                                                                                            <div class="modal-body p-4">
+                                                                                                <div class="row g-3">
+                                                                                                    <div class="col-12">
+                                                                                                        <label
+                                                                                                            class="form-label text-muted small text-uppercase fw-bold">Username</label>
+                                                                                                        <input
+                                                                                                            type="text"
+                                                                                                            name="username"
+                                                                                                            class="form-control"
+                                                                                                            style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                                                                                            value="<%= u.username %>"
+                                                                                                            required>
+                                                                                                    </div>
+                                                                                                    <div class="col-12">
+                                                                                                        <label
+                                                                                                            class="form-label text-muted small text-uppercase fw-bold">Email
+                                                                                                            Address</label>
+                                                                                                        <input
+                                                                                                            type="email"
+                                                                                                            name="email"
+                                                                                                            class="form-control"
+                                                                                                            style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                                                                                            value="<%= u.email %>"
+                                                                                                            required>
+                                                                                                    </div>
+                                                                                                    <div class="col-12">
+                                                                                                        <label
+                                                                                                            class="form-label text-muted small text-uppercase fw-bold">Avatar
+                                                                                                            Provider</label>
+                                                                                                        <select
+                                                                                                            name="avatarProvider"
+                                                                                                            class="form-select avatar-provider-select"
+                                                                                                            style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                                                                                            data-target="avatarUrlEditContainer<%= u.id %>">
+                                                                                                            <option
+                                                                                                                value="gravatar"
+                                                                                                                <%=u.avatarProvider==='gravatar'
+                                                                                                                ? 'selected'
+                                                                                                                : '' %>
+                                                                                                                >Gravatar
+                                                                                                            </option>
+                                                                                                            <option
+                                                                                                                value="url"
+                                                                                                                <%=u.avatarProvider==='url'
+                                                                                                                ? 'selected'
+                                                                                                                : '' %>
+                                                                                                                >Custom
+                                                                                                                URL
+                                                                                                            </option>
+                                                                                                        </select>
+                                                                                                    </div>
+                                                                                                    <div class="col-12 avatar-url-container"
+                                                                                                        id="avatarUrlEditContainer<%= u.id %>"
+                                                                                                        style="<%= u.avatarProvider === 'url' ? '' : 'display: none;' %>">
+                                                                                                        <label
+                                                                                                            class="form-label text-muted small text-uppercase fw-bold">Avatar
+                                                                                                            URL</label>
+                                                                                                        <input
+                                                                                                            type="text"
+                                                                                                            name="avatarUrl"
+                                                                                                            class="form-control"
+                                                                                                            style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                                                                                            value="<%= u.avatarUrl %>">
+                                                                                                    </div>
+                                                                                                    <div class="col-12">
+                                                                                                        <label
+                                                                                                            class="form-label text-muted small text-uppercase fw-bold">New
+                                                                                                            Password
+                                                                                                            (leave
+                                                                                                            blank to
+                                                                                                            keep
+                                                                                                            current)</label>
+                                                                                                        <input
+                                                                                                            type="password"
+                                                                                                            name="password"
+                                                                                                            class="form-control"
+                                                                                                            style="background-color: #141419; border-color: #2d2d35; color: white;">
+                                                                                                    </div>
+                                                                                                    <div
+                                                                                                        class="col-12 mt-3">
+                                                                                                        <div
+                                                                                                            class="form-check form-switch border border-secondary border-opacity-10 p-2 rounded ps-5">
+                                                                                                            <input
+                                                                                                                class="form-check-input"
+                                                                                                                type="checkbox"
+                                                                                                                name="isAdmin"
+                                                                                                                id="isAdminEdit<%= u.id %>"
+                                                                                                                <%=u.isAdmin
+                                                                                                                ? 'checked'
+                                                                                                                : '' %>>
+                                                                                                            <label
+                                                                                                                class="form-check-label text-light"
+                                                                                                                for="isAdminEdit<%= u.id %>">Administrator
+                                                                                                                Privileges</label>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                    <div
+                                                                                                        class="col-12 mt-2">
+                                                                                                        <div
+                                                                                                            class="form-check form-switch border border-secondary border-opacity-10 p-2 rounded ps-5">
+                                                                                                            <input
+                                                                                                                class="form-check-input"
+                                                                                                                type="checkbox"
+                                                                                                                name="isSuspended"
+                                                                                                                id="isSuspendedEdit<%= u.id %>"
+                                                                                                                <%=u.isSuspended
+                                                                                                                ? 'checked'
+                                                                                                                : '' %>
+                                                                                                            <%= isCurrent
+                                                                                                                ? 'disabled'
+                                                                                                                : '' %>>
+                                                                                                                <label
+                                                                                                                    class="form-check-label text-light"
+                                                                                                                    for="isSuspendedEdit<%= u.id %>">Suspend
+                                                                                                                    User
+                                                                                                                    <%= isCurrent
+                                                                                                                        ? '(Cannot suspend yourself)'
+                                                                                                                        : ''
+                                                                                                                        %>
+                                                                                                                </label>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <div
+                                                                                                class="modal-footer border-top border-secondary border-opacity-10">
+                                                                                                <button type="button"
+                                                                                                    class="btn btn-link text-muted text-decoration-none"
+                                                                                                    data-bs-dismiss="modal">Cancel</button>
+                                                                                                <button type="submit"
+                                                                                                    class="btn btn-primary px-4 fw-bold">Save
+                                                                                                    Changes</button>
+                                                                                            </div>
+                                                                                        </form>
+
+                                                                                        <% if (u.linkedAccounts &&
+                                                                                            u.linkedAccounts.length> 0)
+                                                                                            { %>
+                                                                                            <div class="px-4 pb-2">
+                                                                                                <label
+                                                                                                    class="form-label text-muted small text-uppercase fw-bold mb-2">Linked
+                                                                                                    OAuth
+                                                                                                    Accounts</label>
+                                                                                                <div class="row g-2">
+                                                                                                    <%
+                                                                                                        u.linkedAccounts.forEach(link=>
+                                                                                                        {
+                                                                                                        const p = [
+                                                                                                        { id: 'discord',
+                                                                                                        name: 'Discord',
+                                                                                                        icon:
+                                                                                                        'bi-discord',
+                                                                                                        color: '#5865F2'
+                                                                                                        },
+                                                                                                        { id: 'google',
+                                                                                                        name: 'Google',
+                                                                                                        icon:
+                                                                                                        'bi-google',
+                                                                                                        color: '#DB4437'
+                                                                                                        },
+                                                                                                        { id: 'reddit',
+                                                                                                        name: 'Reddit',
+                                                                                                        icon:
+                                                                                                        'bi-reddit',
+                                                                                                        color: '#FF4500'
+                                                                                                        },
+                                                                                                        { id: 'github',
+                                                                                                        name: 'GitHub',
+                                                                                                        icon:
+                                                                                                        'bi-github',
+                                                                                                        color: '#333' }
+                                                                                                        ].find(x => x.id
+                                                                                                        ===
+                                                                                                        link.provider);
+                                                                                                        %>
+                                                                                                        <div
+                                                                                                            class="col-6">
+                                                                                                            <div class="p-2 rounded border border-secondary border-opacity-10 d-flex justify-content-between align-items-center"
+                                                                                                                style="background: rgba(255,255,255,0.02);">
+                                                                                                                <div
+                                                                                                                    class="d-flex align-items-center gap-2">
+                                                                                                                    <i class="bi <%= p ? p.icon : 'bi-link-45deg' %>"
+                                                                                                                        style="color: <%= p ? p.color : '#888' %>;"></i>
+                                                                                                                    <span
+                                                                                                                        class="text-light small fw-bold">
+                                                                                                                        <%= p
+                                                                                                                            ?
+                                                                                                                            p.name
+                                                                                                                            :
+                                                                                                                            link.provider
+                                                                                                                            %>
+                                                                                                                    </span>
+                                                                                                                </div>
+                                                                                                                <form
+                                                                                                                    method="POST"
+                                                                                                                    action="/admin/users/<%= u.id %>/unlink/<%= link.provider %>"
+                                                                                                                    onsubmit="return confirm('Ești sigur că vrei să revoce accesul <%= link.provider %> pentru acest utilizator?')">
+                                                                                                                    <button
+                                                                                                                        type="submit"
+                                                                                                                        class="btn btn-sm btn-outline-danger border-0 p-0 px-1">
+                                                                                                                        <i
+                                                                                                                            class="bi bi-x-circle small"></i>
+                                                                                                                    </button>
+                                                                                                                </form>
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                        <% }) %>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <% } %>
+
+                                                                                                <% if
+                                                                                                    (u.twoFactorEnabled)
+                                                                                                    { %>
+                                                                                                    <div
+                                                                                                        class="px-4 pb-4">
+                                                                                                        <div
+                                                                                                            class="p-3 rounded bg-danger bg-opacity-10 border border-danger border-opacity-25">
+                                                                                                            <div
+                                                                                                                class="d-flex justify-content-between align-items-center">
+                                                                                                                <div
+                                                                                                                    class="text-danger small fw-bold">
+                                                                                                                    <i
+                                                                                                                        class="bi bi-shield-lock-fill me-1"></i>2FA
+                                                                                                                    ENABLED
+                                                                                                                </div>
+                                                                                                                <form
+                                                                                                                    method="POST"
+                                                                                                                    action="/admin/users/disable-2fa/<%= u.id %>"
+                                                                                                                    class="m-0 disable-2fa-form">
+                                                                                                                    <button
+                                                                                                                        type="submit"
+                                                                                                                        class="btn btn-sm btn-danger fw-bold">Force
+                                                                                                                        Disable
+                                                                                                                        2FA</button>
+                                                                                                                </form>
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                    <% } %>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+
+                                                                            <!-- Delete User Modal -->
+                                                                            <% if (!isCurrent) { %>
+                                                                                <div class="modal fade"
+                                                                                    id="deleteUserModal<%= u.id %>"
+                                                                                    tabindex="-1" aria-hidden="true">
+                                                                                    <div
+                                                                                        class="modal-dialog modal-dialog-centered sm">
+                                                                                        <div class="modal-content border-0 shadow-lg"
+                                                                                            style="background-color: #1a1a20; border: 1px solid #2d2d35 !important;">
+                                                                                            <div
+                                                                                                class="modal-header border-0">
+                                                                                                <h5
+                                                                                                    class="modal-title fs-6 fw-bold text-light">
+                                                                                                    Confirm Deletion
+                                                                                                </h5>
+                                                                                                <button type="button"
+                                                                                                    class="btn-close btn-close-white"
+                                                                                                    data-bs-dismiss="modal"></button>
+                                                                                            </div>
+                                                                                            <div
+                                                                                                class="modal-body text-center p-4">
+                                                                                                <i
+                                                                                                    class="bi bi-exclamation-triangle-fill text-danger fs-1 mb-3"></i>
+                                                                                                <p
+                                                                                                    class="text-light mb-0">
+                                                                                                    Are you sure you
+                                                                                                    want to
+                                                                                                    delete user <strong>
+                                                                                                        <%= u.username
+                                                                                                            %>
+                                                                                                    </strong>?</p>
+                                                                                                <p
+                                                                                                    class="text-muted small mt-2">
+                                                                                                    This action is
+                                                                                                    permanent
+                                                                                                    and cannot be
+                                                                                                    undone.
+                                                                                                </p>
+                                                                                            </div>
+                                                                                            <div
+                                                                                                class="modal-footer border-0 justify-content-center pb-4">
+                                                                                                <form method="POST"
+                                                                                                    action="/admin/users/delete/<%= u.id %>">
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        class="btn btn-link text-muted text-decoration-none"
+                                                                                                        data-bs-dismiss="modal">Cancel</button>
+                                                                                                    <button
+                                                                                                        type="submit"
+                                                                                                        class="btn btn-danger px-4 fw-bold shadow-sm">Delete
+                                                                                                        User</button>
+                                                                                                </form>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <% } %>
+
+                                                                                    <% }); %>
+                                                                                        <% } else { %>
+                                                                                            <tr>
+                                                                                                <td colspan="5"
+                                                                                                    class="py-5 text-center text-muted italic">
+                                                                                                    No users found.</td>
+                                                                                            </tr>
+                                                                                            <% } %>
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Create User Modal -->
+                    <div class="modal fade" id="createUserModal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content border-0 shadow-lg"
+                                style="background-color: #1a1a20; border: 1px solid #2d2d35 !important;">
+                                <div class="modal-header border-bottom border-secondary border-opacity-10">
+                                    <h5 class="modal-title fs-6 fw-bold text-light"><i
+                                            class="bi bi-person-plus me-2 text-primary"></i>Create New User</h5>
+                                    <button type="button" class="btn-close btn-close-white"
+                                        data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="POST" action="/admin/users">
+                                    <div class="modal-body p-4 text-center">
+                                        <!--<img src="/assets/happy-rocky.png" alt="Mascot" class="img-fluid mb-4"
+                                            style="max-height: 120px;">-->
+                                        <div class="row g-3">
+                                            <div class="col-12">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Avatar
+                                                    Provider</label>
+                                                <select name="avatarProvider" class="form-select avatar-provider-select"
+                                                    style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                                    data-target="avatarUrlCreateContainer">
+                                                    <option value="gravatar" selected>Gravatar</option>
+                                                    <option value="url">Custom URL</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-12 avatar-url-container" id="avatarUrlCreateContainer"
+                                                style="display: none;">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Avatar
+                                                    URL</label>
+                                                <input type="text" name="avatarUrl" class="form-control"
+                                                    style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                                    placeholder="https://example.com/avatar.png">
+                                            </div>
+                                            <div class="col-12">
+                                                <label
+                                                    class="form-label text-muted small text-uppercase fw-bold">Username</label>
+                                                <input type="text" name="username" class="form-control"
+                                                    style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                                    required placeholder="johndoe">
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Email
+                                                    Address</label>
+                                                <input type="email" name="email" class="form-control"
+                                                    style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                                    required placeholder="john@example.com">
+                                            </div>
+                                            <div class="col-md-6 text-start">
+                                                <label
+                                                    class="form-label text-muted small text-uppercase fw-bold">Password</label>
+                                                <input type="password" name="password" class="form-control"
+                                                    style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                                    required placeholder="••••••">
+                                            </div>
+                                            <div class="col-md-6 text-start">
+                                                <label
+                                                    class="form-label text-muted small text-uppercase fw-bold">Confirm
+                                                    Password</label>
+                                                <input type="password" name="confirmPassword" class="form-control"
+                                                    style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                                    required placeholder="••••••">
+                                            </div>
+                                            <div class="col-12 mt-4">
+                                                <div class="form-check form-switch p-3 rounded-3"
+                                                    style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);">
+                                                    <input class="form-check-input ms-0 me-2" type="checkbox"
+                                                        name="isAdmin" id="isAdminSwitch">
+                                                    <label class="form-check-label text-light fw-bold"
+                                                        for="isAdminSwitch">Administrator Privileges</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer border-top border-secondary border-opacity-10">
+                                        <button type="button" class="btn btn-link text-muted text-decoration-none"
+                                            data-bs-dismiss="modal">Cancel</button>
+                                        <button type="submit" class="btn btn-primary px-4 fw-bold">Create
+                                            User</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <%- include('../partials/footer') %>
+                </div>
+        </div>
+        </div>
+
+        <!-- Admin Confirm 2FA Disable Modal -->
+        <div class="modal fade" id="adminConfirm2FADisableModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg"
+                    style="background-color: #1a1a20; border: 1px solid #2d2d35 !important;">
+                    <div class="modal-header border-bottom border-secondary border-opacity-10">
+                        <h5 class="modal-title fs-6 fw-bold text-light">Confirmare Dezactivare 2FA</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-4 text-center">
+                        <img src="/assets/rocky-security.png" alt="Security Mascot" class="img-fluid mb-4"
+                            style="max-height: 160px;">
+                        <h6 class="text-light fw-bold mb-2">Force disable 2FA for this user?</h6>
+                        <p class="text-muted small mb-0">They will be able to login with just their password.</p>
+                    </div>
+                    <div class="modal-footer border-top border-secondary border-opacity-10">
+                        <button type="button" class="btn btn-link text-muted text-decoration-none"
+                            data-bs-dismiss="modal">Cancel</button>
+                        <button id="confirmForceDisableBtn" type="button" class="btn btn-danger px-4 fw-bold">Disable
+                            Now</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            let formToSubmit = null;
+
+            document.querySelectorAll('.avatar-provider-select').forEach(select => {
+                select.addEventListener('change', function () {
+                    const targetId = this.getAttribute('data-target');
+                    const container = document.getElementById(targetId);
+                    if (container) {
+                        container.style.display = this.value === 'url' ? 'block' : 'none';
+                    }
+                });
+            });
+
+            document.querySelectorAll('.disable-2fa-form').forEach(form => {
+                form.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    formToSubmit = this;
+                    const forceDisableModal = new bootstrap.Modal(document.getElementById('adminConfirm2FADisableModal'));
+                    forceDisableModal.show();
+                });
+            });
+
+            document.getElementById('confirmForceDisableBtn').addEventListener('click', function () {
+                if (formToSubmit) {
+                    this.disabled = true;
+                    this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Se dezactivează...';
+                    formToSubmit.submit();
+                }
+            });
+        </script>
+        <!-- Bootstrap JS -->
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= (settings.brandName || 'CPanel' ).toUpperCase() %> - Create Server
+    </title>
+    <%- include('../partials/favicon') %>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+            rel="stylesheet">
+        <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="bg-dark text-light">
+    <%- include ('../partials/error-modal') %>
+        <div class="admin-wrapper">
+            <%- include('../partials/admin-sidebar') %>
+                <div class="admin-content">
+                    <div class="admin-header">
+                        <div class="d-flex align-items-baseline gap-3">
+                            <h4 class="mb-0 text-light fw-normal">Create Server</h4>
+                            <small class="text-muted">Deploy a new server instance.</small>
+                        </div>
+                        <div class="breadcrumb-admin">
+                            <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <a
+                                href="/admin/servers">Servers</a> <span class="mx-2">&gt;</span> <span
+                                class="text-light">Create</span>
+                        </div>
+                    </div>
+
+                    <div class="container-fluid py-4 px-lg-4">
+                        <form action="/admin/servers" method="POST">
+                            <div class="row g-4">
+                                <!-- Core Details -->
+                                <div class="col-lg-8">
+                                    <div class="card border-0 shadow-sm" style="background-color: #141419;">
+                                        <div
+                                            class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                                            <h5 class="card-title mb-0 fs-6 fw-bold text-light">Core Details</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row g-3">
+                                                <div class="col-12">
+                                                    <label
+                                                        class="form-label text-muted small text-uppercase fw-bold">Server
+                                                        Name</label>
+                                                    <input type="text" name="name" class="form-control"
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;"
+                                                        required placeholder="My Awesome Server">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label
+                                                        class="form-label text-muted small text-uppercase fw-bold">Server
+                                                        Owner</label>
+                                                    <select name="ownerId" class="form-select"
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;"
+                                                        required>
+                                                        <option value="" disabled selected>Select an owner...</option>
+                                                        <% users.forEach(u=> { %>
+                                                            <option value="<%= u.id %>">
+                                                                <%= u.username %> (<%= u.email %>)
+                                                            </option>
+                                                            <% }) %>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label
+                                                        class="form-label text-muted small text-uppercase fw-bold">Server
+                                                        Image</label>
+                                                    <select name="imageId" id="imageId" class="form-select"
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;"
+                                                        required>
+                                                        <option value="" disabled selected>Select an image...</option>
+                                                        <% images.forEach(img=> { %>
+                                                            <option value="<%= img.id %>">
+                                                                <%= img.name %>
+                                                            </option>
+                                                            <% }) %>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6" id="dockerImageGroup" style="display: none;">
+                                                    <label
+                                                        class="form-label text-muted small text-uppercase fw-bold">Docker
+                                                        Image (Tag)</label>
+                                                    <select name="dockerImage" id="dockerImage" class="form-select"
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                                        <!-- Dynamic options -->
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="card border-0 shadow-sm mt-4" style="background-color: #141419;">
+                                        <div
+                                            class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                                            <h5 class="card-title mb-0 fs-6 fw-bold text-light">Resource Limits</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row g-3">
+                                                <div class="col-md-4">
+                                                    <label
+                                                        class="form-label text-muted small text-uppercase fw-bold">Memory
+                                                        (MB)</label>
+                                                    <input type="number" name="memory" class="form-control"
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;"
+                                                        value="1024" required>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label
+                                                        class="form-label text-muted small text-uppercase fw-bold">CPU
+                                                        Limit (%)</label>
+                                                    <input type="number" name="cpu" class="form-control"
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;"
+                                                        value="100" required>
+                                                    <small class="text-muted">100% = 1 Core</small>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label
+                                                        class="form-label text-muted small text-uppercase fw-bold">Disk
+                                                        Space (MB)</label>
+                                                    <input type="number" name="disk" class="form-control"
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;"
+                                                        value="10240" required>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label
+                                                        class="form-label text-muted small text-uppercase fw-bold">Swap
+                                                        (MB)</label>
+                                                    <input type="number" name="swapLimit" class="form-control"
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;"
+                                                        value="0">
+                                                    <small class="text-muted">0 = no swap, -1 = unlimited</small>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label
+                                                        class="form-label text-muted small text-uppercase fw-bold">I/O
+                                                        Weight</label>
+                                                    <input type="number" name="ioWeight" class="form-control"
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;"
+                                                        value="500" min="10" max="1000">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label
+                                                        class="form-label text-muted small text-uppercase fw-bold">PIDs
+                                                        Limit</label>
+                                                    <input type="number" name="pidsLimit" class="form-control"
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;"
+                                                        value="512" min="0">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label
+                                                        class="form-label text-muted small text-uppercase fw-bold">OOM
+                                                        Score Adj</label>
+                                                    <input type="number" name="oomScoreAdj" class="form-control"
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;"
+                                                        value="0" min="-1000" max="1000">
+                                                </div>
+                                                <div class="col-md-4 d-flex align-items-end">
+                                                    <div class="form-check form-switch w-100 p-2 rounded-2"
+                                                        style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);">
+                                                        <input type="hidden" name="oomKillDisable" value="0">
+                                                        <input class="form-check-input ms-0 me-2" type="checkbox"
+                                                            name="oomKillDisable" id="oomKillDisable">
+                                                        <label class="form-check-label text-light fw-bold"
+                                                            for="oomKillDisable">Disable OOM Killer</label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Dynamic Environment Variables -->
+                                    <div id="variablesCard" class="card border-0 shadow-sm mt-4"
+                                        style="background-color: #141419; display: none;">
+                                        <div
+                                            class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                                            <h5 class="card-title mb-0 fs-6 fw-bold text-light">Environment Variables
+                                            </h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="variablesContainer" class="row g-3">
+                                                <!-- Dynamic variables injected here -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Networking/Allocation -->
+                                <div class="col-lg-4">
+                                    <div class="card border-0 shadow-sm h-100" style="background-color: #141419;">
+                                        <div
+                                            class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                                            <h5 class="card-title mb-0 fs-6 fw-bold text-light">Networking / Node</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-3">
+                                                <label
+                                                    class="form-label text-muted small text-uppercase fw-bold">Connector
+                                                    (Node)</label>
+                                                <select id="connectorId" name="connectorId" class="form-select"
+                                                    style="background-color: #1a1a20; border-color: #2d2d35; color: white;"
+                                                    required>
+                                                    <option value="" disabled selected>Select a connector...</option>
+                                                    <% connectors.forEach(conn=> { %>
+                                                        <option value="<%= conn.id %>">
+                                                            <%= conn.name %> (<%= conn.fqdn %>)
+                                                        </option>
+                                                        <% }) %>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label
+                                                    class="form-label text-muted small text-uppercase fw-bold">Default
+                                                    Allocation</label>
+                                                <select name="allocationId" id="allocationId" class="form-select"
+                                                    style="background-color: #1a1a20; border-color: #2d2d35; color: white;"
+                                                    required disabled>
+                                                    <option value="" disabled selected>Select a node first...</option>
+                                                </select>
+                                                <div class="d-flex align-items-center justify-content-between mt-2">
+                                                    <div class="form-check form-switch mb-0">
+                                                        <input class="form-check-input" type="checkbox" id="smartAllocation" name="smartAllocation" value="1" checked>
+                                                        <label class="form-check-label text-muted small" for="smartAllocation">Smart Allocation Engine</label>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm btn-outline-info" id="smartPickBtn">Auto Pick</button>
+                                                </div>
+                                                <div class="small text-muted mt-1" id="smartAllocationHint">
+                                                    Smart engine selects the best online allocation for requested limits.
+                                                </div>
+                                            </div>
+
+                                            <div class="mt-5">
+                                                <button type="submit"
+                                                    class="btn btn-primary w-100 py-2 fw-bold shadow-sm">
+                                                    <i class="bi bi-rocket-takeoff me-2"></i> Create Server
+                                                </button>
+                                                <a href="/admin/servers"
+                                                    class="btn btn-outline-secondary w-100 mt-2">Cancel</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <%- include('../partials/footer') %>
+                </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            const connectors = <%- JSON.stringify(connectors) %>;
+            const images = <%- JSON.stringify(images) %>;
+            const connectorStatuses = <%- JSON.stringify(connectorStatus) %>;
+
+            const connectorSelect = document.getElementById('connectorId');
+            const imageSelect = document.getElementById('imageId');
+            const dockerImageGroup = document.getElementById('dockerImageGroup');
+            const dockerImageSelect = document.getElementById('dockerImage');
+            const allocationSelect = document.getElementById('allocationId');
+            const submitBtn = document.querySelector('button[type="submit"]');
+            const smartToggle = document.getElementById('smartAllocation');
+            const smartPickBtn = document.getElementById('smartPickBtn');
+            const smartHint = document.getElementById('smartAllocationHint');
+            const memoryInput = document.querySelector('input[name="memory"]');
+            const diskInput = document.querySelector('input[name="disk"]');
+
+            const variablesCard = document.getElementById('variablesCard');
+            const variablesContainer = document.getElementById('variablesContainer');
+            const escapeHtml = (value) => String(value === null || value === undefined ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+
+            const syncSmartRequiredState = () => {
+                const smartEnabled = smartToggle && smartToggle.checked;
+                connectorSelect.required = !smartEnabled;
+                allocationSelect.required = !smartEnabled;
+            };
+
+            const setSmartHint = (text, tone = 'muted') => {
+                if (!smartHint) return;
+                smartHint.textContent = text;
+                smartHint.classList.remove('text-muted', 'text-info', 'text-warning');
+                if (tone === 'info') smartHint.classList.add('text-info');
+                else if (tone === 'warning') smartHint.classList.add('text-warning');
+                else smartHint.classList.add('text-muted');
+            };
+
+            const applySmartAllocation = (allocation) => {
+                if (!allocation) return;
+                if (allocation.connectorId) {
+                    connectorSelect.value = String(allocation.connectorId);
+                }
+                connectorSelect.dispatchEvent(new Event('change'));
+                allocationSelect.value = String(allocation.id || '');
+                setSmartHint(`Picked ${allocation.ip}:${allocation.port} on ${allocation.connectorName} (score ${Number(allocation.score || 0).toFixed(2)}).`, 'info');
+            };
+
+            const runSmartAllocation = async () => {
+                if (!smartToggle || !smartToggle.checked) return;
+                try {
+                    if (smartPickBtn) smartPickBtn.disabled = true;
+                    setSmartHint('Finding best allocation...', 'muted');
+
+                    const params = new URLSearchParams({
+                        memory: String(Math.max(64, Number.parseInt(memoryInput && memoryInput.value, 10) || 1024)),
+                        disk: String(Math.max(512, Number.parseInt(diskInput && diskInput.value, 10) || 10240))
+                    });
+                    if (connectorSelect.value) params.set('connectorId', String(connectorSelect.value));
+
+                    const response = await fetch(`/api/admin/servers/smart-allocation?${params.toString()}`);
+                    const payload = await response.json();
+                    if (!response.ok || !payload.success || !payload.allocation) {
+                        throw new Error(payload && payload.error ? payload.error : `Smart allocation failed (${response.status})`);
+                    }
+
+                    applySmartAllocation(payload.allocation);
+                } catch (error) {
+                    setSmartHint(String(error && error.message ? error.message : 'Smart allocation failed.'), 'warning');
+                } finally {
+                    if (smartPickBtn) smartPickBtn.disabled = false;
+                }
+            };
+
+            imageSelect.addEventListener('change', function () {
+                const imageId = this.value;
+                const image = images.find((img) => String(img.id) === String(imageId));
+
+                // Handle Docker Images
+                if (image && image.dockerImages && Object.keys(image.dockerImages).length > 0) {
+                    dockerImageSelect.innerHTML = '';
+                    Object.entries(image.dockerImages).forEach(([label, tag]) => {
+                        const option = document.createElement('option');
+                        option.value = tag;
+                        option.textContent = label;
+                        if (label.includes('Recommended') || label.includes('17')) option.selected = true;
+                        dockerImageSelect.appendChild(option);
+                    });
+                    dockerImageGroup.style.display = 'block';
+                    dockerImageSelect.required = true;
+                } else {
+                    dockerImageGroup.style.display = 'none';
+                    dockerImageSelect.required = false;
+                }
+
+                // Handle Dynamic Variables
+                variablesContainer.innerHTML = '';
+                let varsArray = [];
+                if (image && image.eggVariables && image.eggVariables.length > 0) {
+                    varsArray = image.eggVariables;
+                } else if (image && image.environment && Object.keys(image.environment).length > 0) {
+                    const metaMap = image.environmentMeta && typeof image.environmentMeta === 'object' ? image.environmentMeta : {};
+                    Object.entries(image.environment).forEach(([key, defaultValue]) => {
+                        varsArray.push({
+                            env_variable: key,
+                            default_value: defaultValue,
+                            name: metaMap[key]?.name || key.replace(/_/g, ' '),
+                            description: metaMap[key]?.description || '',
+                            rules: metaMap[key]?.rules || '',
+                            user_viewable: metaMap[key]?.userViewable !== false ? 1 : 0,
+                            user_editable: metaMap[key]?.userEditable !== false ? 1 : 0
+                        });
+                    });
+                }
+
+                if (varsArray.length > 0) {
+                    varsArray.forEach(v => {
+                        const key = v.env_variable;
+                        if (key === 'SERVER_MEMORY' || key === 'SERVER_IP' || key === 'SERVER_PORT') return;
+
+                        const isUserViewable = v.user_viewable == 1 || v.user_viewable === true;
+                        const isUserEditable = v.user_editable == 1 || v.user_editable === true;
+                        const rules = typeof v.rules === 'string' ? v.rules : '';
+                        const isRequiredByRules = /(^|\\|)required(\\||$)/.test(rules) && !/(^|\\|)nullable(\\||$)/.test(rules);
+
+                        if (!isUserViewable) return;
+
+                        const col = document.createElement('div');
+                        col.className = 'col-md-6';
+                        const labelText = typeof v.name === 'string' && v.name.trim() ? v.name.trim() : key;
+                        const helperParts = [];
+                        if (typeof v.description === 'string' && v.description.trim()) {
+                            helperParts.push(escapeHtml(v.description.trim()));
+                        }
+                        if (rules) {
+                            helperParts.push(`Rules: <code>${escapeHtml(rules)}</code>`);
+                        }
+                        col.innerHTML = `
+                        <label class="form-label text-muted small text-uppercase fw-bold">${escapeHtml(labelText)}</label>
+                        <input type="text" name="variables[${key}]" class="form-control" 
+                            style="background-color: #1a1a20; border-color: #2d2d35; color: white;"
+                            value="${escapeHtml(v.default_value === null || v.default_value === undefined ? '' : v.default_value)}"
+                            ${isRequiredByRules ? 'required' : ''}
+                            ${isUserEditable ? '' : 'readonly'}>
+                        ${helperParts.length > 0 ? `<div class="form-text text-muted">${helperParts.join(' · ')}</div>` : ''}
+                    `;
+                        variablesContainer.appendChild(col);
+                    });
+
+                    if (variablesContainer.children.length > 0) {
+                        variablesCard.style.display = 'block';
+                    } else {
+                        variablesCard.style.display = 'none';
+                    }
+                } else {
+                    variablesCard.style.display = 'none';
+                }
+            });
+
+            connectorSelect.addEventListener('change', function () {
+                const connectorId = Number.parseInt(this.value, 10);
+                const connector = connectors.find((c) => Number.parseInt(c.id, 10) === connectorId);
+                const statusData = connectorStatuses[connectorId] || { status: 'offline', lastSeen: null };
+
+                // Check online status (online if last seen < 30s ago)
+                const isOnline = statusData.status === 'online' && (new Date() - new Date(statusData.lastSeen)) < 30000;
+
+                // Clear previous message if any
+                const existingMsg = connectorSelect.parentNode.querySelector('.status-msg');
+                if (existingMsg) existingMsg.remove();
+
+                const statusMsg = document.createElement('small');
+                statusMsg.className = 'status-msg d-block mt-1 fw-bold ' + (isOnline ? 'text-success' : 'text-danger');
+                statusMsg.innerHTML = '<i class="bi bi-circle-fill small me-1"></i> ' + (isOnline ? 'Node is ONLINE' : 'Node is OFFLINE - Deployment disabled');
+                connectorSelect.parentNode.appendChild(statusMsg);
+
+                allocationSelect.innerHTML = '<option value="" disabled selected>Select an allocation...</option>';
+
+                if (!isOnline) {
+                    allocationSelect.disabled = true;
+                    if (!smartToggle || !smartToggle.checked) {
+                        submitBtn.disabled = true;
+                        submitBtn.classList.add('opacity-50');
+                    }
+                    return;
+                }
+
+                if (connector && connector.allocations) {
+                    const availableAllocations = connector.allocations.filter(a => !a.serverId);
+
+                    if (availableAllocations.length > 0) {
+                        availableAllocations.forEach(a => {
+                            const option = document.createElement('option');
+                            option.value = a.id;
+                            option.textContent = `${a.ip}:${a.port} ${a.alias ? '(' + a.alias + ')' : ''}`;
+                            allocationSelect.appendChild(option);
+                        });
+                        allocationSelect.disabled = false;
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('opacity-50');
+                    } else {
+                        allocationSelect.innerHTML = '<option value="" disabled selected>No free allocations on this node!</option>';
+                        allocationSelect.disabled = true;
+                        if (!smartToggle || !smartToggle.checked) {
+                            submitBtn.disabled = true;
+                        }
+                    }
+                }
+            });
+
+            if (smartPickBtn) {
+                smartPickBtn.addEventListener('click', () => {
+                    runSmartAllocation();
+                });
+            }
+            if (smartToggle) {
+                smartToggle.addEventListener('change', () => {
+                    syncSmartRequiredState();
+                    if (smartToggle.checked) {
+                        runSmartAllocation();
+                    } else {
+                        setSmartHint('Smart allocation disabled. Select connector/allocation manually.', 'muted');
+                    }
+                });
+            }
+            [memoryInput, diskInput].forEach((input) => {
+                if (!input) return;
+                input.addEventListener('change', () => {
+                    if (smartToggle && smartToggle.checked) {
+                        runSmartAllocation();
+                    }
+                });
+            });
+            syncSmartRequiredState();
+            if (smartToggle && smartToggle.checked) {
+                runSmartAllocation();
+            }
+        </script>
+</body>
+
+</html>

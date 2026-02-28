@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= (settings.brandName || 'CPanel' ).toUpperCase() %>
+            <%= locals.title ? ' - ' + title.toUpperCase() : '' %> - Locations
+    </title>
+    <!-- Favicon -->
+    <%- include('../partials/favicon') %>
+        <!-- Bootstrap CSS -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <!-- Bootstrap Icons -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+        <!-- Google Fonts -->
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+            rel="stylesheet">
+        <!-- Custom CSS -->
+        <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <%- include ('../partials/error-modal') %>
+        <div class="admin-wrapper">
+            <!-- Sidebar -->
+            <%- include('../partials/admin-sidebar') %>
+
+                <!-- Content -->
+                <div class="admin-content">
+                    <!-- Admin Top Header -->
+                    <div class="admin-header">
+                        <div class="d-flex align-items-baseline gap-3">
+                            <h4 class="mb-0 text-light fw-normal">Locations</h4>
+                            <small class="text-muted">Manage regions and deployment zones.</small>
+                        </div>
+                        <div class="breadcrumb-admin">
+                            <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span
+                                class="text-light">Locations</span>
+                        </div>
+                    </div>
+
+                    <div class="container-fluid py-4 px-lg-4">
+                        <div class="row">
+                            <!-- List of Locations -->
+                            <div class="col-lg-12">
+                                <div class="card border-0 shadow-sm" style="background-color: #141419;">
+                                    <div
+                                        class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent d-flex justify-content-between align-items-center">
+                                        <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i
+                                                class="bi bi-geo-alt me-2"></i>Existing Locations</h5>
+                                        <button class="btn btn-sm btn-primary px-3 fw-bold shadow-sm"
+                                            data-bs-toggle="modal" data-bs-target="#createLocationModal">
+                                            <i class="bi bi-plus-lg me-1"></i> Create Location
+                                        </button>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <% if (success) { %>
+                                            <div
+                                                class="alert alert-success m-3 border-0 bg-success bg-opacity-10 text-success">
+                                                <i class="bi bi-check-circle-fill me-2"></i>
+                                                <%= success %>
+                                            </div>
+                                            <% } %>
+                                                <% if (error) { %>
+                                                    <div
+                                                        class="alert alert-danger m-3 border-0 bg-danger bg-opacity-10 text-danger">
+                                                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                                        <%= error %>
+                                                    </div>
+                                                    <% } %>
+
+                                                        <div class="table-responsive">
+                                                            <table class="table table-dark table-hover mb-0"
+                                                                style="--bs-table-bg: transparent;">
+                                                                <thead class="text-muted small text-uppercase">
+                                                                    <tr>
+                                                                        <th class="ps-4 py-3 fw-bold"
+                                                                            style="letter-spacing: 0.05em;">Short Name
+                                                                        </th>
+                                                                        <th class="py-3 fw-bold"
+                                                                            style="letter-spacing: 0.05em;">Description
+                                                                        </th>
+                                                                        <th class="py-3 text-center fw-bold"
+                                                                            style="letter-spacing: 0.05em;">Image</th>
+                                                                        <th class="py-3 text-center fw-bold"
+                                                                            style="letter-spacing: 0.05em;">Databases
+                                                                        </th>
+                                                                        <th class="py-3 text-center fw-bold"
+                                                                            style="letter-spacing: 0.05em;">Connectors
+                                                                        </th>
+                                                                        <th class="pe-4 py-3 text-end fw-bold"
+                                                                            style="letter-spacing: 0.05em;">Actions</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody class="border-top-0">
+                                                                    <% if (locations && locations.length> 0) { %>
+                                                                        <% locations.forEach(loc=> { %>
+                                                                            <tr
+                                                                                class="align-middle border-bottom border-secondary border-opacity-10">
+                                                                                <td class="ps-4 fw-bold text-light">
+                                                                                    <%= loc.shortName %>
+                                                                                </td>
+                                                                                <td class="text-muted small">
+                                                                                    <%= loc.description
+                                                                                        || 'No description' %>
+                                                                                </td>
+                                                                                <td class="text-center">
+                                                                                    <% if (loc.imageUrl) { %>
+                                                                                        <img src="<%= loc.imageUrl %>"
+                                                                                            alt="" width="24"
+                                                                                            height="24"
+                                                                                            class="rounded shadow-sm border border-secondary border-opacity-25">
+                                                                                        <% } else { %>
+                                                                                            <span
+                                                                                                class="text-muted opacity-50">-</span>
+                                                                                            <% } %>
+                                                                                </td>
+                                                                                <td class="text-center">
+                                                                                    <span
+                                                                                        class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-2">
+                                                                                        <%= (loc.databaseHosts ?
+                                                                                            loc.databaseHosts.length :
+                                                                                            0) %>
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td class="text-center">
+                                                                                    <span
+                                                                                        class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2">
+                                                                                        <%= (loc.connectors ?
+                                                                                            loc.connectors.length : 0)
+                                                                                            %>
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td class="pe-4 text-end">
+                                                                                    <div
+                                                                                        class="d-flex justify-content-end gap-2">
+                                                                                        <button
+                                                                                            class="btn btn-sm btn-outline-info"
+                                                                                            data-bs-toggle="modal"
+                                                                                            data-bs-target="#viewAssetsModal<%= loc.id %>"
+                                                                                            title="View Assets">
+                                                                                            <i class="bi bi-eye"></i>
+                                                                                        </button>
+                                                                                        <button
+                                                                                            class="btn btn-sm btn-outline-primary"
+                                                                                            data-bs-toggle="modal"
+                                                                                            data-bs-target="#editModal<%= loc.id %>">
+                                                                                            <i
+                                                                                                class="bi bi-pencil-square"></i>
+                                                                                        </button>
+                                                                                        <button type="button"
+                                                                                            class="btn btn-sm btn-outline-danger btn-delete-location"
+                                                                                            data-id="<%= loc.id %>"
+                                                                                            data-name="<%= loc.shortName %>">
+                                                                                            <i class="bi bi-trash"></i>
+                                                                                        </button>
+                                                                                        <form
+                                                                                            id="delete-form-<%= loc.id %>"
+                                                                                            method="POST"
+                                                                                            action="/admin/locations/delete/<%= loc.id %>"
+                                                                                            style="display: none;">
+                                                                                        </form>
+                                                                                    </div>
+
+                                                                                    <!-- View Assets Modal -->
+                                                                                    <div class="modal fade"
+                                                                                        id="viewAssetsModal<%= loc.id %>"
+                                                                                        tabindex="-1"
+                                                                                        aria-hidden="true">
+                                                                                        <div
+                                                                                            class="modal-dialog modal-dialog-centered modal-lg">
+                                                                                            <div class="modal-content border-0 shadow-lg text-start"
+                                                                                                style="background-color: #1a1a20; border: 1px solid #2d2d35 !important;">
+                                                                                                <div
+                                                                                                    class="modal-header border-bottom border-secondary border-opacity-10">
+                                                                                                    <h5
+                                                                                                        class="modal-title fs-6 fw-bold text-light">
+                                                                                                        Assets in <%=
+                                                                                                            loc.shortName
+                                                                                                            %>
+                                                                                                    </h5>
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        class="btn-close btn-close-white"
+                                                                                                        data-bs-dismiss="modal"
+                                                                                                        aria-label="Close"></button>
+                                                                                                </div>
+                                                                                                <div
+                                                                                                    class="modal-body p-4">
+                                                                                                    <div
+                                                                                                        class="row g-4">
+                                                                                                        <!-- Databases -->
+                                                                                                        <div
+                                                                                                            class="col-md-6">
+                                                                                                            <label
+                                                                                                                class="form-label text-muted small text-uppercase fw-bold mb-3 d-block">
+                                                                                                                <i
+                                                                                                                    class="bi bi-database me-2"></i>Assigned
+                                                                                                                Databases
+                                                                                                            </label>
+                                                                                                            <% if
+                                                                                                                (loc.databaseHosts
+                                                                                                                &&
+                                                                                                                loc.databaseHosts.length>
+                                                                                                                0) { %>
+                                                                                                                <div
+                                                                                                                    class="list-group list-group-flush">
+                                                                                                                    <%
+                                                                                                                        loc.databaseHosts.forEach(db=>
+                                                                                                                        {
+                                                                                                                        %>
+                                                                                                                        <div
+                                                                                                                            class="list-group-item bg-transparent border-secondary border-opacity-10 px-0 py-2 d-flex justify-content-between align-items-center">
+                                                                                                                            <span
+                                                                                                                                class="text-light small">
+                                                                                                                                <%= db.name
+                                                                                                                                    %>
+                                                                                                                            </span>
+                                                                                                                            <span
+                                                                                                                                class="badge bg-secondary bg-opacity-10 text-muted x-small">ID:
+                                                                                                                                <%= db.id
+                                                                                                                                    %>
+                                                                                                                            </span>
+                                                                                                                        </div>
+                                                                                                                        <% });
+                                                                                                                            %>
+                                                                                                                </div>
+                                                                                                                <% } else
+                                                                                                                    { %>
+                                                                                                                    <div
+                                                                                                                        class="text-center py-4 bg-dark bg-opacity-25 rounded border border-secondary border-opacity-10">
+                                                                                                                        <span
+                                                                                                                            class="text-muted small">No
+                                                                                                                            databases
+                                                                                                                            found.</span>
+                                                                                                                    </div>
+                                                                                                                    <% }
+                                                                                                                        %>
+                                                                                                        </div>
+                                                                                                        <!-- Connectors -->
+                                                                                                        <div
+                                                                                                            class="col-md-6">
+                                                                                                            <label
+                                                                                                                class="form-label text-muted small text-uppercase fw-bold mb-3 d-block">
+                                                                                                                <i
+                                                                                                                    class="bi bi-cloud-check me-2"></i>Assigned
+                                                                                                                Connectors
+                                                                                                            </label>
+                                                                                                            <% if
+                                                                                                                (loc.connectors
+                                                                                                                &&
+                                                                                                                loc.connectors.length>
+                                                                                                                0) { %>
+                                                                                                                <div
+                                                                                                                    class="list-group list-group-flush">
+                                                                                                                    <%
+                                                                                                                        loc.connectors.forEach(con=>
+                                                                                                                        {
+                                                                                                                        %>
+                                                                                                                        <div
+                                                                                                                            class="list-group-item bg-transparent border-secondary border-opacity-10 px-0 py-2 d-flex justify-content-between align-items-center">
+                                                                                                                            <span
+                                                                                                                                class="text-light small">
+                                                                                                                                <%= con.name
+                                                                                                                                    %>
+                                                                                                                            </span>
+                                                                                                                            <span
+                                                                                                                                class="badge bg-secondary bg-opacity-10 text-muted x-small">
+                                                                                                                                <%= con.ip
+                                                                                                                                    %>
+                                                                                                                            </span>
+                                                                                                                        </div>
+                                                                                                                        <% });
+                                                                                                                            %>
+                                                                                                                </div>
+                                                                                                                <% } else
+                                                                                                                    { %>
+                                                                                                                    <div
+                                                                                                                        class="text-center py-4 bg-dark bg-opacity-25 rounded border border-secondary border-opacity-10">
+                                                                                                                        <span
+                                                                                                                            class="text-muted small">No
+                                                                                                                            connectors
+                                                                                                                            found.</span>
+                                                                                                                    </div>
+                                                                                                                    <% }
+                                                                                                                        %>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                <div
+                                                                                                    class="modal-footer border-top border-secondary border-opacity-10">
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        class="btn btn-secondary px-4 fw-bold"
+                                                                                                        data-bs-dismiss="modal">Close</button>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+
+                                                                                    <!-- Edit Modal -->
+                                                                                    <div class="modal fade"
+                                                                                        id="editModal<%= loc.id %>"
+                                                                                        tabindex="-1"
+                                                                                        aria-hidden="true">
+                                                                                        <div
+                                                                                            class="modal-dialog modal-dialog-centered">
+                                                                                            <div class="modal-content border-0 shadow-lg text-start"
+                                                                                                style="background-color: #1a1a20; border: 1px solid #2d2d35 !important;">
+                                                                                                <div
+                                                                                                    class="modal-header border-bottom border-secondary border-opacity-10">
+                                                                                                    <h5
+                                                                                                        class="modal-title fs-6 fw-bold text-light">
+                                                                                                        Edit Location:
+                                                                                                        <%= loc.shortName
+                                                                                                            %>
+                                                                                                    </h5>
+                                                                                                    <button
+                                                                                                        type="button"
+                                                                                                        class="btn-close btn-close-white"
+                                                                                                        data-bs-dismiss="modal"
+                                                                                                        aria-label="Close"></button>
+                                                                                                </div>
+                                                                                                <form method="POST"
+                                                                                                    action="/admin/locations/edit/<%= loc.id %>">
+                                                                                                    <div
+                                                                                                        class="modal-body p-4">
+                                                                                                        <div
+                                                                                                            class="mb-3">
+                                                                                                            <label
+                                                                                                                class="form-label text-muted small text-uppercase fw-bold">Short
+                                                                                                                Name</label>
+                                                                                                            <input
+                                                                                                                type="text"
+                                                                                                                name="shortName"
+                                                                                                                class="form-control"
+                                                                                                                style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                                                                                                value="<%= loc.shortName %>"
+                                                                                                                required>
+                                                                                                        </div>
+                                                                                                        <div
+                                                                                                            class="mb-3">
+                                                                                                            <label
+                                                                                                                class="form-label text-muted small text-uppercase fw-bold">Description
+                                                                                                                (Max 30
+                                                                                                                chars)</label>
+                                                                                                            <input
+                                                                                                                type="text"
+                                                                                                                name="description"
+                                                                                                                class="form-control"
+                                                                                                                style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                                                                                                value="<%= loc.description %>"
+                                                                                                                maxlength="30">
+                                                                                                        </div>
+                                                                                                        <div
+                                                                                                            class="mb-0">
+                                                                                                            <label
+                                                                                                                class="form-label text-muted small text-uppercase fw-bold">Image
+                                                                                                                URL
+                                                                                                                (Optional)</label>
+                                                                                                            <input
+                                                                                                                type="text"
+                                                                                                                name="imageUrl"
+                                                                                                                class="form-control"
+                                                                                                                style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                                                                                                value="<%= loc.imageUrl %>">
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                    <div
+                                                                                                        class="modal-footer border-top border-secondary border-opacity-10">
+                                                                                                        <button
+                                                                                                            type="button"
+                                                                                                            class="btn btn-link text-muted text-decoration-none fw-medium"
+                                                                                                            data-bs-dismiss="modal">Cancel</button>
+                                                                                                        <button
+                                                                                                            type="submit"
+                                                                                                            class="btn btn-primary px-4 fw-bold">Save
+                                                                                                            Changes</button>
+                                                                                                    </div>
+                                                                                                </form>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                            <% }); %>
+                                                                                <% } else { %>
+                                                                                    <tr>
+                                                                                        <td colspan="5"
+                                                                                            class="py-5 text-center text-muted italic">
+                                                                                            No locations configured yet.
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                    <% } %>
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Create Location Modal -->
+                    <div class="modal fade" id="createLocationModal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content border-0 shadow-lg"
+                                style="background-color: #1a1a20; border: 1px solid #2d2d35 !important;">
+                                <div class="modal-header border-bottom border-secondary border-opacity-10">
+                                    <h5 class="modal-title fs-6 fw-bold text-light">
+                                        <i class="bi bi-plus-circle me-2 text-primary"></i>Create New Location
+                                    </h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                                        aria-label="Close"></button>
+                                </div>
+                                <form method="POST" action="/admin/locations">
+                                    <div class="modal-body p-4 text-start">
+                                        <div class="row g-3">
+                                            <div class="col-12">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Short
+                                                    Name</label>
+                                                <input type="text" name="shortName" class="form-control"
+                                                    style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                                    required placeholder="e.g. NY-1">
+                                                <div class="form-text text-muted x-small mt-1">A unique identifier for
+                                                    this
+                                                    location.</div>
+                                            </div>
+                                            <div class="col-12">
+                                                <label
+                                                    class="form-label text-muted small text-uppercase fw-bold">Description</label>
+                                                <input type="text" name="description" class="form-control"
+                                                    style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                                    maxlength="30" placeholder="e.g. New York Data Center">
+                                                <div class="form-text text-muted x-small mt-1">Short description (max 30
+                                                    chars).</div>
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Image
+                                                    URL
+                                                    (Optional)</label>
+                                                <input type="text" name="imageUrl" class="form-control"
+                                                    style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                                    placeholder="e.g. https://...">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer border-top border-secondary border-opacity-10">
+                                        <button type="button"
+                                            class="btn btn-link text-muted text-decoration-none fw-medium"
+                                            data-bs-dismiss="modal">Cancel</button>
+                                        <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm">
+                                            Create Location
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <%- include('../partials/footer') %>
+                </div>
+        </div>
+        </div>
+
+        <!-- Bootstrap JS -->
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <!-- SweetAlert2 -->
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+        <script>
+            document.addEventListener('click', function (e) {
+                if (e.target.closest('.btn-delete-location')) {
+                    const btn = e.target.closest('.btn-delete-location');
+                    const id = btn.getAttribute('data-id');
+                    const name = btn.getAttribute('data-name');
+                    confirmDelete(id, name);
+                }
+            });
+
+            function confirmDelete(id, name) {
+                Swal.fire({
+                    title: 'Are you sure?',
+                    text: `You are about to delete the location "${name}". This action cannot be undone!`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ef4444',
+                    cancelButtonColor: '#2d2d35',
+                    confirmButtonText: 'Yes, delete it!',
+                    background: '#1a1a20',
+                    color: '#ffffff'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        document.getElementById('delete-form-' + id).submit();
+                    }
+                })
+            }
+        </script>
+</body>
+
+</html>

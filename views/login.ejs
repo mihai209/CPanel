@@ -1,0 +1,415 @@
+<%- include('partials/header') %>
+    <%- include ('partials/error-modal') %>
+        <style>
+            body {
+                background-color: #0d0d0f;
+                overflow: hidden;
+                /* Prevent body scroll if possible */
+            }
+
+            .login-container {
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 1rem;
+                overflow-y: auto;
+                /* Allow scrolling only within container if needed */
+            }
+
+            .login-card {
+                background-color: #1f2023;
+                border: 1px solid #2e3036;
+                border-radius: 12px;
+                width: 100%;
+                max-width: 800px;
+                overflow: hidden;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+                margin-bottom: 2rem;
+                flex-shrink: 0;
+            }
+
+            .login-row {
+                display: flex;
+                flex-direction: row;
+            }
+
+            .mascot-column {
+                flex: 1;
+                background-color: #1f2023;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 2rem;
+            }
+
+            .mascot-img {
+                max-width: 200%;
+                height: auto;
+                border-radius: 12px;
+            }
+
+            .form-column {
+                flex: 1.2;
+                padding: 3rem;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
+
+            .login-title {
+                color: #ffffff;
+                font-weight: 700;
+                margin-bottom: 2rem;
+                text-align: center;
+                font-size: 1.5rem;
+            }
+
+            .form-label {
+                color: #9ca3af !important;
+                font-size: 0.75rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin-bottom: 0.5rem;
+            }
+
+            .form-control {
+                background-color: transparent !important;
+                border: 1px solid #3f3f46;
+                color: #ffffff !important;
+                padding: 0.75rem 1rem;
+                border-radius: 6px;
+                transition: border-color 0.2s;
+            }
+
+            .form-control:focus {
+                border-color: #3b82f6;
+                box-shadow: none;
+            }
+
+            .btn-login {
+                background-color: #1d4ed8;
+                border: none;
+                padding: 0.875rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin-top: 1rem;
+                border-radius: 6px;
+            }
+
+            .btn-login:hover {
+                background-color: #2563eb;
+            }
+
+            .forgot-password {
+                display: block;
+                text-align: center;
+                margin-top: 1.5rem;
+                color: #9ca3af;
+                text-decoration: none;
+                font-size: 0.75rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+
+            .forgot-password:hover {
+                color: #ffffff;
+            }
+
+            /* Modal Styles */
+            .modal-content {
+                background-color: #1f2023;
+                border: 1px solid #2e3036;
+                color: #ffffff;
+            }
+
+            .modal-header {
+                border-bottom: 1px solid #2e3036;
+            }
+
+            .modal-footer {
+                border-top: 1px solid #2e3036;
+            }
+
+            .btn-close-white {
+                filter: invert(1) grayscale(100%) brightness(200%);
+            }
+
+            @media (max-width: 768px) {
+                .login-container {
+                    justify-content: flex-start;
+                    padding-top: 2rem;
+                }
+
+                .login-row {
+                    flex-direction: column;
+                }
+
+                .mascot-column {
+                    padding: 1.5rem;
+                    display: none;
+                    /* Hide mascot on small mobile to save space */
+                }
+
+                .form-column {
+                    padding: 2rem;
+                }
+
+                .login-card {
+                    max-width: 450px;
+                }
+            }
+
+            /* Viewport height specific adjustment */
+            @media (max-height: 700px) {
+                .login-card {
+                    margin-bottom: 1rem;
+                }
+
+                .form-column {
+                    padding: 1.5rem 2rem;
+                }
+
+                .login-title {
+                    margin-bottom: 1rem;
+                }
+            }
+        </style>
+
+        <div class="login-container">
+            <div class="login-card">
+                <div class="login-row">
+                    <div class="mascot-column">
+                        <img src="/assets/rocky.png" alt="Rocky" class="mascot-img">
+                    </div>
+                    <div class="form-column">
+                        <h2 class="login-title">Login to Continue</h2>
+
+                        <% if (error) { %>
+                            <div class="alert alert-danger py-2" style="font-size: 0.875rem;">
+                                <%= error %>
+                            </div>
+                            <% } %>
+
+                                <% if (locals.success) { %>
+                                    <div class="alert alert-success py-2" style="font-size: 0.875rem;">
+                                        <%= success %>
+                                    </div>
+                                    <% } %>
+
+                                        <% if (settings.authStandardEnabled !=='false' ) { %>
+                                            <form method="POST" action="/login">
+                                                <div class="mb-4">
+                                                    <label class="form-label">Email</label>
+                                                    <input type="email" name="email" class="form-control"
+                                                        placeholder="user@example.com" required autofocus>
+                                                </div>
+                                                <div class="mb-4">
+                                                    <label class="form-label">Password</label>
+                                                    <input type="password" name="password" class="form-control"
+                                                        placeholder="••••••••" required>
+                                                </div>
+
+                                                <% if (settings.captchastatus==='on' ) { %>
+                                                    <div class="mb-4">
+                                                        <label class="form-label">Captcha Verification</label>
+                                                        <div class="d-flex gap-2 align-items-center mb-2">
+                                                            <div class="captcha-img-container"
+                                                                style="background: #1a1a20; padding: 5px; border-radius: 6px; border: 1px solid #3f3f46;">
+                                                                <img src="/captcha" alt="captcha" id="captcha-img"
+                                                                    style="height: 40px; display: block;">
+                                                            </div>
+                                                            <button type="button"
+                                                                class="btn btn-outline-secondary btn-sm"
+                                                                id="refresh-captcha-btn" title="Refresh Captcha">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="16"
+                                                                    height="16" fill="currentColor"
+                                                                    class="bi bi-arrow-counterclockwise"
+                                                                    viewBox="0 0 16 16">
+                                                                    <path fill-rule="evenodd"
+                                                                        d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2z" />
+                                                                    <path
+                                                                        d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466" />
+                                                                </svg>
+                                                            </button>
+                                                        </div>
+                                                        <input type="text" name="captcha" class="form-control"
+                                                            placeholder="Enter the code from the image" required
+                                                            autocomplete="off">
+                                                    </div>
+                                                    <script>
+                                                        (() => {
+                                                            if (window.__cpanelLoginCaptchaLifecycleBound) return;
+                                                            window.__cpanelLoginCaptchaLifecycleBound = true;
+
+                                                            let loginCaptchaState = null;
+                                                            const initLoginCaptcha = () => {
+                                                                const loginForm = document.querySelector('form[action="/login"]');
+                                                                if (!loginForm) return;
+                                                                if (loginForm.dataset.cpanelLoginCaptchaInit === '1') return;
+                                                                loginForm.dataset.cpanelLoginCaptchaInit = '1';
+
+                                                                const refreshBtn = document.getElementById('refresh-captcha-btn');
+                                                                const captchaImg = document.getElementById('captcha-img');
+                                                                if (!refreshBtn || !captchaImg) return;
+
+                                                                const refreshHandler = () => {
+                                                                    captchaImg.src = '/captcha?t=' + Date.now();
+                                                                };
+
+                                                                refreshBtn.addEventListener('click', refreshHandler);
+                                                                loginCaptchaState = { loginForm, refreshBtn, refreshHandler };
+                                                            };
+
+                                                            const cleanupLoginCaptcha = () => {
+                                                                if (!loginCaptchaState) return;
+                                                                try {
+                                                                    loginCaptchaState.refreshBtn.removeEventListener('click', loginCaptchaState.refreshHandler);
+                                                                } catch { }
+                                                                if (loginCaptchaState.loginForm) {
+                                                                    loginCaptchaState.loginForm.dataset.cpanelLoginCaptchaInit = '0';
+                                                                }
+                                                                loginCaptchaState = null;
+                                                            };
+
+                                                            document.addEventListener('turbo:load', initLoginCaptcha);
+                                                            document.addEventListener('turbo:before-cache', cleanupLoginCaptcha);
+                                                            if (document.readyState === 'loading') {
+                                                                document.addEventListener('DOMContentLoaded', initLoginCaptcha, { once: true });
+                                                            } else {
+                                                                initLoginCaptcha();
+                                                            }
+                                                        })();
+                                                    </script>
+                                                    <% } %>
+
+                                                        <button type="submit"
+                                                            class="btn btn-primary btn-login w-100">Login</button>
+                                                        <a href="#" class="forgot-password" data-bs-toggle="modal"
+                                                            data-bs-target="#forgotPasswordModal">Forgot Password?</a>
+                                            </form>
+                                            <% } %>
+
+                                                <% const hasOAuth=settings.authDiscordEnabled==='true' ||
+                                                    settings.authGoogleEnabled==='true' ||
+                                                    settings.authRedditEnabled==='true' ||
+                                                    settings.authGithubEnabled==='true' ; if (hasOAuth) { %>
+                                                    <% if (settings.authStandardEnabled !=='false' ) { %>
+                                                        <div class="d-flex align-items-center my-4">
+                                                            <hr class="flex-grow-1 border-secondary border-opacity-25"
+                                                                style="margin: 0;">
+                                                            <span class="px-3 text-muted small text-uppercase fw-bold"
+                                                                style="letter-spacing: 0.05em;">OR</span>
+                                                            <hr class="flex-grow-1 border-secondary border-opacity-25"
+                                                                style="margin: 0;">
+                                                        </div>
+                                                        <% } else { %>
+                                                            <div class="mb-4 text-center mt-3">
+                                                                <span class="text-muted small text-uppercase fw-bold"
+                                                                    style="letter-spacing: 0.05em;">LOGIN WITH</span>
+                                                            </div>
+                                                            <% } %>
+
+                                                                <div class="d-flex flex-column gap-3">
+                                                                    <% if (settings.authDiscordEnabled==='true' ) { %>
+                                                                        <a href="/auth/discord"
+                                                                            class="btn w-100 d-flex align-items-center justify-content-center gap-2"
+                                                                            style="background-color: #5865F2; color: white; border: none; padding: 0.75rem; font-weight: 600; border-radius: 6px; transition: opacity 0.2s;"
+                                                                            onmouseover="this.style.opacity=0.9"
+                                                                            onmouseout="this.style.opacity=1">
+                                                                            <i class="bi bi-discord fs-5"></i> Discord
+                                                                        </a>
+                                                                        <% } %>
+                                                                            <% if (settings.authGoogleEnabled==='true' )
+                                                                                { %>
+                                                                                <a href="/auth/google"
+                                                                                    class="btn w-100 d-flex align-items-center justify-content-center gap-2"
+                                                                                    style="background-color: #ffffff; color: #1f2023; border: 1px solid #e5e7eb; padding: 0.75rem; font-weight: 600; border-radius: 6px; transition: background-color 0.2s;"
+                                                                                    onmouseover="this.style.backgroundColor='#f9fafb'"
+                                                                                    onmouseout="this.style.backgroundColor='#ffffff'">
+                                                                                    <i class="bi bi-google fs-5"
+                                                                                        style="color: #ea4335;"></i>
+                                                                                    Google
+                                                                                </a>
+                                                                                <% } %>
+                                                                                    <% if
+                                                                                        (settings.authRedditEnabled==='true'
+                                                                                        ) { %>
+                                                                                        <a href="/auth/reddit"
+                                                                                            class="btn w-100 d-flex align-items-center justify-content-center gap-2"
+                                                                                            style="background-color: #FF4500; color: white; border: none; padding: 0.75rem; font-weight: 600; border-radius: 6px; transition: opacity 0.2s;"
+                                                                                            onmouseover="this.style.opacity=0.9"
+                                                                                            onmouseout="this.style.opacity=1">
+                                                                                            <i
+                                                                                                class="bi bi-reddit fs-5"></i>
+                                                                                            Reddit
+                                                                                        </a>
+                                                                                        <% } %>
+                                                                                            <% if
+                                                                                                (settings.authGithubEnabled==='true'
+                                                                                                ) { %>
+                                                                                                <a href="/auth/github"
+                                                                                                    class="btn w-100 d-flex align-items-center justify-content-center gap-2"
+                                                                                                    style="background-color: #24292e; color: white; border: none; padding: 0.75rem; font-weight: 600; border-radius: 6px; transition: opacity 0.2s;"
+                                                                                                    onmouseover="this.style.opacity=0.9"
+                                                                                                    onmouseout="this.style.opacity=1">
+                                                                                                    <i
+                                                                                                        class="bi bi-github fs-5"></i>
+                                                                                                    GitHub
+                                                                                                </a>
+                                                                                                <% } %>
+                                                                </div>
+                                                                <% } %>
+
+                                                                    <% if (settings.authStandardEnabled==='false' &&
+                                                                        !hasOAuth) { %>
+                                                                        <div
+                                                                            class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning text-center mt-3 mb-0">
+                                                                            <i
+                                                                                class="bi bi-exclamation-triangle-fill me-2"></i>
+                                                                            No authentication methods are currently
+                                                                            enabled.
+                                                                        </div>
+                                                                        <% } %>
+                    </div>
+                </div>
+            </div>
+
+            <%- include('partials/footer') %>
+        </div>
+        </div>
+
+        <!-- Forgot Password Modal -->
+        <div class="modal fade" id="forgotPasswordModal" tabindex="-1" aria-labelledby="forgotPasswordModalLabel"
+            aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="forgotPasswordModalLabel">Forgot Password?</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Uh oh! If you have forgotten your password, please contact the system administrator(s) for
+                            assistance.</p>
+                        <p class="text-secondary small">Resetting passwords usually requires verification of your
+                            account
+                            details. Please ensure you have your registered email address ready.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <%- include('partials/footer') %>
+
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+            </body>
+
+            </html>

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scaling <%= server.name %> | <%= settings.brandName.toUpperCase() %></title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body { background:#0f0f12; color:#e1e1e6; margin:0; font-family:Inter,system-ui,-apple-system,sans-serif; height:100vh; overflow:hidden; }
+        .wrapper{display:flex;height:100vh}.sidebar{width:260px;background:#121216;border-right:1px solid #2d2d35;overflow-y:auto}.sidebar.collapsed{margin-left:-260px}
+        .content{flex:1;display:flex;flex-direction:column;min-width:0}.top{background:#121216;border-bottom:1px solid #2d2d35;padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem}
+        .scroll{flex:1;overflow:auto;padding:1rem}.cardx{background:#121216;border:1px solid #2d2d35;border-radius:.8rem}.btn-icon{background:transparent;border:0;color:#8b8b9a;font-size:1.2rem}
+        .table-dark{--bs-table-bg:transparent}
+    </style>
+</head>
+<body>
+<%
+const config = scalingConfig || { enabled: false, timezone: 'UTC', rules: [] };
+const rules = Array.isArray(config.rules) ? config.rules : [];
+const inventoryEnabled = Boolean(typeof locals !== 'undefined' && locals.inventoryEnabled);
+const ownerInventory = (typeof locals !== 'undefined' && locals.ownerInventory && typeof locals.ownerInventory === 'object') ? locals.ownerInventory : { ramMb: 0, cpuPercent: 0, diskMb: 0, swapMb: 0 };
+const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const formatDays = (list) => {
+    const values = Array.isArray(list) ? list.map((v) => Number.parseInt(v, 10)).filter((v) => Number.isInteger(v) && v >= 0 && v <= 6) : [];
+    if (values.length === 7) return 'Every day';
+    if (values.length === 0) return 'Every day';
+    return values.sort((a, b) => a - b).map((idx) => dayLabels[idx]).join(', ');
+};
+const formatLimit = (value, suffix) => {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isInteger(parsed) || parsed <= 0) return '-';
+    return `${parsed}${suffix || ''}`;
+};
+%>
+<div class="wrapper">
+    <nav class="sidebar" id="sidebar"><div class="p-3"><%- include('../partials/server-sidebar', { server, active: 'scaling' }) %></div></nav>
+    <main class="content">
+        <header class="top">
+            <button class="btn-icon" id="sidebarToggle"><i class="bi bi-list"></i></button>
+            <h1 class="h5 mb-0">Scheduled Scaling / <span class="text-secondary"><%= server.name %></span></h1>
+            <div class="ms-auto">
+                <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="modal" data-bs-target="#scalingTutorialModal">
+                    <i class="bi bi-question-circle me-1"></i>Tutorial
+                </button>
+            </div>
+        </header>
+        <section class="scroll">
+            <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+            <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+
+            <% if (inventoryEnabled) { %>
+            <div class="cardx p-3 mb-3">
+                <h2 class="h6 mb-2">Inventory Budget (Scaling)</h2>
+                <div class="small text-secondary mb-2">Scaling consumă inventory la creștere și returnează inventory la scădere (RAM/CPU/Disk/Swap).</div>
+                <div class="row g-2 small">
+                    <div class="col-md-3">RAM available: <strong><%= Number.parseInt(ownerInventory.ramMb || 0, 10) %> MB</strong></div>
+                    <div class="col-md-3">CPU available: <strong><%= Number.parseInt(ownerInventory.cpuPercent || 0, 10) %>%</strong></div>
+                    <div class="col-md-3">Disk available: <strong><%= Number.parseInt(ownerInventory.diskMb || 0, 10) %> MB</strong></div>
+                    <div class="col-md-3">Swap available: <strong><%= Number.parseInt(ownerInventory.swapMb || 0, 10) %> MB</strong></div>
+                </div>
+            </div>
+            <% } %>
+
+            <div class="cardx p-3 mb-3">
+                <h2 class="h6 mb-3">Engine Settings</h2>
+                <form method="POST" action="/server/<%= server.containerId %>/scaling/settings" class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small">Timezone</label>
+                        <input class="form-control" name="timezone" value="<%= config.timezone || 'UTC' %>" placeholder="Europe/Bucharest" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-check form-switch mt-4">
+                            <input class="form-check-input" type="checkbox" id="scalingEnabled" name="enabled" value="1" <%= config.enabled ? 'checked' : '' %> <%= canManageScaling ? '' : 'disabled' %>>
+                            <label class="form-check-label" for="scalingEnabled">Enable scheduled scaling</label>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <% if (canManageScaling) { %>
+                        <button class="btn btn-primary" type="submit">Save Settings</button>
+                        <% } else { %>
+                        <span class="text-secondary">No permission to edit.</span>
+                        <% } %>
+                    </div>
+                </form>
+                <div class="small text-secondary mt-2">Rules run each minute and apply when day/hour/minute match in the rule timezone.</div>
+            </div>
+
+            <% if (canManageScaling) { %>
+            <div class="cardx p-3 mb-3">
+                <h2 class="h6 mb-3">Add Rule</h2>
+                <form method="POST" action="/server/<%= server.containerId %>/scaling/rules" class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small">Rule Name</label>
+                        <input class="form-control" name="name" maxlength="120" required placeholder="Peak hours" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Timezone</label>
+                        <input class="form-control" name="timezone" value="<%= config.timezone || 'UTC' %>" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label small">Hour</label>
+                        <input class="form-control" type="number" min="0" max="23" name="hour" value="0" required style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label small">Minute</label>
+                        <input class="form-control" type="number" min="0" max="59" name="minute" value="0" required style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Memory (MB)</label>
+                        <input class="form-control" type="number" min="0" name="memory" placeholder="optional" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label small">CPU (%)</label>
+                        <input class="form-control" type="number" min="0" name="cpu" placeholder="optional" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Disk (MB)</label>
+                        <input class="form-control" type="number" min="0" name="disk" placeholder="optional" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">Swap (MB)</label>
+                        <input class="form-control" type="number" min="0" name="swapLimit" placeholder="optional" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">IO Weight</label>
+                        <input class="form-control" type="number" min="10" max="1000" name="ioWeight" placeholder="optional" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">PIDs Limit</label>
+                        <input class="form-control" type="number" min="0" name="pidsLimit" placeholder="optional" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small">OOM Score Adj</label>
+                        <input class="form-control" type="number" min="-1000" max="1000" name="oomScoreAdj" placeholder="optional" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small mb-1">Days of week</label>
+                        <div class="d-flex flex-wrap gap-3">
+                            <% dayLabels.forEach((label, idx) => { %>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="dow-<%= idx %>" name="daysOfWeek" value="<%= idx %>" checked>
+                                    <label class="form-check-label" for="dow-<%= idx %>"><%= label %></label>
+                                </div>
+                            <% }) %>
+                        </div>
+                    </div>
+                    <div class="col-12 d-flex gap-3 align-items-center">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="ruleEnabled" name="enabled" value="1" checked>
+                            <label class="form-check-label" for="ruleEnabled">Rule enabled</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="ruleOomKillDisable" name="oomKillDisable" value="1">
+                            <label class="form-check-label" for="ruleOomKillDisable">Disable OOM Kill</label>
+                        </div>
+                    </div>
+                    <div class="col-12 text-end">
+                        <button class="btn btn-primary" type="submit">Add Rule</button>
+                    </div>
+                </form>
+            </div>
+            <% } %>
+
+            <div class="cardx p-3">
+                <h2 class="h6 mb-3">Rules</h2>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Schedule</th>
+                                <th>Targets</th>
+                                <th>Status</th>
+                                <th>Last Applied</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (!rules.length) { %>
+                                <tr><td colspan="6" class="text-secondary">No scaling rules configured.</td></tr>
+                            <% } else { rules.forEach((rule) => { %>
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold"><%= rule.name %></div>
+                                        <div class="text-secondary small"><%= rule.timezone %></div>
+                                    </td>
+                                    <td>
+                                        <div><%= formatDays(rule.daysOfWeek) %></div>
+                                        <div class="text-secondary small"><%= String(rule.hour || 0).padStart(2, '0') %>:<%= String(rule.minute || 0).padStart(2, '0') %></div>
+                                    </td>
+                                    <td class="small">
+                                        RAM <strong><%= formatLimit(rule.memory, 'MB') %></strong> |
+                                        CPU <strong><%= formatLimit(rule.cpu, '%') %></strong> |
+                                        Disk <strong><%= formatLimit(rule.disk, 'MB') %></strong><br>
+                                        Swap <strong><%= formatLimit(rule.swapLimit, 'MB') %></strong> |
+                                        IO <strong><%= formatLimit(rule.ioWeight, '') %></strong> |
+                                        PIDs <strong><%= formatLimit(rule.pidsLimit, '') %></strong>
+                                        <% if (rule.oomKillDisable) { %><span class="badge bg-warning text-dark ms-1">OOM Kill Off</span><% } %>
+                                        <% if (Number(rule.oomScoreAdj || 0) !== 0) { %><span class="badge bg-info text-dark ms-1">oomScoreAdj <%= Number(rule.oomScoreAdj || 0) %></span><% } %>
+                                    </td>
+                                    <td>
+                                        <span class="badge <%= rule.enabled === false ? 'bg-secondary' : 'bg-success' %>"><%= rule.enabled === false ? 'Disabled' : 'Enabled' %></span>
+                                    </td>
+                                    <td><%= rule.lastAppliedSlot ? rule.lastAppliedSlot : '-' %></td>
+                                    <td class="text-end">
+                                        <% if (canManageScaling) { %>
+                                        <form method="POST" action="/server/<%= server.containerId %>/scaling/rules/<%= rule.id %>/delete" class="d-inline">
+                                            <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                                        </form>
+                                        <% } else { %>
+                                            <span class="text-secondary">-</span>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }) } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+<div class="modal fade" id="scalingTutorialModal" tabindex="-1" aria-labelledby="scalingTutorialModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content" style="background:#121216;border:1px solid #2d2d35;color:#e1e1e6;">
+            <div class="modal-header" style="border-bottom:1px solid #2d2d35;">
+                <h5 class="modal-title" id="scalingTutorialModalLabel">Scaling Tutorial</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-secondary mb-3">Scheduled Scaling schimbă automat limitele serverului (RAM/CPU/Disk/etc.) la orele stabilite de tine.</p>
+
+                <h6 class="mb-2">Ce este și cum funcționează</h6>
+                <ul class="text-secondary">
+                    <li>Motorul verifică regulile la fiecare minut.</li>
+                    <li>Dacă ziua + ora + minutul se potrivesc, aplică limitele din regulă.</li>
+                    <li>Timezone-ul regulii decide când se execută.</li>
+                </ul>
+
+                <h6 class="mb-2 mt-3">Pași de configurare</h6>
+                <ol class="text-secondary mb-3">
+                    <li>Setează timezone în <strong>Engine Settings</strong> și activează <strong>Enable scheduled scaling</strong>.</li>
+                    <li>În <strong>Add Rule</strong>, alege nume, oră, minut, zile și limitele dorite.</li>
+                    <li>Lasă necompletate câmpurile pe care nu vrei să le modifici.</li>
+                    <li>Salvează regula, apoi verifică în tabelul <strong>Rules</strong> dacă e <strong>Enabled</strong>.</li>
+                </ol>
+
+                <h6 class="mb-2">Exemple rapide</h6>
+                <div class="mb-2"><strong>Peak Hours (18:00) - crește resursele</strong></div>
+                <pre class="p-2 rounded" style="background:#0f0f12;border:1px solid #2d2d35;"><code>Rule Name: Peak Hours
+Timezone: Europe/Bucharest
+Hour: 18
+Minute: 0
+Days: Mon Tue Wed Thu Fri Sat Sun
+Memory: 6144
+CPU: 300</code></pre>
+
+                <div class="mb-2 mt-3"><strong>Night Mode (02:00) - scade resursele</strong></div>
+                <pre class="p-2 rounded" style="background:#0f0f12;border:1px solid #2d2d35;"><code>Rule Name: Night Mode
+Timezone: Europe/Bucharest
+Hour: 2
+Minute: 0
+Days: Mon Tue Wed Thu Fri Sat Sun
+Memory: 2048
+CPU: 120</code></pre>
+
+                <div class="mb-2 mt-3"><strong>Weekend Boost (10:00 doar Sâmbătă + Duminică)</strong></div>
+                <pre class="p-2 rounded" style="background:#0f0f12;border:1px solid #2d2d35;"><code>Rule Name: Weekend Boost
+Timezone: Europe/Bucharest
+Hour: 10
+Minute: 0
+Days: Sat Sun
+Memory: 8192
+CPU: 400
+Disk: (empty - unchanged)</code></pre>
+
+                <h6 class="mb-2 mt-3">Recomandări</h6>
+                <ul class="text-secondary mb-0">
+                    <li>Evită mai multe reguli pe exact același slot (aceeași oră/minut), ca să nu se suprascrie neclar.</li>
+                    <li>Folosește nume clare: <code>Peak</code>, <code>Night</code>, <code>Weekend</code>.</li>
+                    <li>Dacă vrei doar RAM/CPU, lasă Disk/Swap/IO/PIDs goale.</li>
+                </ul>
+            </div>
+            <div class="modal-footer" style="border-top:1px solid #2d2d35;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>document.getElementById('sidebarToggle')?.addEventListener('click',()=>document.getElementById('sidebar')?.classList.toggle('collapsed'));</script>
+</body>
+</html>

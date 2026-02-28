@@ -1,0 +1,213 @@
+<%- include('partials/header') %>
+    <%- include ('partials/error-modal') %>
+        <style>
+            body {
+                background-color: #0d0d0f;
+                font-family: 'Inter', sans-serif;
+                height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0;
+                overflow: hidden;
+            }
+
+            .login-container {
+                width: 100%;
+                max-width: 450px;
+                padding: 20px;
+                animation: fadeIn 0.8s ease-out;
+            }
+
+            .login-card {
+                background: rgba(26, 26, 30, 0.8);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                border-radius: 20px;
+                padding: 40px;
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            }
+
+            .mascot-box {
+                width: 120px;
+                height: 120px;
+                margin: 0 auto 30px;
+                background: rgba(0, 212, 255, 0.05);
+                border-radius: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transform: rotate(-5deg);
+            }
+
+            .form-label {
+                font-size: 0.75rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: rgba(255, 255, 255, 0.5);
+                margin-bottom: 10px;
+            }
+
+            .form-control {
+                background-color: #141419;
+                border: 1px solid #2d2d35;
+                color: white;
+                padding: 15px;
+                border-radius: 12px;
+                font-size: 24px;
+                text-align: center;
+                letter-spacing: 8px;
+                transition: all 0.3s ease;
+            }
+
+            .form-control:focus {
+                background-color: #141419;
+                border-color: #00d4ff;
+                box-shadow: 0 0 0 4px rgba(0, 212, 255, 0.1);
+                color: white;
+            }
+
+            .btn-login {
+                background: linear-gradient(135deg, #00d4ff 0%, #0072ff 100%);
+                border: none;
+                padding: 15px;
+                border-radius: 12px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin-top: 20px;
+                transition: all 0.3s ease;
+            }
+
+            .btn-login:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 20px -10px rgba(0, 114, 255, 0.5);
+                opacity: 0.9;
+            }
+
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .brand-text {
+                font-weight: 800;
+                letter-spacing: -0.02em;
+                margin-bottom: 5px;
+                background: linear-gradient(to right, #fff, #888);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+
+            .captcha-input {
+                font-size: 18px !important;
+                letter-spacing: 2px !important;
+            }
+        </style>
+
+        <div class="login-container">
+            <div class="login-card">
+                <div class="text-center mb-4">
+                    <div class="mascot-box">
+                        <img src="/assets/rocky-security.png" alt="Mascot"
+                            style="width: 130%; height: 130%; object-fit: contain;">
+                    </div>
+                    <h2 class="brand-text text-uppercase">Two-Factor</h2>
+                    <p class="text-muted small">Enter your 6-digit authentication code</p>
+                </div>
+
+                <form action="/login/2fa" method="POST">
+                    <div class="mb-4">
+                        <label class="form-label">Verification Code</label>
+                        <input type="text" name="code" class="form-control" autofocus required maxlength="6"
+                            pattern="[0-9]*" inputmode="numeric" placeholder="000000">
+                    </div>
+
+                    <% if (settings.captchastatus==='on' ) { %>
+                        <div class="mb-4">
+                            <label class="form-label" style="text-align: left; display: block;">Captcha
+                                Verification</label>
+                            <div class="d-flex gap-2 align-items-center mb-2">
+                                <div class="captcha-img-container"
+                                    style="background: #141419; padding: 5px; border-radius: 12px; border: 1px solid #2d2d35; flex-grow: 1;">
+                                    <img src="/captcha" alt="captcha" id="captcha-img"
+                                        style="height: 45px; display: block; margin: 0 auto; filter: brightness(1.2);">
+                                </div>
+                                <button type="button" class="btn btn-outline-info" id="refresh-captcha-btn"
+                                    title="Refresh Captcha" style="border-radius: 12px; padding: 12px;">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </button>
+                            </div>
+                            <input type="text" name="captcha" class="form-control captcha-input"
+                                placeholder="Enter the code" required autocomplete="off">
+                        </div>
+                        <script>
+                            (() => {
+                                if (window.__cpanelLogin2faCaptchaLifecycleBound) return;
+                                window.__cpanelLogin2faCaptchaLifecycleBound = true;
+
+                                let login2faCaptchaState = null;
+                                const initLogin2faCaptcha = () => {
+                                    const verifyForm = document.querySelector('form[action="/login-2fa"]');
+                                    if (!verifyForm) return;
+                                    if (verifyForm.dataset.cpanelLogin2faCaptchaInit === '1') return;
+                                    verifyForm.dataset.cpanelLogin2faCaptchaInit = '1';
+
+                                    const refreshBtn = document.getElementById('refresh-captcha-btn');
+                                    const captchaImg = document.getElementById('captcha-img');
+                                    if (!refreshBtn || !captchaImg) return;
+
+                                    const refreshHandler = () => {
+                                        captchaImg.src = '/captcha?t=' + Date.now();
+                                    };
+
+                                    refreshBtn.addEventListener('click', refreshHandler);
+                                    login2faCaptchaState = { verifyForm, refreshBtn, refreshHandler };
+                                };
+
+                                const cleanupLogin2faCaptcha = () => {
+                                    if (!login2faCaptchaState) return;
+                                    try {
+                                        login2faCaptchaState.refreshBtn.removeEventListener('click', login2faCaptchaState.refreshHandler);
+                                    } catch { }
+                                    if (login2faCaptchaState.verifyForm) {
+                                        login2faCaptchaState.verifyForm.dataset.cpanelLogin2faCaptchaInit = '0';
+                                    }
+                                    login2faCaptchaState = null;
+                                };
+
+                                document.addEventListener('turbo:load', initLogin2faCaptcha);
+                                document.addEventListener('turbo:before-cache', cleanupLogin2faCaptcha);
+                                if (document.readyState === 'loading') {
+                                    document.addEventListener('DOMContentLoaded', initLogin2faCaptcha, { once: true });
+                                } else {
+                                    initLogin2faCaptcha();
+                                }
+                            })();
+                        </script>
+                        <% } %>
+
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary btn-login">Verify & Login</button>
+                            </div>
+
+                            <div class="text-center mt-4">
+                                <a href="/login" class="text-muted small text-decoration-none">← Back to Login</a>
+                            </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Bootstrap JS -->
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        </body>
+
+        </html>

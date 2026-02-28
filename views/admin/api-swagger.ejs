@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= (settings.brandName || 'CPanel').toUpperCase() %>
+        <%= locals.title ? ' - ' + title.toUpperCase() : '' %> - Admin API Swagger
+    </title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include ('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3">
+                    <h4 class="mb-0 text-light fw-normal">API Swagger</h4>
+                    <small class="text-muted">Route reference and integration examples.</small>
+                </div>
+                <div class="breadcrumb-admin">
+                    <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span>
+                    <a href="/admin/api">API Keys</a> <span class="mx-2">&gt;</span>
+                    <span class="text-light">Swagger</span>
+                </div>
+            </div>
+
+            <div class="container-fluid py-4 px-lg-4">
+                <% if (success) { %>
+                    <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
+                        <i class="bi bi-check-circle-fill me-2"></i><%= success %>
+                    </div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i><%= error %>
+                    </div>
+                <% } %>
+
+                <div class="card border-0 shadow-sm mb-4" style="background-color:#141419;">
+                    <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i class="bi bi-file-earmark-code me-2"></i>Overview</h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <a href="/admin/api/swagger.json" target="_blank" rel="noopener" class="btn btn-outline-info btn-sm">
+                                <i class="bi bi-braces-asterisk me-1"></i>Open JSON
+                            </a>
+                            <a href="/admin/api/swagger.json?format=openapi" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-diagram-3 me-1"></i>OpenAPI JSON
+                            </a>
+                            <span class="badge bg-secondary-subtle text-light border border-secondary border-opacity-25">Generated: <%= swagger.generatedAt %></span>
+                        </div>
+                    </div>
+                    <div class="card-body p-4">
+                        <p class="text-light mb-2">
+                            Base URL: <code><%= swagger.baseUrl %></code>
+                        </p>
+                        <p class="text-muted mb-0">
+                            This page documents current HTTP endpoints available in this panel build. Connector-private routes are included for completeness and should not be exposed to third-party clients.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm mb-4" style="background-color:#141419;">
+                    <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                        <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i class="bi bi-shield-lock me-2"></i>Authentication Schemes</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <div class="row g-3">
+                            <% (swagger.authSchemes || []).forEach((item) => { %>
+                                <div class="col-12 col-lg-6">
+                                    <div class="p-3 rounded border border-secondary border-opacity-25 h-100" style="background-color:#101017;">
+                                        <div class="fw-semibold text-light mb-2"><%= item.title %></div>
+                                        <div class="small mb-2"><code><%= item.header %></code></div>
+                                        <div class="small text-muted"><%= item.notes %></div>
+                                    </div>
+                                </div>
+                            <% }) %>
+                        </div>
+                    </div>
+                </div>
+
+                <% (swagger.routeGroups || []).forEach((group) => { %>
+                    <div class="card border-0 shadow-sm mb-4" style="background-color:#141419;">
+                        <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                            <h5 class="card-title mb-1 fs-6 fw-bold text-light"><%= group.title %></h5>
+                            <div class="small text-muted"><%= group.description %></div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-dark table-hover mb-0 align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Method</th>
+                                            <th>Path</th>
+                                            <th>Auth</th>
+                                            <th>Permission</th>
+                                            <th>Summary</th>
+                                            <th>Request</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% (group.routes || []).forEach((route) => { %>
+                                            <tr>
+                                                <td>
+                                                    <% const m = String(route.method || '').toUpperCase(); %>
+                                                    <span class="badge <%= m === 'GET' ? 'bg-success' : m === 'POST' ? 'bg-primary' : 'bg-secondary' %>"><%= m %></span>
+                                                </td>
+                                                <td><code><%= route.path %></code></td>
+                                                <td class="small"><%= route.auth %></td>
+                                                <td class="small"><%= route.permission %></td>
+                                                <td class="small text-light"><%= route.summary %></td>
+                                                <td class="small text-muted"><%= route.payload %></td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                <% }) %>
+
+                <div class="row g-4">
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm" style="background-color:#141419;">
+                            <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                                <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i class="bi bi-terminal me-2"></i>Examples: cURL</h5>
+                            </div>
+                            <div class="card-body p-0">
+                                <pre class="m-0 p-3 text-light" style="background:#0f1118;white-space:pre-wrap;"><code><%= swagger.examples && swagger.examples.curl ? swagger.examples.curl : '' %></code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-xl-6">
+                        <div class="card border-0 shadow-sm h-100" style="background-color:#141419;">
+                            <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                                <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i class="bi bi-filetype-js me-2"></i>Examples: Node.js</h5>
+                            </div>
+                            <div class="card-body p-0">
+                                <pre class="m-0 p-3 text-light h-100" style="background:#0f1118;white-space:pre-wrap;"><code><%= swagger.examples && swagger.examples.nodejs ? swagger.examples.nodejs : '' %></code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-xl-6">
+                        <div class="card border-0 shadow-sm h-100" style="background-color:#141419;">
+                            <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                                <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i class="bi bi-filetype-py me-2"></i>Examples: Python</h5>
+                            </div>
+                            <div class="card-body p-0">
+                                <pre class="m-0 p-3 text-light h-100" style="background:#0f1118;white-space:pre-wrap;"><code><%= swagger.examples && swagger.examples.python ? swagger.examples.python : '' %></code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <%- include('../partials/footer') %>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

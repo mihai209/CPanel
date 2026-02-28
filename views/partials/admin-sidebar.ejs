@@ -1,0 +1,247 @@
+<style>
+    /* Custom Scrollbar for Sidebar */
+    .sidebar-nav-container::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .sidebar-nav-container::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .sidebar-nav-container::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+    }
+
+    .sidebar-nav-container::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .sidebar-category-header {
+        font-size: 0.65rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: rgba(255, 255, 255, 0.2);
+        padding: 1.5rem 1.5rem 0.5rem;
+        margin: 0;
+    }
+
+    .sidebar.collapsed .sidebar-category-header {
+        display: none;
+    }
+</style>
+
+<div class="sidebar d-flex flex-column flex-shrink-0" id="adminSidebar">
+    <!-- Header/Logo Area -->
+    <div class="sidebar-header">
+        <a href="/" class="d-flex align-items-center text-decoration-none text-light fade-in">
+            <img src="<%= settings.faviconUrl %>" alt="Favicon" width="32" height="32">
+            <span class="sidebar-brand sidebar-text text-uppercase">
+                <%= settings.brandName %>
+            </span>
+        </a>
+        <button class="btn btn-link text-muted p-0 ms-auto d-none d-lg-block" id="sidebarToggle">
+            <i class="bi bi-list fs-4"></i>
+        </button>
+    </div>
+
+    <!-- Navigation -->
+    <div class="flex-grow-1 overflow-auto sidebar-nav-container">
+        <ul class="nav flex-column mb-auto">
+            <!-- GENERAL -->
+            <li class="sidebar-category-header">General</li>
+            <li class="nav-item">
+                <a href="/admin/overview" class="nav-link <%= path === '/admin/overview' ? 'active' : '' %>">
+                    <i class="bi bi-house-door"></i>
+                    <span class="sidebar-text">Overview</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/settings" class="nav-link <%= path === '/admin/settings' ? 'active' : '' %>">
+                    <i class="bi bi-gear"></i>
+                    <span class="sidebar-text">Settings</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/let-user-create" class="nav-link <%= path === '/admin/let-user-create' ? 'active' : '' %>">
+                    <i class="bi bi-shop"></i>
+                    <span class="sidebar-text">Let User Create</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/store/deals" class="nav-link <%= path === '/admin/store/deals' ? 'active' : '' %>">
+                    <i class="bi bi-stars"></i>
+                    <span class="sidebar-text">Store Deals</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/store/redeem-codes" class="nav-link <%= path === '/admin/store/redeem-codes' ? 'active' : '' %>">
+                    <i class="bi bi-ticket-perforated"></i>
+                    <span class="sidebar-text">Redeem Codes</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/revenue-plans" class="nav-link <%= path === '/admin/revenue-plans' ? 'active' : '' %>">
+                    <i class="bi bi-cash-stack"></i>
+                    <span class="sidebar-text">Revenue Plans</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/api" class="nav-link <%= path === '/admin/api' ? 'active' : '' %>">
+                    <i class="bi bi-code-square"></i>
+                    <span class="sidebar-text">CPanel API</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/captcha" class="nav-link <%= path === '/admin/captcha' ? 'active' : '' %>">
+                    <i class="bi bi-robot"></i>
+                    <span class="sidebar-text">Captcha</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/lang" class="nav-link <%= path === '/admin/lang' ? 'active' : '' %>">
+                    <i class="bi bi-translate"></i>
+                    <span class="sidebar-text">Languages</span>
+                </a>
+            </li>
+
+            <!-- INFRASTRUCTURE -->
+            <li class="sidebar-category-header">Infrastructure</li>
+            <li class="nav-item">
+                <a href="/admin/users" class="nav-link <%= path === '/admin/users' ? 'active' : '' %>">
+                    <i class="bi bi-people"></i>
+                    <span class="sidebar-text">Users</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/connectors" class="nav-link <%= path === '/admin/connectors' ? 'active' : '' %>">
+                    <i class="bi bi-diagram-3"></i>
+                    <span class="sidebar-text">Connectors</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/connect-info" class="nav-link <%= path === '/admin/connect-info' ? 'active' : '' %>">
+                    <i class="bi bi-activity"></i>
+                    <span class="sidebar-text">Connector(s) Health</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/platform" class="nav-link <%= path === '/admin/platform' ? 'active' : '' %>">
+                    <i class="bi bi-command"></i>
+                    <span class="sidebar-text">Platform Ops</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/incidents" class="nav-link <%= path === '/admin/incidents' ? 'active' : '' %>">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <span class="sidebar-text">Incident Center</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/migrations/pterodactyl" class="nav-link <%= path === '/admin/migrations/pterodactyl' ? 'active' : '' %>">
+                    <i class="bi bi-arrow-left-right"></i>
+                    <span class="sidebar-text">Migrations</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/locations" class="nav-link <%= path === '/admin/locations' ? 'active' : '' %>">
+                    <i class="bi bi-geo-alt"></i>
+                    <span class="sidebar-text">Locations</span>
+                </a>
+            </li>
+
+            <!-- RESOURCES -->
+            <li class="sidebar-category-header">Resources</li>
+
+            <li class="nav-item">
+                <a href="/admin/servers" class="nav-link <%= path === '/admin/servers' ? 'active' : '' %>">
+                    <i class="bi bi-hdd-stack"></i>
+                    <span class="sidebar-text">Servers</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/images" class="nav-link <%= path === '/admin/images' ? 'active' : '' %>">
+                    <i class="bi bi-grid-3x3-gap"></i>
+                    <span class="sidebar-text">Images</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/packages" class="nav-link <%= path === '/admin/packages' ? 'active' : '' %>">
+                    <i class="bi bi-box"></i>
+                    <span class="sidebar-text">Packages</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/databases" class="nav-link <%= path === '/admin/databases' ? 'active' : '' %>">
+                    <i class="bi bi-database"></i>
+                    <span class="sidebar-text">Databases</span>
+                </a>
+            </li>
+
+            <!-- SYSTEM -->
+            <li class="sidebar-category-header">System</li>
+
+            <li class="nav-item">
+                <a href="/admin/auth-providers"
+                    class="nav-link <%= path === '/admin/auth-providers' ? 'active' : '' %>">
+                    <i class="bi bi-shield-lock"></i>
+                    <span class="sidebar-text">Auth Providers</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/themes" class="nav-link <%= path === '/admin/themes' ? 'active' : '' %>">
+                    <i class="bi bi-palette"></i>
+                    <span class="sidebar-text">Themes</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/extensions" class="nav-link <%= path === '/admin/extensions' ? 'active' : '' %>">
+                    <i class="bi bi-box"></i>
+                    <span class="sidebar-text">Extensions</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/admin/logs" class="nav-link <%= path === '/admin/logs' ? 'active' : '' %>">
+                    <i class="bi bi-file-text"></i>
+                    <span class="sidebar-text">Logs</span>
+                </a>
+            </li>
+
+
+        </ul>
+    </div>
+
+    <!-- User Footer (Mini) -->
+    <div class="sidebar-footer border-top border-secondary border-opacity-10 p-3">
+        <div class="d-flex align-items-center">
+            <img src="<%= user.avatarUrl || `https://www.gravatar.com/avatar/${user.gravatarHash}?d=retro` %>" alt=""
+                width="34" height="34" class="rounded-circle me-2">
+            <span class="sidebar-text small text-muted">
+                <%= user.username %>
+            </span>
+            <a href="/logout" class="btn btn-link text-muted p-0 ms-auto d-none d-lg-block">
+                <i class="bi bi-box-arrow-right"></i>
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const sidebar = document.getElementById('adminSidebar');
+        const toggleBtn = document.getElementById('sidebarToggle');
+
+        const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+        if (isCollapsed) {
+            sidebar.classList.add('collapsed');
+        }
+
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                sidebar.classList.toggle('collapsed');
+                localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+            });
+        }
+    })();
+</script>

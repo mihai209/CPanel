@@ -1,0 +1,647 @@
+<%- include('partials/header') %>
+    <%- include('partials/navbar') %>
+        <%- include ('partials/error-modal') %>
+            <div class="container-fluid py-4">
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h2 class="mb-0 text-light">Account Settings</h2>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <!-- Two-Factor Authentication -->
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm"
+                            style="background-color: #141419; border: 1px solid rgba(255,255,255,0.05) !important; border-radius: 15px;">
+                            <div
+                                class="card-header border-bottom border-secondary border-opacity-10 bg-transparent py-3 d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0 fs-6 fw-bold text-light">
+                                    <i class="bi bi-shield-lock me-2 text-primary"></i>Two-Factor Authentication
+                                </h5>
+                                <% if (user.twoFactorEnabled) { %>
+                                    <span
+                                        class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-3">ACTIVE</span>
+                                    <% } else { %>
+                                        <span
+                                            class="badge bg-secondary bg-opacity-10 text-muted border border-secondary border-opacity-25 px-3">INACTIVE</span>
+                                        <% } %>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="row align-items-center">
+                                    <div class="col-lg-8">
+                                        <p class="text-light mb-1">Secure your account with 2FA</p>
+                                        <p class="text-muted small mb-0">Two-factor authentication adds an extra layer
+                                            of security to your account by requiring more than just a password to log
+                                            in.</p>
+                                    </div>
+                                    <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+                                        <% if (user.twoFactorEnabled) { %>
+                                            <button class="btn btn-outline-danger px-4 fw-bold" data-bs-toggle="modal"
+                                                data-bs-target="#disable2FAModal">
+                                                Disable 2FA
+                                            </button>
+                                            <% } else { %>
+                                                <button id="setup2FABtn" class="btn btn-primary px-4 fw-bold">
+                                                    Enable 2FA
+                                                </button>
+                                                <% } %>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Linked Accounts -->
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm"
+                            style="background-color: #141419; border: 1px solid rgba(255,255,255,0.05) !important; border-radius: 15px;">
+                            <div
+                                class="card-header border-bottom border-secondary border-opacity-10 bg-transparent py-3">
+                                <h5 class="card-title mb-0 fs-6 fw-bold text-light">
+                                    <i class="bi bi-link-45deg me-2 text-primary"></i>Linked Accounts
+                                </h5>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="row g-3">
+                                    <% const providers=[ { id: 'discord' , name: 'Discord' , icon: 'bi-discord' ,
+                                        color: '#5865F2' }, { id: 'google' , name: 'Google' , icon: 'bi-google' ,
+                                        color: '#DB4437' }, { id: 'reddit' , name: 'Reddit' , icon: 'bi-reddit' ,
+                                        color: '#FF4500' }, { id: 'github' , name: 'GitHub' , icon: 'bi-github' ,
+                                        color: '#333' } ]; const settingsMap=(typeof settings==='object' && settings)
+                                        ? settings : {}; let normalizedLinks=Array.isArray(linkedAccounts) ?
+                                        linkedAccounts.map((entry)=> { if (!entry) return null; const provider =
+                                        String(entry.provider || '').trim().toLowerCase(); if (!provider) return
+                                        null; return { ...entry, provider }; }).filter(Boolean) : []; const
+                                        legacyProvider=String((user && user.oauthProvider) || '').trim().toLowerCase();
+                                        const legacyProviderId=String((user && user.oauthId) || '').trim(); if
+                                        (legacyProvider && legacyProviderId && !normalizedLinks.some((entry)=> entry.provider
+                                        === legacyProvider)) { normalizedLinks.push({ provider: legacyProvider,
+                                        providerId: legacyProviderId, isLegacy: true }); } %>
+
+                                        <% providers.forEach(p=> {
+                                            const link = normalizedLinks.find(l => String(l.provider || '').trim().toLowerCase() === p.id);
+                                            const configKey = `auth${p.id.charAt(0).toUpperCase() + p.id.slice(1)}Enabled`;
+                                            const isConfigured = String(settingsMap[configKey] || '').toLowerCase() === 'true';
+
+                                            // Show if either configured OR already linked
+                                            if (!isConfigured && !link) return;
+                                            %>
+                                            <div class="col-md-6 col-lg-3">
+                                                <div class="p-3 rounded-3 d-flex align-items-center justify-content-between"
+                                                    style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);">
+                                                    <div class="d-flex align-items-center">
+                                                        <i class="bi <%= p.icon %> fs-4 me-3"
+                                                            style="color: <%= p.color %>;"></i>
+                                                        <div>
+                                                            <div class="text-light small fw-bold">
+                                                                <%= p.name %>
+                                                            </div>
+                                                            <% if (link) { %>
+                                                                <div class="text-success" style="font-size: 0.7rem;"><i
+                                                                        class="bi bi-check-circle-fill me-1"></i>Linked
+                                                                </div>
+                                                                <% } else { %>
+                                                                    <div class="text-muted" style="font-size: 0.7rem;">
+                                                                        Not Linked</div>
+                                                                    <% } %>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <% if (link) { %>
+                                                            <button type="button"
+                                                                data-provider-id="<%= p.id %>"
+                                                                data-provider-name="<%= p.name %>"
+                                                                class="btn btn-sm btn-danger border-0 px-2 py-1 d-inline-flex align-items-center gap-1 shadow-sm unlink-account-btn"
+                                                                title="Unlink Account">
+                                                                <i class="bi bi-x-circle-fill fs-5"></i>
+                                                                <span class="small fw-bold">Unlink</span>
+                                                            </button>
+                                                            <form id="unlink-form-<%= p.id %>"
+                                                                action="/account/unlink/<%= p.id %>" method="POST"
+                                                                style="display: none;"></form>
+                                                            <% } else { %>
+                                                                <a href="/auth/<%= p.id %>"
+                                                                    class="btn btn-sm btn-primary py-1 px-3 fw-bold shadow-sm">
+                                                                    <i class="bi <%= p.icon %> me-1"></i>Link
+                                                                </a>
+                                                                <% } %>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <% }) %>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Update Account Details -->
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm h-100"
+                            style="background-color: #1a1a20; border: 1px solid rgba(255,255,255,0.05) !important; border-radius: 15px;">
+                            <div
+                                class="card-header border-bottom border-secondary border-opacity-10 bg-transparent py-3">
+                                <h5 class="card-title mb-0 fs-6 fw-bold text-light">Account Details</h5>
+                            </div>
+                            <div class="card-body p-4">
+                                <form method="POST" action="/account/update">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label text-muted small text-uppercase">First Name</label>
+                                            <input type="text" name="firstName"
+                                                class="form-control bg-dark border-secondary text-light"
+                                                value="<%= user.firstName || '' %>" required>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label text-muted small text-uppercase">Last Name</label>
+                                            <input type="text" name="lastName"
+                                                class="form-control bg-dark border-secondary text-light"
+                                                value="<%= user.lastName || '' %>" required>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small text-uppercase">Email Address</label>
+                                        <input type="email" name="email"
+                                            class="form-control bg-dark border-secondary text-light"
+                                            value="<%= user.email %>" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small text-uppercase">Avatar
+                                            Provider</label>
+                                        <select name="avatarProvider"
+                                            class="form-select bg-dark border-secondary text-light" id="avatarProvider">
+                                            <option value="gravatar" <%=user.avatarProvider==='gravatar' ? 'selected'
+                                                : '' %>>Gravatar (Based on Email)</option>
+                                            <option value="url" <%=user.avatarProvider==='url' ? 'selected' : '' %>
+                                                >Custom URL</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3" id="avatarUrlContainer"
+                                        style="<%= user.avatarProvider === 'url' ? '' : 'display: none;' %>">
+                                        <label class="form-label text-muted small text-uppercase">Avatar URL</label>
+                                        <input type="url" name="avatarUrl"
+                                            class="form-control bg-dark border-secondary text-light"
+                                            value="<%= user.avatarUrl || '' %>"
+                                            placeholder="https://example.com/avatar.png">
+                                        <div class="form-text text-muted small">Supported formats: .png, .jpg, .jpeg,
+                                            .gif, .webp</div>
+                                    </div>
+                                    <script>
+                                        (() => {
+                                            if (window.__cpanelAvatarProviderLifecycleBound) return;
+                                            window.__cpanelAvatarProviderLifecycleBound = true;
+
+                                            let avatarState = null;
+                                            const initAvatarProviderToggle = () => {
+                                                const avatarProvider = document.getElementById('avatarProvider');
+                                                const container = document.getElementById('avatarUrlContainer');
+                                                if (!avatarProvider || !container) return;
+                                                if (avatarProvider.dataset.cpanelAvatarToggleInit === '1') return;
+                                                avatarProvider.dataset.cpanelAvatarToggleInit = '1';
+
+                                                const changeHandler = function () {
+                                                    container.style.display = this.value === 'url' ? 'block' : 'none';
+                                                };
+                                                avatarProvider.addEventListener('change', changeHandler);
+                                                avatarState = { avatarProvider, changeHandler };
+                                            };
+
+                                            const cleanupAvatarProviderToggle = () => {
+                                                if (!avatarState) return;
+                                                try {
+                                                    avatarState.avatarProvider.removeEventListener('change', avatarState.changeHandler);
+                                                } catch { }
+                                                avatarState.avatarProvider.dataset.cpanelAvatarToggleInit = '0';
+                                                avatarState = null;
+                                            };
+
+                                            document.addEventListener('turbo:load', initAvatarProviderToggle);
+                                            document.addEventListener('turbo:before-cache', cleanupAvatarProviderToggle);
+                                            if (document.readyState === 'loading') {
+                                                document.addEventListener('DOMContentLoaded', initAvatarProviderToggle, { once: true });
+                                            } else {
+                                                initAvatarProviderToggle();
+                                            }
+                                        })();
+                                    </script>
+                                    <div class="mb-4">
+                                        <label class="form-label text-muted small text-uppercase">Username</label>
+                                        <input type="text" name="username" readonly="readonly"
+                                            class="form-control bg-dark border-secondary text-muted"
+                                            value="<%= user.username %>">
+                                        <div class="form-text text-muted small">Usernames cannot be changed.</div>
+                                    </div>
+                                    <div class="text-end">
+                                        <button type="submit" class="btn btn-primary px-4 fw-bold">Update
+                                            Account</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Update Password -->
+                    <div class="col-md-6">
+                        <div class="card border-0 shadow-sm h-100"
+                            style="background-color: #1a1a20; border: 1px solid rgba(255,255,255,0.05) !important; border-radius: 15px;">
+                            <div
+                                class="card-header border-bottom border-secondary border-opacity-10 bg-transparent py-3">
+                                <h5 class="card-title mb-0 fs-6 fw-bold text-light">Update Password</h5>
+                            </div>
+                            <div class="card-body p-4">
+                                <form method="POST" action="/account/password">
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small text-uppercase">Current
+                                            Password</label>
+                                        <input type="password" name="currentPassword"
+                                            class="form-control bg-dark border-secondary text-light" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small text-uppercase">New Password</label>
+                                        <input type="password" name="newPassword"
+                                            class="form-control bg-dark border-secondary text-light" required>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="form-label text-muted small text-uppercase">Confirm New
+                                            Password</label>
+                                        <input type="password" name="confirmPassword"
+                                            class="form-control bg-dark border-secondary text-light" required>
+                                    </div>
+                                    <div class="text-end">
+                                        <button type="submit" class="btn btn-primary px-4 fw-bold">Update
+                                            Password</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div> <!-- End Row g-4 -->
+            </div> <!-- End Container Fluid -->
+
+            <!-- Modals -->
+            <!-- Setup 2FA Modal -->
+            <div class="modal fade" id="setup2FAModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content border-0 shadow-lg"
+                        style="background-color: #1a1a20; border: 1px solid #2d2d35 !important;">
+                        <div class="modal-header border-bottom border-secondary border-opacity-10">
+                            <h5 class="modal-title fs-6 fw-bold text-light">Configure Two-Factor Authentication</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body p-4">
+                            <div class="row g-4">
+                                <div class="col-md-5 text-center border-end border-secondary border-opacity-10">
+                                    <div class="p-3 bg-white rounded-3 d-inline-block shadow-sm mb-3">
+                                        <img id="qrCodeImg" src="" alt="QR Code" style="width: 200px; height: 200px;">
+                                    </div>
+                                    <div class="text-start">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Manual Entry
+                                            Key</label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="text" id="manualSecret"
+                                                class="form-control bg-dark border-secondary text-light font-monospace"
+                                                readonly>
+                                            <button id="copySecretBtn" class="btn btn-outline-secondary">Copy</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-7 ps-md-4">
+                                    <h6 class="text-light fw-bold mb-3">Step 1: Scan QR Code</h6>
+                                    <p class="text-muted small mb-4">Open your authenticator app and scan the QR code.
+                                        If you can't scan it, use the manual entry key provided.</p>
+
+                                    <h6 class="text-light fw-bold mb-3">Step 2: Enter Verification Code</h6>
+                                    <p class="text-muted small mb-3">Enter the 6-digit code generated by your app.</p>
+
+                                    <div class="verification-step">
+                                        <div class="mb-3">
+                                            <input type="text" id="verificationCode"
+                                                class="form-control bg-dark border-secondary text-light fs-3 text-center fw-bold"
+                                                style="letter-spacing: 4px;" maxlength="6" placeholder="000000">
+                                        </div>
+                                        <div id="setupError" class="text-danger small mb-3" style="display: none;">
+                                        </div>
+                                        <button id="confirmEnableBtn"
+                                            class="btn btn-success w-100 py-2 fw-bold shadow-sm">
+                                            <i class="bi bi-check-circle me-2"></i>Verify & Enable 2FA
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Disable 2FA Modal -->
+            <div class="modal fade" id="disable2FAModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 shadow-lg"
+                        style="background-color: #1a1a20; border: 1px solid #2d2d35 !important;">
+                        <div class="modal-header border-bottom border-secondary border-opacity-10">
+                            <h5 class="modal-title fs-6 fw-bold text-light">Disable 2FA Authentication</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body p-4">
+                            <p class="text-muted small mb-4">Confirm your password to disable 2FA.</p>
+                            <div class="mb-3">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Current
+                                    Password</label>
+                                <input type="password" id="disablePassword"
+                                    class="form-control bg-dark border-secondary text-light" required>
+                            </div>
+                            <div id="disableError" class="text-danger small mb-0" style="display: none;"></div>
+                        </div>
+                        <div class="modal-footer border-top border-secondary border-opacity-10">
+                            <button type="button" class="btn btn-link text-muted text-decoration-none"
+                                data-bs-dismiss="modal">Cancel</button>
+                            <button id="confirmDisableBtn" type="button" class="btn btn-danger px-4 fw-bold">Disable
+                                Now</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Confirm 2FA Enable Modal -->
+            <div class="modal fade" id="confirm2FAModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 shadow-lg"
+                        style="background-color: #1a1a20; border: 1px solid #2d2d35 !important;">
+                        <div class="modal-header border-bottom border-secondary border-opacity-10">
+                            <h5 class="modal-title fs-6 fw-bold text-light">
+                                <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Atenție: Punct fără
+                                întoarcere
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body p-4 text-center">
+                            <img src="/assets/rocky-security.png" alt="Security Mascot" class="img-fluid mb-4"
+                                style="max-height: 180px;">
+                            <p class="text-light fw-bold mb-3">Ești pe cale să activezi Autentificarea în Doi Pași
+                                (2FA).</p>
+                            <p class="text-muted small mb-0">
+                                Dacă pierzi accesul la dispozitivul care conține codul 2FA, <strong>vei pierde accesul
+                                    la contul tău</strong>.
+                                În acest caz, va trebui să contactezi suportul administrativ pentru a-ți verifica
+                                identitatea manual și a dezactiva 2FA de către un administrator.
+                            </p>
+                        </div>
+                        <div class="modal-footer border-top border-secondary border-opacity-10">
+                            <button type="button" class="btn btn-link text-muted text-decoration-none"
+                                data-bs-dismiss="modal">Anulează</button>
+                            <button id="finalEnableBtn" type="button" class="btn btn-warning px-4 fw-bold">Am înțeles,
+                                activează 2FA</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+
+            <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+            <script>
+                let accountPageState = null;
+
+                function showRockySweetAlert(options) {
+                    if (typeof Swal === 'undefined') {
+                        const fallbackText = (options && options.text)
+                            ? options.text
+                            : ((options && options.title) ? options.title : 'Confirmation');
+                        const confirmed = window.confirm(fallbackText);
+                        return Promise.resolve({ isConfirmed: confirmed });
+                    }
+                    return Swal.fire({
+                        imageUrl: '/assets/rocky.png',
+                        imageWidth: 130,
+                        imageAlt: 'Rocky mascot',
+                        background: '#1a1a20',
+                        color: '#fff',
+                        confirmButtonColor: '#0d6efd',
+                        ...options
+                    });
+                }
+
+                async function setup2FA() {
+                    try {
+                        const response = await fetch('/account/2fa/setup');
+                        const data = await response.json();
+
+                        if (data.error) throw new Error(data.error);
+
+                        document.getElementById('qrCodeImg').src = data.qrCodeUrl;
+                        document.getElementById('manualSecret').value = data.secret;
+
+                        const setupModal = new bootstrap.Modal(document.getElementById('setup2FAModal'));
+                        setupModal.show();
+                    } catch (err) {
+                        showRockySweetAlert({
+                            title: '2FA Setup Failed',
+                            text: 'Failed to initialize 2FA setup: ' + err.message,
+                            icon: 'error',
+                            imageUrl: '/assets/what-rocky.png'
+                        });
+                    }
+                }
+
+                function showEnableConfirmation() {
+                    const code = document.getElementById('verificationCode').value;
+                    const errorDiv = document.getElementById('setupError');
+
+                    if (code.length !== 6) {
+                        errorDiv.textContent = 'Codul trebuie să aibă 6 cifre.';
+                        errorDiv.style.display = 'block';
+                        return;
+                    }
+
+                    errorDiv.style.display = 'none';
+                    const confirmModal = new bootstrap.Modal(document.getElementById('confirm2FAModal'));
+                    confirmModal.show();
+                }
+
+                async function processEnable2FA() {
+                    const code = document.getElementById('verificationCode').value;
+                    const errorDiv = document.getElementById('setupError');
+                    const finalEnableBtn = document.getElementById('finalEnableBtn');
+
+                    finalEnableBtn.disabled = true;
+                    finalEnableBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Se activează...';
+
+                    try {
+                        const response = await fetch('/account/2fa/enable', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ code })
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            window.location.href = '/account?success=2FA a fost activat cu succes!';
+                        } else {
+                            bootstrap.Modal.getInstance(document.getElementById('confirm2FAModal')).hide();
+                            errorDiv.textContent = data.error || 'Cod invalid';
+                            errorDiv.style.display = 'block';
+                            finalEnableBtn.disabled = false;
+                            finalEnableBtn.textContent = 'Am înțeles, activează 2FA';
+                        }
+                    } catch (err) {
+                        bootstrap.Modal.getInstance(document.getElementById('confirm2FAModal')).hide();
+                        errorDiv.textContent = 'Eroare de rețea. Încearcă din nou.';
+                        errorDiv.style.display = 'block';
+                        finalEnableBtn.disabled = false;
+                        finalEnableBtn.textContent = 'Am înțeles, activează 2FA';
+                    }
+                }
+
+                async function confirmDisable2FA() {
+                    const password = document.getElementById('disablePassword').value;
+                    const errorDiv = document.getElementById('disableError');
+
+                    try {
+                        const response = await fetch('/account/2fa/disable', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ password })
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            window.location.href = '/account?success=2FA disabled successfully.';
+                        } else {
+                            errorDiv.textContent = data.error || 'Invalid password';
+                            errorDiv.style.display = 'block';
+                        }
+                    } catch (err) {
+                        errorDiv.textContent = 'Network error.';
+                        errorDiv.style.display = 'block';
+                    }
+                }
+
+                function copySecret() {
+                    const input = document.getElementById('manualSecret');
+                    const text = input ? String(input.value || '') : '';
+                    if (!text) return;
+
+                    const showSuccess = () => showRockySweetAlert({
+                        title: 'Copied',
+                        text: 'Manual secret copied to clipboard.',
+                        icon: 'success',
+                        imageUrl: '/assets/happy-rocky.png'
+                    });
+
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).then(showSuccess).catch(() => {
+                            if (input) {
+                                input.select();
+                                document.execCommand('copy');
+                            }
+                            showSuccess();
+                        });
+                        return;
+                    }
+
+                    if (input) {
+                        input.select();
+                        document.execCommand('copy');
+                    }
+                    showSuccess();
+                }
+
+                const initAccountPage = () => {
+                    const profileForm = document.querySelector('form[action="/account/profile"]');
+                    if (!profileForm) return;
+                    if (profileForm.dataset.cpanelAccountInit === '1') return;
+                    profileForm.dataset.cpanelAccountInit = '1';
+
+                    const listeners = [];
+                    const bind = (element, eventName, handler) => {
+                        if (!element) return;
+                        element.addEventListener(eventName, handler);
+                        listeners.push({ element, eventName, handler });
+                    };
+
+                    bind(document.getElementById('setup2FABtn'), 'click', setup2FA);
+                    bind(document.getElementById('copySecretBtn'), 'click', copySecret);
+                    bind(document.getElementById('confirmEnableBtn'), 'click', showEnableConfirmation);
+                    bind(document.getElementById('finalEnableBtn'), 'click', processEnable2FA);
+                    bind(document.getElementById('confirmDisableBtn'), 'click', confirmDisable2FA);
+
+                    document.querySelectorAll('.unlink-account-btn').forEach((button) => {
+                        const unlinkHandler = () => {
+                            const providerId = String(button.dataset.providerId || '').trim();
+                            const providerName = String(button.dataset.providerName || '').trim() || providerId;
+                            if (!providerId) return;
+                            confirmUnlink(providerId, providerName);
+                        };
+                        bind(button, 'click', unlinkHandler);
+                    });
+
+                    accountPageState = { profileForm, listeners };
+                };
+
+                const cleanupAccountPage = () => {
+                    if (!accountPageState) return;
+                    accountPageState.listeners.forEach(({ element, eventName, handler }) => {
+                        try {
+                            element.removeEventListener(eventName, handler);
+                        } catch { }
+                    });
+                    ['setup2FAModal', 'disable2FAModal', 'confirm2FAModal'].forEach((id) => {
+                        const modalElement = document.getElementById(id);
+                        if (!modalElement) return;
+                        const instance = bootstrap.Modal.getInstance(modalElement);
+                        if (instance) {
+                            try { instance.hide(); } catch { }
+                        }
+                    });
+                    document.querySelectorAll('.modal-backdrop').forEach((element) => element.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('padding-right');
+                    if (accountPageState.profileForm) {
+                        accountPageState.profileForm.dataset.cpanelAccountInit = '0';
+                    }
+                    accountPageState = null;
+                };
+
+                if (!window.__cpanelAccountLifecycleEventsBound) {
+                    window.__cpanelAccountLifecycleEventsBound = true;
+                    document.addEventListener('turbo:load', initAccountPage);
+                    document.addEventListener('turbo:before-cache', cleanupAccountPage);
+                }
+
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', initAccountPage, { once: true });
+                } else {
+                    initAccountPage();
+                }
+            </script>
+
+            <script>
+                function confirmUnlink(providerId, providerName) {
+                    showRockySweetAlert({
+                        title: 'Dezlegare Cont?',
+                        text: `Ești sigur că vrei să dezlegi contul de ${providerName}? Acest lucru va limita opțiunile de login.`,
+                        imageUrl: '/assets/sad-rocky.png',
+                        imageWidth: 160,
+                        imageAlt: 'Sad Rocky Mascot',
+                        showCancelButton: true,
+                        confirmButtonColor: '#dc3545',
+                        cancelButtonColor: '#6c757d',
+                        confirmButtonText: 'Da, dezleagă-l!',
+                        cancelButtonText: 'Anulează',
+                        background: '#1a1a20',
+                        color: '#fff',
+                        customClass: {
+                            popup: 'rounded-4 border border-secondary border-opacity-10 shadow-lg'
+                        }
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            document.getElementById(`unlink-form-${providerId}`).submit();
+                        }
+                    });
+                }
+            </script>
+
+            <!-- Bootstrap JS -->
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+            </body>
+
+            </html>

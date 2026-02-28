@@ -1,0 +1,126 @@
+<%- include('partials/header') %>
+<%- include('partials/navbar') %>
+<%- include('partials/error-modal') %>
+
+<%
+const compactCoins = (value) => {
+    const num = Number(value || 0);
+    if (!Number.isFinite(num)) return '0';
+    return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(num);
+};
+const list = Array.isArray(codes) ? codes : [];
+const formatDateTime = (value) => {
+    const date = new Date(Number(value || 0));
+    if (!Number.isFinite(date.getTime())) return '-';
+    return date.toLocaleString();
+};
+const rewardSummary = (rewards) => {
+    const src = rewards && typeof rewards === 'object' ? rewards : {};
+    const parts = [];
+    if (Number(src.coins || 0) > 0) parts.push(`${Number(src.coins || 0)} ${economyUnit}`);
+    if (Number(src.ramMb || 0) > 0) parts.push(`${(Number(src.ramMb || 0) / 1024).toFixed(2).replace(/\.00$/, '')} GB RAM`);
+    if (Number(src.cpuPercent || 0) > 0) parts.push(`${(Number(src.cpuPercent || 0) / 100).toFixed(2).replace(/\.00$/, '')} CPU`);
+    if (Number(src.diskMb || 0) > 0) parts.push(`${(Number(src.diskMb || 0) / 1024).toFixed(2).replace(/\.00$/, '')} GB Disk`);
+    if (Number(src.swapMb || 0) > 0) parts.push(`${(Number(src.swapMb || 0) / 1024).toFixed(2).replace(/\.00$/, '')} GB Swap`);
+    if (Number(src.allocations || 0) > 0) parts.push(`${Number(src.allocations || 0)} Allocation`);
+    if (Number(src.images || 0) > 0) parts.push(`${Number(src.images || 0)} Image`);
+    if (Number(src.packages || 0) > 0) parts.push(`${Number(src.packages || 0)} Package`);
+    return parts.length ? parts.join(' | ') : 'No rewards';
+};
+%>
+
+<style>
+    .store-shell { max-width: 1100px; margin: 0 auto; }
+    .store-card { border: 1px solid #2e3036; background: linear-gradient(180deg, rgba(31, 32, 35, 0.95), rgba(31, 32, 35, 0.72)); border-radius: 14px; padding: 1.25rem; }
+    .store-table th, .store-table td { border-color: rgba(255,255,255,0.08) !important; vertical-align: middle; }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="store-shell">
+        <div class="store-card mb-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h1 class="h4 fw-bold mb-1">Redeem Codes</h1>
+                    <p class="text-muted mb-0 small">Redeem code can grant coins or inventory resources.</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/store" class="btn btn-outline-light btn-sm">Back to Store</a>
+                </div>
+            </div>
+        </div>
+
+        <% if (success) { %>
+            <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success"><i class="bi bi-check-circle-fill me-2"></i><%= success %></div>
+        <% } %>
+        <% if (error) { %>
+            <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i><%= error %></div>
+        <% } %>
+        <% if (!inventoryEnabled) { %>
+            <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning"><i class="bi bi-exclamation-triangle me-2"></i>Inventory is disabled, so only coin rewards can be fully claimed.</div>
+        <% } %>
+
+        <div class="store-card mb-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="text-muted small">Wallet</div>
+                <div class="h5 mb-0 fw-bold"><%= compactCoins(user.coins || 0) %> <%= economyUnit %></div>
+            </div>
+        </div>
+
+        <div class="store-card mb-3">
+            <h2 class="h6 text-uppercase fw-bold mb-3">Redeem</h2>
+            <form method="POST" action="/store/redeem/claim" class="row g-2">
+                <div class="col-md-8">
+                    <input type="text" name="code" required maxlength="64" class="form-control" placeholder="Enter code (ex: WELCOME2026)" style="background-color:#1a1a20;border-color:#2d2d35;">
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">Redeem Code</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="store-card">
+            <h2 class="h6 text-uppercase fw-bold mb-3">Visible Active Codes</h2>
+            <% if (!list.length) { %>
+                <div class="text-muted">No active or exhausted codes visible right now.</div>
+            <% } else { %>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm store-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Code</th>
+                                <th>Status</th>
+                                <th>Rewards</th>
+                                <th>Uses</th>
+                                <th>Per User</th>
+                                <th>Expires</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% list.forEach((entry) => { %>
+                                <tr>
+                                    <td><code><%= entry.code %></code></td>
+                                    <td>
+                                        <span class="badge <%= entry.status === 'active' ? 'bg-success' : 'bg-warning text-dark' %>"><%= entry.status %></span>
+                                    </td>
+                                    <td class="small"><%= rewardSummary(entry.rewards) %></td>
+                                    <td class="small">
+                                        <%= Number(entry.usesCount || 0) %><% if (entry.maxUses > 0) { %> / <%= Number(entry.maxUses || 0) %><% } else { %> / unlimited<% } %>
+                                    </td>
+                                    <td class="small">
+                                        <%= Number(entry.userUses || 0) %><% if (entry.perUserLimit > 0) { %> / <%= Number(entry.perUserLimit || 0) %><% } else { %> / unlimited<% } %>
+                                    </td>
+                                    <td class="small"><%= Number(entry.expiresAtMs || 0) > 0 ? formatDateTime(entry.expiresAtMs) : 'never' %></td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<%- include('partials/footer') %>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

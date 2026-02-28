@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= (settings.brandName || 'CPanel').toUpperCase() %>
+        <%= locals.title ? ' - ' + title.toUpperCase() : '' %> - Redeem Codes
+    </title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include ('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3">
+                    <h4 class="mb-0 text-light fw-normal">Store Redeem Codes</h4>
+                    <small class="text-muted">Code-based rewards with usage limits and expiry.</small>
+                </div>
+                <div class="breadcrumb-admin">
+                    <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span>
+                    <a href="/admin/let-user-create">Let User Create</a> <span class="mx-2">&gt;</span>
+                    <span class="text-light">Redeem Codes</span>
+                </div>
+            </div>
+
+            <%
+            const toDateTimeLocal = (value) => {
+                const ms = Number(value || 0);
+                if (!Number.isFinite(ms) || ms <= 0) return '';
+                const date = new Date(ms);
+                if (Number.isNaN(date.getTime())) return '';
+                const pad = (n) => String(n).padStart(2, '0');
+                return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+            };
+            const formatDateTime = (value) => {
+                const date = new Date(Number(value || 0));
+                if (!Number.isFinite(date.getTime())) return '-';
+                return date.toLocaleString();
+            };
+            const compact = (value) => {
+                const num = Number(value || 0);
+                if (!Number.isFinite(num)) return '0';
+                return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(num);
+            };
+            const list = Array.isArray(codes) ? codes : [];
+            const rewardSummary = (rewards) => {
+                const src = rewards && typeof rewards === 'object' ? rewards : {};
+                const parts = [];
+                if (Number(src.coins || 0) > 0) parts.push(`${Number(src.coins || 0)} ${economyUnit}`);
+                if (Number(src.ramMb || 0) > 0) parts.push(`${(Number(src.ramMb || 0) / 1024).toFixed(2).replace(/\.00$/, '')} GB RAM`);
+                if (Number(src.cpuPercent || 0) > 0) parts.push(`${(Number(src.cpuPercent || 0) / 100).toFixed(2).replace(/\.00$/, '')} CPU`);
+                if (Number(src.diskMb || 0) > 0) parts.push(`${(Number(src.diskMb || 0) / 1024).toFixed(2).replace(/\.00$/, '')} GB Disk`);
+                if (Number(src.swapMb || 0) > 0) parts.push(`${(Number(src.swapMb || 0) / 1024).toFixed(2).replace(/\.00$/, '')} GB Swap`);
+                if (Number(src.allocations || 0) > 0) parts.push(`${Number(src.allocations || 0)} Allocation`);
+                if (Number(src.images || 0) > 0) parts.push(`${Number(src.images || 0)} Image`);
+                if (Number(src.packages || 0) > 0) parts.push(`${Number(src.packages || 0)} Package`);
+                return parts.length ? parts.join(' | ') : 'No rewards';
+            };
+            %>
+
+            <div class="container-fluid py-4 px-lg-4">
+                <% if (success) { %>
+                    <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
+                        <i class="bi bi-check-circle-fill me-2"></i><%= success %>
+                    </div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i><%= error %>
+                    </div>
+                <% } %>
+
+                <div class="card border-0 shadow-sm mb-4" style="background-color:#141419;">
+                    <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i class="bi bi-ticket-perforated me-2"></i>Create Redeem Code</h5>
+                        <a href="/admin/let-user-create" class="btn btn-outline-light btn-sm">Back to Let User Create</a>
+                    </div>
+                    <div class="card-body p-4">
+                        <form method="POST" action="/admin/store/redeem-codes" class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Code</label>
+                                <input type="text" name="code" maxlength="64" required placeholder="WELCOME2026" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Name</label>
+                                <input type="text" name="name" maxlength="120" placeholder="Welcome Pack" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Expires At (optional)</label>
+                                <input type="datetime-local" name="expiresAt" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Description</label>
+                                <textarea name="description" maxlength="1200" rows="2" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;"></textarea>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Max Uses (0 unlimited)</label>
+                                <input type="number" name="maxUses" min="0" step="1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Per User Limit (0 unlimited)</label>
+                                <input type="number" name="perUserLimit" min="0" step="1" value="1" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+
+                            <div class="col-12">
+                                <h6 class="text-light mb-2">Rewards</h6>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Coins</label>
+                                <input type="number" name="rewardCoins" min="0" step="1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">RAM GB</label>
+                                <input type="number" name="rewardRamGb" min="0" step="0.1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">CPU Cores</label>
+                                <input type="number" name="rewardCpuCores" min="0" step="0.1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Disk GB</label>
+                                <input type="number" name="rewardDiskGb" min="0" step="0.1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Swap GB</label>
+                                <input type="number" name="rewardSwapGb" min="0" step="0.1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Alloc</label>
+                                <input type="number" name="rewardAllocations" min="0" step="1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Images</label>
+                                <input type="number" name="rewardImages" min="0" step="1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Packages</label>
+                                <input type="number" name="rewardPackages" min="0" step="1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-3 d-flex align-items-center">
+                                <div class="form-check form-switch mt-3">
+                                    <input class="form-check-input" type="checkbox" id="codeEnabledNew" name="enabled" value="1" checked>
+                                    <label class="form-check-label text-light" for="codeEnabledNew">Enabled</label>
+                                </div>
+                            </div>
+
+                            <div class="col-12 text-end">
+                                <button type="submit" class="btn btn-primary px-4 fw-medium">Create Redeem Code</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm" style="background-color:#141419;">
+                    <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                        <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i class="bi bi-card-checklist me-2"></i>Existing Codes</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <% if (!list.length) { %>
+                            <div class="text-muted">No redeem codes created yet.</div>
+                        <% } else { %>
+                            <div class="row g-3">
+                                <% list.forEach((entry) => { %>
+                                    <div class="col-12">
+                                        <div class="p-3 rounded border border-secondary border-opacity-25">
+                                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+                                                <div>
+                                                    <div class="text-light fw-semibold"><code><%= entry.code %></code> <span class="ms-2"><%= entry.name %></span></div>
+                                                    <div class="small text-muted">Status:
+                                                        <span class="badge <%= entry.status === 'active' ? 'bg-success' : (entry.status === 'expired' || entry.status === 'exhausted' ? 'bg-warning text-dark' : 'bg-secondary') %>"><%= entry.status %></span>
+                                                        | Uses: <strong><%= compact(entry.usesCount || 0) %></strong><% if (entry.maxUses > 0) { %>/<%= compact(entry.maxUses) %><% } else { %> / unlimited<% } %>
+                                                        | Remaining: <strong><%= entry.remainingUses === null ? 'unlimited' : compact(entry.remainingUses) %></strong>
+                                                    </div>
+                                                    <div class="small text-muted">Per-user limit: <strong><%= Number(entry.perUserLimit || 0) > 0 ? entry.perUserLimit : 'unlimited' %></strong></div>
+                                                    <div class="small text-muted">Expires: <strong><%= Number(entry.expiresAtMs || 0) > 0 ? formatDateTime(entry.expiresAtMs) : 'never' %></strong></div>
+                                                    <div class="small text-muted">Rewards: <strong><%= rewardSummary(entry.rewards) %></strong></div>
+                                                </div>
+                                                <form method="POST" action="/admin/store/redeem-codes/<%= entry.id %>/delete">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                                                </form>
+                                            </div>
+
+                                            <% if (entry.description) { %>
+                                                <div class="small text-muted mb-2"><%= entry.description %></div>
+                                            <% } %>
+
+                                            <form method="POST" action="/admin/store/redeem-codes/<%= entry.id %>/update" class="row g-2 mt-2">
+                                                <div class="col-md-3">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Code</label>
+                                                    <input type="text" name="code" maxlength="64" required value="<%= entry.code %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Name</label>
+                                                    <input type="text" name="name" maxlength="120" value="<%= entry.name %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Expires At</label>
+                                                    <input type="datetime-local" name="expiresAt" value="<%= toDateTimeLocal(entry.expiresAtMs) %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Max Uses</label>
+                                                    <input type="number" name="maxUses" min="0" step="1" value="<%= Number(entry.maxUses || 0) %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Per User Limit</label>
+                                                    <input type="number" name="perUserLimit" min="0" step="1" value="<%= Number(entry.perUserLimit || 0) %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-3 d-flex align-items-end">
+                                                    <div class="form-check form-switch mb-1">
+                                                        <input class="form-check-input" type="checkbox" id="codeEnabled-<%= entry.id %>" name="enabled" value="1" <%= entry.enabled ? 'checked' : '' %>>
+                                                        <label class="form-check-label text-light" for="codeEnabled-<%= entry.id %>">Enabled</label>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Description</label>
+                                                    <textarea name="description" rows="1" maxlength="1200" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;"><%= entry.description || '' %></textarea>
+                                                </div>
+
+                                                <div class="col-12 mt-2">
+                                                    <div class="small text-light mb-1">Rewards</div>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <input type="number" name="rewardCoins" min="0" step="1" value="<%= Number(entry.rewards && entry.rewards.coins || 0) %>" class="form-control form-control-sm" placeholder="Coins" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <input type="number" name="rewardRamGb" min="0" step="0.1" value="<%= ((entry.rewards && entry.rewards.ramMb) ? (entry.rewards.ramMb / 1024) : 0) %>" class="form-control form-control-sm" placeholder="RAM GB" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <input type="number" name="rewardCpuCores" min="0" step="0.1" value="<%= ((entry.rewards && entry.rewards.cpuPercent) ? (entry.rewards.cpuPercent / 100) : 0) %>" class="form-control form-control-sm" placeholder="CPU" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <input type="number" name="rewardDiskGb" min="0" step="0.1" value="<%= ((entry.rewards && entry.rewards.diskMb) ? (entry.rewards.diskMb / 1024) : 0) %>" class="form-control form-control-sm" placeholder="Disk GB" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <input type="number" name="rewardSwapGb" min="0" step="0.1" value="<%= ((entry.rewards && entry.rewards.swapMb) ? (entry.rewards.swapMb / 1024) : 0) %>" class="form-control form-control-sm" placeholder="Swap GB" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-1">
+                                                    <input type="number" name="rewardAllocations" min="0" step="1" value="<%= Number(entry.rewards && entry.rewards.allocations || 0) %>" class="form-control form-control-sm" placeholder="Alloc" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-1">
+                                                    <input type="number" name="rewardImages" min="0" step="1" value="<%= Number(entry.rewards && entry.rewards.images || 0) %>" class="form-control form-control-sm" placeholder="Img" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-1">
+                                                    <input type="number" name="rewardPackages" min="0" step="1" value="<%= Number(entry.rewards && entry.rewards.packages || 0) %>" class="form-control form-control-sm" placeholder="Pkg" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-11 text-end">
+                                                    <button type="submit" class="btn btn-outline-primary btn-sm">Save Code</button>
+                                                </div>
+                                            </form>
+
+                                            <% if (Array.isArray(entry.recentUses) && entry.recentUses.length) { %>
+                                                <div class="mt-3 pt-2 border-top border-secondary border-opacity-25">
+                                                    <div class="small text-light mb-1">Recent Uses</div>
+                                                    <div class="small text-muted">
+                                                        <% entry.recentUses.slice(0, 8).forEach((use, idx) => { %>
+                                                            <span>
+                                                                <%= use.username || `User #${use.userId}` %> - <%= formatDateTime(use.usedAtMs) %>
+                                                            </span><%= idx < Math.min(entry.recentUses.length, 8) - 1 ? ' | ' : '' %>
+                                                        <% }) %>
+                                                    </div>
+                                                </div>
+                                            <% } %>
+                                        </div>
+                                    </div>
+                                <% }) %>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+
+            <%- include('../partials/footer') %>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

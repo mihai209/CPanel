@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= (settings.brandName || 'CPanel' ).toUpperCase() %> - Manage Servers
+    </title>
+    <%- include('../partials/favicon') %>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+            rel="stylesheet">
+        <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body> <%- include ('../partials/error-modal') %>
+        <div class="admin-wrapper">
+            <%- include('../partials/admin-sidebar') %>
+                <div class="admin-content">
+                    <div class="admin-header">
+                        <div class="d-flex align-items-baseline gap-3">
+                            <h4 class="mb-0 text-light fw-normal">Servers</h4>
+                            <small class="text-muted">Manage all user servers.</small>
+                        </div>
+                        <div class="breadcrumb-admin">
+                            <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span
+                                class="text-light">Servers</span>
+                        </div>
+                    </div>
+
+                    <div class="container-fluid py-4 px-lg-4">
+                        <div class="row">
+                            <div class="col-lg-12">
+                                <div class="card border-0 shadow-sm" style="background-color: #141419;">
+                                    <div
+                                        class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent d-flex justify-content-between align-items-center">
+                                        <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i
+                                                class="bi bi-hdd-stack me-2"></i>Existing Servers</h5>
+                                        <a href="/admin/servers/create"
+                                            class="btn btn-sm btn-primary px-3 fw-bold shadow-sm">
+                                            <i class="bi bi-plus-lg me-1"></i> Create Server
+                                        </a>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="table-responsive">
+                                            <table class="table table-dark table-hover mb-0"
+                                                style="--bs-table-bg: transparent;">
+                                                <thead class="text-muted small text-uppercase">
+                                                    <tr>
+                                                        <th class="ps-4 py-3">Server Name</th>
+                                                        <th class="py-3">Owner</th>
+                                                        <th class="py-3">Node / IP</th>
+                                                        <th class="py-3">Image</th>
+                                                        <th class="py-3">Status</th>
+                                                        <th class="pe-4 py-3 text-end">Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="border-top-0">
+                                                    <% if (servers && servers.length> 0) { %>
+                                                        <% servers.forEach(server=> { %>
+                                                            <tr
+                                                                class="align-middle border-bottom border-secondary border-opacity-10">
+                                                                <td class="ps-4">
+                                                                    <div class="fw-bold text-light">
+                                                                        <%= server.name %>
+                                                                    </div>
+                                                                    <small class="text-muted">
+                                                                        <%= server.containerId ?
+                                                                            server.containerId.substring(0, 8)
+                                                                            : 'No Container' %>
+                                                                    </small>
+                                                                </td>
+                                                                <td>
+                                                                    <div class="text-light">
+                                                                        <%= server.owner ? server.owner.username
+                                                                            : 'Unknown' %>
+                                                                    </div>
+                                                                    <small class="text-muted">
+                                                                        <%= server.owner ? server.owner.email : 'N/A' %>
+                                                                    </small>
+                                                                </td>
+                                                                <td>
+                                                                    <% if (server.allocation) { %>
+                                                                        <div class="text-light">
+                                                                            <%= server.allocation.connector ?
+                                                                                server.allocation.connector.name
+                                                                                : 'Unknown Node' %>
+                                                                        </div>
+                                                                        <small class="text-muted">
+                                                                            <%= server.allocation.ip %>:<%=
+                                                                                    server.allocation.port %>
+                                                                        </small>
+                                                                        <% } else { %>
+                                                                            <span class="text-muted italic">No
+                                                                                Allocation</span>
+                                                                            <% } %>
+                                                                </td>
+                                                                <td>
+                                                                    <span
+                                                                        class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25">
+                                                                        <%= server.image ? server.image.name
+                                                                            : 'Unknown Image' %>
+                                                                    </span>
+                                                                </td>
+                                                                <td>
+                                                                    <span
+                                                                        class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 py-1 px-2">
+                                                                        <%= server.status.toUpperCase() %>
+                                                                    </span>
+                                                                </td>
+                                                                <td class="pe-4 text-end">
+                                                                    <a href="/server/<%= server.containerId %>"
+                                                                        class="btn btn-sm btn-outline-success me-1">
+                                                                        <i class="bi bi-terminal text-success"></i>
+                                                                    </a>
+                                                                    <a href="/admin/servers/<%= server.containerId %>/manage"
+                                                                        class="btn btn-sm btn-outline-primary">
+                                                                        <i class="bi bi-gear text-info"></i>
+                                                                    </a>
+                                                                </td>
+                                                            </tr>
+                                                            <% }); %>
+                                                                <% } else { %>
+                                                                    <tr>
+                                                                        <td colspan="6"
+                                                                            class="py-5 text-center text-muted italic">
+                                                                            No servers found.
+                                                                        </td>
+                                                                    </tr>
+                                                                    <% } %>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <%- include('../partials/footer') %>
+                </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

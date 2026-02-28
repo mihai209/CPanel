@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= (settings.brandName || 'CPanel' ).toUpperCase() %> - Auth Providers
+    </title>
+    <%- include('../partials/favicon') %>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+            rel="stylesheet">
+        <link rel="stylesheet" href="/css/style.css">
+        <style>
+            .callback-url-box {
+                font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+                font-size: 0.8rem;
+                background-color: #0d0d11 !important;
+                border-color: #2d2d35 !important;
+                color: #7dd3fc !important;
+                cursor: default;
+            }
+
+            .callback-url-box:focus {
+                box-shadow: none;
+                border-color: #2d2d35 !important;
+            }
+
+            .provider-card {
+                border: 1px solid rgba(255, 255, 255, 0.07);
+                border-radius: 10px;
+                background-color: #18181e;
+                padding: 1.25rem 1.5rem;
+                transition: border-color 0.2s;
+            }
+
+            .provider-card:hover {
+                border-color: rgba(255, 255, 255, 0.13);
+            }
+
+            .tutorial-btn {
+                font-size: 0.7rem;
+                padding: 0.15rem 0.55rem;
+                letter-spacing: 0.05em;
+                border-radius: 5px;
+            }
+        </style>
+</head>
+
+<body>
+    <%- include('../partials/error-modal') %>
+        <div class="admin-wrapper">
+            <%- include('../partials/admin-sidebar') %>
+                <div class="admin-content">
+                    <div class="admin-header">
+                        <div class="d-flex align-items-baseline gap-3">
+                            <h4 class="mb-0 text-light fw-normal">Authentication Providers</h4>
+                            <small class="text-muted">Configure how users can log into your panel.</small>
+                        </div>
+                        <div class="breadcrumb-admin">
+                            <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span>
+                            <span class="text-light">Auth Providers</span>
+                        </div>
+                    </div>
+
+                    <div class="container-fluid py-4 px-lg-4">
+                        <div class="row g-4 justify-content-center">
+                            <div class="col-lg-8">
+                                <div class="card border-0 shadow-sm" style="background-color: #141419;">
+                                    <div
+                                        class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                                        <h5 class="card-title mb-0 fs-6 fw-bold text-light">
+                                            <i class="bi bi-shield-lock me-2"></i>Login Methods
+                                        </h5>
+                                    </div>
+                                    <div class="card-body p-4">
+                                        <% if (locals.success) { %>
+                                            <div
+                                                class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
+                                                <i class="bi bi-check-circle-fill me-2"></i>
+                                                <%= success %>
+                                            </div>
+                                            <% } %>
+                                                <% if (locals.error) { %>
+                                                    <div
+                                                        class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
+                                                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                                        <%= error %>
+                                                    </div>
+                                                    <% } %>
+
+                                                        <form method="POST" action="/admin/auth-providers"
+                                                            class="d-flex flex-column gap-3">
+
+                                                            <!-- Standard Login -->
+                                                            <div class="provider-card">
+                                                                <div
+                                                                    class="d-flex align-items-center justify-content-between">
+                                                                    <div class="d-flex align-items-center gap-2">
+                                                                        <i class="bi bi-envelope fs-5 text-muted"></i>
+                                                                        <div>
+                                                                            <h6 class="text-light fw-bold mb-0">Standard
+                                                                                Login</h6>
+                                                                            <p class="text-muted small mb-0">Email and
+                                                                                Password authentication.</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <input class="form-check-input ms-0 mt-0"
+                                                                        style="width:48px;height:24px;cursor:pointer;"
+                                                                        type="checkbox" role="switch"
+                                                                        name="authStandardEnabled"
+                                                                        id="authStandardEnabled"
+                                                                        <%=settings.authStandardEnabled !=='false'
+                                                                        ? 'checked' : '' %>>
+                                                                </div>
+                                                            </div>
+
+                                                            <!-- Discord Login -->
+                                                            <div class="provider-card">
+                                                                <div
+                                                                    class="d-flex align-items-center justify-content-between mb-2">
+                                                                    <div class="d-flex align-items-center gap-2">
+                                                                        <i class="bi bi-discord fs-5"
+                                                                            style="color:#5865F2;"></i>
+                                                                        <div>
+                                                                            <h6 class="text-light fw-bold mb-0">Discord
+                                                                                Login</h6>
+                                                                            <p class="text-muted small mb-0">Login with
+                                                                                Discord account.</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="d-flex align-items-center gap-2">
+                                                                        <button type="button"
+                                                                            class="btn btn-outline-secondary tutorial-btn text-uppercase fw-bold"
+                                                                            data-bs-toggle="modal"
+                                                                            data-bs-target="#tutorialDiscord">
+                                                                            <i class="bi bi-book me-1"></i>Tutorial
+                                                                        </button>
+                                                                        <input class="form-check-input ms-0 mt-0"
+                                                                            style="width:48px;height:24px;cursor:pointer;"
+                                                                            type="checkbox" role="switch"
+                                                                            name="authDiscordEnabled"
+                                                                            id="authDiscordEnabled"
+                                                                            <%=settings.authDiscordEnabled==='true'
+                                                                            ? 'checked' : '' %>>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="provider-settings" id="discordSettings"
+                                                                    style="display:<%= settings.authDiscordEnabled === 'true' ? 'block' : 'none' %>;">
+                                                                    <div class="mt-3 mb-2">
+                                                                        <label
+                                                                            class="form-label text-muted small text-uppercase fw-bold">Callback
+                                                                            URL <span class="text-info ms-1 fw-normal"
+                                                                                style="font-size:0.65rem;">(Read-only —
+                                                                                paste this in your app
+                                                                                settings)</span></label>
+                                                                        <input type="text"
+                                                                            class="form-control form-control-sm callback-url-box"
+                                                                            value="<%= appUrl %>/auth/discord/callback"
+                                                                            readonly>
+                                                                    </div>
+                                                                    <div class="mb-2">
+                                                                        <label
+                                                                            class="form-label text-muted small text-uppercase fw-bold">Client
+                                                                            ID</label>
+                                                                        <input type="text" name="authDiscordClientId"
+                                                                            class="form-control form-control-sm"
+                                                                            style="background-color:#1a1a20;border-color:#2d2d35;"
+                                                                            value="<%= settings.authDiscordClientId || '' %>">
+                                                                    </div>
+                                                                    <div>
+                                                                        <label
+                                                                            class="form-label text-muted small text-uppercase fw-bold">Client
+                                                                            Secret</label>
+                                                                        <input type="password"
+                                                                            name="authDiscordClientSecret"
+                                                                            class="form-control form-control-sm"
+                                                                            style="background-color:#1a1a20;border-color:#2d2d35;"
+                                                                            value="<%= settings.authDiscordClientSecret || '' %>">
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <!-- Google Login -->
+                                                            <div class="provider-card">
+                                                                <div
+                                                                    class="d-flex align-items-center justify-content-between mb-2">
+                                                                    <div class="d-flex align-items-center gap-2">
+                                                                        <i class="bi bi-google fs-5"
+                                                                            style="color:#ea4335;"></i>
+                                                                        <div>
+                                                                            <h6 class="text-light fw-bold mb-0">Google
+                                                                                Login</h6>
+                                                                            <p class="text-muted small mb-0">Login with
+                                                                                Google account.</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="d-flex align-items-center gap-2">
+                                                                        <button type="button"
+                                                                            class="btn btn-outline-secondary tutorial-btn text-uppercase fw-bold"
+                                                                            data-bs-toggle="modal"
+                                                                            data-bs-target="#tutorialGoogle">
+                                                                            <i class="bi bi-book me-1"></i>Tutorial
+                                                                        </button>
+                                                                        <input class="form-check-input ms-0 mt-0"
+                                                                            style="width:48px;height:24px;cursor:pointer;"
+                                                                            type="checkbox" role="switch"
+                                                                            name="authGoogleEnabled"
+                                                                            id="authGoogleEnabled"
+                                                                            <%=settings.authGoogleEnabled==='true'
+                                                                            ? 'checked' : '' %>>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="provider-settings" id="googleSettings"
+                                                                    style="display:<%= settings.authGoogleEnabled === 'true' ? 'block' : 'none' %>;">
+                                                                    <div class="mt-3 mb-2">
+                                                                        <label
+                                                                            class="form-label text-muted small text-uppercase fw-bold">Callback
+                                                                            URL <span class="text-info ms-1 fw-normal"
+                                                                                style="font-size:0.65rem;">(Read-only —
+                                                                                paste this in your app
+                                                                                settings)</span></label>
+                                                                        <input type="text"
+                                                                            class="form-control form-control-sm callback-url-box"
+                                                                            value="<%= appUrl %>/auth/google/callback"
+                                                                            readonly>
+                                                                    </div>
+                                                                    <div class="mb-2">
+                                                                        <label
+                                                                            class="form-label text-muted small text-uppercase fw-bold">Client
+                                                                            ID</label>
+                                                                        <input type="text" name="authGoogleClientId"
+                                                                            class="form-control form-control-sm"
+                                                                            style="background-color:#1a1a20;border-color:#2d2d35;"
+                                                                            value="<%= settings.authGoogleClientId || '' %>">
+                                                                    </div>
+                                                                    <div>
+                                                                        <label
+                                                                            class="form-label text-muted small text-uppercase fw-bold">Client
+                                                                            Secret</label>
+                                                                        <input type="password"
+                                                                            name="authGoogleClientSecret"
+                                                                            class="form-control form-control-sm"
+                                                                            style="background-color:#1a1a20;border-color:#2d2d35;"
+                                                                            value="<%= settings.authGoogleClientSecret || '' %>">
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <!-- Reddit Login -->
+                                                            <div class="provider-card">
+                                                                <div
+                                                                    class="d-flex align-items-center justify-content-between mb-2">
+                                                                    <div class="d-flex align-items-center gap-2">
+                                                                        <i class="bi bi-reddit fs-5"
+                                                                            style="color:#FF4500;"></i>
+                                                                        <div>
+                                                                            <h6 class="text-light fw-bold mb-0">Reddit
+                                                                                Login</h6>
+                                                                            <p class="text-muted small mb-0">Login with
+                                                                                Reddit account.</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="d-flex align-items-center gap-2">
+                                                                        <button type="button"
+                                                                            class="btn btn-outline-secondary tutorial-btn text-uppercase fw-bold"
+                                                                            data-bs-toggle="modal"
+                                                                            data-bs-target="#tutorialReddit">
+                                                                            <i class="bi bi-book me-1"></i>Tutorial
+                                                                        </button>
+                                                                        <input class="form-check-input ms-0 mt-0"
+                                                                            style="width:48px;height:24px;cursor:pointer;"
+                                                                            type="checkbox" role="switch"
+                                                                            name="authRedditEnabled"
+                                                                            id="authRedditEnabled"
+                                                                            <%=settings.authRedditEnabled==='true'
+                                                                            ? 'checked' : '' %>>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="provider-settings" id="redditSettings"
+                                                                    style="display:<%= settings.authRedditEnabled === 'true' ? 'block' : 'none' %>;">
+                                                                    <div class="mt-3 mb-2">
+                                                                        <label
+                                                                            class="form-label text-muted small text-uppercase fw-bold">Callback
+                                                                            URL <span class="text-info ms-1 fw-normal"
+                                                                                style="font-size:0.65rem;">(Read-only —
+                                                                                paste this in your app
+                                                                                settings)</span></label>
+                                                                        <input type="text"
+                                                                            class="form-control form-control-sm callback-url-box"
+                                                                            value="<%= appUrl %>/auth/reddit/callback"
+                                                                            readonly>
+                                                                    </div>
+                                                                    <div class="mb-2">
+                                                                        <label
+                                                                            class="form-label text-muted small text-uppercase fw-bold">Client
+                                                                            ID</label>
+                                                                        <input type="text" name="authRedditClientId"
+                                                                            class="form-control form-control-sm"
+                                                                            style="background-color:#1a1a20;border-color:#2d2d35;"
+                                                                            value="<%= settings.authRedditClientId || '' %>">
+                                                                    </div>
+                                                                    <div>
+                                                                        <label
+                                                                            class="form-label text-muted small text-uppercase fw-bold">Client
+                                                                            Secret</label>
+                                                                        <input type="password"
+                                                                            name="authRedditClientSecret"
+                                                                            class="form-control form-control-sm"
+                                                                            style="background-color:#1a1a20;border-color:#2d2d35;"
+                                                                            value="<%= settings.authRedditClientSecret || '' %>">
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <!-- GitHub Login -->
+                                                            <div class="provider-card">
+                                                                <div
+                                                                    class="d-flex align-items-center justify-content-between mb-2">
+                                                                    <div class="d-flex align-items-center gap-2">
+                                                                        <i class="bi bi-github fs-5 text-light"></i>
+                                                                        <div>
+                                                                            <h6 class="text-light fw-bold mb-0">GitHub
+                                                                                Login</h6>
+                                                                            <p class="text-muted small mb-0">Login with
+                                                                                GitHub account.</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="d-flex align-items-center gap-2">
+                                                                        <button type="button"
+                                                                            class="btn btn-outline-secondary tutorial-btn text-uppercase fw-bold"
+                                                                            data-bs-toggle="modal"
+                                                                            data-bs-target="#tutorialGithub">
+                                                                            <i class="bi bi-book me-1"></i>Tutorial
+                                                                        </button>
+                                                                        <input class="form-check-input ms-0 mt-0"
+                                                                            style="width:48px;height:24px;cursor:pointer;"
+                                                                            type="checkbox" role="switch"
+                                                                            name="authGithubEnabled"
+                                                                            id="authGithubEnabled"
+                                                                            <%=settings.authGithubEnabled==='true'
+                                                                            ? 'checked' : '' %>>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="provider-settings" id="githubSettings"
+                                                                    style="display:<%= settings.authGithubEnabled === 'true' ? 'block' : 'none' %>;">
+                                                                    <div class="mt-3 mb-2">
+                                                                        <label
+                                                                            class="form-label text-muted small text-uppercase fw-bold">Callback
+                                                                            URL <span class="text-info ms-1 fw-normal"
+                                                                                style="font-size:0.65rem;">(Read-only —
+                                                                                paste this in your app
+                                                                                settings)</span></label>
+                                                                        <input type="text"
+                                                                            class="form-control form-control-sm callback-url-box"
+                                                                            value="<%= appUrl %>/auth/github/callback"
+                                                                            readonly>
+                                                                    </div>
+                                                                    <div class="mb-2">
+                                                                        <label
+                                                                            class="form-label text-muted small text-uppercase fw-bold">Client
+                                                                            ID</label>
+                                                                        <input type="text" name="authGithubClientId"
+                                                                            class="form-control form-control-sm"
+                                                                            style="background-color:#1a1a20;border-color:#2d2d35;"
+                                                                            value="<%= settings.authGithubClientId || '' %>">
+                                                                    </div>
+                                                                    <div>
+                                                                        <label
+                                                                            class="form-label text-muted small text-uppercase fw-bold">Client
+                                                                            Secret</label>
+                                                                        <input type="password"
+                                                                            name="authGithubClientSecret"
+                                                                            class="form-control form-control-sm"
+                                                                            style="background-color:#1a1a20;border-color:#2d2d35;"
+                                                                            value="<%= settings.authGithubClientSecret || '' %>">
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="text-end mt-2">
+                                                                <button type="submit"
+                                                                    class="btn btn-primary px-4 fw-medium">Save
+                                                                    Changes</button>
+                                                            </div>
+                                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <%- include('../partials/footer') %>
+                </div>
+        </div>
+
+        <!-- ====== TUTORIAL MODALS ====== -->
+
+        <!-- Discord Tutorial -->
+        <div class="modal fade" id="tutorialDiscord" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content" style="background-color:#1f2023;border:1px solid #2e3036;color:#fff;">
+                    <div class="modal-header border-bottom border-secondary border-opacity-10">
+                        <h5 class="modal-title"><i class="bi bi-discord me-2" style="color:#5865F2;"></i>Discord OAuth —
+                            Setup Guide</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" style="font-size:0.9rem;line-height:1.7;">
+                        <ol class="ps-3">
+                            <li>Go to <a href="https://discord.com/developers/applications" target="_blank"
+                                    class="text-info">discord.com/developers/applications</a> and create a new
+                                application.</li>
+                            <li>In the sidebar choose <strong>OAuth2</strong>, then copy the <strong>Client ID</strong>
+                                and generate a <strong>Client Secret</strong>.</li>
+                            <li>Under <strong>Redirects</strong>, add the callback URL shown in the panel (the blue
+                                field above).</li>
+                            <li>Paste the Client ID and Secret here and save.</li>
+                        </ol>
+                        <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning mt-3 mb-0"
+                            style="font-size:0.82rem;">
+                            <strong><i class="bi bi-exclamation-triangle-fill me-1"></i>Common errors:</strong><br>
+                            • <code>invalid_client</code> — wrong Client ID or Secret.<br>
+                            • <code>redirect_uri_mismatch</code> — the callback URL in Discord doesn't match
+                            exactly.<br>
+                            • <code>access_denied</code> — the user cancelled the authorization.
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top border-secondary border-opacity-10">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Google Tutorial -->
+        <div class="modal fade" id="tutorialGoogle" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content" style="background-color:#1f2023;border:1px solid #2e3036;color:#fff;">
+                    <div class="modal-header border-bottom border-secondary border-opacity-10">
+                        <h5 class="modal-title"><i class="bi bi-google me-2" style="color:#ea4335;"></i>Google OAuth —
+                            Setup Guide</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" style="font-size:0.9rem;line-height:1.7;">
+                        <ol class="ps-3">
+                            <li>Open <a href="https://console.cloud.google.com/" target="_blank"
+                                    class="text-info">Google Cloud Console</a> and create a project (or select an
+                                existing one).</li>
+                            <li>Navigate to <strong>APIs &amp; Services → Credentials</strong> and click <strong>Create
+                                    Credentials → OAuth client ID</strong>.</li>
+                            <li>Choose <strong>Web application</strong>, and in <strong>Authorized redirect
+                                    URIs</strong> add the callback URL shown above.</li>
+                            <li>Copy the <strong>Client ID</strong> and <strong>Client Secret</strong> and paste them
+                                here.</li>
+                            <li>Make sure the <strong>Google People API</strong> (or Google+ API) is enabled for your
+                                project.</li>
+                        </ol>
+                        <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning mt-3 mb-0"
+                            style="font-size:0.82rem;">
+                            <strong><i class="bi bi-exclamation-triangle-fill me-1"></i>Common errors:</strong><br>
+                            • <code>redirect_uri_mismatch</code> — the callback URL must match <em>exactly</em>
+                            (including https).<br>
+                            • <code>access_blocked</code> — your app is in test mode; add the user as a test user in the
+                            OAuth consent screen.<br>
+                            • <code>invalid_client</code> — incorrect credentials.
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top border-secondary border-opacity-10">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reddit Tutorial -->
+        <div class="modal fade" id="tutorialReddit" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content" style="background-color:#1f2023;border:1px solid #2e3036;color:#fff;">
+                    <div class="modal-header border-bottom border-secondary border-opacity-10">
+                        <h5 class="modal-title"><i class="bi bi-reddit me-2" style="color:#FF4500;"></i>Reddit OAuth —
+                            Setup Guide</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" style="font-size:0.9rem;line-height:1.7;">
+                        <ol class="ps-3">
+                            <li>Go to <a href="https://www.reddit.com/prefs/apps" target="_blank"
+                                    class="text-info">reddit.com/prefs/apps</a> and click <strong>Create App</strong>
+                                (or <em>Create another app</em>).</li>
+                            <li>Select type <strong>web app</strong> and fill in the <strong>redirect uri</strong> with
+                                the callback URL shown above.</li>
+                            <li>After saving, you'll see the <strong>Client ID</strong> (under the app name) and a
+                                <strong>Secret</strong>.
+                            </li>
+                            <li>Paste them into the fields above and save.</li>
+                        </ol>
+                        <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning mt-3 mb-0"
+                            style="font-size:0.82rem;">
+                            <strong><i class="bi bi-exclamation-triangle-fill me-1"></i>Common errors:</strong><br>
+                            • <code>unauthorized_client</code> — app type is not <em>web app</em>, or Client ID is
+                            wrong.<br>
+                            • <code>invalid_grant</code> — token expired — user must re-authorize.<br>
+                            • Reddit requires a custom <code>User-Agent</code> header; make sure it's set on the
+                            backend.
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top border-secondary border-opacity-10">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- GitHub Tutorial -->
+        <div class="modal fade" id="tutorialGithub" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content" style="background-color:#1f2023;border:1px solid #2e3036;color:#fff;">
+                    <div class="modal-header border-bottom border-secondary border-opacity-10">
+                        <h5 class="modal-title"><i class="bi bi-github me-2 text-light"></i>GitHub OAuth — Setup Guide
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" style="font-size:0.9rem;line-height:1.7;">
+                        <ol class="ps-3">
+                            <li>Go to <a href="https://github.com/settings/developers" target="_blank"
+                                    class="text-info">github.com/settings/developers</a> and click <strong>New OAuth
+                                    App</strong>.</li>
+                            <li>Fill in the <strong>Application name</strong>, set the <strong>Homepage URL</strong> to
+                                your panel URL, and set the <strong>Authorization callback URL</strong> to the callback
+                                URL shown above.</li>
+                            <li>After creating the app, click <strong>Generate a new client secret</strong>.</li>
+                            <li>Copy the <strong>Client ID</strong> and <strong>Client Secret</strong> and paste them
+                                here.</li>
+                        </ol>
+                        <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning mt-3 mb-0"
+                            style="font-size:0.82rem;">
+                            <strong><i class="bi bi-exclamation-triangle-fill me-1"></i>Common errors:</strong><br>
+                            • <code>redirect_uri_mismatch</code> — the callback URL must match exactly what you
+                            registered.<br>
+                            • <code>bad_verification_code</code> — code was already used or expired; try logging in
+                            again.<br>
+                            • GitHub does not expose email if it's set to private — users may need to make their email
+                            public or add a public email in GitHub settings.
+                        </div>
+                    </div>
+                    <div class="modal-footer border-top border-secondary border-opacity-10">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            function setupToggle(checkboxId, settingsId) {
+                const cb = document.getElementById(checkboxId);
+                const panel = document.getElementById(settingsId);
+                if (cb && panel) {
+                    cb.addEventListener('change', () => {
+                        panel.style.display = cb.checked ? 'block' : 'none';
+                    });
+                }
+            }
+            setupToggle('authDiscordEnabled', 'discordSettings');
+            setupToggle('authGoogleEnabled', 'googleSettings');
+            setupToggle('authRedditEnabled', 'redditSettings');
+            setupToggle('authGithubEnabled', 'githubSettings');
+        </script>
+</body>
+
+</html>

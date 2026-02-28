@@ -1,0 +1,470 @@
+<%- include('partials/header') %>
+<%- include('partials/navbar') %>
+<%- include('partials/error-modal') %>
+
+<style>
+    .rewards-shell {
+        max-width: 1100px;
+        margin: 0 auto;
+    }
+
+    .rewards-card {
+        border: 1px solid #2e3036;
+        background: linear-gradient(180deg, rgba(31, 32, 35, 0.95), rgba(31, 32, 35, 0.72));
+        border-radius: 14px;
+        padding: 1.25rem;
+    }
+
+    .metric-card {
+        border: 1px solid #2e3036;
+        border-radius: 12px;
+        padding: 1rem;
+        background-color: rgba(255, 255, 255, 0.02);
+        height: 100%;
+    }
+
+    .metric-label {
+        color: #9ca3af;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    .metric-value {
+        font-size: 1.45rem;
+        font-weight: 700;
+        margin-top: 0.4rem;
+        line-height: 1.1;
+    }
+
+    .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 0.6rem;
+    }
+
+    .calendar-day {
+        border: 1px solid #2e3036;
+        border-radius: 10px;
+        padding: 0.65rem 0.4rem;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.02);
+        color: #9ca3af;
+        font-size: 0.78rem;
+        font-weight: 600;
+    }
+
+    .calendar-day.active {
+        border-color: rgba(59, 130, 246, 0.55);
+        background: rgba(59, 130, 246, 0.2);
+        color: #dbeafe;
+    }
+
+    .claim-calendar {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 0.8rem;
+    }
+
+    .claim-cell {
+        border: 1px solid #2e3036;
+        border-radius: 12px;
+        padding: 0.9rem;
+        background: rgba(255, 255, 255, 0.02);
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+        min-height: 170px;
+    }
+
+    .claim-cell h6 {
+        margin: 0;
+        font-size: 0.92rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #cbd5e1;
+    }
+
+    .claim-reward {
+        font-size: 1.12rem;
+        font-weight: 700;
+    }
+
+    .claim-countdown {
+        color: #9ca3af;
+        font-size: 0.84rem;
+    }
+
+    .status-chip {
+        border: 1px solid #2e3036;
+        border-radius: 999px;
+        padding: 0.35rem 0.8rem;
+        font-size: 0.8rem;
+        color: #d1d5db;
+        background-color: rgba(255, 255, 255, 0.02);
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <%
+        const compactCoins = (value) => {
+            const num = Number(value || 0);
+            if (!Number.isFinite(num)) return '0';
+            return new Intl.NumberFormat('en', {
+                notation: 'compact',
+                maximumFractionDigits: 1
+            }).format(num);
+        };
+        const formatRemainingByPeriod = (period, rawSeconds) => {
+            let seconds = Math.max(0, Number.parseInt(String(rawSeconds || 0), 10) || 0);
+            if (seconds <= 0) return 'Ready';
+
+            const d = Math.floor(seconds / 86400);
+            seconds -= d * 86400;
+            const h = Math.floor(seconds / 3600);
+            seconds -= h * 3600;
+            const m = Math.floor(seconds / 60);
+            seconds -= m * 60;
+            const s = seconds;
+
+            if (period === 'minute') return `${m}m ${s}s`;
+            if (period === 'hour') return `${h}h ${m}m ${s}s`;
+            if (period === 'day') return `${d}d ${h}h ${m}m`;
+            if (period === 'week') return `${d}d ${h}h`;
+            if (period === 'month') return `${d}d ${h}h`;
+            if (period === 'year') {
+                const months = Math.floor(d / 30);
+                const days = d % 30;
+                return `${months}mo ${days}d`;
+            }
+            return `${d}d ${h}h ${m}m`;
+        };
+    %>
+    <div class="rewards-shell">
+        <div class="rewards-card mb-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h1 class="h4 fw-bold mb-1">Rewards Center</h1>
+                    <p class="text-muted mb-0 small">Claim pe minute / hours / days / weekly / monthly / yearly și păstrează streak-ul activ.</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/afk" class="btn btn-outline-primary btn-sm">Open AFK</a>
+                    <a href="/" class="btn btn-outline-light btn-sm">Back to Dashboard</a>
+                </div>
+            </div>
+        </div>
+
+        <% if (success) { %>
+            <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
+                <i class="bi bi-check-circle-fill me-2"></i><%= success %>
+            </div>
+        <% } %>
+        <% if (error) { %>
+            <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i><%= error %>
+            </div>
+        <% } %>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <div class="metric-label">Wallet</div>
+                    <div id="walletValue" class="metric-value"><%= compactCoins(user.coins || 0) %> <%= economyUnit %></div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <div class="metric-label">Daily Streak</div>
+                    <div id="dailyStreakValue" class="metric-value"><%= Number(dailyStreak || 0) %></div>
+                    <div class="text-muted small mt-1">Bonus +<%= Number(claimDailyStreakBonusCoins || 0) %> / day (max <%= Number(claimDailyStreakMax || 30) %>)</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <div class="metric-label">Streak Reset</div>
+                    <div id="streakResetValue" class="metric-value">--</div>
+                    <div class="text-muted small mt-1">Se resetează dacă nu intri 24h.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="rewards-card mb-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <h2 class="h6 text-uppercase mb-0" style="letter-spacing: 0.04em;">Streak Calendar</h2>
+                <span id="claimStatus" class="status-chip">Ready</span>
+            </div>
+
+            <div id="streakCalendar" class="calendar-grid">
+                <% for (let i = 1; i <= 7; i += 1) { %>
+                    <div class="calendar-day <%= Number(dailyStreak || 0) >= i ? 'active' : '' %>" data-streak-day="<%= i %>">
+                        Day <%= i %>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+
+        <div class="rewards-card">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <h2 class="h6 text-uppercase mb-0" style="letter-spacing: 0.04em;">Claim Calendar</h2>
+                <span class="text-muted small">Fiecare card are cooldown propriu.</span>
+            </div>
+
+            <% const cards = [
+                { key: 'minute', label: 'Minutes' },
+                { key: 'hour', label: 'Hours' },
+                { key: 'day', label: 'Days' },
+                { key: 'week', label: 'Weekly' },
+                { key: 'month', label: 'Monthly' },
+                { key: 'year', label: 'Yearly' }
+            ]; %>
+
+            <% if (!claimRewardsEnabled) { %>
+                <div class="alert alert-warning mb-0">Claim rewards are disabled by admin.</div>
+            <% } else { %>
+                <div class="claim-calendar">
+                    <% cards.forEach((card) => { %>
+                        <% const rewardValue = rewardsMap ? Number(rewardsMap[card.key] || 0) : 0; %>
+                        <% const remaining = claimRemainingByPeriod ? Number(claimRemainingByPeriod[card.key] || 0) : 0; %>
+                        <div class="claim-cell" data-period-cell="<%= card.key %>">
+                            <h6><%= card.label %></h6>
+                            <div class="claim-reward">+<%= compactCoins(rewardValue) %> <%= economyUnit %></div>
+                            <div class="claim-countdown">Remaining: <span id="claimRemaining-<%= card.key %>"><%= formatRemainingByPeriod(card.key, remaining) %></span></div>
+                            <button type="button"
+                                class="btn btn-primary btn-sm mt-auto claim-btn"
+                                data-period="<%= card.key %>"
+                                data-reward-disabled="<%= rewardValue <= 0 ? '1' : '0' %>"
+                                <%= remaining > 0 || rewardValue <= 0 ? 'disabled' : '' %>>
+                                Claim
+                            </button>
+                        </div>
+                    <% }); %>
+                </div>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        if (window.__cpanelRewardsLifecycleBound) return;
+        window.__cpanelRewardsLifecycleBound = true;
+
+        let rewardsPageState = null;
+        const economyUnit = '<%= economyUnit %>';
+        const claimRewardsEnabled = <%= claimRewardsEnabled ? 'true' : 'false' %>;
+        const compactFormatter = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
+
+        const walletValueEl = document.getElementById('walletValue');
+        const claimStatusEl = document.getElementById('claimStatus');
+        const dailyStreakEl = document.getElementById('dailyStreakValue');
+        const streakResetEl = document.getElementById('streakResetValue');
+
+        let dailyStreak = Number.parseInt('<%= Number(dailyStreak || 0) %>', 10);
+        if (!Number.isFinite(dailyStreak) || dailyStreak < 0) dailyStreak = 0;
+
+        let streakResetSeconds = Number.parseInt('<%= Number(streakResetSeconds || 0) %>', 10);
+        if (!Number.isFinite(streakResetSeconds) || streakResetSeconds < 0) streakResetSeconds = 0;
+
+        const claimRemaining = <%- JSON.stringify(claimRemainingByPeriod || {}) %>;
+        Object.keys(claimRemaining).forEach((period) => {
+            const value = Number.parseInt(String(claimRemaining[period]), 10);
+            claimRemaining[period] = Number.isFinite(value) && value > 0 ? value : 0;
+        });
+
+        const formatDuration = (secondsInput) => {
+            let seconds = Math.max(0, Number.parseInt(String(secondsInput), 10) || 0);
+            const d = Math.floor(seconds / 86400);
+            seconds -= d * 86400;
+            const h = Math.floor(seconds / 3600);
+            seconds -= h * 3600;
+            const m = Math.floor(seconds / 60);
+            seconds -= m * 60;
+            if (d > 0) return `${d}d ${h}h ${m}m`;
+            if (h > 0) return `${h}h ${m}m ${seconds}s`;
+            if (m > 0) return `${m}m ${seconds}s`;
+            return `${seconds}s`;
+        };
+
+        const formatRemainingByPeriod = (period, secondsInput) => {
+            let seconds = Math.max(0, Number.parseInt(String(secondsInput), 10) || 0);
+            if (seconds <= 0) return 'Ready';
+
+            const d = Math.floor(seconds / 86400);
+            seconds -= d * 86400;
+            const h = Math.floor(seconds / 3600);
+            seconds -= h * 3600;
+            const m = Math.floor(seconds / 60);
+            seconds -= m * 60;
+            const s = seconds;
+
+            if (period === 'minute') return `${m}m ${s}s`;
+            if (period === 'hour') return `${h}h ${m}m ${s}s`;
+            if (period === 'day') return `${d}d ${h}h ${m}m`;
+            if (period === 'week') return `${d}d ${h}h`;
+            if (period === 'month') return `${d}d ${h}h`;
+            if (period === 'year') {
+                const months = Math.floor(d / 30);
+                const days = d % 30;
+                return `${months}mo ${days}d`;
+            }
+            return `${d}d ${h}h ${m}m`;
+        };
+
+        const updateWallet = (coins) => {
+            if (!walletValueEl) return;
+            const parsed = Number(coins);
+            if (!Number.isFinite(parsed)) return;
+            walletValueEl.textContent = `${compactFormatter.format(parsed)} ${economyUnit}`;
+        };
+
+        const updateStreakCalendar = () => {
+            document.querySelectorAll('[data-streak-day]').forEach((cell) => {
+                const index = Number.parseInt(cell.getAttribute('data-streak-day') || '0', 10);
+                cell.classList.toggle('active', dailyStreak >= index);
+            });
+            if (dailyStreakEl) dailyStreakEl.textContent = String(dailyStreak);
+        };
+
+        const updateStreakResetUi = () => {
+            if (!streakResetEl) return;
+            if (dailyStreak <= 0) {
+                streakResetEl.textContent = 'No streak';
+                return;
+            }
+            streakResetEl.textContent = formatDuration(streakResetSeconds);
+        };
+
+        const updateClaimRow = (period) => {
+            const remaining = Number(claimRemaining[period] || 0);
+            const remainingEl = document.getElementById(`claimRemaining-${period}`);
+            if (remainingEl) remainingEl.textContent = formatRemainingByPeriod(period, remaining);
+
+            const btn = document.querySelector(`.claim-btn[data-period="${period}"]`);
+            if (btn) {
+                btn.disabled = remaining > 0 || btn.getAttribute('data-reward-disabled') === '1';
+            }
+        };
+
+        const tick = () => {
+            Object.keys(claimRemaining).forEach((period) => {
+                if (claimRemaining[period] > 0) claimRemaining[period] -= 1;
+                updateClaimRow(period);
+            });
+
+            if (dailyStreak > 0 && streakResetSeconds > 0) {
+                streakResetSeconds -= 1;
+                if (streakResetSeconds <= 0) {
+                    dailyStreak = 0;
+                    updateStreakCalendar();
+                }
+            }
+            updateStreakResetUi();
+        };
+
+        const claimReward = async (period) => {
+            if (!claimRewardsEnabled) return;
+            try {
+                const response = await fetch('/rewards/claim', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ period })
+                });
+
+                const payload = await response.json();
+                if (!response.ok || !payload || payload.success !== true) {
+                    if (payload && Number.isFinite(Number(payload.remainingSeconds))) {
+                        claimRemaining[period] = Math.max(0, Number(payload.remainingSeconds));
+                        updateClaimRow(period);
+                    }
+                    if (payload && Number.isFinite(Number(payload.dailyStreak))) {
+                        dailyStreak = Math.max(0, Number(payload.dailyStreak));
+                        updateStreakCalendar();
+                    }
+                    const message = payload && payload.error ? payload.error : 'Claim failed';
+                    throw new Error(message);
+                }
+
+                if (Number.isFinite(Number(payload.coins))) {
+                    updateWallet(payload.coins);
+                }
+                if (Number.isFinite(Number(payload.remainingSeconds))) {
+                    claimRemaining[period] = Math.max(0, Number(payload.remainingSeconds));
+                    updateClaimRow(period);
+                }
+                if (Number.isFinite(Number(payload.dailyStreak))) {
+                    dailyStreak = Math.max(0, Number(payload.dailyStreak));
+                    updateStreakCalendar();
+                }
+
+                streakResetSeconds = 86400;
+                updateStreakResetUi();
+
+                if (claimStatusEl) {
+                    const awarded = Number(payload.awardedCoins || 0);
+                    claimStatusEl.textContent = `Claimed +${compactFormatter.format(Number.isFinite(awarded) ? awarded : 0)} ${payload.economyUnit || economyUnit} (${period})`;
+                }
+            } catch (error) {
+                if (claimStatusEl) {
+                    claimStatusEl.textContent = String(error && error.message ? error.message : 'Claim error');
+                }
+            }
+        };
+
+        const initRewardsPage = () => {
+            const root = document.querySelector('.rewards-shell');
+            if (!root) return;
+            if (root.dataset.cpanelRewardsInit === '1') return;
+            root.dataset.cpanelRewardsInit = '1';
+
+            const buttonHandlers = [];
+            document.querySelectorAll('.claim-btn').forEach((button) => {
+                const clickHandler = () => {
+                    const period = button.getAttribute('data-period');
+                    if (!period) return;
+                    claimReward(period);
+                };
+                button.addEventListener('click', clickHandler);
+                buttonHandlers.push({ button, clickHandler });
+            });
+
+            Object.keys(claimRemaining).forEach((period) => updateClaimRow(period));
+            updateStreakCalendar();
+            updateStreakResetUi();
+            const tickTimer = window.setInterval(tick, 1000);
+
+            if (!claimRewardsEnabled && claimStatusEl) {
+                claimStatusEl.textContent = 'Claim rewards disabled';
+            }
+
+            rewardsPageState = { root, tickTimer, buttonHandlers };
+        };
+
+        const cleanupRewardsPage = () => {
+            if (!rewardsPageState) return;
+            if (rewardsPageState.tickTimer) {
+                clearInterval(rewardsPageState.tickTimer);
+            }
+            (rewardsPageState.buttonHandlers || []).forEach(({ button, clickHandler }) => {
+                try { button.removeEventListener('click', clickHandler); } catch { }
+            });
+            if (rewardsPageState.root) {
+                rewardsPageState.root.dataset.cpanelRewardsInit = '0';
+            }
+            rewardsPageState = null;
+        };
+
+        document.addEventListener('turbo:load', initRewardsPage);
+        document.addEventListener('turbo:before-cache', cleanupRewardsPage);
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initRewardsPage, { once: true });
+        } else {
+            initRewardsPage();
+        }
+    })();
+</script>
+
+<%- include('partials/footer') %>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

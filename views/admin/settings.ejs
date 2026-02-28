@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= (settings.brandName || 'CPanel' ).toUpperCase() %>
+            <%= locals.title ? ' - ' + title.toUpperCase() : '' %> - Settings
+    </title>
+    <!-- Favicon -->
+    <%- include('../partials/favicon') %>
+        <!-- Bootstrap CSS -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <!-- Bootstrap Icons -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+        <!-- Google Fonts -->
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+            rel="stylesheet">
+        <!-- Custom CSS -->
+        <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <%- include ('../partials/error-modal') %>
+        <div class="admin-wrapper">
+            <!-- Sidebar -->
+            <%- include('../partials/admin-sidebar') %>
+
+                <!-- Content -->
+                <div class="admin-content">
+                    <!-- Admin Top Header -->
+                    <div class="admin-header">
+                        <div class="d-flex align-items-baseline gap-3">
+                            <h4 class="mb-0 text-light fw-normal">Panel Settings</h4>
+                            <small class="text-muted">Configure your panel's appearance and branding.</small>
+                        </div>
+                        <div class="breadcrumb-admin">
+                            <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span
+                                class="text-light">Settings</span>
+                        </div>
+                    </div>
+
+                    <div class="container-fluid py-4 px-lg-4">
+                        <div class="row g-4 justify-content-center">
+                            <div class="col-lg-8">
+                                <div class="card border-0 shadow-sm" style="background-color: #141419;">
+                                    <div
+                                        class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                                        <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i
+                                                class="bi bi-gear me-2"></i>Branding Configuration</h5>
+                                    </div>
+                                    <div class="card-body p-4">
+                                        <% if (success) { %>
+                                            <div
+                                                class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
+                                                <i class="bi bi-check-circle-fill me-2"></i>
+                                                <%= success %>
+                                            </div>
+                                            <% } %>
+                                                <% if (error) { %>
+                                                    <div
+                                                        class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
+                                                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                                        <%= error %>
+                                                    </div>
+                                                    <% } %>
+
+                                                        <form method="POST" action="/admin/settings" class="row g-3">
+                                                            <div class="col-12">
+                                                                <label
+                                                                    class="form-label text-muted small text-uppercase fw-bold">Brand
+                                                                    Name</label>
+                                                                <input type="text" name="brandName" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.brandName %>" required
+                                                                    placeholder="e.g. CPanel" maxlength="20">
+                                                                <div class="form-text text-muted">This name will appear
+                                                                    in
+                                                                    the sidebar and around the panel.</div>
+                                                            </div>
+                                                            <div class="col-12">
+                                                                <label
+                                                                    class="form-label text-muted small text-uppercase fw-bold">Favicon
+                                                                    URL</label>
+                                                                <input type="text" name="faviconUrl"
+                                                                    class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.faviconUrl %>" required
+                                                                    placeholder="e.g. /favicon.ico" maxlength="256">
+                                                                <div class="form-text text-muted">Specify the path or
+                                                                    URL
+                                                                    for your panel's favicon.</div>
+                                                            </div>
+                                                            <div class="col-12 mt-4">
+                                                                <h6 class="text-light mb-3"><i class="bi bi-toggles me-2"></i>Feature Toggles</h6>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                        id="featurePolicyEngineEnabled"
+                                                                        name="featurePolicyEngineEnabled" value="1"
+                                                                        <%= String(settings.featurePolicyEngineEnabled || 'false') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="featurePolicyEngineEnabled">Policy Engine</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                        id="featureAutoRemediationEnabled"
+                                                                        name="featureAutoRemediationEnabled" value="1"
+                                                                        <%= String(settings.featureAutoRemediationEnabled || 'false') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="featureAutoRemediationEnabled">Auto-Remediation</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                        id="featureAfkRewardsEnabled"
+                                                                        name="featureAfkRewardsEnabled" value="1"
+                                                                        <%= String(settings.featureAfkRewardsEnabled || 'false') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="featureAfkRewardsEnabled">AFK Timer</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                        id="featureClaimRewardsEnabled"
+                                                                        name="featureClaimRewardsEnabled" value="1"
+                                                                        <%= String(settings.featureClaimRewardsEnabled || 'false') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="featureClaimRewardsEnabled">Claim Rewards</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                        id="featureWebUploadEnabled"
+                                                                        name="featureWebUploadEnabled" value="1"
+                                                                        <%= String(settings.featureWebUploadEnabled || 'true') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="featureWebUploadEnabled">File Manager Upload</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                        id="featureSftpEnabled"
+                                                                        name="featureSftpEnabled" value="1"
+                                                                        <%= String(settings.featureSftpEnabled || 'true') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="featureSftpEnabled">SFTP Access</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Web Upload Max (MB)</label>
+                                                                <input type="number" min="1" max="2048" name="featureWebUploadMaxMb" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.featureWebUploadMaxMb || '50' %>">
+                                                                <div class="form-text text-muted">Applies to uploads from File Manager UI.</div>
+                                                            </div>
+
+                                                            <div class="col-12 mt-4">
+                                                                <h6 class="text-light mb-3"><i class="bi bi-currency-exchange me-2"></i>Virtual Economy (Coins)</h6>
+                                                                <div class="form-text text-muted mb-2">Costs and rewards are measured in Coins.</div>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Economy Unit</label>
+                                                                <input type="text" name="economyUnit" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.economyUnit || settings.costCurrency || 'Coins' %>" maxlength="16">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Auto-Remediation Cooldown (s)</label>
+                                                                <input type="number" min="10" max="86400" name="autoRemediationCooldownSeconds" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.autoRemediationCooldownSeconds || '300' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">AFK Timer Coins</label>
+                                                                <input type="number" min="0" max="1000000" name="afkTimerCoins" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.afkTimerCoins || '2' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">AFK Timer (Seconds)</label>
+                                                                <input type="number" min="5" max="86400" name="afkTimerCooldownSeconds" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.afkTimerCooldownSeconds || '60' %>">
+                                                            </div>
+                                                            <div class="col-12">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Claim Rewards Default Period</label>
+                                                                <select name="afkRewardActivePeriod" class="form-select"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;">
+                                                                    <option value="minute" <%= String(settings.afkRewardActivePeriod || 'minute') === 'minute' ? 'selected' : '' %>>Minute</option>
+                                                                    <option value="hour" <%= String(settings.afkRewardActivePeriod || '') === 'hour' ? 'selected' : '' %>>Hour</option>
+                                                                    <option value="day" <%= String(settings.afkRewardActivePeriod || '') === 'day' ? 'selected' : '' %>>Day</option>
+                                                                    <option value="week" <%= String(settings.afkRewardActivePeriod || '') === 'week' ? 'selected' : '' %>>Week</option>
+                                                                    <option value="month" <%= String(settings.afkRewardActivePeriod || '') === 'month' ? 'selected' : '' %>>Month</option>
+                                                                    <option value="year" <%= String(settings.afkRewardActivePeriod || '') === 'year' ? 'selected' : '' %>>Year</option>
+                                                                </select>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Minute Claim Reward</label>
+                                                                <input type="number" min="0" max="1000000" name="afkRewardMinuteCoins" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.afkRewardMinuteCoins || '2' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Hour Claim Reward</label>
+                                                                <input type="number" min="0" max="1000000" name="afkRewardHourCoins" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.afkRewardHourCoins || '20' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Day Claim Reward</label>
+                                                                <input type="number" min="0" max="1000000" name="afkRewardDayCoins" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.afkRewardDayCoins || '120' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Week Claim Reward</label>
+                                                                <input type="number" min="0" max="1000000" name="afkRewardWeekCoins" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.afkRewardWeekCoins || '700' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Month Claim Reward</label>
+                                                                <input type="number" min="0" max="1000000" name="afkRewardMonthCoins" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.afkRewardMonthCoins || '3000' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Year Claim Reward</label>
+                                                                <input type="number" min="0" max="1000000" name="afkRewardYearCoins" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.afkRewardYearCoins || '36000' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Daily Streak Bonus / Day</label>
+                                                                <input type="number" min="0" max="1000000" name="claimDailyStreakBonusCoins" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.claimDailyStreakBonusCoins || '5' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Daily Streak Max</label>
+                                                                <input type="number" min="1" max="365" name="claimDailyStreakMax" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.claimDailyStreakMax || '30' %>">
+                                                            </div>
+                                                            <div class="col-12 text-end mt-4">
+                                                                <button type="submit"
+                                                                    class="btn btn-primary px-4 fw-medium">
+                                                                    Update Settings
+                                                                </button>
+                                                            </div>
+                                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <%- include('../partials/footer') %>
+                </div>
+        </div>
+
+        <!-- Bootstrap JS -->
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

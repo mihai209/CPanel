@@ -1,0 +1,109 @@
+<%
+const navItems = [
+    { id: 'overview', label: 'Overview', icon: 'bi-speedometer2', link: `/server/${server.containerId}/overview` },
+    { id: 'console', label: 'Console', icon: 'bi-terminal', link: `/server/${server.containerId}`, turbo: false },
+    { id: 'files', label: 'File Manager', icon: 'bi-folder2-open', link: `/server/${server.containerId}/files`, turbo: false },
+    { id: 'dbs', label: 'Databases', icon: 'bi-database', link: `/server/${server.containerId}/databases` },
+    { id: 'schedules', label: 'Schedules', icon: 'bi-calendar-event', link: `/server/${server.containerId}/schedules` },
+    { id: 'users', label: 'Users', icon: 'bi-people', link: `/server/${server.containerId}/users` },
+    { id: 'api', label: 'API Keys', icon: 'bi-key', link: `/server/${server.containerId}/api` },
+    { id: 'backups', label: 'SFTP Backup', icon: 'bi-archive', link: `/server/${server.containerId}/backups` },
+    { id: 'network', label: 'Network', icon: 'bi-hdd-network', link: `/server/${server.containerId}/network` },
+    { id: 'startup', label: 'Startup', icon: 'bi-play-circle', link: `/server/${server.containerId}/startup` },
+    { id: 'smartalerts', label: 'Smart Alerts', icon: 'bi-bell', link: `/server/${server.containerId}/smartalerts` },
+    { id: 'activity', label: 'Activity', icon: 'bi-activity', link: `/server/${server.containerId}/activity` },
+    { id: 'debuglogs', label: 'Debug Logs', icon: 'bi-bug', link: `/server/${server.containerId}/debug-logs` },
+    { id: 'minecraft', label: 'Minecraft', icon: 'bi-magic', link: `/server/${server.containerId}/minecraft` }
+];
+if (String(settings.featureScheduledScalingEnabled || 'false') === 'true') {
+    navItems.push({ id: 'scaling', label: 'Scheduled Scaling', icon: 'bi-sliders2-vertical', link: `/server/${server.containerId}/scaling` });
+}
+if (String(settings.featurePolicyEngineEnabled || 'false') === 'true') {
+    navItems.push({ id: 'policy', label: 'Policy Engine', icon: 'bi-shield-check', link: `/server/${server.containerId}/policy` });
+}
+%>
+
+    <!-- Sidebar Header (Brand) -->
+    <div class="sidebar-header py-2" style="border-bottom: 1px solid #2d2d35;">
+        <a href="/" class="d-flex align-items-center text-decoration-none text-light">
+            <img src="<%= settings.faviconUrl %>" alt="Logo" width="32" height="32" class="me-3 rounded">
+            <span class="fw-bold tracking-wide" style="letter-spacing: 0.5px;">
+                <%= settings.brandName.toUpperCase() %>
+            </span>
+        </a>
+    </div>
+
+    <!-- Navigation Items -->
+    <% navItems.forEach(item=> { %>
+        <a href="<%= item.link %>" class="sidebar-item <%= active === item.id ? 'active' : '' %>"
+            <%= item.turbo === false ? 'data-turbo="false"' : '' %>
+            data-bs-toggle="tooltip" data-bs-placement="right" title="<%= item.label %>">
+            <div class="sidebar-icon">
+                <i class="bi <%= item.icon %>"></i>
+            </div>
+            <span class="sidebar-label">
+                <%= item.label %>
+            </span>
+        </a>
+        <% }); %>
+
+            <!-- Sidebar styles (fallback if parent page doesn't define them) -->
+            <style>
+                .sidebar-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.72rem 0.85rem;
+                    margin-bottom: 0.3rem;
+                    border-radius: 0.6rem;
+                    color: #8b8b9a;
+                    text-decoration: none;
+                    transition: all 0.2s ease;
+                    font-size: 0.92rem;
+                    line-height: 1.2;
+                    border: 1px solid transparent;
+                }
+
+                .sidebar-item:hover {
+                    color: #e1e1e6;
+                    background: rgba(255, 255, 255, 0.03);
+                    border-color: #2d2d35;
+                }
+
+                .sidebar-item.active {
+                    color: #3b82f6;
+                    background: rgba(59, 130, 246, 0.12);
+                    border-color: rgba(59, 130, 246, 0.28);
+                }
+
+                .sidebar-icon {
+                    width: 1.2rem;
+                    min-width: 1.2rem;
+                    text-align: center;
+                    font-size: 1rem;
+                }
+
+                .sidebar-label {
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .sidebar-header {
+                    color: #e1e1e6;
+                }
+
+                .sidebar-header a {
+                    color: inherit;
+                }
+
+                .sidebar-header img {
+                    object-fit: contain;
+                }
+
+                @media (max-width: 992px) {
+                    .sidebar-label {
+                        font-size: 0.88rem;
+                    }
+                }
+            </style>

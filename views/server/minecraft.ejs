@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        Minecraft <%= server.name %> | <%= settings.brandName.toUpperCase() %>
+    </title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --bg-dark: #0f0f12;
+            --bg-darker: #0a0a0c;
+            --bg-sidebar: #121216;
+            --border-color: #2d2d35;
+            --text-primary: #e1e1e6;
+            --text-secondary: #8b8b9a;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .wrapper {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 260px;
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            overflow-y: auto;
+        }
+
+        .sidebar .sidebar-content {
+            padding: 1.5rem 0.75rem;
+        }
+
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .sidebar-item:hover {
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-primary);
+        }
+
+        .sidebar-item.active {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent-blue);
+        }
+
+        .sidebar-icon {
+            margin-right: 12px;
+            font-size: 1.1rem;
+            width: 24px;
+            text-align: center;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--bg-dark);
+        }
+
+        .top-navbar {
+            background: var(--bg-sidebar);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .navbar-toggle {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 1rem;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .navbar-toggle:hover {
+            color: var(--text-primary);
+        }
+
+        .server-info {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .server-name {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .settings-card {
+            background: var(--bg-sidebar);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .settings-card-header {
+            border-bottom: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.02);
+            padding: 1rem 1.25rem;
+        }
+
+        .settings-card-body {
+            padding: 1.25rem;
+        }
+
+        .form-control,
+        .form-select {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .form-select option {
+            background-color: var(--bg-darker);
+            color: var(--text-primary);
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: var(--accent-blue);
+            color: var(--text-primary);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        .form-label {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-weight: 600;
+        }
+
+        .btn-primary-soft {
+            background: var(--accent-blue);
+            border: 1px solid var(--accent-blue);
+            color: #fff;
+        }
+
+        .btn-primary-soft:hover {
+            background: #2563eb;
+            border-color: #2563eb;
+            color: #fff;
+        }
+
+        .result-grid {
+            display: grid;
+            gap: 0.9rem;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        }
+
+        .result-card {
+            background: #17171c;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 0.95rem;
+            display: flex;
+            gap: 0.8rem;
+            min-height: 160px;
+        }
+
+        .result-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            object-fit: cover;
+            flex-shrink: 0;
+            background: #0f0f12;
+            border: 1px solid var(--border-color);
+        }
+
+        .result-title {
+            font-size: 1rem;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 0.25rem;
+        }
+
+        .result-meta {
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .result-description {
+            color: #c4c4cf;
+            font-size: 0.82rem;
+            margin-bottom: 0.75rem;
+            max-height: 2.8em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .chip-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            margin-bottom: 0.7rem;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.15rem 0.45rem;
+            border-radius: 999px;
+            font-size: 0.68rem;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: var(--text-secondary);
+            border: 1px dashed var(--border-color);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .pagination-info {
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+        }
+
+        .mode-switch .btn {
+            min-width: 110px;
+        }
+
+        .installed-list {
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .installed-item {
+            border: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+            padding: 0.85rem;
+        }
+
+        .installed-item-name {
+            font-weight: 700;
+            font-size: 0.95rem;
+            margin-bottom: 0.2rem;
+        }
+
+        .installed-item-meta {
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                margin-left: -260px;
+                position: fixed;
+                top: 0;
+                bottom: 0;
+                z-index: 1050;
+                box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            }
+
+            .sidebar.show {
+                margin-left: 0;
+            }
+
+            .content {
+                width: 100%;
+            }
+
+            .scroll-area {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <%- include ('../partials/error-modal') %>
+    <div class="wrapper">
+        <nav id="sidebar" class="sidebar">
+            <div class="sidebar-content">
+                <%- include('../partials/server-sidebar', { server, active: 'minecraft' , settings }) %>
+            </div>
+        </nav>
+
+        <div class="content">
+            <div class="top-navbar">
+                <button id="sidebarToggle" class="navbar-toggle">
+                    <i class="bi bi-list"></i>
+                </button>
+                <div class="server-info">
+                    <h1 class="server-name">Minecraft Addons</h1>
+                    <span class="text-secondary opacity-50 mx-2">/</span>
+                    <span class="text-secondary"><%= server.name %></span>
+                </div>
+            </div>
+
+            <div class="scroll-area">
+                <div id="alerts"></div>
+
+                <div class="d-flex justify-content-between align-items-center mb-3 mode-switch">
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-sm btn-primary-soft" id="browseModeBtn">Browse</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="installedModeBtn">Installed</button>
+                    </div>
+                </div>
+
+                <div id="browseSection">
+                    <div class="settings-card">
+                        <div class="settings-card-header">
+                            <h6 class="mb-0 fw-semibold">Browse Modrinth</h6>
+                        </div>
+                        <div class="settings-card-body">
+                            <div class="row g-3">
+                                <div class="col-md-2">
+                                    <label class="form-label" for="kindInput">Type</label>
+                                    <select class="form-select" id="kindInput">
+                                        <option value="plugin" <%= minecraftDefaults.kind === 'plugin' ? 'selected' : '' %>>Plugins</option>
+                                        <option value="mod" <%= minecraftDefaults.kind === 'mod' ? 'selected' : '' %>>Mods</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="loaderInput">Loader</label>
+                                    <select class="form-select" id="loaderInput"></select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label" for="versionInput">MC Version</label>
+                                    <input class="form-control" id="versionInput" placeholder="1.20.1" value="<%= minecraftDefaults.version %>">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="targetDirectoryInput">Install Directory</label>
+                                    <input class="form-control" id="targetDirectoryInput" value="<%= minecraftDefaults.targetDirectory %>">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="queryInput">Search</label>
+                                    <div class="input-group">
+                                        <input class="form-control" id="queryInput" placeholder="Essentials, LuckPerms, Iris...">
+                                        <button class="btn btn-primary-soft" id="searchBtn" type="button">
+                                            <i class="bi bi-search"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="small text-secondary mt-2">
+                                Search is powered by Modrinth. Install downloads directly into your server folder.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="pagination-info" id="paginationInfo">Ready to search.</div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="prevBtn" disabled>Previous</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="nextBtn" disabled>Next</button>
+                        </div>
+                    </div>
+
+                    <div id="results" class="result-grid"></div>
+                </div>
+
+                <div id="installedSection" class="d-none">
+                    <div class="settings-card">
+                        <div class="settings-card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0 fw-semibold">Installed Addons</h6>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshInstalledBtn">
+                                <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="settings-card-body">
+                            <div class="small text-secondary mb-3">
+                                Update works only for addons installed from this panel (tracked source: Modrinth).
+                            </div>
+                            <div id="installedList" class="installed-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', () => sidebar.classList.toggle('show'));
+        }
+
+        const serverId = '<%= server.containerId %>';
+        const loaderCatalog = {
+            plugin: <%- JSON.stringify(minecraftCatalog.plugins || []) %>,
+            mod: <%- JSON.stringify(minecraftCatalog.mods || []) %>
+        };
+
+        const kindInput = document.getElementById('kindInput');
+        const loaderInput = document.getElementById('loaderInput');
+        const versionInput = document.getElementById('versionInput');
+        const targetDirectoryInput = document.getElementById('targetDirectoryInput');
+        const queryInput = document.getElementById('queryInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const resultsElement = document.getElementById('results');
+        const alertsElement = document.getElementById('alerts');
+        const paginationInfo = document.getElementById('paginationInfo');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const browseModeBtn = document.getElementById('browseModeBtn');
+        const installedModeBtn = document.getElementById('installedModeBtn');
+        const browseSection = document.getElementById('browseSection');
+        const installedSection = document.getElementById('installedSection');
+        const installedList = document.getElementById('installedList');
+        const refreshInstalledBtn = document.getElementById('refreshInstalledBtn');
+
+        const state = {
+            offset: 0,
+            limit: 12,
+            total: 0,
+            loading: false,
+            installedMessages: new Set()
+        };
+
+        function escapeHtml(value) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+            return String(value || '').replace(/[&<>"']/g, (m) => map[m]);
+        }
+
+        function setAlert(kind, message) {
+            const cls = kind === 'success' ? 'alert-success' : (kind === 'warning' ? 'alert-warning' : 'alert-danger');
+            alertsElement.innerHTML = `<div class="alert ${cls} py-2">${escapeHtml(message)}</div>`;
+            setTimeout(() => {
+                if (alertsElement.innerHTML.includes(message)) {
+                    alertsElement.innerHTML = '';
+                }
+            }, 6000);
+        }
+
+        function formatBytes(value) {
+            const bytes = Number(value || 0);
+            if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            let size = bytes;
+            let index = 0;
+            while (size >= 1024 && index < units.length - 1) {
+                size /= 1024;
+                index += 1;
+            }
+            return `${size.toFixed(size >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
+        }
+
+        function renderLoaderOptions(kind, selected = '') {
+            const options = loaderCatalog[kind] || [];
+            loaderInput.innerHTML = `<option value="">Any</option>` + options.map((loader) => {
+                const isSelected = loader === selected ? 'selected' : '';
+                return `<option value="${escapeHtml(loader)}" ${isSelected}>${escapeHtml(loader)}</option>`;
+            }).join('');
+        }
+
+        function getCurrentFilters() {
+            return {
+                kind: kindInput.value || 'plugin',
+                loader: loaderInput.value || '',
+                version: versionInput.value.trim(),
+                q: queryInput.value.trim(),
+                targetDirectory: targetDirectoryInput.value.trim()
+            };
+        }
+
+        function setLoading(loading) {
+            state.loading = loading;
+            searchBtn.disabled = loading;
+            searchBtn.innerHTML = loading
+                ? '<span class="spinner-border spinner-border-sm"></span>'
+                : '<i class="bi bi-search"></i>';
+        }
+
+        function setMode(mode) {
+            const installed = mode === 'installed';
+            browseSection.classList.toggle('d-none', installed);
+            installedSection.classList.toggle('d-none', !installed);
+            browseModeBtn.className = installed ? 'btn btn-sm btn-outline-secondary' : 'btn btn-sm btn-primary-soft';
+            installedModeBtn.className = installed ? 'btn btn-sm btn-primary-soft' : 'btn btn-sm btn-outline-secondary';
+            if (installed) {
+                loadInstalled();
+            }
+        }
+
+        function updatePagination() {
+            const from = state.total === 0 ? 0 : state.offset + 1;
+            const to = Math.min(state.offset + state.limit, state.total);
+            paginationInfo.textContent = state.total > 0
+                ? `Showing ${from}-${to} of ${state.total} results`
+                : 'No results found.';
+            prevBtn.disabled = state.offset <= 0 || state.loading;
+            nextBtn.disabled = (state.offset + state.limit) >= state.total || state.loading;
+        }
+
+        function renderResults(results) {
+            if (!Array.isArray(results) || results.length === 0) {
+                resultsElement.innerHTML = `<div class="empty-state">No projects matched your filters.</div>`;
+                return;
+            }
+
+            resultsElement.innerHTML = results.map((item) => {
+                const icon = item.iconUrl
+                    ? `<img class="result-icon" src="${escapeHtml(item.iconUrl)}" alt="${escapeHtml(item.title)}">`
+                    : '<div class="result-icon d-flex align-items-center justify-content-center"><i class="bi bi-box fs-4 text-secondary"></i></div>';
+                const chips = (Array.isArray(item.categories) ? item.categories.slice(0, 5) : []).map((cat) => `<span class="chip">${escapeHtml(cat)}</span>`).join('');
+                return `
+                    <div class="result-card">
+                        ${icon}
+                        <div class="w-100 d-flex flex-column">
+                            <div class="result-title">${escapeHtml(item.title)}</div>
+                            <div class="result-meta">by ${escapeHtml(item.author || 'unknown')} · ${Number(item.downloads || 0).toLocaleString()} downloads</div>
+                            <div class="result-description">${escapeHtml(item.description || 'No description')}</div>
+                            <div class="chip-list">${chips}</div>
+                            <div class="mt-auto d-flex justify-content-end">
+                                <button class="btn btn-sm btn-primary-soft install-btn"
+                                    data-project-id="${escapeHtml(item.id)}"
+                                    data-project-title="${escapeHtml(item.title || '')}">
+                                    <i class="bi bi-download"></i> Install
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.querySelectorAll('.install-btn').forEach((button) => {
+                button.addEventListener('click', () => installProject(button));
+            });
+        }
+
+        function renderInstalled(items) {
+            if (!Array.isArray(items) || items.length === 0) {
+                installedList.innerHTML = `<div class="empty-state">No installed addons found in selected directory.</div>`;
+                return;
+            }
+
+            installedList.innerHTML = items.map((item) => {
+                const trackedBadge = item.tracked
+                    ? '<span class="badge text-bg-success">Tracked</span>'
+                    : '<span class="badge text-bg-secondary">Manual</span>';
+                const updateDisabled = item.canUpdate ? '' : 'disabled';
+                const updateTitle = item.canUpdate ? 'Update from Modrinth' : 'Only tracked addons can be auto-updated';
+                const modrinthHint = item.projectTitle ? ` · ${escapeHtml(item.projectTitle)}` : '';
+                return `
+                    <div class="installed-item">
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <div>
+                                <div class="installed-item-name">${escapeHtml(item.name)}</div>
+                                <div class="installed-item-meta">${escapeHtml(item.path)}${modrinthHint}</div>
+                            </div>
+                            ${trackedBadge}
+                        </div>
+                        <div class="installed-item-meta mb-3">
+                            ${formatBytes(item.size)} · ${escapeHtml(item.permissions || '---')}
+                        </div>
+                        <div class="d-flex justify-content-end gap-2">
+                            <button class="btn btn-sm btn-outline-secondary update-installed-btn" ${updateDisabled}
+                                title="${escapeHtml(updateTitle)}"
+                                data-path="${escapeHtml(item.path)}"
+                                data-kind="${escapeHtml(item.kind || '')}"
+                                data-loader="${escapeHtml(item.loader || '')}"
+                                data-version="${escapeHtml(item.gameVersion || '')}">
+                                <i class="bi bi-arrow-repeat"></i> Update
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger delete-installed-btn" data-path="${escapeHtml(item.path)}">
+                                <i class="bi bi-trash3"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.querySelectorAll('.delete-installed-btn').forEach((button) => {
+                button.addEventListener('click', () => deleteInstalledAddon(button));
+            });
+            document.querySelectorAll('.update-installed-btn').forEach((button) => {
+                button.addEventListener('click', () => updateInstalledAddon(button));
+            });
+        }
+
+        async function searchProjects(offset = 0) {
+            if (state.loading) return;
+            setLoading(true);
+            try {
+                const filters = getCurrentFilters();
+                const params = new URLSearchParams({
+                    kind: filters.kind,
+                    loader: filters.loader,
+                    version: filters.version,
+                    q: filters.q,
+                    offset: String(offset),
+                    limit: String(state.limit)
+                });
+
+                const response = await fetch(`/server/${serverId}/minecraft/search?${params.toString()}`);
+                const payload = await response.json();
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.error || 'Failed to fetch Modrinth results.');
+                }
+
+                state.offset = payload.pagination.offset || 0;
+                state.total = payload.pagination.total || 0;
+
+                renderResults(payload.results || []);
+                updatePagination();
+            } catch (error) {
+                renderResults([]);
+                state.total = 0;
+                state.offset = 0;
+                updatePagination();
+                setAlert('error', error.message || 'Search failed.');
+            } finally {
+                setLoading(false);
+                updatePagination();
+            }
+        }
+
+        async function installProject(button) {
+            if (!button) return;
+            const projectId = button.getAttribute('data-project-id');
+            const projectTitle = button.getAttribute('data-project-title') || '';
+            const filters = getCurrentFilters();
+
+            if (!projectId) {
+                setAlert('error', 'Missing project identifier.');
+                return;
+            }
+
+            button.disabled = true;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Installing...';
+
+            try {
+                const response = await fetch(`/server/${serverId}/minecraft/install`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        projectId,
+                        projectTitle,
+                        kind: filters.kind,
+                        loader: filters.loader,
+                        version: filters.version,
+                        targetDirectory: filters.targetDirectory
+                    })
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.error || 'Install failed.');
+                }
+
+                if (payload.queued) {
+                    const jobSuffix = payload.jobId ? ` (job #${payload.jobId})` : '';
+                    setAlert('warning', (payload.message || 'Install queued and still processing.') + jobSuffix);
+                    return;
+                }
+
+                const installedName = payload.installed && payload.installed.fileName ? payload.installed.fileName : 'file';
+                const signature = `${projectId}:${installedName}`;
+                if (!state.installedMessages.has(signature)) {
+                    setAlert('success', `Installed ${installedName} successfully.`);
+                    state.installedMessages.add(signature);
+                }
+            } catch (error) {
+                setAlert('error', error.message || 'Install failed.');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        }
+
+        async function loadInstalled() {
+            installedList.innerHTML = `<div class="empty-state"><span class="spinner-border spinner-border-sm me-2"></span>Loading installed addons...</div>`;
+            try {
+                const filters = getCurrentFilters();
+                const params = new URLSearchParams({
+                    kind: filters.kind,
+                    targetDirectory: filters.targetDirectory
+                });
+                const response = await fetch(`/server/${serverId}/minecraft/installed?${params.toString()}`);
+                const payload = await response.json();
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.error || 'Failed to load installed addons.');
+                }
+                renderInstalled(payload.installed || []);
+            } catch (error) {
+                installedList.innerHTML = `<div class="empty-state">Failed to load installed addons.</div>`;
+                setAlert('error', error.message || 'Failed to load installed addons.');
+            }
+        }
+
+        async function deleteInstalledAddon(button) {
+            const addonPath = button.getAttribute('data-path');
+            if (!addonPath) return;
+            if (!confirm(`Delete ${addonPath}?`)) return;
+
+            button.disabled = true;
+            const oldHtml = button.innerHTML;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+            try {
+                const response = await fetch(`/server/${serverId}/minecraft/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: addonPath })
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.error || 'Delete failed.');
+                }
+                setAlert('success', `Deleted ${addonPath}`);
+                loadInstalled();
+            } catch (error) {
+                setAlert('error', error.message || 'Delete failed.');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = oldHtml;
+            }
+        }
+
+        async function updateInstalledAddon(button) {
+            if (button.disabled) return;
+            const addonPath = button.getAttribute('data-path');
+            if (!addonPath) return;
+
+            button.disabled = true;
+            const oldHtml = button.innerHTML;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+            try {
+                const response = await fetch(`/server/${serverId}/minecraft/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        path: addonPath,
+                        kind: button.getAttribute('data-kind') || '',
+                        loader: button.getAttribute('data-loader') || '',
+                        version: button.getAttribute('data-version') || ''
+                    })
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.error || 'Update failed.');
+                }
+                setAlert('success', `Updated ${addonPath}`);
+                if (payload.warning) {
+                    setAlert('warning', payload.warning);
+                }
+                loadInstalled();
+            } catch (error) {
+                setAlert('error', error.message || 'Update failed.');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = oldHtml;
+            }
+        }
+
+        kindInput.addEventListener('change', () => {
+            const kind = kindInput.value === 'mod' ? 'mod' : 'plugin';
+            renderLoaderOptions(kind, '');
+            const currentTarget = targetDirectoryInput.value.trim().toLowerCase();
+            if (!currentTarget || currentTarget === '/plugins' || currentTarget === '/mods') {
+                targetDirectoryInput.value = kind === 'mod' ? '/mods' : '/plugins';
+            }
+        });
+
+        searchBtn.addEventListener('click', () => searchProjects(0));
+        queryInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                searchProjects(0);
+            }
+        });
+
+        prevBtn.addEventListener('click', () => {
+            const nextOffset = Math.max(state.offset - state.limit, 0);
+            searchProjects(nextOffset);
+        });
+
+        nextBtn.addEventListener('click', () => {
+            const nextOffset = state.offset + state.limit;
+            if (nextOffset < state.total) {
+                searchProjects(nextOffset);
+            }
+        });
+
+        browseModeBtn.addEventListener('click', () => setMode('browse'));
+        installedModeBtn.addEventListener('click', () => setMode('installed'));
+        refreshInstalledBtn.addEventListener('click', () => loadInstalled());
+
+        renderLoaderOptions('<%= minecraftDefaults.kind %>', '<%= minecraftDefaults.loader || '' %>');
+        setMode('browse');
+        searchProjects(0);
+    </script>
+</body>
+
+</html>

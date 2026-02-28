@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= (settings.brandName || 'CPanel' ).toUpperCase() %>
+            <%= locals.title ? ' - ' + title.toUpperCase() : '' %> - Overview
+    </title>
+    <!-- Favicon -->
+    <%- include('../partials/favicon') %>
+        <!-- Bootstrap CSS -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <!-- Bootstrap Icons -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+        <!-- Google Fonts -->
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+            rel="stylesheet">
+        <!-- Custom CSS -->
+        <link rel="stylesheet" href="/css/style.css">
+        <style>
+            :root {
+                --dashboard-card-bg: rgba(26, 26, 35, 0.45);
+                --dashboard-hover-bg: rgba(35, 35, 45, 0.7);
+                --accent-primary: #6366f1;
+                --accent-secondary: #06b6d4;
+                --glass-border: rgba(255, 255, 255, 0.04);
+                --card-radius: 2rem;
+            }
+
+            /* New grid layout – cleaner, balanced, and modern */
+            .dashboard-grid {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 1.5rem;
+            }
+
+            /* base card styling (replaces bento-item) */
+            .grid-card {
+                background: var(--dashboard-card-bg);
+                border: 1px solid var(--glass-border);
+                backdrop-filter: blur(16px);
+                border-radius: var(--card-radius);
+                padding: 1.75rem;
+                transition: all 0.3s ease;
+                text-decoration: none;
+                color: inherit;
+                display: flex;
+                flex-direction: column;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .grid-card:hover {
+                background: var(--dashboard-hover-bg);
+                border-color: rgba(255, 255, 255, 0.1);
+                transform: translateY(-4px);
+                box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.5);
+            }
+
+            /* Hero card – spans full width */
+            .hero-card {
+                grid-column: span 4;
+                flex-direction: row;
+                align-items: center;
+                gap: 2rem;
+                background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), transparent),
+                    rgba(26, 26, 35, 0.4);
+                padding: 2rem 2.5rem;
+            }
+
+            .hero-content {
+                flex: 1;
+                max-width: 60%;
+            }
+
+            .hero-mascot-container {
+                flex-shrink: 0;
+                margin-left: auto;
+            }
+
+            .floating-mascot {
+                height: 220px;
+                animation: float 6s ease-in-out infinite;
+                filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.5));
+            }
+
+            @keyframes float {
+
+                0%,
+                100% {
+                    transform: translateY(0) rotate(0deg);
+                }
+
+                50% {
+                    transform: translateY(-12px) rotate(2deg);
+                }
+            }
+
+            /* Servers card – spans 2 columns, stands out */
+            .servers-card {
+                grid-column: span 2;
+                background: linear-gradient(180deg, rgba(6, 182, 212, 0.15), transparent);
+                justify-content: space-between;
+            }
+
+
+            /* Combined stats card (users, databases, locations) – spans 2 columns */
+            .combined-card {
+                grid-column: span 2;
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-around;
+                gap: 1rem;
+                padding: 1.5rem 1rem;
+            }
+
+            .combined-stat-item {
+                flex: 1;
+                text-align: center;
+                padding: 0.75rem 0.5rem;
+                border-radius: 1.5rem;
+                transition: background 0.2s;
+            }
+
+            .combined-stat-item:hover {
+                background: rgba(255, 255, 255, 0.02);
+            }
+
+            .combined-stat-item i {
+                font-size: 2rem;
+                display: block;
+                margin-bottom: 0.5rem;
+                color: rgba(255, 255, 255, 0.7);
+            }
+
+            .combined-stat-item .stat-value {
+                font-size: 2rem;
+                font-weight: 700;
+                line-height: 1.2;
+                color: #fff;
+            }
+
+            .combined-stat-item .stat-label {
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                color: rgba(255, 255, 255, 0.4);
+                font-weight: 600;
+            }
+
+            /* action cards (community, docs) – each span 2 columns */
+            .action-card {
+                grid-column: span 2;
+                flex-direction: row;
+                align-items: center;
+                gap: 1.2rem;
+                padding: 1.5rem 2rem;
+                cursor: pointer;
+            }
+
+            .action-icon {
+                width: 56px;
+                height: 56px;
+                border-radius: 1.2rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.8rem;
+                color: #fff;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                transition: all 0.2s;
+            }
+
+            .action-card:hover .action-icon {
+                background: var(--accent-primary);
+                border-color: var(--accent-primary);
+            }
+
+            .bg-discord {
+                background: #5865F2 !important;
+            }
+
+            .action-card .action-text h6 {
+                font-weight: 600;
+                font-size: 1.1rem;
+                margin-bottom: 0.2rem;
+            }
+
+            .action-card .action-text p {
+                font-size: 0.85rem;
+                color: rgba(255, 255, 255, 0.5);
+                margin: 0;
+            }
+
+            .arrow-icon {
+                margin-left: auto;
+                font-size: 1.4rem;
+                color: rgba(255, 255, 255, 0.2);
+                transition: color 0.2s;
+            }
+
+            .action-card:hover .arrow-icon {
+                color: rgba(255, 255, 255, 0.7);
+            }
+
+            /* status badge reused */
+            .status-badge {
+                padding: 0.4rem 1rem;
+                border-radius: 2rem;
+                background: rgba(255, 255, 255, 0.05);
+                color: rgba(255, 255, 255, 0.7);
+                font-size: 0.75rem;
+                font-weight: 700;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .status-badge.success {
+                background: rgba(16, 185, 129, 0.1);
+                color: #10b981;
+                border-color: rgba(16, 185, 129, 0.2);
+            }
+
+            .status-badge.warning {
+                background: rgba(245, 158, 11, 0.1);
+                color: #f59e0b;
+                border-color: rgba(245, 158, 11, 0.2);
+            }
+
+            .status-badge.error {
+                background: rgba(239, 68, 68, 0.1);
+                color: #ef4444;
+                border-color: rgba(239, 68, 68, 0.2);
+            }
+
+            .status-pulse {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
+                animation: pulse 2s infinite;
+            }
+
+            .success .status-pulse {
+                background: #10b981;
+            }
+
+            .warning .status-pulse {
+                background: #f59e0b;
+            }
+
+            .error .status-pulse {
+                background: #ef4444;
+            }
+
+            @keyframes pulse {
+                0% {
+                    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+                }
+
+                70% {
+                    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+                }
+
+                100% {
+                    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+                }
+            }
+
+            /* responsiveness */
+            @media (max-width: 992px) {
+                .dashboard-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+
+                .hero-card,
+                .servers-card,
+                .combined-card,
+                .action-card {
+                    grid-column: span 2;
+                }
+
+                .hero-card {
+                    flex-direction: column;
+                    text-align: center;
+                }
+
+                .hero-content {
+                    max-width: 100%;
+                }
+
+                .hero-mascot-container {
+                    margin: 1.5rem 0 0 0;
+                }
+
+                .combined-card {
+                    flex-wrap: wrap;
+                }
+
+                .combined-stat-item {
+                    flex: 1 1 40%;
+                }
+            }
+
+            @media (max-width: 576px) {
+                .dashboard-grid {
+                    grid-template-columns: 1fr;
+                }
+
+                .hero-card,
+                .servers-card,
+                .combined-card,
+                .action-card {
+                    grid-column: span 1;
+                }
+
+                .combined-card {
+                    flex-direction: column;
+                }
+
+                .combined-stat-item {
+                    width: 100%;
+                }
+            }
+        </style>
+</head>
+
+<body class="dashboard-header-bg">
+    <%- include ('../partials/error-modal') %>
+        <div class="admin-wrapper">
+            <!-- Sidebar -->
+            <%- include('../partials/admin-sidebar') %>
+
+                <!-- Content -->
+                <div class="admin-content">
+                    <div class="container-fluid py-5 px-lg-5">
+
+                        <!-- New dashboard grid -->
+                        <div class="dashboard-grid">
+
+                            <!-- Welcome Hero Card (full width) -->
+                            <div class="grid-card hero-card">
+                                <div class="hero-content">
+                                    <div class="status-badge mb-3 <%= versionStatus.type %>">
+                                        <span class="status-pulse"> </span>
+                                        <%= versionStatus.message %>
+                                    </div>
+                                    <h1 class="display-5 fw-bold text-light mb-3" style="letter-spacing: -0.04em;">
+                                        Hello, <%= user.username %>
+                                    </h1>
+                                    <p class="text-muted opacity-75 mb-4">
+                                        CPanel is ready to use!
+                                    </p>
+                                    <div class="d-flex gap-2">
+                                        <a href="/admin/settings"
+                                            class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">
+                                            <i class="bi bi-gear-fill me-2"></i>Configure
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="hero-mascot-container">
+                                    <img src="/assets/welcoming-rocky.png" alt="Rocky" class="floating-mascot">
+                                </div>
+                            </div>
+
+
+
+
+                            <div class="grid-card combined-card">
+                                <div class="combined-stat-item">
+                                    <i class="bi bi-server" style="color: #9263f1;"></i>
+                                    <div class="stat-value">
+                                        <%= stats.servers %>
+                                    </div>
+                                    <div class="stat-label">Servers</div>
+                                </div>
+                                <div class="combined-stat-item">
+                                    <i class="bi bi-people-fill" style="color: #6366f1;"></i>
+                                    <div class="stat-value">
+                                        <%= stats.users %>
+                                    </div>
+                                    <div class="stat-label">Users</div>
+                                </div>
+                                <div class="combined-stat-item">
+                                    <i class="bi bi-database-fill-gear" style="color: #f59e0b;"></i>
+                                    <div class="stat-value">
+                                        <%= stats.databases %>
+                                    </div>
+                                    <div class="stat-label">Databases</div>
+                                </div>
+                                <div class="combined-stat-item">
+                                    <i class="bi bi-geo-alt-fill" style="color: #10b981;"></i>
+                                    <div class="stat-value">
+                                        <%= stats.locations %>
+                                    </div>
+                                    <div class="stat-label">Locations</div>
+                                </div>
+                            </div>
+
+                            <!-- Discord Community Card (spans 2 columns) -->
+                            <a href="https://cpanel-rocky.netlify.app/discord" class="grid-card action-card">
+                                <div class="action-icon bg-discord">
+                                    <i class="bi bi-discord"></i>
+                                </div>
+                                <div class="action-text">
+                                    <h6 class="fw-bold text-light">Community Help</h6>
+                                    <p class="text-muted">Join our Discord server</p>
+                                </div>
+                                <i class="bi bi-arrow-right arrow-icon"></i>
+                            </a>
+
+                            <!-- Documentation Card (spans 2 columns) -->
+                            <a href="https://cpanel-rocky.netlify.app/docs/introduction" class="grid-card action-card">
+                                <div class="action-icon bg-primary">
+                                    <i class="bi bi-journal-text"></i>
+                                </div>
+                                <div class="action-text">
+                                    <h6 class="fw-bold text-light">Documentation</h6>
+                                    <p class="text-muted">Learn everything here</p>
+                                </div>
+                                <i class="bi bi-arrow-right arrow-icon"></i>
+                            </a>
+
+                        </div> <!-- end dashboard-grid -->
+
+                    </div>
+                    <%- include('../partials/footer') %>
+                </div>
+        </div>
+
+        <!-- Bootstrap JS -->
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= title %> | <%= settings.brandName.toUpperCase() %>
+    </title>
+    <%- include('../partials/favicon.ejs') %>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.2.1/css/xterm.css" />
+        <script>
+            const isPopout = new URLSearchParams(window.location.search).get('popout') === 'true';
+            if (isPopout) {
+                document.documentElement.classList.add('is-popout');
+            }
+        </script>
+        <style>
+            html.is-popout .sidebar,
+            html.is-popout .top-navbar {
+                display: none !important;
+            }
+
+            html.is-popout .terminal-wrapper {
+                padding: 0 !important;
+            }
+
+            html.is-popout .terminal-container {
+                border-radius: 0 !important;
+                border: none !important;
+            }
+
+            html.is-popout .wrapper {
+                width: 100vw !important;
+                height: 100vh !important;
+            }
+
+            :root {
+                --bg-dark: #0f0f12;
+                --bg-darker: #0a0a0c;
+                --bg-sidebar: #121216;
+                --border-color: #2d2d35;
+                --text-primary: #e1e1e6;
+                --text-secondary: #8b8b9a;
+                --accent-blue: #3b82f6;
+                --accent-green: #10b981;
+                --accent-red: #ef4444;
+                --accent-yellow: #f59e0b;
+            }
+
+            body {
+                background-color: var(--bg-dark);
+                color: var(--text-primary);
+                font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                overflow: hidden;
+                height: 100vh;
+            }
+
+            /* Wrapper for sidebar + content */
+            .wrapper {
+                display: flex;
+                height: 100vh;
+                overflow: hidden;
+            }
+
+            /* Sidebar styles (Pterodactyl-like) */
+            .sidebar {
+                width: 260px;
+                background: var(--bg-sidebar);
+                border-right: 1px solid var(--border-color);
+                transition: all 0.3s ease;
+                display: flex;
+                flex-direction: column;
+                flex-shrink: 0;
+                overflow-y: auto;
+            }
+
+            .sidebar.collapsed {
+                margin-left: -260px;
+            }
+
+            .sidebar .sidebar-content {
+                padding: 1.5rem 0.75rem;
+            }
+
+            .sidebar-item {
+                display: flex;
+                align-items: center;
+                padding: 0.75rem 1rem;
+                color: var(--text-secondary);
+                text-decoration: none;
+                border-radius: 8px;
+                transition: all 0.2s ease;
+                font-weight: 500;
+                font-size: 0.9rem;
+                margin-bottom: 0.25rem;
+            }
+
+            .sidebar-item:hover {
+                background: rgba(255, 255, 255, 0.03);
+                color: var(--text-primary);
+            }
+
+            .sidebar-item.active {
+                background: rgba(59, 130, 246, 0.1);
+                color: var(--accent-blue);
+            }
+
+            .sidebar-icon {
+                margin-right: 12px;
+                font-size: 1.1rem;
+                width: 24px;
+                text-align: center;
+            }
+
+            /* Main content area */
+            .content {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                background: var(--bg-dark);
+            }
+
+            /* Top navbar */
+            .top-navbar {
+                background: var(--bg-sidebar);
+                border-bottom: 1px solid var(--border-color);
+                padding: 0.75rem 1.5rem;
+                display: flex;
+                align-items: center;
+                flex-shrink: 0;
+            }
+
+            .navbar-toggle {
+                background: transparent;
+                border: none;
+                color: var(--text-secondary);
+                font-size: 1.5rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-right: 1rem;
+                cursor: pointer;
+                padding: 0;
+            }
+
+            .navbar-toggle:hover {
+                color: var(--text-primary);
+            }
+
+            .server-info {
+                display: flex;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 1rem;
+            }
+
+            .server-name {
+                font-size: 1.25rem;
+                font-weight: 600;
+                margin: 0;
+            }
+
+            .server-address {
+                color: var(--text-secondary);
+                font-size: 0.85rem;
+            }
+
+            /* Status badge (reuse existing styles but adjust) */
+            .status-badge {
+                padding: 0.4rem 1rem;
+                border-radius: 20px;
+                font-size: 0.75rem;
+                font-weight: 600;
+                display: inline-flex;
+                align-items: center;
+                background: rgba(16, 185, 129, 0.15);
+                color: #10b981;
+                border: 1px solid rgba(16, 185, 129, 0.3);
+            }
+
+            .status-dot {
+                display: inline-block;
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                margin-right: 8px;
+            }
+
+            .status-running .status-dot {
+                background: #10b981;
+                animation: pulse 2s infinite;
+            }
+
+            .status-stopped .status-dot {
+                background: #ef4444;
+            }
+
+            .status-stopped {
+                background: rgba(239, 68, 68, 0.15);
+                color: #ef4444;
+                border-color: rgba(239, 68, 68, 0.3);
+            }
+
+            .status-starting .status-dot {
+                background: #3b82f6;
+                animation: pulse 2s infinite;
+            }
+
+            .status-starting {
+                background: rgba(59, 130, 246, 0.15);
+                color: #3b82f6;
+                border-color: rgba(59, 130, 246, 0.3);
+            }
+
+            @keyframes pulse {
+
+                0%,
+                100% {
+                    opacity: 1;
+                }
+
+                50% {
+                    opacity: 0.5;
+                }
+            }
+
+            /* Terminal container */
+            .terminal-wrapper {
+                flex: 1;
+                padding: 1.5rem;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+
+            .terminal-container {
+                background: var(--bg-darker);
+                border-radius: 12px;
+                border: 1px solid var(--border-color);
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+                overflow: hidden;
+                box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+            }
+
+            .terminal-header {
+                background: var(--bg-sidebar);
+                padding: 0.75rem 1.25rem;
+                border-bottom: 1px solid var(--border-color);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                flex-shrink: 0;
+            }
+
+            .terminal-title {
+                font-size: 0.85rem;
+                font-weight: 600;
+                color: var(--text-secondary);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .terminal-controls {
+                display: flex;
+                gap: 0.5rem;
+            }
+
+            #terminal {
+                flex: 1;
+                padding: 0.5rem;
+                min-height: 0;
+                background: #0d0d10;
+            }
+
+            .terminal-footer {
+                background: var(--bg-sidebar);
+                padding: 0.75rem 1.25rem;
+                border-top: 1px solid var(--border-color);
+                flex-shrink: 0;
+            }
+
+            .input-group-text {
+                background: var(--bg-darker);
+                border-color: var(--border-color);
+                color: var(--text-secondary);
+            }
+
+            .form-control {
+                background: var(--bg-darker);
+                border-color: var(--border-color);
+                color: var(--text-primary);
+            }
+
+            .form-control:focus {
+                background: #1a1a20;
+                border-color: var(--accent-blue);
+                color: var(--text-primary);
+                box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.15);
+            }
+
+            /* Connection Toast */
+            .connection-toast {
+                position: fixed;
+                bottom: 2rem;
+                right: 2rem;
+                z-index: 9999;
+                background: #1a1a20;
+                border: 1px solid rgba(239, 68, 68, 0.3);
+                border-left: 4px solid #ef4444;
+                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+                border-radius: 8px;
+                padding: 1rem 1.25rem;
+                min-width: 320px;
+                max-width: 400px;
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+
+            .connection-toast.d-none {
+                display: none !important;
+            }
+
+            @keyframes slideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .toast-icon {
+                font-size: 1.5rem;
+                color: #ef4444;
+                line-height: 1;
+            }
+
+            .toast-content h5 {
+                margin: 0 0 4px 0;
+                font-size: 0.95rem;
+                font-weight: 600;
+                color: #e1e1e6;
+            }
+
+            .toast-content p {
+                margin: 0;
+                font-size: 0.85rem;
+                color: #a1a1aa;
+                line-height: 1.4;
+            }
+
+            /* Responsive */
+            @media (max-width: 768px) {
+                .sidebar {
+                    margin-left: -260px;
+                    position: fixed;
+                    top: 0;
+                    bottom: 0;
+                    z-index: 1050;
+                    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+                }
+
+                .sidebar.show {
+                    margin-left: 0;
+                }
+
+                .content {
+                    width: 100%;
+                }
+
+                .terminal-wrapper {
+                    padding: 1rem;
+                }
+
+                .connection-toast {
+                    left: 1rem;
+                    right: 1rem;
+                    min-width: auto;
+                }
+            }
+
+            /* Small adjustments */
+            .btn-sm {
+                padding: 0.25rem 0.75rem;
+                font-size: 0.85rem;
+            }
+
+            #wsStatusBadge {
+                margin-left: auto;
+                margin-right: 0.5rem;
+            }
+        </style>
+</head>
+
+<body data-turbo="false"> <%- include ('../partials/error-modal') %>
+        <div class="wrapper">
+            <!-- Sidebar -->
+            <nav id="sidebar" class="sidebar">
+                <div class="sidebar-content">
+                    <%- include('../partials/server-sidebar', { server, active: 'console' , settings }) %>
+                </div>
+            </nav>
+
+            <!-- Main Content -->
+            <div class="content">
+                <!-- Top Navbar -->
+                <div class="top-navbar">
+                    <button id="sidebarToggle" class="navbar-toggle">
+                        <i class="bi bi-list"></i>
+                    </button>
+                    <div class="server-info">
+                        <h1 class="server-name">
+                            <%= server.name %>
+                        </h1>
+
+                        <span id="statusBadge" class="status-badge status-<%= server.status %>">
+                            <span class="status-dot"></span>
+                            <span id="statusText">
+                                <%= server.status.toUpperCase() %>
+                            </span>
+                        </span>
+                    </div>
+                    <!-- Optional: quick stats can go here -->
+                </div>
+
+                <!-- Terminal Wrapper -->
+                <div class="terminal-wrapper">
+                    <!-- Connection Toast (moved inside but absolute positioned) -->
+                    <div id="connectionAlert" class="connection-toast d-none">
+                        <div class="toast-icon">
+                            <i class="bi bi-wifi-off"></i>
+                        </div>
+                        <div class="toast-content">
+                            <h5>Connection Lost</h5>
+                            <p>The server node is currently unreachable. Controls are disabled until connection is
+                                restored.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Terminal Container -->
+                    <div class="terminal-container">
+                        <div class="terminal-header">
+                            <div class="d-flex align-items-center">
+                                <span class="terminal-title">
+                                    <i class="bi bi-terminal"></i> [<%= server.name %>] Console
+                                </span>
+                            </div>
+                            <div class="terminal-controls">
+                                <span id="wsStatusBadge" class="badge bg-secondary" title="Panel status">
+                                    <i class="bi bi-arrow-repeat"></i> Connecting...
+                                </span>
+                                <div id="powerActions" class="d-flex gap-2">
+                                    <button id="btnPopout" class="btn btn-outline-secondary btn-sm"
+                                        data-server-id="<%= server.containerId %>">
+                                        <i class="bi bi-box-arrow-up-right"></i> Popout
+                                    </button>
+                                    <button id="btnStart" class="btn btn-success btn-sm">
+                                        <i class="bi bi-play-fill"></i> Start
+                                    </button>
+                                    <button id="btnRestart" class="btn btn-warning btn-sm">
+                                        <i class="bi bi-arrow-clockwise"></i> Restart
+                                    </button>
+                                    <button id="btnStop"
+                                        class="btn btn-danger btn-sm <%= server.status === 'stopping' ? 'd-none' : '' %>">
+                                        <i class="bi bi-stop-fill"></i> Stop
+                                    </button>
+                                    <button id="btnKill"
+                                        class="btn btn-danger btn-sm <%= server.status === 'stopping' ? '' : 'd-none' %>">
+                                        <i class="bi bi-lightning-fill"></i> Kill
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="terminal"></div>
+                        <div class="terminal-footer">
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="text" id="consoleInput" class="form-control"
+                                    placeholder="Type a command...">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- EULA Modal -->
+        <div class="modal fade" id="eulaModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content bg-dark text-white border-secondary">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title fw-bold">Minecraft EULA Agreement</h5>
+                    </div>
+                    <div class="modal-body">
+                        <p>To run a Minecraft server, you must agree to Minecraft's End User License Agreement.</p>
+                        <p class="small text-muted">By clicking "Agree", you explicitly accept the EULA found at <a
+                                href="https://www.minecraft.net/eula" target="_blank"
+                                class="text-info">minecraft.net/eula</a>.</p>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" id="btnAcceptEula" class="btn btn-primary w-100">I Agree</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm@5.2.1/lib/xterm.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.7.0/lib/xterm-addon-fit.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm-addon-webgl@0.16.0/lib/xterm-addon-webgl.js"></script>
+
+        <script>
+            // Sidebar toggle functionality (for mobile and desktop)
+            const sidebar = document.getElementById('sidebar');
+            const sidebarToggle = document.getElementById('sidebarToggle');
+
+            sidebarToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('show');
+                setTimeout(() => {
+                    if (typeof fitAddon !== 'undefined') fitAddon.fit();
+                }, 300);
+            });
+
+            // Close sidebar on outside click for mobile
+            document.addEventListener('click', (e) => {
+                if (window.innerWidth <= 768) {
+                    if (!sidebar.contains(e.target) && !sidebarToggle.contains(e.target)) {
+                        sidebar.classList.remove('show');
+                    }
+                }
+            });
+
+            // ================== Existing console functionality (preserved) ==================
+            const serverId = '<%= server.id %>';
+            const serverMemory = <%= server.memory || 0 %>;
+            const serverDisk = <%= server.disk || 0 %>;
+            let currentServerStatus = '<%= String(server.status || "stopped").toLowerCase() %>';
+            const promptBrand = <%- JSON.stringify(String((settings && settings.brandName) ? settings.brandName : 'cpanel').toLowerCase()) %>;
+
+            let connectorOnline = true;
+
+            const term = new Terminal({
+                theme: {
+                    background: '#0d0d10',
+                    foreground: '#e1e1e6',
+                    cursor: '#e1e1e6',
+                    black: '#16161a',
+                    red: '#ef4444',
+                    green: '#10b981',
+                    yellow: '#f59e0b',
+                    blue: '#3b82f6',
+                    magenta: '#8b5cf6',
+                    cyan: '#06b6d4',
+                    white: '#e1e1e6'
+                },
+                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                fontSize: 13,
+                cursorBlink: true,
+                scrollback: 1000,
+                convertEol: true
+            });
+
+            const fitAddon = new FitAddon.FitAddon();
+            term.loadAddon(fitAddon);
+            term.open(document.getElementById('terminal'));
+
+            try {
+                const webglAddon = new WebglAddon.WebglAddon();
+                webglAddon.onContextLoss(() => { webglAddon.dispose(); });
+                term.loadAddon(webglAddon);
+                console.log('xterm WebGL addon loaded successfully.');
+            } catch (e) {
+                console.warn('xterm WebGL addon could not load. Falling back to default renderer.', e);
+            }
+
+            fitAddon.fit();
+
+            // WebSocket Manager Class for Robust Connection
+            class ConsoleClient {
+                constructor(url) {
+                    this.url = url;
+                    this.ws = null;
+                    this.reconnectInterval = 1000;
+                    this.maxReconnectInterval = 5000;
+                    this.isExplicitDisconnect = false;
+                    this.heartbeatTimer = null;
+                }
+
+                connect() {
+                    this.isExplicitDisconnect = false;
+                    this.ws = new WebSocket(this.url);
+                    this.updateStatus('connecting');
+
+                    this.ws.onopen = () => {
+                        this.updateStatus('connected');
+                        this.reconnectInterval = 1000; // Reset backoff
+                        term.writeln('\x1b[1;32m[✓] Console stream connected.\x1b[0m');
+                        this.startHeartbeat();
+                    };
+
+                    this.ws.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            this.handleMessage(data);
+                        } catch (e) {
+                            console.error('Failed to parse WS message:', e);
+                        }
+                    };
+
+                    this.ws.onclose = (e) => {
+                        this.stopHeartbeat();
+                        this.updateStatus('disconnected');
+                        if (!this.isExplicitDisconnect) {
+                            term.writeln('\x1b[1;33m[!] Connection lost. Reconnecting in ' + (this.reconnectInterval / 1000) + 's...\x1b[0m');
+                            setTimeout(() => {
+                                this.reconnectInterval = Math.min(this.reconnectInterval * 1.5, this.maxReconnectInterval);
+                                this.connect();
+                            }, this.reconnectInterval);
+                        }
+                    };
+
+                    this.ws.onerror = (err) => {
+                        console.error('WebSocket error:', err);
+                        this.ws.close();
+                    };
+                }
+
+                send(type, payload = {}) {
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        this.ws.send(JSON.stringify({ type, ...payload }));
+                    }
+                }
+
+                handleMessage(data) {
+                    switch (data.type) {
+                        case 'console_output':
+                            const cleanOutput = this.scrubAnsi(data.output);
+                            term.write(this.rewritePromptBrand(cleanOutput));
+                            break;
+                        case 'server_status_update':
+                            updateUIStatus(data.status);
+                            break;
+                        case 'connector_status':
+                            updateConnectorStatus(data.online);
+                            break;
+                        case 'server_action_ack': {
+                            const phase = String(data.phase || '').toLowerCase();
+                            const actionType = String(data.actionType || 'action');
+                            const text = String(data.message || '').trim() || `${actionType} ${phase}`;
+                            if (phase === 'failed') {
+                                term.writeln(`\x1b[1;31m[ACK] ${actionType}: ${text}\x1b[0m`);
+                            } else if (phase === 'executed') {
+                                term.writeln(`\x1b[1;32m[ACK] ${actionType}: ${text}\x1b[0m`);
+                            } else {
+                                term.writeln(`\x1b[1;34m[ACK] ${actionType}: ${text}\x1b[0m`);
+                            }
+                            break;
+                        }
+                        case 'resource_limits_result':
+                            if (data.success) {
+                                term.writeln('\x1b[1;32m[✓] Live resource limits were applied.\x1b[0m');
+                            } else {
+                                term.writeln(`\x1b[1;31m[!] Live resource apply failed: ${data.error || 'unknown error'}\x1b[0m`);
+                            }
+                            break;
+                        case 'eula_status':
+                            if (!data.accepted) {
+                                const modal = new bootstrap.Modal(document.getElementById('eulaModal'));
+                                modal.show();
+                            }
+                            break;
+                        case 'error':
+                            term.writeln(`\x1b[1;31m[!] Error: ${data.message}\x1b[0m`);
+                            break;
+                    }
+                }
+
+                scrubAnsi(text) {
+                    if (!text) return '';
+                    return text.replace(/\\x1b/g, '\x1b');
+                }
+
+                rewritePromptBrand(text) {
+                    if (!text || !promptBrand) return text || '';
+                    return text.replace(/@pterodactyl/gi, `@${promptBrand}`);
+                }
+
+                updateStatus(state) {
+                    const badge = document.getElementById('wsStatusBadge');
+                    if (!badge) return;
+
+                    if (state === 'connected') {
+                        badge.className = 'badge bg-success ms-2';
+                        badge.innerHTML = '<i class="bi bi-hdd-network"></i> Connected';
+                    } else if (state === 'connecting') {
+                        badge.className = 'badge bg-warning text-dark ms-2';
+                        badge.innerHTML = '<i class="bi bi-arrow-repeat"></i> Reconnecting...';
+                    } else {
+                        badge.className = 'badge bg-danger ms-2';
+                        badge.innerHTML = '<i class="bi bi-hdd-network"></i> Disconnected';
+                    }
+                }
+
+                startHeartbeat() {
+                    this.stopHeartbeat();
+                    this.heartbeatTimer = setInterval(() => {
+                        this.send('ping');
+                    }, 30000);
+                }
+
+                stopHeartbeat() {
+                    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+                }
+            }
+
+
+            // Persistent Status Polling
+            let statusPollingTimer = null;
+            const statusUrl = `/server/<%= server.containerId %>/status`;
+
+            function startStatusCheck() {
+                if (statusPollingTimer) return;
+                console.log('Starting persistent status polling (5.5s)...');
+                statusPollingTimer = setInterval(checkStatus, 5500);
+            }
+
+            async function checkStatus() {
+                try {
+                    const response = await fetch(statusUrl);
+                    const data = await response.json();
+
+                    if (data.online) {
+                        if (!connectorOnline) {
+                            console.log('Connector is back online (polling detected)');
+                            updateConnectorStatus(true);
+                        }
+                    } else {
+                        if (connectorOnline) {
+                            console.log('Connector went offline (polling detected)');
+                            updateConnectorStatus(false);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Status check error:', err);
+                    if (connectorOnline) {
+                        updateConnectorStatus(false);
+                    }
+                }
+            }
+
+            // Initialize Client
+            const wsToken = '<%= wsToken || "" %>';
+            const finalWsUrl = window.location.protocol.replace('http', 'ws') + '//' + window.location.host + '/ws/server/<%= server.containerId %>?token=' + encodeURIComponent(wsToken);
+
+            const client = new ConsoleClient(finalWsUrl);
+            client.connect();
+            startStatusCheck();
+
+            // UI Event Listeners
+            const consoleInput = document.getElementById('consoleInput');
+            consoleInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && connectorOnline) {
+                    const command = consoleInput.value;
+                    if (command) {
+                        client.send('console_input', { command });
+                        consoleInput.value = '';
+                    }
+                }
+            });
+
+            const btnPopout = document.getElementById('btnPopout');
+            if (btnPopout) {
+                btnPopout.addEventListener('click', function () {
+                    const srvId = this.getAttribute('data-server-id');
+                    window.open(`/server/${srvId}?popout=true`, `console_popout_${srvId}`, 'width=900,height=600');
+                });
+            }
+
+            document.getElementById('btnStart').addEventListener('click', () => sendPower('start'));
+            document.getElementById('btnRestart').addEventListener('click', () => sendPower('restart'));
+            document.getElementById('btnStop').addEventListener('click', function () {
+                sendPower('stop');
+                this.classList.add('d-none');
+                document.getElementById('btnKill').classList.remove('d-none');
+            });
+            document.getElementById('btnKill').addEventListener('click', () => sendPower('kill'));
+
+            document.getElementById('btnAcceptEula').addEventListener('click', () => {
+                client.send('accept_eula');
+                const modal = bootstrap.Modal.getInstance(document.getElementById('eulaModal'));
+                modal.hide();
+                term.writeln('\x1b[1;32m[*] EULA accepted! Please start your server now.\x1b[0m');
+            });
+
+            function sendPower(action) {
+                if (!connectorOnline) {
+                    term.writeln('\x1b[1;31m[!] Cannot execute command: connector is offline.\x1b[0m');
+                    return;
+                }
+                client.send('power_action', { action });
+                term.writeln(`\x1b[1;33m[*] Sending ${action} command...\x1b[0m`);
+            }
+
+            function updateUIStatus(status) {
+                const nextStatus = String(status || '').toLowerCase();
+                const previousStatus = currentServerStatus;
+                currentServerStatus = nextStatus;
+
+                const badge = document.getElementById('statusBadge');
+                const text = document.getElementById('statusText');
+                badge.className = `status-badge status-${nextStatus}`;
+                text.textContent = nextStatus.toUpperCase();
+
+                // Clear terminal if server stops and was previously running/starting
+                if (nextStatus === 'stopped' && previousStatus !== 'stopped') {
+                    term.clear();
+                }
+
+                if (connectorOnline) {
+                    const btnStart = document.getElementById('btnStart');
+                    const btnRestart = document.getElementById('btnRestart');
+                    const btnStop = document.getElementById('btnStop');
+                    const btnKill = document.getElementById('btnKill');
+
+                    if (nextStatus === 'running') {
+                        btnStart.disabled = true;
+                        btnRestart.disabled = false;
+                        btnStop.disabled = false;
+                        btnStop.classList.remove('d-none');
+                        btnKill.disabled = false;
+                        btnKill.classList.add('d-none');
+                    } else if (nextStatus === 'stopping') {
+                        btnStart.disabled = true;
+                        btnRestart.disabled = true;
+                        btnStop.disabled = true;
+                        btnStop.classList.add('d-none');
+                        btnKill.disabled = false;
+                        btnKill.classList.remove('d-none');
+                    } else {
+                        btnStart.disabled = false;
+                        btnRestart.disabled = true;
+                        btnStop.disabled = true;
+                        btnStop.classList.remove('d-none');
+                        btnKill.disabled = true;
+                        btnKill.classList.add('d-none');
+                    }
+                }
+
+                if (previousStatus === nextStatus) return;
+
+                if (nextStatus === 'running') {
+                    term.writeln('\x1b[1;32m[✓] Server is now running.\x1b[0m');
+                } else if (nextStatus === 'stopped') {
+                    term.writeln('\x1b[1;31m[✗] Server has stopped.\x1b[0m');
+                }
+            }
+
+            function updateConnectorStatus(online) {
+                connectorOnline = online;
+                const alert = document.getElementById('connectionAlert');
+                const buttons = [
+                    document.getElementById('btnStart'),
+                    document.getElementById('btnRestart'),
+                    document.getElementById('btnStop'),
+                    document.getElementById('btnKill')
+                ];
+                const input = document.getElementById('consoleInput');
+
+                if (online) {
+                    alert.classList.add('d-none');
+                    buttons.forEach(btn => btn.disabled = false);
+                    input.disabled = false;
+                } else {
+                    alert.classList.remove('d-none');
+                    buttons.forEach(btn => btn.disabled = true);
+                    input.disabled = true;
+                }
+            }
+
+            const handleResize = () => fitAddon.fit();
+            window.addEventListener('resize', handleResize);
+
+            let consoleRuntimeCleaned = false;
+            function cleanupConsoleRuntime() {
+                if (consoleRuntimeCleaned) return;
+                consoleRuntimeCleaned = true;
+
+                if (statusPollingTimer) {
+                    clearInterval(statusPollingTimer);
+                    statusPollingTimer = null;
+                }
+
+                try {
+                    client.isExplicitDisconnect = true;
+                    client.stopHeartbeat();
+                    if (client.ws && (client.ws.readyState === WebSocket.OPEN || client.ws.readyState === WebSocket.CONNECTING)) {
+                        client.ws.close(1000, 'Leaving console page');
+                    }
+                } catch (error) {
+                    console.warn('Console cleanup warning:', error);
+                }
+
+                window.removeEventListener('resize', handleResize);
+            }
+
+            window.addEventListener('beforeunload', cleanupConsoleRuntime);
+            document.addEventListener('turbo:before-cache', cleanupConsoleRuntime);
+        </script>
+</body>
+
+</html>

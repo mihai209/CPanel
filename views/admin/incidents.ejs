@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= (settings.brandName || 'CPanel').toUpperCase() %> - Incident Center</title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .incident-card {
+            background: #141419;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 0.75rem;
+        }
+        .incident-row {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 0.65rem;
+            padding: 0.9rem;
+        }
+        .muted-small {
+            color: #9ca3af;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <%- include('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3">
+                    <h4 class="mb-0 text-light fw-normal">Incident Center</h4>
+                    <small class="text-muted">Unified runtime and extension incidents.</small>
+                </div>
+                <div class="breadcrumb-admin">
+                    <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span class="text-light">Incident Center</span>
+                </div>
+            </div>
+
+            <div class="container-fluid py-4 px-lg-4">
+                <% if (success) { %>
+                    <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success"><%= success %></div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger"><%= error %></div>
+                <% } %>
+
+                <div class="row g-4">
+                    <div class="col-xl-8">
+                        <div class="incident-card p-3">
+                            <h5 class="fs-6 fw-bold text-light mb-3"><i class="bi bi-exclamation-triangle me-2"></i>Runtime Incidents</h5>
+                            <div class="d-grid gap-2">
+                                <% if (!incidentCenter || incidentCenter.length === 0) { %>
+                                    <div class="incident-row muted-small">No runtime incidents recorded.</div>
+                                <% } %>
+                                <% (incidentCenter || []).forEach((item) => { %>
+                                    <div class="incident-row">
+                                        <div class="d-flex justify-content-between align-items-start gap-2">
+                                            <div>
+                                                <div class="fw-semibold text-light"><%= item.title %></div>
+                                                <% if (item.message) { %>
+                                                    <div class="muted-small mt-1"><%= item.message %></div>
+                                                <% } %>
+                                                <div class="muted-small mt-2">
+                                                    Source: <%= item.source || 'runtime' %>
+                                                    <% if (item.serverId) { %> | Server #<%= item.serverId %><% } %>
+                                                    | <%= new Date(Number(item.createdAtMs || Date.now())).toLocaleString() %>
+                                                </div>
+                                            </div>
+                                            <div class="d-flex flex-column align-items-end gap-2">
+                                                <span class="badge <%= item.severity === 'critical' ? 'bg-danger' : item.severity === 'warning' ? 'bg-warning text-dark' : 'bg-success' %>"><%= item.severity %></span>
+                                                <span class="badge <%= item.status === 'resolved' ? 'bg-success' : 'bg-secondary' %>"><%= item.status %></span>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex justify-content-end gap-2 mt-2">
+                                            <% if (item.status === 'resolved') { %>
+                                                <form method="POST" action="/admin/incidents/<%= item.id %>/reopen">
+                                                    <button type="submit" class="btn btn-outline-light btn-sm">Reopen</button>
+                                                </form>
+                                            <% } else { %>
+                                                <form method="POST" action="/admin/incidents/<%= item.id %>/resolve">
+                                                    <button type="submit" class="btn btn-outline-success btn-sm">Resolve</button>
+                                                </form>
+                                            <% } %>
+                                        </div>
+                                    </div>
+                                <% }) %>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-4">
+                        <div class="incident-card p-3 h-100">
+                            <h5 class="fs-6 fw-bold text-light mb-3"><i class="bi bi-box me-2"></i>Extension Incidents (Read-only)</h5>
+                            <div class="d-grid gap-2">
+                                <% if (!extensionIncidents || extensionIncidents.length === 0) { %>
+                                    <div class="incident-row muted-small">No extension incidents recorded.</div>
+                                <% } %>
+                                <% (extensionIncidents || []).slice(0, 30).forEach((item) => { %>
+                                    <div class="incident-row">
+                                        <div class="d-flex justify-content-between align-items-center gap-2">
+                                            <div class="fw-semibold text-light"><%= item.title %></div>
+                                            <span class="badge <%= item.status === 'resolved' ? 'bg-success' : 'bg-secondary' %>"><%= item.status %></span>
+                                        </div>
+                                        <% if (item.message) { %>
+                                            <div class="muted-small mt-1"><%= item.message %></div>
+                                        <% } %>
+                                        <div class="muted-small mt-2"><%= new Date(Number(item.createdAtMs || Date.now())).toLocaleString() %></div>
+                                    </div>
+                                <% }) %>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <%- include('../partials/footer') %>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/error-modal.js"></script>
+</body>
+</html>

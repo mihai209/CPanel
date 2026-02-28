@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= (settings.brandName || 'CPanel').toUpperCase() %>
+        <%= locals.title ? ' - ' + title.toUpperCase() : '' %> - Revenue Plans
+    </title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include ('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3">
+                    <h4 class="mb-0 text-light fw-normal">Revenue Plans</h4>
+                    <small class="text-muted">Subscription plans used by Revenue Mode.</small>
+                </div>
+                <div class="breadcrumb-admin">
+                    <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span>
+                    <a href="/admin/let-user-create">Let User Create</a> <span class="mx-2">&gt;</span>
+                    <span class="text-light">Revenue Plans</span>
+                </div>
+            </div>
+
+            <% const list = Array.isArray(plans) ? plans : []; %>
+
+            <div class="container-fluid py-4 px-lg-4">
+                <% if (success) { %>
+                    <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
+                        <i class="bi bi-check-circle-fill me-2"></i><%= success %>
+                    </div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i><%= error %>
+                    </div>
+                <% } %>
+
+                <div class="card border-0 shadow-sm mb-4" style="background-color:#141419;">
+                    <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i class="bi bi-plus-circle me-2"></i>Create Revenue Plan</h5>
+                        <a href="/admin/let-user-create" class="btn btn-outline-light btn-sm">Back to Let User Create</a>
+                    </div>
+                    <div class="card-body p-4">
+                        <form method="POST" action="/admin/revenue-plans" class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Plan Name</label>
+                                <input type="text" name="name" maxlength="120" required class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Price (Coins)</label>
+                                <input type="number" min="0" step="1" name="priceCoins" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Period (days)</label>
+                                <input type="number" min="1" step="1" name="periodDays" value="30" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Max Servers</label>
+                                <input type="number" min="0" step="1" name="maxServers" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="planEnabledCreate" name="enabled" value="1" checked>
+                                    <label class="form-check-label text-light" for="planEnabledCreate">Enabled</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Max RAM (GB)</label>
+                                <input type="number" min="0" step="0.1" name="maxMemoryGb" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Max CPU (cores)</label>
+                                <input type="number" min="0" step="0.1" name="maxCpuCores" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Max Disk (GB)</label>
+                                <input type="number" min="0" step="0.1" name="maxDiskGb" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Description</label>
+                                <textarea name="description" rows="2" maxlength="500" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;"></textarea>
+                            </div>
+                            <div class="col-12 text-end">
+                                <button type="submit" class="btn btn-primary px-4 fw-medium">Create Plan</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm" style="background-color:#141419;">
+                    <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                        <h5 class="card-title mb-0 fs-6 fw-bold text-light"><i class="bi bi-list-check me-2"></i>Existing Plans</h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <% if (!list.length) { %>
+                            <div class="text-muted">No revenue plans defined yet.</div>
+                        <% } else { %>
+                            <div class="row g-3">
+                                <% list.forEach((plan) => { %>
+                                    <div class="col-12">
+                                        <div class="p-3 rounded border border-secondary border-opacity-25">
+                                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+                                                <div>
+                                                    <div class="text-light fw-semibold"><%= plan.name %></div>
+                                                    <div class="small text-muted">
+                                                        <span class="badge <%= plan.enabled ? 'bg-success' : 'bg-secondary' %>"><%= plan.enabled ? 'enabled' : 'disabled' %></span>
+                                                        <span class="ms-2">Price: <strong><%= Number(plan.priceCoins || 0) %> coins</strong></span>
+                                                        <span class="ms-2">Period: <strong><%= Number(plan.periodDays || 0) %>d</strong></span>
+                                                        <span class="ms-2">Max servers: <strong><%= Number(plan.maxServers || 0) || 'unlimited' %></strong></span>
+                                                    </div>
+                                                    <div class="small text-muted">
+                                                        RAM: <strong><%= Number(plan.maxMemoryMb || 0) > 0 ? ((Number(plan.maxMemoryMb || 0) / 1024).toFixed(2).replace(/\.00$/, '') + ' GB') : 'unlimited' %></strong>
+                                                        <span class="ms-2">CPU: <strong><%= Number(plan.maxCpuPercent || 0) > 0 ? ((Number(plan.maxCpuPercent || 0) / 100).toFixed(2).replace(/\.00$/, '') + ' cores') : 'unlimited' %></strong></span>
+                                                        <span class="ms-2">Disk: <strong><%= Number(plan.maxDiskMb || 0) > 0 ? ((Number(plan.maxDiskMb || 0) / 1024).toFixed(2).replace(/\.00$/, '') + ' GB') : 'unlimited' %></strong></span>
+                                                    </div>
+                                                    <% if (plan.description) { %>
+                                                        <div class="small text-muted mt-1"><%= plan.description %></div>
+                                                    <% } %>
+                                                </div>
+                                                <form method="POST" action="/admin/revenue-plans/<%= plan.id %>/delete">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                                                </form>
+                                            </div>
+
+                                            <form method="POST" action="/admin/revenue-plans/<%= plan.id %>/update" class="row g-2 mt-2">
+                                                <div class="col-md-3">
+                                                    <input type="text" name="name" maxlength="120" required value="<%= plan.name %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <input type="number" min="0" step="1" name="priceCoins" value="<%= Number(plan.priceCoins || 0) %>" class="form-control form-control-sm" placeholder="Coins" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <input type="number" min="1" step="1" name="periodDays" value="<%= Number(plan.periodDays || 30) %>" class="form-control form-control-sm" placeholder="Days" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <input type="number" min="0" step="1" name="maxServers" value="<%= Number(plan.maxServers || 0) %>" class="form-control form-control-sm" placeholder="Max servers" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-3 d-flex align-items-center">
+                                                    <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" id="planEnabled-<%= plan.id %>" name="enabled" value="1" <%= plan.enabled ? 'checked' : '' %>>
+                                                        <label class="form-check-label text-light small" for="planEnabled-<%= plan.id %>">Enabled</label>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <input type="number" min="0" step="0.1" name="maxMemoryGb" value="<%= Number(plan.maxMemoryMb || 0) > 0 ? (Number(plan.maxMemoryMb || 0) / 1024) : 0 %>" class="form-control form-control-sm" placeholder="Max RAM GB" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <input type="number" min="0" step="0.1" name="maxCpuCores" value="<%= Number(plan.maxCpuPercent || 0) > 0 ? (Number(plan.maxCpuPercent || 0) / 100) : 0 %>" class="form-control form-control-sm" placeholder="Max CPU cores" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <input type="number" min="0" step="0.1" name="maxDiskGb" value="<%= Number(plan.maxDiskMb || 0) > 0 ? (Number(plan.maxDiskMb || 0) / 1024) : 0 %>" class="form-control form-control-sm" placeholder="Max disk GB" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-12">
+                                                    <textarea name="description" rows="1" maxlength="500" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;"><%= plan.description || '' %></textarea>
+                                                </div>
+                                                <div class="col-12 text-end">
+                                                    <button type="submit" class="btn btn-outline-primary btn-sm">Save Plan</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                <% }) %>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+
+            <%- include('../partials/footer') %>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

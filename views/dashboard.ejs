@@ -1,0 +1,456 @@
+<%- include('partials/header') %>
+<%- include('partials/navbar') %>
+<%- include('partials/error-modal') %>
+
+<%
+const serverList = Array.isArray(servers) ? servers : [];
+const totalServers = serverList.length;
+const runningServers = serverList.filter((server) => String(server.status || '').toLowerCase() === 'running').length;
+const installingServers = serverList.filter((server) => String(server.status || '').toLowerCase() === 'installing').length;
+const offlineServers = serverList.filter((server) => !['running', 'installing'].includes(String(server.status || '').toLowerCase())).length;
+const suspendedServers = serverList.filter((server) => !!server.isSuspended).length;
+const userCreateEnabled = String((settings && settings.featureUserCreateEnabled) || 'false') === 'true';
+const announcerEnabled = String((settings && settings.extensionAnnouncerEnabled) || 'false') === 'true';
+const announcerMessage = String((settings && settings.extensionAnnouncerMessage) || '').trim();
+const announcerSeverity = String((settings && settings.extensionAnnouncerSeverity) || 'normal').toLowerCase();
+const incidentFeedSource = typeof openIncidents !== 'undefined' ? openIncidents : [];
+const maintenanceFeedSource = typeof pendingMaintenance !== 'undefined' ? pendingMaintenance : [];
+const securityFeedSource = typeof openSecurityAlerts !== 'undefined' ? openSecurityAlerts : [];
+const incidentFeed = Array.isArray(incidentFeedSource) ? incidentFeedSource : [];
+const maintenanceFeed = Array.isArray(maintenanceFeedSource) ? maintenanceFeedSource : [];
+const securityFeed = Array.isArray(securityFeedSource) ? securityFeedSource : [];
+const dashboardNow = Number.isFinite(Number(typeof dashboardNowMs !== 'undefined' ? dashboardNowMs : Date.now()))
+    ? Number(typeof dashboardNowMs !== 'undefined' ? dashboardNowMs : Date.now())
+    : Date.now();
+const announcerSeverityMap = {
+    normal: {
+        badge: 'NORMAL',
+        classes: '',
+        style: 'background-color: rgba(25, 135, 84, 0.15); border-color: rgba(25, 135, 84, 0.45); color: #d1fae5;'
+    },
+    warning: {
+        badge: 'WARNING',
+        classes: '',
+        style: 'background-color: rgba(255, 193, 7, 0.16); border-color: rgba(255, 193, 7, 0.52); color: #fde68a;'
+    },
+    critical: {
+        badge: 'CRITICAL',
+        classes: '',
+        style: 'background-color: rgba(220, 53, 69, 0.16); border-color: rgba(220, 53, 69, 0.52); color: #fecaca;'
+    }
+};
+const activeAnnouncerSeverity = Object.prototype.hasOwnProperty.call(announcerSeverityMap, announcerSeverity) ? announcerSeverity : 'normal';
+const activeAnnouncerConfig = announcerSeverityMap[activeAnnouncerSeverity];
+const normalizeTimestamp = (value) => {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+    if (parsed < 10000000000) return parsed * 1000;
+    return parsed;
+};
+const formatDateTime = (value) => {
+    const parsed = normalizeTimestamp(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) return 'N/A';
+    return new Date(parsed).toLocaleString();
+};
+const severityBadgeClass = (severity) => {
+    const normalized = String(severity || '').toLowerCase();
+    if (normalized === 'critical') return 'bg-danger';
+    if (normalized === 'warning') return 'bg-warning text-dark';
+    return 'bg-success';
+};
+const maintenanceState = (entry) => {
+    const startsAt = normalizeTimestamp(entry && entry.startsAtMs);
+    const endsAt = normalizeTimestamp(entry && entry.endsAtMs);
+    if (dashboardNow < startsAt) return 'upcoming';
+    if (dashboardNow > endsAt) return 'awaiting completion';
+    return 'active';
+};
+const formatLimit = (value) => {
+    if (!value || Number(value) <= 0) return 'N/A';
+    const mb = Number(value);
+    if (mb >= 1024) return `${(mb / 1024).toFixed(mb % 1024 === 0 ? 0 : 1)} GB`;
+    return `${mb} MB`;
+};
+%>
+
+<style>
+    .dashboard-shell {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .dashboard-hero {
+        border: 1px solid #2e3036;
+        background: linear-gradient(180deg, rgba(31, 32, 35, 0.95), rgba(31, 32, 35, 0.65));
+        border-radius: 14px;
+        padding: 1.25rem;
+    }
+
+    .metric-card {
+        background-color: #1f2023;
+        border: 1px solid #2e3036;
+        border-radius: 12px;
+        padding: 1rem;
+        height: 100%;
+    }
+
+    .metric-label {
+        color: #9ca3af;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 0.72rem;
+        font-weight: 700;
+    }
+
+    .metric-value {
+        font-size: 1.85rem;
+        line-height: 1;
+        font-weight: 700;
+        margin-top: 0.45rem;
+    }
+
+    .servers-grid {
+        margin-top: 1.25rem;
+    }
+
+    .server-card {
+        background-color: #1f2023;
+        border: 1px solid #2e3036;
+        border-radius: 12px;
+        padding: 1rem;
+        transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .server-card:hover {
+        border-color: #3f3f46;
+        transform: translateY(-2px);
+    }
+
+    .server-name {
+        font-size: 1.05rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+    }
+
+    .server-subtext {
+        color: #9ca3af;
+        font-size: 0.78rem;
+        margin-top: 0.25rem;
+    }
+
+    .resource-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.65rem;
+        margin-top: 1rem;
+    }
+
+    .resource-pill {
+        border: 1px solid #2e3036;
+        border-radius: 10px;
+        padding: 0.6rem 0.65rem;
+        background-color: rgba(255, 255, 255, 0.02);
+    }
+
+    .resource-pill-label {
+        display: block;
+        color: #9ca3af;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 0.1rem;
+    }
+
+    .resource-pill-value {
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .empty-state-card {
+        border: 1px dashed #3f3f46;
+        border-radius: 14px;
+        background-color: #1f2023;
+        text-align: center;
+        padding: 3rem 1rem;
+    }
+
+    .announcement-card {
+        border-radius: 12px;
+        border-width: 1px;
+        border-style: solid;
+        padding: 0.85rem 0.95rem;
+        margin-bottom: 1rem;
+    }
+
+    .announcement-meta {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        opacity: 0.8;
+    }
+
+    .announcement-body {
+        font-size: 0.95rem;
+        margin-top: 0.4rem;
+        white-space: pre-wrap;
+        line-height: 1.45;
+    }
+
+    .ops-feed-card {
+        border: 1px solid #2e3036;
+        border-radius: 12px;
+        background: #1a1b1f;
+        padding: 0.9rem;
+    }
+
+    .ops-feed-item {
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        border-radius: 10px;
+        padding: 0.65rem 0.7rem;
+        background: rgba(255, 255, 255, 0.02);
+    }
+
+    .ops-feed-item-title {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #f3f4f6;
+    }
+
+    .ops-feed-item-meta {
+        margin-top: 0.25rem;
+        color: #9ca3af;
+        font-size: 0.76rem;
+    }
+
+    .ops-feed-item-message {
+        margin-top: 0.35rem;
+        color: #d1d5db;
+        font-size: 0.84rem;
+        white-space: pre-wrap;
+    }
+
+    @media (max-width: 767px) {
+        .resource-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="dashboard-shell">
+        <div class="dashboard-hero mb-4">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div>
+                    <h1 class="h3 mb-1 fw-bold" style="letter-spacing: -0.02em;">
+                    <img src="<%= settings.faviconUrl %>" alt="Favicon"
+                class="rounded-circle border border-secondary border-opacity-25 me-2" style="object-fit: cover;"
+                width="40" height="40">
+                        <%= (settings.brandName || 'CPanel' ).toUpperCase() %>
+            <%= locals.title ? ' - ' + title.toUpperCase() : '' %> Servers</h1>
+                    <p class="text-muted mb-0 small">Manage your instances from one place.</p>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                    <% if (userCreateEnabled) { %>
+                        <a href="/user/create" class="btn btn-primary btn-sm fw-semibold">
+                            <i class="bi bi-plus-square me-1"></i>Create Server
+                        </a>
+                        <a href="/store" class="btn btn-outline-light btn-sm fw-semibold">
+                            <i class="bi bi-shop me-1"></i>Store
+                        </a>
+                    <% } %>
+                    <div class="text-muted small">Signed in as <span class="text-light fw-semibold"><%= user.username %></span></div>
+                </div>
+            </div>
+        </div>
+
+        <% if (announcerEnabled && announcerMessage.length > 0) { %>
+            <div class="announcement-card <%= activeAnnouncerConfig.classes %>" style="<%= activeAnnouncerConfig.style %>">
+                <div class="announcement-meta">
+                    <i class="bi bi-megaphone me-1"></i>Announcer • <%= activeAnnouncerConfig.badge %>
+                </div>
+                <div class="announcement-body"><%= announcerMessage %></div>
+            </div>
+        <% } %>
+
+        <% if (incidentFeed.length > 0 || maintenanceFeed.length > 0 || securityFeed.length > 0) { %>
+            <div class="row g-3 mb-3">
+                <% if (incidentFeed.length > 0) { %>
+                    <div class="col-12 col-xl-4">
+                        <div class="ops-feed-card">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h2 class="h6 mb-0 text-uppercase fw-bold" style="letter-spacing: 0.04em;">Open Incidents</h2>
+                                <span class="badge bg-danger"><%= incidentFeed.length %></span>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <% incidentFeed.forEach((entry) => { %>
+                                    <div class="ops-feed-item">
+                                        <div class="d-flex justify-content-between align-items-start gap-2">
+                                            <div class="ops-feed-item-title"><%= entry.title %></div>
+                                            <span class="badge <%= severityBadgeClass(entry.severity) %>"><%= entry.severity %></span>
+                                        </div>
+                                        <div class="ops-feed-item-meta">Created: <%= formatDateTime(entry.createdAtMs) %></div>
+                                        <% if (entry.message) { %><div class="ops-feed-item-message"><%= entry.message %></div><% } %>
+                                    </div>
+                                <% }); %>
+                            </div>
+                        </div>
+                    </div>
+                <% } %>
+
+                <% if (maintenanceFeed.length > 0) { %>
+                    <div class="col-12 col-xl-4">
+                        <div class="ops-feed-card">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h2 class="h6 mb-0 text-uppercase fw-bold" style="letter-spacing: 0.04em;">Maintenance</h2>
+                                <span class="badge bg-primary"><%= maintenanceFeed.length %></span>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <% maintenanceFeed.forEach((entry) => { %>
+                                    <div class="ops-feed-item">
+                                        <div class="d-flex justify-content-between align-items-start gap-2">
+                                            <div class="ops-feed-item-title"><%= entry.title %></div>
+                                            <span class="badge bg-secondary"><%= maintenanceState(entry) %></span>
+                                        </div>
+                                        <div class="ops-feed-item-meta">Window: <%= formatDateTime(entry.startsAtMs) %> -> <%= formatDateTime(entry.endsAtMs) %></div>
+                                        <% if (entry.message) { %><div class="ops-feed-item-message"><%= entry.message %></div><% } %>
+                                    </div>
+                                <% }); %>
+                            </div>
+                        </div>
+                    </div>
+                <% } %>
+
+                <% if (securityFeed.length > 0) { %>
+                    <div class="col-12 col-xl-4">
+                        <div class="ops-feed-card">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h2 class="h6 mb-0 text-uppercase fw-bold" style="letter-spacing: 0.04em;">Security Alerts</h2>
+                                <span class="badge bg-warning text-dark"><%= securityFeed.length %></span>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <% securityFeed.forEach((entry) => { %>
+                                    <div class="ops-feed-item">
+                                        <div class="d-flex justify-content-between align-items-start gap-2">
+                                            <div class="ops-feed-item-title"><%= entry.title %></div>
+                                            <span class="badge <%= severityBadgeClass(entry.severity) %>"><%= entry.severity %></span>
+                                        </div>
+                                        <div class="ops-feed-item-meta">Category: <%= entry.category || 'general' %> • Created: <%= formatDateTime(entry.createdAtMs) %></div>
+                                        <% if (entry.message) { %><div class="ops-feed-item-message"><%= entry.message %></div><% } %>
+                                    </div>
+                                <% }); %>
+                            </div>
+                        </div>
+                    </div>
+                <% } %>
+            </div>
+        <% } %>
+
+        <div class="row g-3">
+            <div class="col-6 col-lg-3">
+                <div class="metric-card">
+                    <div class="metric-label">Total Servers</div>
+                    <div class="metric-value"><%= totalServers %></div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="metric-card">
+                    <div class="metric-label">Running</div>
+                    <div class="metric-value"><%= runningServers %></div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="metric-card">
+                    <div class="metric-label">Offline</div>
+                    <div class="metric-value"><%= offlineServers %></div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="metric-card">
+                    <div class="metric-label">Suspended</div>
+                    <div class="metric-value"><%= suspendedServers %></div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="metric-card">
+                    <div class="metric-label">Wallet (Coins)</div>
+                    <div class="metric-value"><%= Number(user.coins || 0).toLocaleString() %></div>
+                </div>
+            </div>
+        </div>
+
+        <% if (serverList.length > 0) { %>
+            <div class="d-flex align-items-center justify-content-between mt-4 mb-2">
+                <h2 class="h6 mb-0 text-uppercase fw-bold" style="letter-spacing: 0.04em;">Your Servers</h2>
+                <span class="text-muted small"><%= totalServers %> total</span>
+            </div>
+
+            <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 servers-grid">
+                <% serverList.forEach((server) => { %>
+                    <%
+                    const rawStatus = String(server.status || 'unknown').toLowerCase();
+                    let badgeClass = 'bg-secondary';
+                    let statusLabel = rawStatus;
+
+                    if (server.isSuspended) {
+                        badgeClass = 'bg-danger';
+                        statusLabel = 'suspended';
+                    } else if (rawStatus === 'running') {
+                        badgeClass = 'bg-success';
+                    } else if (rawStatus === 'stopped') {
+                        badgeClass = 'bg-danger';
+                    } else if (rawStatus === 'installing') {
+                        badgeClass = 'bg-warning text-dark';
+                    }
+                    %>
+                    <div class="col">
+                        <div class="server-card h-100">
+                            <div class="d-flex justify-content-between align-items-start gap-2">
+                                <div>
+                                    <div class="server-name"><%= server.name %></div>
+                                    <div class="server-subtext">Container ID: <%= server.containerId ? server.containerId.substring(0, 12) : 'N/A' %></div>
+                                </div>
+                                <span class="badge <%= badgeClass %> text-uppercase"><%= statusLabel %></span>
+                            </div>
+
+                            <div class="resource-grid">
+                                <div class="resource-pill">
+                                    <span class="resource-pill-label">Memory</span>
+                                    <span class="resource-pill-value"><%= formatLimit(server.memory) %></span>
+                                </div>
+                                <div class="resource-pill">
+                                    <span class="resource-pill-label">Disk</span>
+                                    <span class="resource-pill-value"><%= formatLimit(server.disk) %></span>
+                                </div>
+                                <div class="resource-pill">
+                                    <span class="resource-pill-label">CPU</span>
+                                    <span class="resource-pill-value"><%= server.cpu ? `${server.cpu}%` : 'N/A' %></span>
+                                </div>
+                            </div>
+
+                            <div class="mt-3">
+                                <a href="/server/<%= server.containerId %>" class="btn btn-primary w-100 btn-sm fw-semibold">Manage Server</a>
+                            </div>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+        <% } else { %>
+            <div class="empty-state-card mt-4">
+                <h3 class="h4 fw-bold mb-2">No servers found</h3>
+                <p class="text-muted mb-0">There are no servers assigned to this account yet.</p>
+                <% if (userCreateEnabled) { %>
+                    <div class="mt-3 d-flex justify-content-center gap-2 flex-wrap">
+                        <a href="/user/create" class="btn btn-primary btn-sm fw-semibold">Create First Server</a>
+                        <a href="/store" class="btn btn-outline-light btn-sm fw-semibold">Open Store</a>
+                    </div>
+                <% } %>
+            </div>
+        <% } %>
+    </div>
+</div>
+
+<%- include('partials/footer') %>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

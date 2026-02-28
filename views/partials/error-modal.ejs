@@ -1,0 +1,192 @@
+<!-- Global Status Modal Redesigned -->
+<div class="modal fade" id="globalStatusModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content overflow-hidden border-0 shadow-lg"
+            style="background: rgba(26, 26, 32, 0.95); backdrop-filter: blur(10px); border-radius: 20px;">
+
+            <!-- Decorative Top Bar -->
+            <div id="modal-top-bar"
+                style="height: 6px; background: <%= locals.error ? 'linear-gradient(90deg, #ef4444, #b91c1c)' : locals.warning ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 'linear-gradient(90deg, #22c55e, #15803d)' %>;">
+            </div>
+
+            <div class="modal-body p-4 pt-5 text-center position-relative">
+                <!-- Close Button -->
+                <button type="button" class="btn-close btn-close-white position-absolute end-0 top-0 m-3 opacity-50"
+                    data-bs-dismiss="modal" aria-label="Close"></button>
+
+                <!-- Mascot Placeholder / Icon -->
+                <div class="mb-4 position-relative d-inline-block">
+                    <div class="mascot-container mb-3"
+                        style="width: 120px; height: 120px; margin: 0 auto; background: <%= locals.error ? 'rgba(239, 68, 68, 0.1)' : locals.warning ? 'rgba(245, 158, 11, 0.1)' : 'rgba(34, 197, 94, 0.1)' %>; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px dashed <%= locals.error ? 'rgba(239, 68, 68, 0.3)' : locals.warning ? 'rgba(245, 158, 11, 0.3)' : 'rgba(34, 197, 94, 0.3)' %>;">
+                        <img src="/assets/<%= locals.error ? 'sad-rocky.png' : locals.warning ? 'what-rocky.png' : 'happy-rocky.png' %>"
+                            alt="Mascot" id="mascot-img"
+                            style="max-width: 225%; max-height: 225%; object-fit: contain;">
+                        <i class="bi <%= locals.error ? 'bi-exclamation-octagon text-danger' : locals.warning ? 'bi-exclamation-triangle text-warning' : 'bi-stars text-success' %> display-3"
+                            id="mascot-icon" style="display: none;"></i>
+                    </div>
+                </div>
+
+                <h4 id="statusModalTitle"
+                    class="fw-bold mb-2 <%= locals.error ? 'text-danger' : locals.warning ? 'text-warning' : 'text-success' %>">
+                    <%= locals.error ? 'Whoops! Something went wrong.' : locals.warning ? 'Warning!'
+                        : 'Great! Operation successful.' %>
+                </h4>
+
+                <p id="statusModalMessage" class="text-light opacity-75 fs-5 mb-4 px-3" style="font-weight: 500;">
+                    <%= locals.error || locals.warning || locals.success %>
+                </p>
+
+                <div id="errorAlert" class="<%= locals.error ? '' : 'd-none' %>">
+                    <div class="alert bg-danger bg-opacity-10 border-0 text-danger small py-2 mb-4 mx-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        If this error persists, please contact the administrator.
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2 px-3 pb-2">
+                    <button id="statusModalButton" type="button"
+                        class="btn fw-bold p-3 border-0 transition-all rounded-pill"
+                        style="background: <%= locals.error ? 'linear-gradient(90deg, #ef4444, #b91c1c)' : locals.warning ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 'linear-gradient(90deg, #22c55e, #15803d)' %>; color: white; box-shadow: 0 4px 15px <%= locals.error ? 'rgba(239, 68, 68, 0.3)' : locals.warning ? 'rgba(245, 158, 11, 0.3)' : 'rgba(34, 197, 94, 0.3)' %>;"
+                        data-bs-dismiss="modal">
+                        <%= locals.error ? 'I Understand' : locals.warning ? 'Got It' : 'Perfect, thanks!' %>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .transition-all {
+        transition: all 0.3s ease;
+    }
+
+    .btn:hover {
+        transform: translateY(-2px);
+        opacity: 0.9;
+    }
+
+    #globalStatusModal .modal-content {
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+    }
+</style>
+
+<script>
+    (() => {
+        let statusModal = null;
+
+        function applyStatusPresentation(modalEl, message, type = 'success') {
+            const titleEl = document.getElementById('statusModalTitle');
+            const messageEl = document.getElementById('statusModalMessage');
+            const topBarEl = document.getElementById('modal-top-bar');
+            const mascotImg = document.getElementById('mascot-img');
+            const mascotIcon = document.getElementById('mascot-icon');
+            const alertEl = document.getElementById('errorAlert');
+            const buttonEl = document.getElementById('statusModalButton');
+            const mascotContainer = modalEl.querySelector('.mascot-container');
+
+            if (!titleEl || !messageEl || !topBarEl || !mascotImg || !mascotIcon || !alertEl || !buttonEl || !mascotContainer) {
+                return;
+            }
+
+            if (type === 'error') {
+                titleEl.textContent = 'Whoops! Something went wrong.';
+                titleEl.className = 'fw-bold mb-2 text-danger';
+                messageEl.textContent = message;
+                topBarEl.style.background = 'linear-gradient(90deg, #ef4444, #b91c1c)';
+                mascotImg.src = '/assets/sad-rocky.png';
+                mascotIcon.className = 'bi bi-exclamation-octagon text-danger display-3';
+                mascotContainer.style.background = 'rgba(239, 68, 68, 0.1)';
+                mascotContainer.style.border = '2px dashed rgba(239, 68, 68, 0.3)';
+                alertEl.classList.remove('d-none');
+                buttonEl.style.background = 'linear-gradient(90deg, #ef4444, #b91c1c)';
+                buttonEl.style.boxShadow = '0 4px 15px rgba(239, 68, 68, 0.3)';
+                buttonEl.textContent = 'I Understand';
+                return;
+            }
+
+            if (type === 'warning') {
+                titleEl.textContent = 'Warning!';
+                titleEl.className = 'fw-bold mb-2 text-warning';
+                messageEl.textContent = message;
+                topBarEl.style.background = 'linear-gradient(90deg, #f59e0b, #d97706)';
+                mascotImg.src = '/assets/what-rocky.png';
+                mascotIcon.className = 'bi bi-exclamation-triangle text-warning display-3';
+                mascotContainer.style.background = 'rgba(245, 158, 11, 0.1)';
+                mascotContainer.style.border = '2px dashed rgba(245, 158, 11, 0.3)';
+                alertEl.classList.add('d-none');
+                buttonEl.style.background = 'linear-gradient(90deg, #f59e0b, #d97706)';
+                buttonEl.style.boxShadow = '0 4px 15px rgba(245, 158, 11, 0.3)';
+                buttonEl.textContent = 'Got It';
+                return;
+            }
+
+            titleEl.textContent = 'Great! Operation successful.';
+            titleEl.className = 'fw-bold mb-2 text-success';
+            messageEl.textContent = message;
+            topBarEl.style.background = 'linear-gradient(90deg, #22c55e, #15803d)';
+            mascotImg.src = '/assets/happy-rocky.png';
+            mascotIcon.className = 'bi bi-stars text-success display-3';
+            mascotContainer.style.background = 'rgba(34, 197, 94, 0.1)';
+            mascotContainer.style.border = '2px dashed rgba(34, 197, 94, 0.3)';
+            alertEl.classList.add('d-none');
+            buttonEl.style.background = 'linear-gradient(90deg, #22c55e, #15803d)';
+            buttonEl.style.boxShadow = '0 4px 15px rgba(34, 197, 94, 0.3)';
+            buttonEl.textContent = 'Perfect, thanks!';
+        }
+
+        function initGlobalStatusModal() {
+            const modalEl = document.getElementById('globalStatusModal');
+            if (!modalEl) return;
+            if (modalEl.dataset.cpanelStatusInit === '1') return;
+
+            modalEl.dataset.cpanelStatusInit = '1';
+            statusModal = new bootstrap.Modal(modalEl);
+
+            window.showStatusModal = function (message, type = 'success') {
+                applyStatusPresentation(modalEl, message, type);
+                statusModal.show();
+            };
+
+            const mascotImg = document.getElementById('mascot-img');
+            const mascotIcon = document.getElementById('mascot-icon');
+            if (mascotImg && mascotIcon) {
+                mascotImg.addEventListener('error', function () {
+                    mascotImg.style.display = 'none';
+                    mascotIcon.style.display = 'flex';
+                    mascotIcon.style.alignItems = 'center';
+                    mascotIcon.style.justifyContent = 'center';
+                });
+            }
+
+            <% if (locals.error || locals.warning || locals.success) { %>
+                statusModal.show();
+                if (window.history.replaceState) {
+                    const url = new URL(window.location);
+                    url.searchParams.delete('error');
+                    url.searchParams.delete('warning');
+                    url.searchParams.delete('success');
+                    window.history.replaceState({}, document.title, url.pathname + url.search);
+                }
+            <% } %>
+        }
+
+        function cleanupGlobalStatusModal() {
+            const modalEl = document.getElementById('globalStatusModal');
+            if (!modalEl) return;
+            const existingInstance = bootstrap.Modal.getInstance(modalEl);
+            if (existingInstance) existingInstance.hide();
+            document.querySelectorAll('.modal-backdrop').forEach((el) => el.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
+        }
+
+        document.addEventListener('turbo:load', initGlobalStatusModal);
+        document.addEventListener('turbo:before-cache', cleanupGlobalStatusModal);
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initGlobalStatusModal, { once: true });
+        } else {
+            initGlobalStatusModal();
+        }
+    })();
+</script>
