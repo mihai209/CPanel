@@ -9,6 +9,9 @@ const connectorsList = Array.isArray(connectors) ? connectors : [];
 const inventoryEnabled = Boolean(featureInventoryEnabled);
 const inventoryAppliedMode = typeof inventoryApplied !== 'undefined' ? Boolean(inventoryApplied) : inventoryEnabled;
 const revenueInventoryBypassEnabled = Boolean(typeof revenueInventoryBypass !== 'undefined' ? revenueInventoryBypass : false);
+const revenueInventoryFallbackAllowedFlag = typeof revenueInventoryFallbackAllowed !== 'undefined'
+    ? Boolean(revenueInventoryFallbackAllowed)
+    : false;
 const quotaForecastingEnabled = Boolean(featureQuotaForecastingEnabled);
 const revenueModeEnabled = Boolean(featureRevenueModeEnabled);
 const inventory = inventoryState || {
@@ -37,7 +40,10 @@ const hasAnyImages = imagesList.length > 0;
 const hasOnlineAllocations = allocationsList.some((allocation) => allocation && allocation.isOnline);
 const hasLocations = locationsList.length > 0;
 const hasOnlineConnectors = connectorsList.some((connector) => connector && connector.online);
-const canSubmitCreate = hasAnyImages && hasOnlineAllocations && hasLocations && hasOnlineConnectors && (!revenueModeEnabled || Boolean(revenueProvisioningAllowed));
+const revenueCreateLockedFlag = typeof revenueCreateLocked !== 'undefined'
+    ? Boolean(revenueCreateLocked)
+    : (revenueModeEnabled && !Boolean(revenueProvisioningAllowed) && !revenueInventoryFallbackAllowedFlag);
+const canSubmitCreate = hasAnyImages && hasOnlineAllocations && hasLocations && hasOnlineConnectors && !revenueCreateLockedFlag;
 const smartDefault = smartAllocationDefault || null;
 const mbToGb = (value) => {
     const num = Number(value || 0) / 1024;
@@ -103,8 +109,10 @@ const statusBadgeClass = (() => {
                             <span class="ms-2">No active plan selected.</span>
                         <% } %>
                     </div>
-                    <% if (!revenueProvisioningAllowed) { %>
+                    <% if (revenueCreateLockedFlag) { %>
                         <a href="/store" class="btn btn-sm btn-outline-warning">Open Store Revenue</a>
+                    <% } else if (revenueInventoryFallbackAllowedFlag) { %>
+                        <span class="small text-info"><i class="bi bi-info-circle me-1"></i>No active revenue plan, inventory mode is active for provisioning.</span>
                     <% } %>
                 </div>
             </div>
@@ -163,9 +171,10 @@ const statusBadgeClass = (() => {
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label text-muted small text-uppercase fw-bold">Memory (MB)</label>
-                    <input type="number" class="form-control" name="memory" id="memory" value="1024" required style="background-color:#1a1a20;border-color:#2d2d35;">
-                    <div class="form-text text-muted">Recommended: 64 MB+</div>
+                    <label class="form-label text-muted small text-uppercase fw-bold">Memory (GB)</label>
+                    <input type="number" class="form-control" name="memoryGb" id="memoryGb" value="1" min="0.1" step="0.1" required style="background-color:#1a1a20;border-color:#2d2d35;">
+                    <input type="hidden" name="memory" id="memory" value="1024">
+                    <div class="form-text text-muted">Recommended: 1 GB+</div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label text-muted small text-uppercase fw-bold">CPU (%)</label>
@@ -173,14 +182,16 @@ const statusBadgeClass = (() => {
                     <div class="form-text text-muted">Recommended: 10%+</div>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label text-muted small text-uppercase fw-bold">Disk (MB)</label>
-                    <input type="number" class="form-control" name="disk" id="disk" value="10240" required style="background-color:#1a1a20;border-color:#2d2d35;">
-                    <div class="form-text text-muted">Recommended: 512 MB+</div>
+                    <label class="form-label text-muted small text-uppercase fw-bold">Disk (GB)</label>
+                    <input type="number" class="form-control" name="diskGb" id="diskGb" value="10" min="0.5" step="0.1" required style="background-color:#1a1a20;border-color:#2d2d35;">
+                    <input type="hidden" name="disk" id="disk" value="10240">
+                    <div class="form-text text-muted">Recommended: 1 GB+</div>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label text-muted small text-uppercase fw-bold">Swap (MB)</label>
-                    <input type="number" class="form-control" name="swapLimit" id="swapLimit" value="0" style="background-color:#1a1a20;border-color:#2d2d35;">
-                    <div class="form-text text-muted">Optional, can be 0 MB</div>
+                    <label class="form-label text-muted small text-uppercase fw-bold">Swap (GB)</label>
+                    <input type="number" class="form-control" name="swapLimitGb" id="swapLimitGb" value="0" min="0" step="0.1" style="background-color:#1a1a20;border-color:#2d2d35;">
+                    <input type="hidden" name="swapLimit" id="swapLimit" value="0">
+                    <div class="form-text text-muted">Optional, can be 0 GB</div>
                 </div>
 
                 <% if (inventoryAppliedMode) { %>
@@ -279,8 +290,10 @@ const statusBadgeClass = (() => {
 
                 <div class="col-12 text-end">
                     <button type="submit" class="btn btn-primary px-4 fw-semibold" <%= canSubmitCreate ? '' : 'disabled' %>>Create and Deploy</button>
-                    <% if (revenueModeEnabled && !revenueProvisioningAllowed) { %>
+                    <% if (revenueCreateLockedFlag) { %>
                         <div class="text-warning small mt-2">Create is locked until your revenue plan is active or trial.</div>
+                    <% } else if (revenueInventoryFallbackAllowedFlag) { %>
+                        <div class="text-info small mt-2">No active revenue plan detected. Create will use your inventory resources.</div>
                     <% } %>
                 </div>
             </form>
@@ -305,10 +318,14 @@ const statusBadgeClass = (() => {
     const walletCoins = Number(<%- JSON.stringify(user && Number.isFinite(Number(user.coins)) ? Number(user.coins) : 0) %>) || 0;
     const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
+    const $memoryGb = document.getElementById('memoryGb');
     const $memory = document.getElementById('memory');
     const $cpu = document.getElementById('cpu');
+    const $diskGb = document.getElementById('diskGb');
     const $disk = document.getElementById('disk');
+    const $swapGb = document.getElementById('swapLimitGb');
     const $swap = document.getElementById('swapLimit');
+    const $createForm = document.getElementById('createForm');
     const $image = document.getElementById('imageId');
     const $location = document.getElementById('locationId');
     const $connector = document.getElementById('connectorId');
@@ -333,6 +350,16 @@ const statusBadgeClass = (() => {
         const num = Number(value || 0);
         if (!Number.isFinite(num)) return '0';
         return num % 1 === 0 ? String(num) : num.toFixed(2);
+    };
+    const gbToMb = (gb, minMb = 0) => {
+        const parsed = Number.parseFloat(gb);
+        if (!Number.isFinite(parsed)) return minMb;
+        return Math.max(minMb, Math.round(parsed * 1024));
+    };
+    const syncResourceHiddenFields = () => {
+        if ($memory) $memory.value = String(gbToMb(toNum($memoryGb, 1), 1));
+        if ($disk) $disk.value = String(gbToMb(toNum($diskGb, 10), 1));
+        if ($swap) $swap.value = String(gbToMb(toNum($swapGb, 0), 0));
     };
     const runwayToText = (days) => {
         const num = Number(days);
@@ -502,8 +529,8 @@ const statusBadgeClass = (() => {
         }
 
         const params = new URLSearchParams({
-            memory: String(Math.max(1, toNum($memory, 1024))),
-            disk: String(Math.max(1, toNum($disk, 10240)))
+            memory: String(gbToMb(toNum($memoryGb, 1), 1)),
+            disk: String(gbToMb(toNum($diskGb, 10), 1))
         });
         params.set('connectorId', String($connector.value));
         params.set('locationId', String($location.value));
@@ -530,13 +557,14 @@ const statusBadgeClass = (() => {
     const applyInventoryInputCaps = () => {};
 
     const update = () => {
-        const memoryMb = Math.max(0, toNum($memory, 1024));
+        const memoryGb = Math.max(0, toNum($memoryGb, 1));
+        const memoryMb = gbToMb(memoryGb, 1);
         const cpuPercent = Math.max(0, toNum($cpu, 100));
-        const diskMb = Math.max(0, toNum($disk, 10240));
-        const memoryGb = memoryMb / 1024;
+        const diskGb = Math.max(0, toNum($diskGb, 10));
+        const diskMb = gbToMb(diskGb, 1);
         const cpuCores = cpuPercent / 100;
-        const diskGb = diskMb / 1024;
-        const swapGb = Math.max(0, toNum($swap, 0)) / 1024;
+        const swapGb = Math.max(0, toNum($swapGb, 0));
+        syncResourceHiddenFields();
         const hasPackage = $image && $image.selectedOptions && $image.selectedOptions[0]
             ? ($image.selectedOptions[0].getAttribute('data-package') === '1')
             : false;
@@ -604,7 +632,7 @@ const statusBadgeClass = (() => {
         }
     };
 
-    [$memory, $cpu, $disk, $swap, $image].forEach((node) => {
+    [$memoryGb, $cpu, $diskGb, $swapGb, $image].forEach((node) => {
         if (node) node.addEventListener('input', update);
         if (node) node.addEventListener('change', update);
     });
@@ -637,7 +665,7 @@ const statusBadgeClass = (() => {
             }
         });
     }
-    [$memory, $disk, $connector, $location].forEach((node) => {
+    [$memoryGb, $diskGb, $connector, $location].forEach((node) => {
         if (!node) return;
         node.addEventListener('change', () => {
             if ($smartToggle && $smartToggle.checked) {
@@ -645,6 +673,11 @@ const statusBadgeClass = (() => {
             }
         });
     });
+    if ($createForm) {
+        $createForm.addEventListener('submit', () => {
+            syncResourceHiddenFields();
+        });
+    }
     applyInventoryInputCaps();
     rebuildConnectorOptions();
     rebuildAllocationOptions();

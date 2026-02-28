@@ -3701,8 +3701,11 @@ app.get('/user/create', requireAuth, async (req, res) => {
         const smartAllocationDefault = formatSmartAllocationResponse(smartSuggestionResult);
         const revenueProfile = normalizeUserRevenueProfile(revenueProfileRaw || {});
         const revenueActivePlan = resolveRevenuePlanById(revenuePlanCatalog, revenueProfile.planId);
-        const revenueProvisioningAllowed = !featureFlags.revenueModeEnabled || (Boolean(revenueActivePlan) && isRevenueProfileProvisioningAllowed(revenueProfile));
-        const revenueInventoryBypass = Boolean(featureFlags.revenueModeEnabled) && Boolean(revenueActivePlan) && isRevenueProfileProvisioningAllowed(revenueProfile);
+        const revenuePlanSelected = Boolean(revenueActivePlan);
+        const revenueProvisioningAllowed = !featureFlags.revenueModeEnabled || (revenuePlanSelected && isRevenueProfileProvisioningAllowed(revenueProfile));
+        const revenueInventoryFallbackAllowed = Boolean(featureFlags.revenueModeEnabled) && !revenuePlanSelected && Boolean(featureFlags.inventoryEnabled);
+        const revenueCreateLocked = Boolean(featureFlags.revenueModeEnabled) && !revenueProvisioningAllowed && !revenueInventoryFallbackAllowed;
+        const revenueInventoryBypass = Boolean(featureFlags.revenueModeEnabled) && revenuePlanSelected && isRevenueProfileProvisioningAllowed(revenueProfile);
         const inventoryApplied = Boolean(featureFlags.inventoryEnabled) && !revenueInventoryBypass;
         const renewDays = Math.max(1, Number.parseInt(featureFlags.storeRenewDays, 10) || 30);
         const recurringEstimateCoins = featureFlags.costPerServerEnabled
@@ -3749,6 +3752,8 @@ app.get('/user/create', requireAuth, async (req, res) => {
             revenueProfile,
             revenueActivePlan,
             revenueProvisioningAllowed,
+            revenueInventoryFallbackAllowed,
+            revenueCreateLocked,
             revenueUsage: ownedUsage,
             quotaForecast,
             smartAllocationDefault,
@@ -3842,6 +3847,7 @@ app.post('/user/create', requireAuth, async (req, res) => {
         if (!featureFlags.userCreateEnabled) {
             return res.redirect('/?error=' + encodeURIComponent('User server creation is disabled by admin.'));
         }
+        const inventoryFeatureEnabled = Boolean(featureFlags.inventoryEnabled);
 
         const account = await User.findByPk(req.session.user.id, { attributes: ['id', 'coins', 'isSuspended'] });
         if (!account) {
@@ -3858,10 +3864,21 @@ app.post('/user/create', requireAuth, async (req, res) => {
         const smartAllocationEnabled = parseSmartAllocationToggle(req.body.smartAllocation, true);
         const selectedLocationId = Number.parseInt(req.body.locationId, 10);
         const selectedConnectorId = Number.parseInt(req.body.connectorId, 10);
-        const memory = Number.parseInt(req.body.memory, 10);
+        const parseResourceMb = (mbRaw, gbRaw, defaultMb = 0, minMb = 0) => {
+            const parsedMb = Number.parseInt(mbRaw, 10);
+            if (Number.isFinite(parsedMb)) {
+                return Math.max(minMb, parsedMb);
+            }
+            const parsedGb = Number.parseFloat(gbRaw);
+            if (Number.isFinite(parsedGb)) {
+                return Math.max(minMb, Math.round(parsedGb * 1024));
+            }
+            return Math.max(minMb, defaultMb);
+        };
+        const memory = parseResourceMb(req.body.memory, req.body.memoryGb, 1024, 1);
         const cpu = Number.parseInt(req.body.cpu, 10);
-        const disk = Number.parseInt(req.body.disk, 10);
-        const swapLimit = Math.max(0, Number.parseInt(req.body.swapLimit, 10) || 0);
+        const disk = parseResourceMb(req.body.disk, req.body.diskGb, 10240, 1);
+        const swapLimit = parseResourceMb(req.body.swapLimit, req.body.swapLimitGb, 0, 0);
         const dockerImage = String(req.body.dockerImage || '').trim();
 
         if (!name) {
@@ -3897,24 +3914,25 @@ app.post('/user/create', requireAuth, async (req, res) => {
             ]);
             const revenueProfile = normalizeUserRevenueProfile(revenueProfileRaw || {});
             const activeRevenuePlan = resolveRevenuePlanById(revenuePlanCatalog, revenueProfile.planId);
-            if (!activeRevenuePlan) {
-                return res.redirect('/store?error=' + encodeURIComponent('Select a revenue plan before creating servers.'));
+            if (activeRevenuePlan) {
+                if (!isRevenueProfileProvisioningAllowed(revenueProfile)) {
+                    return res.redirect('/store?error=' + encodeURIComponent(`Revenue plan status "${revenueProfile.status}" does not allow creating new servers.`));
+                }
+                const planValidation = validateRevenuePlanConstraints(
+                    activeRevenuePlan,
+                    ownedUsage.serverCount,
+                    ownedUsage,
+                    { memory, cpu, disk }
+                );
+                if (!planValidation.ok) {
+                    return res.redirect('/user/create?error=' + encodeURIComponent(planValidation.error));
+                }
+                isRevenueManagedProvisioning = true;
+                revenueManagedPlanId = String(activeRevenuePlan.id || '').trim();
+                revenueManagedProfileStatus = String(revenueProfile.status || '').trim().toLowerCase();
+            } else if (!inventoryFeatureEnabled) {
+                return res.redirect('/store?error=' + encodeURIComponent('No active revenue plan. Enable inventory or activate a revenue plan to create servers.'));
             }
-            if (!isRevenueProfileProvisioningAllowed(revenueProfile)) {
-                return res.redirect('/store?error=' + encodeURIComponent(`Revenue plan status "${revenueProfile.status}" does not allow creating new servers.`));
-            }
-            const planValidation = validateRevenuePlanConstraints(
-                activeRevenuePlan,
-                ownedUsage.serverCount,
-                ownedUsage,
-                { memory, cpu, disk }
-            );
-            if (!planValidation.ok) {
-                return res.redirect('/user/create?error=' + encodeURIComponent(planValidation.error));
-            }
-            isRevenueManagedProvisioning = true;
-            revenueManagedPlanId = String(activeRevenuePlan.id || '').trim();
-            revenueManagedProfileStatus = String(revenueProfile.status || '').trim().toLowerCase();
         }
 
         const image = await Image.findByPk(imageId, { include: [{ model: Package, as: 'package', required: false }] });
@@ -3998,7 +4016,6 @@ app.post('/user/create', requireAuth, async (req, res) => {
             hasImage: true,
             hasPackage: Boolean(image.packageId)
         }, res.locals.settings || {});
-        const inventoryFeatureEnabled = Boolean(featureFlags.inventoryEnabled);
         const inventoryApplied = inventoryFeatureEnabled && !isRevenueManagedProvisioning;
         const inventoryState = inventoryApplied
             ? await getUserInventoryState(account.id)
