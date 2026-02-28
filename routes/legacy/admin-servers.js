@@ -1,4 +1,5 @@
 function registerAdminServersRoutes(ctx) {
+    const nodeCrypto = require('node:crypto');
     const { pickSmartAllocation } = require('../../core/helpers/smart-allocation');
     const {
         app,
@@ -565,7 +566,7 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
             ? dockerOverride
             : (image.dockerImage || dockerOverride);
 
-        const containerId = crypto.randomBytes(4).toString('hex');
+        const containerId = nodeCrypto.randomBytes(4).toString('hex');
         const createdServer = await Server.create({
             name: String(req.body.name || snapshot.name || 'Imported Server').trim() || 'Imported Server',
             containerId,
@@ -773,7 +774,7 @@ app.post('/admin/servers', requireAuth, requireAdmin, async (req, res) => {
         const startupMode = shouldUseCommandStartup(image) ? 'command' : 'environment';
 
         // Create Server
-        const containerId = crypto.randomBytes(4).toString('hex');
+        const containerId = nodeCrypto.randomBytes(4).toString('hex');
         const server = await Server.create({
             name,
             containerId,
@@ -957,7 +958,7 @@ app.post('/api/admin/servers/:containerId/resource-caps', requireAuth, requireAd
         if (server.allocation && server.allocation.connectorId) {
             const connectorWs = connectorConnections.get(server.allocation.connectorId);
             if (connectorWs && connectorWs.readyState === WebSocket.OPEN) {
-                const requestId = `limits_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+                const requestId = `limits_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`;
                 connectorWs.send(JSON.stringify({
                     type: 'apply_resource_limits',
                     serverId: server.id,

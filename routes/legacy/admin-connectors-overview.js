@@ -1,5 +1,6 @@
 const fs = require('fs');
 const pathLib = require('path');
+const nodeCrypto = require('node:crypto');
 
 const WEB_SERVER_TEMPLATE_FILES = Object.freeze({
     nginx: 'nginx.conf',
@@ -147,7 +148,7 @@ app.post('/admin/connectors', requireAuth, requireAdmin, [
         }
 
         // Generate secure token for connector
-        const token = crypto.randomBytes(32).toString('hex');
+        const token = nodeCrypto.randomBytes(32).toString('hex');
 
         const newConnector = await Connector.create({
             name,
@@ -507,7 +508,7 @@ app.post('/admin/connectors/:id/regenerate-token', requireAuth, requireAdmin, as
             return res.redirect('/admin/connectors?error=Connector not found.');
         }
 
-        const newToken = crypto.randomBytes(32).toString('hex');
+        const newToken = nodeCrypto.randomBytes(32).toString('hex');
         await connector.update({ token: newToken });
 
         const liveSocket = connectorConnections.get(connector.id);

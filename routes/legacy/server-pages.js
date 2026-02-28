@@ -6722,7 +6722,7 @@ app.post('/api/client/servers/:containerId/power', async (req, res) => {
         if (action === 'start') {
             consumeServerPowerIntent(server.id);
         }
-        const requestId = `api_pwr_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+        const requestId = `api_pwr_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`;
 
         connectorWs.send(JSON.stringify({
             type: 'server_power',
@@ -6763,7 +6763,7 @@ app.post('/api/client/servers/:containerId/command', async (req, res) => {
         if (command.length > 1024) {
             return res.status(400).json({ success: false, error: 'Command exceeds 1024 characters.' });
         }
-        const requestId = `api_cmd_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+        const requestId = `api_cmd_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`;
 
         connectorWs.send(JSON.stringify({
             type: 'server_command',
