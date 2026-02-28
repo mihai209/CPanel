@@ -83,8 +83,20 @@
         document.dispatchEvent(new Event('cpanel:before-cache'));
     }
 
+    function applyFormTurboCompatibility() {
+        // Turbo is great for page navigation, but legacy forms can violate Turbo redirect rules.
+        // Keep forms native by default. Explicitly opt-in with data-turbo="true" where needed.
+        const forms = document.querySelectorAll('form');
+        forms.forEach((form) => {
+            if (!(form instanceof HTMLFormElement)) return;
+            if (form.getAttribute('data-turbo') === 'true') return;
+            form.setAttribute('data-turbo', 'false');
+        });
+    }
+
     document.addEventListener('turbo:load', () => {
         patchRuntimeResources();
+        applyFormTurboCompatibility();
         dispatchCompatDOMContentLoaded();
         dispatchPageLifecycleEvents();
     });
@@ -97,6 +109,7 @@
     // Non-Turbo fallback for direct loads or pages with data-turbo disabled.
     document.addEventListener('DOMContentLoaded', () => {
         patchRuntimeResources();
+        applyFormTurboCompatibility();
         if (document.documentElement.hasAttribute('data-turbo-preview')) return;
         dispatchPageLifecycleEvents();
     });

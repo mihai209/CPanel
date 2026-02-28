@@ -1,5 +1,8 @@
 <!-- Global Status Modal Redesigned -->
-<div class="modal fade" id="globalStatusModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+<div class="modal fade" id="globalStatusModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static"
+    data-initial-error="<%= locals.error ? encodeURIComponent(String(locals.error)) : '' %>"
+    data-initial-warning="<%= locals.warning ? encodeURIComponent(String(locals.warning)) : '' %>"
+    data-initial-success="<%= locals.success ? encodeURIComponent(String(locals.success)) : '' %>">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content overflow-hidden border-0 shadow-lg"
             style="background: rgba(26, 26, 32, 0.95); backdrop-filter: blur(10px); border-radius: 20px;">
@@ -73,7 +76,11 @@
 
 <script>
     (() => {
+        if (window.__cpanelGlobalStatusModalLoaded) return;
+        window.__cpanelGlobalStatusModalLoaded = true;
+
         let statusModal = null;
+        let boundModalEl = null;
 
         function applyStatusPresentation(modalEl, message, type = 'success') {
             const titleEl = document.getElementById('statusModalTitle');
@@ -135,52 +142,109 @@
             buttonEl.textContent = 'Perfect, thanks!';
         }
 
+        function decodeMaybe(value) {
+            const raw = String(value || '').trim();
+            if (!raw) return '';
+            try {
+                return decodeURIComponent(raw);
+            } catch {
+                return raw;
+            }
+        }
+
+        function readStatusFromQuery() {
+            const params = new URLSearchParams(window.location.search || '');
+            const error = params.get('error');
+            if (error) return { type: 'error', message: error, source: 'query' };
+            const warning = params.get('warning');
+            if (warning) return { type: 'warning', message: warning, source: 'query' };
+            const success = params.get('success');
+            if (success) return { type: 'success', message: success, source: 'query' };
+            return null;
+        }
+
+        function readInitialStatusFromModal(modalEl) {
+            if (!modalEl) return null;
+            const error = decodeMaybe(modalEl.dataset.initialError);
+            if (error) return { type: 'error', message: error, source: 'initial' };
+            const warning = decodeMaybe(modalEl.dataset.initialWarning);
+            if (warning) return { type: 'warning', message: warning, source: 'initial' };
+            const success = decodeMaybe(modalEl.dataset.initialSuccess);
+            if (success) return { type: 'success', message: success, source: 'initial' };
+            return null;
+        }
+
+        function clearInitialStatus(modalEl) {
+            if (!modalEl) return;
+            modalEl.dataset.initialError = '';
+            modalEl.dataset.initialWarning = '';
+            modalEl.dataset.initialSuccess = '';
+        }
+
+        function clearStatusQueryParams() {
+            if (!window.history || typeof window.history.replaceState !== 'function') return;
+            const url = new URL(window.location.href);
+            url.searchParams.delete('error');
+            url.searchParams.delete('warning');
+            url.searchParams.delete('success');
+            const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+            window.history.replaceState({}, document.title, nextUrl);
+        }
+
         function initGlobalStatusModal() {
             const modalEl = document.getElementById('globalStatusModal');
             if (!modalEl) return;
-            if (modalEl.dataset.cpanelStatusInit === '1') return;
+            if (!window.bootstrap || !window.bootstrap.Modal) return;
 
-            modalEl.dataset.cpanelStatusInit = '1';
-            statusModal = new bootstrap.Modal(modalEl);
+            if (!statusModal || boundModalEl !== modalEl) {
+                statusModal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+                boundModalEl = modalEl;
+
+                const mascotImg = document.getElementById('mascot-img');
+                const mascotIcon = document.getElementById('mascot-icon');
+                if (mascotImg && mascotIcon && mascotImg.dataset.statusImgBound !== '1') {
+                    mascotImg.dataset.statusImgBound = '1';
+                    mascotImg.addEventListener('error', function () {
+                        mascotImg.style.display = 'none';
+                        mascotIcon.style.display = 'flex';
+                        mascotIcon.style.alignItems = 'center';
+                        mascotIcon.style.justifyContent = 'center';
+                    });
+                }
+            }
 
             window.showStatusModal = function (message, type = 'success') {
-                applyStatusPresentation(modalEl, message, type);
+                const safeMessage = String(message || '').trim();
+                if (!safeMessage) return;
+                applyStatusPresentation(modalEl, safeMessage, type);
                 statusModal.show();
             };
 
-            const mascotImg = document.getElementById('mascot-img');
-            const mascotIcon = document.getElementById('mascot-icon');
-            if (mascotImg && mascotIcon) {
-                mascotImg.addEventListener('error', function () {
-                    mascotImg.style.display = 'none';
-                    mascotIcon.style.display = 'flex';
-                    mascotIcon.style.alignItems = 'center';
-                    mascotIcon.style.justifyContent = 'center';
-                });
+            const payload = readStatusFromQuery() || readInitialStatusFromModal(modalEl);
+            if (payload && String(payload.message || '').trim()) {
+                applyStatusPresentation(modalEl, String(payload.message), payload.type);
+                statusModal.show();
+                if (payload.source === 'query') {
+                    clearStatusQueryParams();
+                }
             }
 
-            <% if (locals.error || locals.warning || locals.success) { %>
-                statusModal.show();
-                if (window.history.replaceState) {
-                    const url = new URL(window.location);
-                    url.searchParams.delete('error');
-                    url.searchParams.delete('warning');
-                    url.searchParams.delete('success');
-                    window.history.replaceState({}, document.title, url.pathname + url.search);
-                }
-            <% } %>
+            clearInitialStatus(modalEl);
         }
 
         function cleanupGlobalStatusModal() {
             const modalEl = document.getElementById('globalStatusModal');
             if (!modalEl) return;
-            const existingInstance = bootstrap.Modal.getInstance(modalEl);
+            const existingInstance = window.bootstrap && window.bootstrap.Modal
+                ? window.bootstrap.Modal.getInstance(modalEl)
+                : null;
             if (existingInstance) existingInstance.hide();
             document.querySelectorAll('.modal-backdrop').forEach((el) => el.remove());
             document.body.classList.remove('modal-open');
             document.body.style.removeProperty('padding-right');
         }
 
+        document.addEventListener('cpanel:page-load', initGlobalStatusModal);
         document.addEventListener('turbo:load', initGlobalStatusModal);
         document.addEventListener('turbo:before-cache', cleanupGlobalStatusModal);
         if (document.readyState === 'loading') {
