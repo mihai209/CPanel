@@ -10,7 +10,8 @@
     "upgrade-db": "node scripts/upgrade-db.js",
     "sync-images": "node scripts/sync-images.js",
     "ngrok": "ngrok http 3000 --url https://default.internal",
-    "kill3000": "npx kill-port 3000"
+    "kill3000": "npx kill-port 3000",
+    "update-panel": "git fetch origin ; git pull --rebase origin main"
   },
   "keywords": [],
   "author": "",
