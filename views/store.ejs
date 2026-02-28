@@ -324,6 +324,11 @@ const formatAuditSummary = (row) => {
                                     <td>
                                         <div class="fw-semibold"><%= row.server.name %></div>
                                         <div class="text-muted small">/<%= row.server.containerId %></div>
+                                        <% if (row.revenueManaged) { %>
+                                            <div class="text-warning-emphasis small mt-1">
+                                                <i class="bi bi-shield-lock me-1"></i>Revenue managed: edit disabled
+                                            </div>
+                                        <% } %>
                                     </td>
                                     <td>
                                         <span class="badge <%= statusLabel === 'active' ? 'bg-success' : (statusLabel === 'suspended_due' ? 'bg-warning text-dark' : 'bg-secondary') %>">
@@ -346,6 +351,12 @@ const formatAuditSummary = (row) => {
                                     </td>
                                     <td class="text-end">
                                         <a href="/server/<%= row.server.containerId %>" class="btn btn-sm btn-outline-light">Manage</a>
+                                        <% if (!row.revenueManaged) { %>
+                                            <a href="/user/server/<%= row.server.containerId %>/edit" class="btn btn-sm btn-outline-info">Edit</a>
+                                        <% } %>
+                                        <form method="POST" action="/user/server/<%= row.server.containerId %>/delete" class="d-inline js-delete-server-form">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                                        </form>
                                         <% if (canRenew) { %>
                                             <form method="POST" action="/store/renew/<%= row.server.containerId %>" class="d-inline">
                                                 <button type="submit" class="btn btn-sm btn-primary">Renew</button>
@@ -439,6 +450,22 @@ const formatAuditSummary = (row) => {
         return cleanupFns;
     };
 
+    const wireDeleteServerConfirm = () => {
+        const cleanupFns = [];
+        const forms = Array.from(document.querySelectorAll('.js-delete-server-form'));
+        forms.forEach((form) => {
+            const handler = (event) => {
+                const confirmed = window.confirm('Delete this server? This action removes it from panel and attempts connector cleanup.');
+                if (!confirmed) {
+                    event.preventDefault();
+                }
+            };
+            form.addEventListener('submit', handler);
+            cleanupFns.push(() => form.removeEventListener('submit', handler));
+        });
+        return cleanupFns;
+    };
+
     const formatDuration = (secondsInput) => {
         let seconds = Math.max(0, Number.parseInt(String(secondsInput), 10) || 0);
         const d = Math.floor(seconds / 86400);
@@ -460,7 +487,10 @@ const formatAuditSummary = (row) => {
         if (root.dataset.cpanelStoreInit === '1') return;
         root.dataset.cpanelStoreInit = '1';
 
-        const cleanupFns = wireInventoryQtySync();
+        const cleanupFns = [
+            ...wireInventoryQtySync(),
+            ...wireDeleteServerConfirm()
+        ];
         const nodes = Array.from(document.querySelectorAll('.billing-countdown'));
         const tick = () => {
             nodes.forEach((node) => {

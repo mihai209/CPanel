@@ -7,6 +7,8 @@ const allocationsList = Array.isArray(allocations) ? allocations : [];
 const locationsList = Array.isArray(locations) ? locations : [];
 const connectorsList = Array.isArray(connectors) ? connectors : [];
 const inventoryEnabled = Boolean(featureInventoryEnabled);
+const inventoryAppliedMode = typeof inventoryApplied !== 'undefined' ? Boolean(inventoryApplied) : inventoryEnabled;
+const revenueInventoryBypassEnabled = Boolean(typeof revenueInventoryBypass !== 'undefined' ? revenueInventoryBypass : false);
 const quotaForecastingEnabled = Boolean(featureQuotaForecastingEnabled);
 const revenueModeEnabled = Boolean(featureRevenueModeEnabled);
 const inventory = inventoryState || {
@@ -33,7 +35,9 @@ const quota = quotaForecast || {
 };
 const hasAnyImages = imagesList.length > 0;
 const hasOnlineAllocations = allocationsList.some((allocation) => allocation && allocation.isOnline);
-const canSubmitCreate = hasAnyImages && hasOnlineAllocations && (!revenueModeEnabled || Boolean(revenueProvisioningAllowed));
+const hasLocations = locationsList.length > 0;
+const hasOnlineConnectors = connectorsList.some((connector) => connector && connector.online);
+const canSubmitCreate = hasAnyImages && hasOnlineAllocations && hasLocations && hasOnlineConnectors && (!revenueModeEnabled || Boolean(revenueProvisioningAllowed));
 const smartDefault = smartAllocationDefault || null;
 const mbToGb = (value) => {
     const num = Number(value || 0) / 1024;
@@ -122,8 +126,8 @@ const statusBadgeClass = (() => {
                 </div>
                 <div class="col-md-4">
                     <label class="form-label text-muted small text-uppercase fw-bold">Location</label>
-                    <select class="form-select" name="locationId" id="locationId" style="background-color:#1a1a20;border-color:#2d2d35;">
-                        <option value="">Any Location</option>
+                    <select class="form-select" name="locationId" id="locationId" required style="background-color:#1a1a20;border-color:#2d2d35;" <%= hasLocations ? '' : 'disabled' %>>
+                        <option value="">Select Location</option>
                         <% locationsList.forEach((location) => { %>
                             <option value="<%= location.id %>"><%= location.shortName %><%= location.description ? ' - ' + location.description : '' %></option>
                         <% }) %>
@@ -131,8 +135,8 @@ const statusBadgeClass = (() => {
                 </div>
                 <div class="col-md-4">
                     <label class="form-label text-muted small text-uppercase fw-bold">Connector</label>
-                    <select class="form-select" name="connectorId" id="connectorId" style="background-color:#1a1a20;border-color:#2d2d35;">
-                        <option value="">Any Connector</option>
+                    <select class="form-select" name="connectorId" id="connectorId" required style="background-color:#1a1a20;border-color:#2d2d35;" <%= hasLocations ? '' : 'disabled' %>>
+                        <option value="">Select Location first</option>
                         <% connectorsList.forEach((connector) => { %>
                             <option value="<%= connector.id %>" data-location-id="<%= connector.locationId || '' %>" data-online="<%= connector.online ? '1' : '0' %>"><%= connector.name %><%= connector.online ? '' : ' (offline)' %></option>
                         <% }) %>
@@ -179,7 +183,7 @@ const statusBadgeClass = (() => {
                     <div class="form-text text-muted">Optional, can be 0 MB</div>
                 </div>
 
-                <% if (inventoryEnabled) { %>
+                <% if (inventoryAppliedMode) { %>
                     <div class="col-12">
                         <div class="p-3 rounded" style="background:#1a1a20;border:1px solid #2d2d35;">
                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
@@ -195,6 +199,12 @@ const statusBadgeClass = (() => {
                                 <div class="col-4 col-md-2"><div class="text-muted small">Image tokens</div><div class="fw-semibold"><%= Number(inventory.images || 0) %></div></div>
                                 <div class="col-4 col-md-2"><div class="text-muted small">Package tokens</div><div class="fw-semibold"><%= Number(inventory.packages || 0) %></div></div>
                             </div>
+                        </div>
+                    </div>
+                <% } else if (inventoryEnabled && revenueInventoryBypassEnabled) { %>
+                    <div class="col-12">
+                        <div class="alert alert-info border-0 bg-info bg-opacity-10 text-info mb-0">
+                            <i class="bi bi-info-circle-fill me-2"></i>Revenue plan provisioning is active. Inventory checks are bypassed on create for this account.
                         </div>
                     </div>
                 <% } %>
@@ -282,7 +292,8 @@ const statusBadgeClass = (() => {
 (() => {
     const pricing = <%- JSON.stringify(pricing || {}) %>;
     const economyUnit = <%- JSON.stringify(economyUnit || 'Coins') %>;
-    const inventoryEnabled = <%- JSON.stringify(Boolean(featureInventoryEnabled)) %>;
+    const inventoryFeatureEnabled = <%- JSON.stringify(Boolean(featureInventoryEnabled)) %>;
+    const inventoryApplied = <%- JSON.stringify(Boolean(inventoryAppliedMode)) %>;
     const inventoryState = <%- JSON.stringify(inventoryState || {}) %>;
     const quotaForecastingEnabled = <%- JSON.stringify(Boolean(featureQuotaForecastingEnabled)) %>;
     const revenueModeEnabled = <%- JSON.stringify(Boolean(featureRevenueModeEnabled)) %>;
@@ -352,13 +363,39 @@ const statusBadgeClass = (() => {
         if (!$connector) return;
         const selectedLocation = $location ? String($location.value || '') : '';
         const previousValue = String($connector.value || '');
-        const allowed = allConnectorOptions.filter((entry) => {
-            if (entry.isAny) return true;
-            if (selectedLocation && entry.locationId !== selectedLocation) return false;
-            return true;
-        });
+        if (!selectedLocation) {
+            $connector.innerHTML = '';
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'Select Location first';
+            option.selected = true;
+            $connector.appendChild(option);
+            $connector.disabled = true;
+            if ($allocation) {
+                $allocation.innerHTML = '';
+                const allocPlaceholder = document.createElement('option');
+                allocPlaceholder.value = '';
+                allocPlaceholder.textContent = 'Select connector first';
+                allocPlaceholder.disabled = true;
+                allocPlaceholder.selected = true;
+                $allocation.appendChild(allocPlaceholder);
+                $allocation.disabled = true;
+            }
+            return;
+        }
+        const allowed = allConnectorOptions.filter((entry) => !entry.isAny && entry.locationId === selectedLocation);
 
         $connector.innerHTML = '';
+        if (allowed.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No connector available for selected location';
+            option.selected = true;
+            option.disabled = true;
+            $connector.appendChild(option);
+            $connector.disabled = true;
+            return;
+        }
         allowed.forEach((entry) => {
             const option = document.createElement('option');
             option.value = entry.value;
@@ -374,12 +411,24 @@ const statusBadgeClass = (() => {
         } else if (allowed.length > 0) {
             $connector.value = allowed[0].value;
         }
+        $connector.disabled = false;
     };
 
     const rebuildAllocationOptions = () => {
         if (!$allocation) return;
         const selectedConnector = $connector ? String($connector.value || '') : '';
         const selectedLocation = $location ? String($location.value || '') : '';
+        if (!selectedLocation || !selectedConnector) {
+            $allocation.innerHTML = '';
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = selectedLocation ? 'Select connector first' : 'Select location first';
+            option.disabled = true;
+            option.selected = true;
+            $allocation.appendChild(option);
+            $allocation.disabled = true;
+            return;
+        }
 
         const allowed = allAllocationOptions.filter((entry) => {
             if (!entry.online) return false;
@@ -435,13 +484,29 @@ const statusBadgeClass = (() => {
     const runSmartAllocationPick = async () => {
         if (!$smartToggle || !$smartToggle.checked) return;
         if (!$allocation) return;
+        if (!$location || !$location.value) {
+            if ($smartHint) {
+                $smartHint.textContent = 'Select a location before using Smart Allocation.';
+                $smartHint.classList.remove('text-info');
+                $smartHint.classList.add('text-warning');
+            }
+            return;
+        }
+        if (!$connector || !$connector.value) {
+            if ($smartHint) {
+                $smartHint.textContent = 'Select a connector before using Smart Allocation.';
+                $smartHint.classList.remove('text-info');
+                $smartHint.classList.add('text-warning');
+            }
+            return;
+        }
 
         const params = new URLSearchParams({
             memory: String(Math.max(1, toNum($memory, 1024))),
             disk: String(Math.max(1, toNum($disk, 10240)))
         });
-        if ($connector && $connector.value) params.set('connectorId', String($connector.value));
-        if ($location && $location.value) params.set('locationId', String($location.value));
+        params.set('connectorId', String($connector.value));
+        params.set('locationId', String($location.value));
 
         try {
             if ($smartPickBtn) $smartPickBtn.disabled = true;
@@ -494,7 +559,7 @@ const statusBadgeClass = (() => {
             )
             : 0;
 
-        const oneTime = inventoryEnabled ? 0 : Math.max(0, Math.ceil(oneTimeRaw));
+        const oneTime = inventoryFeatureEnabled ? 0 : Math.max(0, Math.ceil(oneTimeRaw));
         const renew = Math.max(0, Math.ceil(renewRaw));
         const total = oneTime + renew;
 

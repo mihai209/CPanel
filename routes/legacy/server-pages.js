@@ -730,6 +730,8 @@ function formatBillingActionLabel(action) {
         'billing.deal.purchase': 'Deal Purchase',
         'billing.server.create': 'Server Create Billing',
         'billing.server.renew': 'Server Renew',
+        'billing.server.edit': 'Server Edit',
+        'billing.server.delete': 'Server Delete',
         'billing.server.auto_suspend': 'Auto Suspend (Overdue)',
         'billing.server.auto_delete': 'Auto Delete (Overdue)',
         'billing.server.auto_unsuspend': 'Auto Unsuspend (Billing Disabled)'
@@ -1512,6 +1514,58 @@ function getStoreBillingSettingKeySafe(serverId) {
         return getServerStoreBillingSettingKey(serverId);
     }
     return `server_store_billing_${serverId}`;
+}
+
+function getServerRevenueManagedSettingKey(serverId) {
+    return `server_revenue_managed_${serverId}`;
+}
+
+function normalizeServerRevenueManagedState(raw) {
+    let parsed = raw;
+    if (typeof parsed === 'string') {
+        try {
+            parsed = JSON.parse(parsed);
+        } catch {
+            parsed = {};
+        }
+    }
+    if (!parsed || typeof parsed !== 'object') parsed = {};
+
+    const managed = Boolean(parsed.managed);
+    const planId = String(parsed.planId || '').trim();
+    const profileStatus = String(parsed.profileStatus || '').trim().toLowerCase();
+    const createdAtMs = Math.max(0, Number.parseInt(parsed.createdAtMs, 10) || Date.now());
+    const updatedAtMs = Math.max(createdAtMs, Number.parseInt(parsed.updatedAtMs, 10) || createdAtMs);
+
+    return {
+        managed,
+        planId,
+        profileStatus,
+        createdAtMs,
+        updatedAtMs
+    };
+}
+
+async function getServerRevenueManagedState(serverId) {
+    const row = await Settings.findByPk(getServerRevenueManagedSettingKey(serverId));
+    if (!row || !row.value) return null;
+    return normalizeServerRevenueManagedState(row.value);
+}
+
+async function setServerRevenueManagedState(serverId, state) {
+    const normalized = normalizeServerRevenueManagedState({
+        ...(state && typeof state === 'object' ? state : {}),
+        updatedAtMs: Date.now()
+    });
+    await Settings.upsert({
+        key: getServerRevenueManagedSettingKey(serverId),
+        value: JSON.stringify(normalized)
+    });
+    return normalized;
+}
+
+async function removeServerRevenueManagedState(serverId) {
+    await Settings.destroy({ where: { key: getServerRevenueManagedSettingKey(serverId) } });
 }
 
 function normalizeStoreBillingStateSafe(raw) {
@@ -2432,6 +2486,7 @@ app.get('/store', requireAuth, async (req, res) => {
         for (const server of servers) {
             serverIdStrings.push(String(server.id));
             const billingState = await getStoreBillingStateSafe(server.id);
+            const revenueManagedState = await getServerRevenueManagedState(server.id);
             const recurringCoins = featureFlags.costPerServerEnabled
                 ? calculateStoreRenewCostSafe(server, res.locals.settings || {})
                 : 0;
@@ -2439,7 +2494,13 @@ app.get('/store', requireAuth, async (req, res) => {
                 ...billingState,
                 remainingSeconds: getStoreBillingRemainingSeconds(billingState, nowMs)
             } : null;
-            storeRows.push({ server, recurringCoins, billing });
+            storeRows.push({
+                server,
+                recurringCoins,
+                billing,
+                revenueManaged: Boolean(revenueManagedState && revenueManagedState.managed),
+                revenueManagedMeta: revenueManagedState || null
+            });
             aggregateUsage.serverCount += 1;
             aggregateUsage.memory += Math.max(0, Number.parseInt(server.memory, 10) || 0);
             aggregateUsage.cpu += Math.max(0, Number.parseInt(server.cpu, 10) || 0);
@@ -2494,6 +2555,11 @@ app.get('/store', requireAuth, async (req, res) => {
         const revenueProfile = normalizeUserRevenueProfile(revenueProfileRaw || {});
         const activeRevenuePlan = resolveRevenuePlanById(revenuePlanCatalog, revenueProfile.planId);
         const revenuePlans = Array.isArray(revenuePlanCatalog) ? revenuePlanCatalog : [];
+        const runtimeRevenueManaged = Boolean(featureFlags.revenueModeEnabled) && Boolean(activeRevenuePlan) && isRevenueProfileProvisioningAllowed(revenueProfile);
+        const storeRowsFinal = storeRows.map((row) => ({
+            ...row,
+            revenueManaged: Boolean((row && row.revenueManaged) || runtimeRevenueManaged)
+        }));
         const revenuePlanPrice = activeRevenuePlan
             ? Math.max(0, Number.parseInt(activeRevenuePlan.priceCoins, 10) || 0)
             : Math.max(0, Number.parseInt(revenueProfile.priceCoins, 10) || 0);
@@ -2531,7 +2597,7 @@ app.get('/store', requireAuth, async (req, res) => {
                 image: Number(featureFlags.storeImageCoins || 0),
                 package: Number(featureFlags.storePackageCoins || 0)
             },
-            storeRows,
+            storeRows: storeRowsFinal,
             storeDealsCount,
             storeDealsActiveCount,
             billingLogs,
@@ -3298,6 +3364,249 @@ app.post('/store/renew/:containerId', requireAuth, async (req, res) => {
     }
 });
 
+app.get('/user/server/:containerId/edit', requireAuth, async (req, res) => {
+    try {
+        const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
+        if (!featureFlags.userCreateEnabled) {
+            return res.redirect('/?error=' + encodeURIComponent('User server management is disabled by admin.'));
+        }
+
+        const account = await User.findByPk(req.session.user.id, {
+            attributes: ['id', 'isSuspended']
+        });
+        if (!account) {
+            req.session.destroy(() => {});
+            return res.redirect('/login?error=' + encodeURIComponent('Session expired. Please login again.'));
+        }
+        if (account.isSuspended) {
+            return res.redirect('/suspend');
+        }
+
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId, ownerId: account.id },
+            include: [
+                { model: Image, as: 'image', required: false },
+                { model: Allocation, as: 'allocation', include: [{ model: Connector, as: 'connector', required: false }], required: false }
+            ]
+        });
+        if (!server) {
+            return res.redirect('/store?error=' + encodeURIComponent('Server not found.'));
+        }
+
+        const revenueManaged = await getServerRevenueManagedState(server.id);
+        let isRevenueManagedLocked = Boolean(revenueManaged && revenueManaged.managed);
+        if (!isRevenueManagedLocked && featureFlags.revenueModeEnabled) {
+            const [revenuePlanCatalog, revenueProfileRaw] = await Promise.all([
+                getRevenuePlanCatalogSafe(),
+                getUserRevenueProfileSafe(account.id)
+            ]);
+            const revenueProfile = normalizeUserRevenueProfile(revenueProfileRaw || {});
+            const activeRevenuePlan = resolveRevenuePlanById(revenuePlanCatalog, revenueProfile.planId);
+            isRevenueManagedLocked = Boolean(activeRevenuePlan) && isRevenueProfileProvisioningAllowed(revenueProfile);
+        }
+        if (isRevenueManagedLocked) {
+            return res.redirect('/store?error=' + encodeURIComponent('Edit mode is disabled for revenue managed servers. Delete remains available.'));
+        }
+
+        return res.render('user-server-edit', {
+            user: req.session.user,
+            title: `Edit Server - ${server.name}`,
+            path: '/store',
+            server,
+            success: req.query.success || null,
+            error: req.query.error || null
+        });
+    } catch (error) {
+        console.error('Error loading user server edit page:', error);
+        return res.redirect('/store?error=' + encodeURIComponent('Failed to load server edit page.'));
+    }
+});
+
+app.post('/user/server/:containerId/edit', requireAuth, async (req, res) => {
+    try {
+        const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
+        if (!featureFlags.userCreateEnabled) {
+            return res.redirect('/?error=' + encodeURIComponent('User server management is disabled by admin.'));
+        }
+
+        const account = await User.findByPk(req.session.user.id, {
+            attributes: ['id', 'isSuspended']
+        });
+        if (!account) {
+            req.session.destroy(() => {});
+            return res.redirect('/login?error=' + encodeURIComponent('Session expired. Please login again.'));
+        }
+        if (account.isSuspended) {
+            return res.redirect('/suspend');
+        }
+
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId, ownerId: account.id }
+        });
+        if (!server) {
+            return res.redirect('/store?error=' + encodeURIComponent('Server not found.'));
+        }
+
+        const revenueManaged = await getServerRevenueManagedState(server.id);
+        let isRevenueManagedLocked = Boolean(revenueManaged && revenueManaged.managed);
+        if (!isRevenueManagedLocked && featureFlags.revenueModeEnabled) {
+            const [revenuePlanCatalog, revenueProfileRaw] = await Promise.all([
+                getRevenuePlanCatalogSafe(),
+                getUserRevenueProfileSafe(account.id)
+            ]);
+            const revenueProfile = normalizeUserRevenueProfile(revenueProfileRaw || {});
+            const activeRevenuePlan = resolveRevenuePlanById(revenuePlanCatalog, revenueProfile.planId);
+            isRevenueManagedLocked = Boolean(activeRevenuePlan) && isRevenueProfileProvisioningAllowed(revenueProfile);
+        }
+        if (isRevenueManagedLocked) {
+            return res.redirect('/store?error=' + encodeURIComponent('Edit mode is disabled for revenue managed servers. Delete remains available.'));
+        }
+
+        const nextName = String(req.body.name || '').trim();
+        if (!nextName) {
+            return res.redirect(`/user/server/${server.containerId}/edit?error=${encodeURIComponent('Server name is required.')}`);
+        }
+        if (nextName.length > 100) {
+            return res.redirect(`/user/server/${server.containerId}/edit?error=${encodeURIComponent('Server name must be at most 100 characters.')}`);
+        }
+
+        const prevName = String(server.name || '').trim();
+        if (prevName === nextName) {
+            return res.redirect(`/user/server/${server.containerId}/edit?success=${encodeURIComponent('No changes detected.')}`);
+        }
+
+        await server.update({ name: nextName });
+
+        await createBillingAuditLog({
+            actorUserId: account.id,
+            action: 'billing.server.edit',
+            targetType: 'server',
+            targetId: server.id,
+            req,
+            metadata: {
+                previousName: prevName,
+                newName: nextName
+            }
+        });
+
+        return res.redirect('/store?success=' + encodeURIComponent(`Server renamed to "${nextName}".`));
+    } catch (error) {
+        console.error('Error editing user server:', error);
+        return res.redirect(`/user/server/${req.params.containerId}/edit?error=${encodeURIComponent('Failed to edit server.')}`);
+    }
+});
+
+app.post('/user/server/:containerId/delete', requireAuth, async (req, res) => {
+    try {
+        const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
+        if (!featureFlags.userCreateEnabled) {
+            return res.redirect('/?error=' + encodeURIComponent('User server management is disabled by admin.'));
+        }
+
+        const account = await User.findByPk(req.session.user.id, {
+            attributes: ['id', 'isSuspended']
+        });
+        if (!account) {
+            req.session.destroy(() => {});
+            return res.redirect('/login?error=' + encodeURIComponent('Session expired. Please login again.'));
+        }
+        if (account.isSuspended) {
+            return res.redirect('/suspend');
+        }
+
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId, ownerId: account.id },
+            include: [{ model: Allocation, as: 'allocation' }]
+        });
+        if (!server) {
+            return res.redirect('/store?error=' + encodeURIComponent('Server not found.'));
+        }
+
+        let connectorOnline = false;
+        if (server.allocation && server.allocation.connectorId) {
+            const connectorWs = connectorConnections.get(server.allocation.connectorId);
+            if (connectorWs && connectorWs.readyState === 1) {
+                connectorOnline = true;
+            }
+        }
+
+        if (connectorOnline && server.allocation && server.allocation.connectorId) {
+            const connectorWs = connectorConnections.get(server.allocation.connectorId);
+            if (connectorWs && connectorWs.readyState === 1) {
+                connectorWs.send(JSON.stringify({ type: 'delete_server', serverId: server.id }));
+            }
+        }
+
+        if (server.allocationId) {
+            await Allocation.update({ serverId: null }, { where: { id: server.allocationId } });
+        }
+
+        const settingsKeysToDelete = [
+            getStoreBillingSettingKeySafe(server.id),
+            getServerRevenueManagedSettingKey(server.id),
+            getServerSchedulesSettingKey(server.id),
+            getServerConfigBaselineSettingKey(server.id),
+            typeof getServerScheduledScalingSettingKey === 'function' ? getServerScheduledScalingSettingKey(server.id) : null,
+            typeof getServerSmartAlertsSettingKey === 'function' ? getServerSmartAlertsSettingKey(server.id) : null,
+            typeof getServerStartupPresetSettingKey === 'function' ? getServerStartupPresetSettingKey(server.id) : null,
+            typeof getServerPolicyEngineSettingKey === 'function' ? getServerPolicyEngineSettingKey(server.id) : null
+        ].filter(Boolean);
+
+        if (settingsKeysToDelete.length > 0) {
+            await Settings.destroy({ where: { key: { [Op.in]: settingsKeysToDelete } } });
+        }
+
+        if (ServerSubuser) {
+            await ServerSubuser.destroy({ where: { serverId: server.id } }).catch(() => {});
+        }
+        if (ServerApiKey) {
+            await ServerApiKey.destroy({ where: { serverId: server.id } }).catch(() => {});
+        }
+
+        if (typeof consumeServerPowerIntent === 'function') {
+            consumeServerPowerIntent(server.id);
+        }
+        if (typeof RESOURCE_ANOMALY_STATE !== 'undefined' && RESOURCE_ANOMALY_STATE && typeof RESOURCE_ANOMALY_STATE.delete === 'function') {
+            RESOURCE_ANOMALY_STATE.delete(server.id);
+        }
+        if (typeof RESOURCE_ANOMALY_SAMPLE_TS !== 'undefined' && RESOURCE_ANOMALY_SAMPLE_TS && typeof RESOURCE_ANOMALY_SAMPLE_TS.delete === 'function') {
+            RESOURCE_ANOMALY_SAMPLE_TS.delete(server.id);
+        }
+        if (typeof PLUGIN_CONFLICT_STATE !== 'undefined' && PLUGIN_CONFLICT_STATE && typeof PLUGIN_CONFLICT_STATE.delete === 'function') {
+            PLUGIN_CONFLICT_STATE.delete(server.id);
+        }
+        if (typeof serverLogCleanupScheduleState !== 'undefined' && serverLogCleanupScheduleState && typeof serverLogCleanupScheduleState.delete === 'function') {
+            serverLogCleanupScheduleState.delete(server.id);
+        }
+        if (typeof pendingMigrationFileImports !== 'undefined' && pendingMigrationFileImports && typeof pendingMigrationFileImports.delete === 'function') {
+            pendingMigrationFileImports.delete(server.id);
+        }
+
+        await server.destroy();
+
+        await createBillingAuditLog({
+            actorUserId: account.id,
+            action: 'billing.server.delete',
+            targetType: 'server',
+            targetId: server.id,
+            req,
+            metadata: {
+                serverName: server.name,
+                containerId: server.containerId,
+                connectorOnline
+            }
+        });
+
+        const message = connectorOnline
+            ? `Server "${server.name}" deleted successfully.`
+            : `Server "${server.name}" deleted from panel. Connector offline, so remote files may still exist.`;
+        return res.redirect('/store?success=' + encodeURIComponent(message));
+    } catch (error) {
+        console.error('Error deleting user server:', error);
+        return res.redirect('/store?error=' + encodeURIComponent('Failed to delete server.'));
+    }
+});
+
 app.get('/user/create', requireAuth, async (req, res) => {
     try {
         const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
@@ -3393,6 +3702,8 @@ app.get('/user/create', requireAuth, async (req, res) => {
         const revenueProfile = normalizeUserRevenueProfile(revenueProfileRaw || {});
         const revenueActivePlan = resolveRevenuePlanById(revenuePlanCatalog, revenueProfile.planId);
         const revenueProvisioningAllowed = !featureFlags.revenueModeEnabled || (Boolean(revenueActivePlan) && isRevenueProfileProvisioningAllowed(revenueProfile));
+        const revenueInventoryBypass = Boolean(featureFlags.revenueModeEnabled) && Boolean(revenueActivePlan) && isRevenueProfileProvisioningAllowed(revenueProfile);
+        const inventoryApplied = Boolean(featureFlags.inventoryEnabled) && !revenueInventoryBypass;
         const renewDays = Math.max(1, Number.parseInt(featureFlags.storeRenewDays, 10) || 30);
         const recurringEstimateCoins = featureFlags.costPerServerEnabled
             ? (
@@ -3430,6 +3741,8 @@ app.get('/user/create', requireAuth, async (req, res) => {
             locations,
             connectors,
             featureInventoryEnabled: Boolean(featureFlags.inventoryEnabled),
+            inventoryApplied,
+            revenueInventoryBypass,
             inventoryState: normalizeUserInventoryState(inventoryState),
             featureQuotaForecastingEnabled: Boolean(featureFlags.quotaForecastingEnabled),
             featureRevenueModeEnabled: Boolean(featureFlags.revenueModeEnabled),
@@ -3483,6 +3796,9 @@ app.get('/user/create/smart-allocation', requireAuth, async (req, res) => {
         const requestedDiskMb = Math.max(1, Number.parseInt(req.query.disk, 10) || 10240);
         const preferredConnectorId = Math.max(0, Number.parseInt(req.query.connectorId, 10) || 0);
         const preferredLocationId = Math.max(0, Number.parseInt(req.query.locationId, 10) || 0);
+        if (preferredLocationId <= 0) {
+            return res.status(400).json({ success: false, error: 'Select a location first.' });
+        }
 
         const allocations = await Allocation.findAll({
             where: { serverId: null },
@@ -3554,6 +3870,12 @@ app.post('/user/create', requireAuth, async (req, res) => {
         if (!imageId) {
             return res.redirect('/user/create?error=' + encodeURIComponent('Image is required.'));
         }
+        if (!Number.isInteger(selectedLocationId) || selectedLocationId <= 0) {
+            return res.redirect('/user/create?error=' + encodeURIComponent('Select a valid location.'));
+        }
+        if (!Number.isInteger(selectedConnectorId) || selectedConnectorId <= 0) {
+            return res.redirect('/user/create?error=' + encodeURIComponent('Select a valid connector.'));
+        }
         if (!smartAllocationEnabled && (!Number.isInteger(requestedAllocationId) || requestedAllocationId <= 0)) {
             return res.redirect('/user/create?error=' + encodeURIComponent('Select a valid allocation or enable Smart Allocation.'));
         }
@@ -3564,6 +3886,9 @@ app.post('/user/create', requireAuth, async (req, res) => {
             return res.redirect('/user/create?error=' + encodeURIComponent('Resource limits must be greater than 0.'));
         }
 
+        let isRevenueManagedProvisioning = false;
+        let revenueManagedPlanId = '';
+        let revenueManagedProfileStatus = '';
         if (featureFlags.revenueModeEnabled) {
             const [revenuePlanCatalog, revenueProfileRaw, ownedUsage] = await Promise.all([
                 getRevenuePlanCatalogSafe(),
@@ -3587,6 +3912,9 @@ app.post('/user/create', requireAuth, async (req, res) => {
             if (!planValidation.ok) {
                 return res.redirect('/user/create?error=' + encodeURIComponent(planValidation.error));
             }
+            isRevenueManagedProvisioning = true;
+            revenueManagedPlanId = String(activeRevenuePlan.id || '').trim();
+            revenueManagedProfileStatus = String(revenueProfile.status || '').trim().toLowerCase();
         }
 
         const image = await Image.findByPk(imageId, { include: [{ model: Package, as: 'package', required: false }] });
@@ -3616,6 +3944,15 @@ app.post('/user/create', requireAuth, async (req, res) => {
                 return res.redirect('/user/create?error=' + encodeURIComponent('Smart Allocation could not find a suitable online allocation for requested resources.'));
             }
             allocation = suggestion.best.allocation;
+            if (allocation.connectorId !== selectedConnectorId) {
+                return res.redirect('/user/create?error=' + encodeURIComponent('Smart Allocation did not find an eligible allocation on the selected connector.'));
+            }
+            const allocationLocationId = allocation.connector && allocation.connector.locationId
+                ? Number.parseInt(allocation.connector.locationId, 10)
+                : 0;
+            if (allocationLocationId !== selectedLocationId) {
+                return res.redirect('/user/create?error=' + encodeURIComponent('Smart Allocation did not find an eligible allocation in the selected location.'));
+            }
         } else {
             allocation = await Allocation.findByPk(requestedAllocationId, {
                 include: [{ model: Connector, as: 'connector', include: [{ model: Location, as: 'location' }] }]
@@ -3661,11 +3998,12 @@ app.post('/user/create', requireAuth, async (req, res) => {
             hasImage: true,
             hasPackage: Boolean(image.packageId)
         }, res.locals.settings || {});
-        const inventoryEnabled = Boolean(featureFlags.inventoryEnabled);
-        const inventoryState = inventoryEnabled
+        const inventoryFeatureEnabled = Boolean(featureFlags.inventoryEnabled);
+        const inventoryApplied = inventoryFeatureEnabled && !isRevenueManagedProvisioning;
+        const inventoryState = inventoryApplied
             ? await getUserInventoryState(account.id)
             : defaultUserInventoryState();
-        if (inventoryEnabled) {
+        if (inventoryApplied) {
             const needs = [];
             if (inventoryState.ramMb < memory) needs.push(`RAM ${memory}MB (available ${inventoryState.ramMb}MB)`);
             if (inventoryState.cpuPercent < cpu) needs.push(`CPU ${cpu}% (available ${inventoryState.cpuPercent}%)`);
@@ -3681,7 +4019,7 @@ app.post('/user/create', requireAuth, async (req, res) => {
         const renewCoins = featureFlags.costPerServerEnabled
             ? calculateStoreRenewCostSafe({ memory, cpu, disk, allocationId: allocation.id }, res.locals.settings || {})
             : 0;
-        const oneTimeCharge = inventoryEnabled ? 0 : Number(oneTimeCostData.total || 0);
+        const oneTimeCharge = inventoryFeatureEnabled ? 0 : Number(oneTimeCostData.total || 0);
         const totalCost = Math.max(0, Number(oneTimeCharge) + Number(renewCoins || 0));
 
         const userCoins = Number.isFinite(Number(account.coins)) ? Number(account.coins) : 0;
@@ -3767,7 +4105,18 @@ app.post('/user/create', requireAuth, async (req, res) => {
 
         await server.update({ status: 'installing' });
 
-        if (inventoryEnabled) {
+        if (isRevenueManagedProvisioning) {
+            await setServerRevenueManagedState(server.id, {
+                managed: true,
+                planId: revenueManagedPlanId,
+                profileStatus: revenueManagedProfileStatus,
+                createdAtMs: Date.now()
+            });
+        } else {
+            await removeServerRevenueManagedState(server.id);
+        }
+
+        if (inventoryApplied) {
             await setUserInventoryState(account.id, {
                 ...inventoryState,
                 ramMb: Math.max(0, inventoryState.ramMb - memory),
@@ -3794,7 +4143,10 @@ app.post('/user/create', requireAuth, async (req, res) => {
             metadata: {
                 serverName: server.name,
                 containerId: server.containerId,
-                inventoryMode: inventoryEnabled,
+                inventoryMode: inventoryApplied,
+                inventoryBypassReason: isRevenueManagedProvisioning ? 'revenue_plan' : null,
+                revenueManagedProvisioning: isRevenueManagedProvisioning,
+                revenuePlanId: isRevenueManagedProvisioning ? revenueManagedPlanId : null,
                 oneTimeCharge,
                 renewCharge: renewCoins,
                 amount: totalCost,
@@ -3824,9 +4176,11 @@ app.post('/user/create', requireAuth, async (req, res) => {
             await removeStoreBillingStateSafe(server.id);
         }
 
-        const billingText = inventoryEnabled
+        const billingText = inventoryApplied
             ? `Used inventory resources${featureFlags.costPerServerEnabled ? ` + charged ${totalCost} ${normalizeEconomyUnit(featureFlags.economyUnit)} for renew cycle` : ''}.`
-            : `Charged ${totalCost} ${normalizeEconomyUnit(featureFlags.economyUnit)}.`;
+            : (isRevenueManagedProvisioning
+                ? `Revenue plan provisioning active, inventory checks were skipped${featureFlags.costPerServerEnabled ? ` + charged ${totalCost} ${normalizeEconomyUnit(featureFlags.economyUnit)} for renew cycle` : ''}.`
+                : `Charged ${totalCost} ${normalizeEconomyUnit(featureFlags.economyUnit)}.`);
         return res.redirect('/store?success=' + encodeURIComponent(`Server created. Deployment queued as job #${installJob.id}. ${billingText}`));
     } catch (error) {
         console.error('Error creating user server:', error);
