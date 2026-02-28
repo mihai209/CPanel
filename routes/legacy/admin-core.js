@@ -41,14 +41,7 @@ app.post('/admin/locations', requireAuth, requireAdmin, [
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        const locations = await Location.findAll();
-        return res.render('admin/locations', {
-            user: req.session.user,
-            locations,
-            path: '/admin/locations',
-            success: null,
-            error: errors.array()[0].msg
-        });
+        return res.redirect('/admin/locations?error=' + encodeURIComponent(errors.array()[0].msg));
     }
 
     const { shortName, description, imageUrl } = req.body;
@@ -57,19 +50,9 @@ app.post('/admin/locations', requireAuth, requireAdmin, [
         res.redirect('/admin/locations?success=Location created successfully!');
     } catch (error) {
         console.error("Error creating location:", error);
-        const locations = await Location.findAll({
-            include: [
-                { model: DatabaseHost, as: 'databaseHosts' },
-                { model: Connector, as: 'connectors' }
-            ]
-        });
-        res.render('admin/locations', {
-            user: req.session.user,
-            locations,
-            path: '/admin/locations',
-            success: null,
-            error: error.name === 'SequelizeUniqueConstraintError' ? 'Short Name already exists' : 'Failed to create location.'
-        });
+        return res.redirect('/admin/locations?error=' + encodeURIComponent(
+            error.name === 'SequelizeUniqueConstraintError' ? 'Short Name already exists' : 'Failed to create location.'
+        ));
     }
 });
 
@@ -155,15 +138,7 @@ app.post('/admin/users', requireAuth, requireAdmin, [
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        const users = await User.findAll();
-        return res.render('admin/users', {
-            user: req.session.user,
-            users,
-            md5,
-            path: '/admin/users',
-            success: null,
-            error: errors.array()[0].msg
-        });
+        return res.redirect('/admin/users?error=' + encodeURIComponent(errors.array()[0].msg));
     }
 
     const { username, email, password, avatarUrl, avatarProvider, isAdmin } = req.body;
@@ -183,15 +158,7 @@ app.post('/admin/users', requireAuth, requireAdmin, [
         res.redirect('/admin/users?success=User created successfully!');
     } catch (error) {
         console.error("Error creating user:", error);
-        const users = await User.findAll();
-        res.render('admin/users', {
-            user: req.session.user,
-            users,
-            md5,
-            path: '/admin/users',
-            success: null,
-            error: 'Failed to create user. Username or email might already exist.'
-        });
+        return res.redirect('/admin/users?error=' + encodeURIComponent('Failed to create user. Username or email might already exist.'));
     }
 });
 
@@ -629,16 +596,7 @@ app.post('/admin/databases', requireAuth, requireAdmin, [
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        const hosts = await DatabaseHost.findAll({ include: [{ model: Location, as: 'location' }] });
-        const locations = await Location.findAll();
-        return res.render('admin/databases', {
-            user: req.session.user,
-            hosts,
-            locations,
-            path: '/admin/databases',
-            success: null,
-            error: errors.array()[0].msg
-        });
+        return res.redirect('/admin/databases?error=' + encodeURIComponent(errors.array()[0].msg));
     }
 
     const { name, host, port, username, password, database, locationId, type } = req.body;
@@ -647,16 +605,7 @@ app.post('/admin/databases', requireAuth, requireAdmin, [
         res.redirect('/admin/databases?success=Database host created successfully!');
     } catch (error) {
         console.error("Error creating database host:", error);
-        const hosts = await DatabaseHost.findAll({ include: [{ model: Location, as: 'location' }] });
-        const locations = await Location.findAll();
-        res.render('admin/databases', {
-            user: req.session.user,
-            hosts,
-            locations,
-            path: '/admin/databases',
-            success: null,
-            error: 'Failed to create database host.'
-        });
+        return res.redirect('/admin/databases?error=' + encodeURIComponent('Failed to create database host.'));
     }
 });
 

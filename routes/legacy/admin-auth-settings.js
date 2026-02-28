@@ -547,8 +547,8 @@ app.get('/admin/settings', requireAuth, requireAdmin, (req, res) => {
     res.render('admin/settings', {
         user: req.session.user,
         path: '/admin/settings',
-        success: null,
-        error: null
+        success: req.query.success || null,
+        error: req.query.error || null
     });
 });
 
@@ -593,20 +593,10 @@ app.post('/admin/settings', requireAuth, requireAdmin, [
         res.locals.settings.brandName = nextSettings.brandName;
         res.locals.settings.faviconUrl = nextSettings.faviconUrl;
 
-        res.render('admin/settings', {
-            user: req.session.user,
-            path: '/admin/settings',
-            success: 'Settings updated successfully!',
-            error: null
-        });
+        return res.redirect('/admin/settings?success=' + encodeURIComponent('Settings updated successfully!'));
     } catch (error) {
         console.error("Error updating settings:", error);
-        res.render('admin/settings', {
-            user: req.session.user,
-            path: '/admin/settings',
-            success: null,
-            error: 'Failed to update settings.'
-        });
+        return res.redirect('/admin/settings?error=' + encodeURIComponent('Failed to update settings.'));
     }
 });
 
@@ -1344,7 +1334,9 @@ app.get('/admin/auth-providers', requireAuth, requireAdmin, (req, res) => {
     res.render('admin/auth-providers', {
         user: req.session.user,
         path: '/admin/auth-providers',
-        appUrl: APP_URL
+        appUrl: APP_URL,
+        success: req.query.success || null,
+        error: req.query.error || null
     });
 });
 
@@ -1370,22 +1362,10 @@ app.post('/admin/auth-providers', requireAuth, requireAdmin, async (req, res) =>
             res.locals.settings[key] = value;
         }
 
-        res.render('admin/auth-providers', {
-            user: req.session.user,
-            path: '/admin/auth-providers',
-            appUrl: APP_URL,
-            success: 'Auth provider settings updated successfully!',
-            error: null
-        });
+        return res.redirect('/admin/auth-providers?success=' + encodeURIComponent('Auth provider settings updated successfully!'));
     } catch (error) {
         console.error('Error updating auth provider settings:', error);
-        res.render('admin/auth-providers', {
-            user: req.session.user,
-            path: '/admin/auth-providers',
-            appUrl: APP_URL,
-            success: null,
-            error: 'Failed to update auth provider settings.'
-        });
+        return res.redirect('/admin/auth-providers?error=' + encodeURIComponent('Failed to update auth provider settings.'));
     }
 });
 }

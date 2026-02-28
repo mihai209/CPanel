@@ -97,7 +97,7 @@ app.post('/login',
         // Check for validation errors
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
-            return res.render('login', { error: 'Invalid input provided' });
+            return res.redirect('/login?error=' + encodeURIComponent('Invalid input provided'));
         }
 
         const { email, password, captcha } = req.body;
@@ -111,7 +111,7 @@ app.post('/login',
                     'warning',
                     'auth'
                 );
-                return res.render('login', { error: 'Invalid captcha code' });
+                return res.redirect('/login?error=' + encodeURIComponent('Invalid captcha code'));
             }
             // Clear captcha after use
             delete req.session.captcha;
@@ -129,7 +129,7 @@ app.post('/login',
                     'warning',
                     'auth'
                 );
-                return res.render('login', { error: 'Invalid credentials' });
+                return res.redirect('/login?error=' + encodeURIComponent('Invalid credentials'));
             }
 
             if (user.twoFactorEnabled) {
@@ -179,7 +179,7 @@ app.post('/login',
             res.redirect('/');
         } catch (err) {
             console.error('Login error:', err);
-            res.render('login', { error: 'Login failed. Please try again.' });
+            return res.redirect('/login?error=' + encodeURIComponent('Login failed. Please try again.'));
         }
     }
 );

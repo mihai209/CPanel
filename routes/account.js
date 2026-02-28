@@ -59,7 +59,9 @@ function registerAccountRoutes({
                 user: userData,
                 linkedAccounts: normalizedLinkedAccounts,
                 title: 'Account Settings',
-                appUrl: APP_URL
+                appUrl: APP_URL,
+                success: req.query.success || null,
+                error: req.query.error || null
             });
         } catch (err) {
             console.error('Error fetching account:', err);
@@ -106,11 +108,7 @@ function registerAccountRoutes({
         if (avatarUrl && avatarUrl.trim() !== '') {
             const validExtensions = /\.(png|webp|jpg|jpeg|gif)$/i;
             if (!validExtensions.test(avatarUrl)) {
-                return res.render('account', {
-                    user: req.session.user,
-                    title: 'Account Settings',
-                    error: 'Invalid avatar URL. Must end with .png, .webp, .jpg, .jpeg, or .gif'
-                });
+                return res.redirect('/account?error=' + encodeURIComponent('Invalid avatar URL. Must end with .png, .webp, .jpg, .jpeg, or .gif'));
             }
         }
 
@@ -135,16 +133,10 @@ function registerAccountRoutes({
             req.session.user.gravatarHash = md5(email.trim().toLowerCase());
             req.session.user.avatarUrl = avatarUrl;
 
-            res.render('account', {
-                user: req.session.user,
-                title: 'Account Settings',
-                success: 'Account details updated successfully!'
-            });
+            return res.redirect('/account?success=' + encodeURIComponent('Account details updated successfully!'));
         } catch (err) {
             console.error("Failed to update account:", err);
-            res.render('account', {
-                error: 'Failed to update account details.'
-            });
+            return res.redirect('/account?error=' + encodeURIComponent('Failed to update account details.'));
         }
     });
 
@@ -238,11 +230,7 @@ function registerAccountRoutes({
         const { currentPassword, newPassword, confirmPassword } = req.body;
 
         if (newPassword !== confirmPassword) {
-            return res.render('account', {
-                user: req.session.user,
-                title: 'Account Settings',
-                error: 'New passwords do not match.'
-            });
+            return res.redirect('/account?error=' + encodeURIComponent('New passwords do not match.'));
         }
 
         try {
@@ -251,11 +239,7 @@ function registerAccountRoutes({
 
             // Verify current password
             if (!(await bcrypt.compare(currentPassword, user.password))) {
-                return res.render('account', {
-                    user: req.session.user,
-                    title: 'Account Settings',
-                    error: 'Current password is incorrect.'
-                });
+                return res.redirect('/account?error=' + encodeURIComponent('Current password is incorrect.'));
             }
 
             // Hash and save new password
@@ -265,15 +249,11 @@ function registerAccountRoutes({
             // Destroy session and redirect to login
             req.session.destroy((err) => {
                 if (err) console.error("Session destroy error:", err);
-                res.render('login', { success: 'Password changed successfully. Please log in again.', error: null });
+                res.redirect('/login?success=' + encodeURIComponent('Password changed successfully. Please log in again.'));
             });
         } catch (err) {
             console.error("Failed to update password:", err);
-            res.render('account', {
-                user: req.session.user,
-                title: 'Account Settings',
-                error: 'Failed to update password.'
-            });
+            return res.redirect('/account?error=' + encodeURIComponent('Failed to update password.'));
         }
     });
 }

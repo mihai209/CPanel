@@ -339,6 +339,9 @@ app.get('/api/admin/servers/smart-allocation', requireAuth, requireAdmin, async 
 
 app.get('/admin/migrations/pterodactyl', requireAuth, requireAdmin, async (req, res) => {
     try {
+        const migrationDraft = req.session && req.session.pterodactylMigrationDraft && typeof req.session.pterodactylMigrationDraft === 'object'
+            ? req.session.pterodactylMigrationDraft
+            : null;
         const [users, images, allocations] = await Promise.all([
             User.findAll({ attributes: ['id', 'username', 'email'], order: [['username', 'ASC']] }),
             Image.findAll({ order: [['name', 'ASC']] }),
@@ -357,14 +360,16 @@ app.get('/admin/migrations/pterodactyl', requireAuth, requireAdmin, async (req, 
             images,
             allocations,
             connectorStatus: global.connectorStatus || {},
-            remotePanelUrl: '',
-            remoteServerRef: '',
-            remoteSftpHost: '',
-            remoteSftpPort: 2022,
-            remoteSftpPath: '/',
-            migrationSnapshot: null,
-            migrationPrecheck: null,
-            migrationToken: '',
+            remotePanelUrl: migrationDraft ? String(migrationDraft.remotePanelUrl || '') : '',
+            remoteServerRef: migrationDraft ? String(migrationDraft.remoteServerRef || '') : '',
+            remoteSftpHost: migrationDraft ? String(migrationDraft.remoteSftpHost || '') : '',
+            remoteSftpPort: migrationDraft && Number.isInteger(Number.parseInt(migrationDraft.remoteSftpPort, 10))
+                ? Number.parseInt(migrationDraft.remoteSftpPort, 10)
+                : 2022,
+            remoteSftpPath: migrationDraft ? String(migrationDraft.remoteSftpPath || '/') : '/',
+            migrationSnapshot: migrationDraft ? (migrationDraft.migrationSnapshot || null) : null,
+            migrationPrecheck: migrationDraft ? (migrationDraft.migrationPrecheck || null) : null,
+            migrationToken: migrationDraft ? String(migrationDraft.migrationToken || '') : '',
             jobId: req.query.jobId || null,
             serverId: req.query.serverId || null,
             fileImport: req.query.fileImport || '0',
@@ -434,14 +439,7 @@ app.post('/admin/migrations/pterodactyl/fetch', requireAuth, requireAdmin, async
         const migrationToken = encodeMigrationSnapshot(migrationSnapshot);
         const inferredSftpHost = inferSftpHostFromPanelUrl(remotePanelUrl);
 
-        res.render('admin/migration-pterodactyl', {
-            user: req.session.user,
-            title: 'Pterodactyl Migration',
-            path: '/admin/migrations/pterodactyl',
-            users,
-            images,
-            allocations,
-            connectorStatus: global.connectorStatus || {},
+        req.session.pterodactylMigrationDraft = {
             remotePanelUrl,
             remoteServerRef,
             remoteSftpHost: inferredSftpHost,
@@ -449,17 +447,13 @@ app.post('/admin/migrations/pterodactyl/fetch', requireAuth, requireAdmin, async
             remoteSftpPath: '/',
             migrationSnapshot,
             migrationPrecheck,
-            migrationToken,
-            jobId: req.query.jobId || null,
-            serverId: req.query.serverId || null,
-            fileImport: req.query.fileImport || '0',
-            success: null,
-            error: null,
-            warning: null
-        });
+            migrationToken
+        };
+        await new Promise((resolve) => req.session.save(resolve));
+        return res.redirect('/admin/migrations/pterodactyl?success=' + encodeURIComponent('Remote server fetched successfully. Continue with import step.'));
     } catch (error) {
         console.error('Failed to fetch Pterodactyl server for migration:', error);
-        res.redirect(`/admin/migrations/pterodactyl?error=${encodeURIComponent(error.message || 'Failed to fetch remote server data.')}`);
+        return res.redirect(`/admin/migrations/pterodactyl?error=${encodeURIComponent(error.message || 'Failed to fetch remote server data.')}`);
     }
 });
 
@@ -672,6 +666,8 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
             ? ' File import via SFTP is queued and will start automatically after install finishes.'
             : '';
         const jobNotice = ` Deployment job #${installJob.id} queued.`;
+        delete req.session.pterodactylMigrationDraft;
+        await new Promise((resolve) => req.session.save(resolve));
         const query = [
             `success=${encodeURIComponent(`Server "${createdServer.name}" imported and deployment started.${jobNotice}${fileImportNotice}`)}`,
             warning ? `warning=${encodeURIComponent(warning)}` : '',
