@@ -343,6 +343,7 @@ app.get('/admin/images', requireAuth, requireAdmin, async (req, res) => {
             packages,
             path: '/admin/images',
             title: 'Images',
+            currentPackageId: packageId || '',
             success: req.query.success || null,
             error: req.query.error || null
         });
@@ -354,6 +355,7 @@ app.get('/admin/images', requireAuth, requireAdmin, async (req, res) => {
             packages: [],
             path: '/admin/images',
             title: 'Images',
+            currentPackageId: req.query.packageId || '',
             success: null,
             error: 'Failed to load images.'
         });
@@ -500,17 +502,23 @@ app.post('/admin/images/edit/:id', requireAuth, requireAdmin, async (req, res) =
 
 // Admin Images (Delete - POST)
 app.post('/admin/images/delete/:id', requireAuth, requireAdmin, async (req, res) => {
+    const packageId = Number.parseInt(req.body.packageId || req.query.packageId, 10);
+    const redirectBase = Number.isInteger(packageId) && packageId > 0
+        ? `/admin/images?packageId=${encodeURIComponent(String(packageId))}`
+        : '/admin/images';
+    const redirectWith = (key, value) => `${redirectBase}${redirectBase.includes('?') ? '&' : '?'}${key}=${encodeURIComponent(value)}`;
+
     try {
         const usageCount = await Server.count({ where: { imageId: req.params.id } });
         if (usageCount > 0) {
-            return res.redirect(`/admin/images?error=Cannot delete image because it is used by ${usageCount} server(s).`);
+            return res.redirect(redirectWith('error', `Cannot delete image because it is used by ${usageCount} server(s).`));
         }
 
         await Image.destroy({ where: { id: req.params.id } });
-        res.redirect('/admin/images?success=Image deleted successfully!');
+        res.redirect(redirectWith('success', 'Image deleted successfully!'));
     } catch (error) {
         console.error('Error deleting image:', error);
-        res.redirect('/admin/images?error=Failed to delete image.');
+        res.redirect(redirectWith('error', 'Failed to delete image.'));
     }
 });
 

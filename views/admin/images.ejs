@@ -217,6 +217,9 @@
                                                                                                 method="POST"
                                                                                                 class="delete-image-form"
                                                                                                 style="display: inline;">
+                                                                                                <% if (currentPackageId) { %>
+                                                                                                    <input type="hidden" name="packageId" value="<%= currentPackageId %>">
+                                                                                                <% } %>
                                                                                                 <button type="submit"
                                                                                                     class="btn btn-sm btn-outline-danger"
                                                                                                     title="Delete">
