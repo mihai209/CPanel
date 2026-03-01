@@ -1395,6 +1395,451 @@ function isServerLikelyMinecraft(serverLike) {
     return keywords.some((keyword) => haystack.includes(keyword));
 }
 
+const MINECRAFT_PROPERTIES_FIELD_GROUPS = [
+    {
+        id: 'general',
+        title: 'General',
+        fields: [
+            { key: 'motd', label: 'MOTD', type: 'text', placeholder: 'A Minecraft Server' },
+            { key: 'max-players', label: 'Max Players', type: 'number', min: 1, max: 500, fallback: '20' },
+            { key: 'difficulty', label: 'Difficulty', type: 'select', fallback: 'easy', options: ['peaceful', 'easy', 'normal', 'hard'] },
+            { key: 'gamemode', label: 'Game Mode', type: 'select', fallback: 'survival', options: ['survival', 'creative', 'adventure', 'spectator'] },
+            { key: 'level-name', label: 'Level Name', type: 'text', fallback: 'world' },
+            { key: 'level-seed', label: 'Level Seed', type: 'text', fallback: '' }
+        ]
+    },
+    {
+        id: 'network',
+        title: 'Network',
+        fields: [
+            { key: 'server-port', label: 'Server Port', type: 'number', min: 1, max: 65535, readonly: true },
+            { key: 'query.port', label: 'Query Port', type: 'number', min: 1, max: 65535, fallback: '' },
+            { key: 'server-ip', label: 'Bind IP', type: 'text', fallback: '0.0.0.0' },
+            { key: 'online-mode', label: 'Online Mode', type: 'boolean', fallback: 'true' },
+            { key: 'white-list', label: 'Whitelist Enabled', type: 'boolean', fallback: 'false' }
+        ]
+    },
+    {
+        id: 'gameplay',
+        title: 'Gameplay',
+        fields: [
+            { key: 'pvp', label: 'PVP', type: 'boolean', fallback: 'true' },
+            { key: 'hardcore', label: 'Hardcore', type: 'boolean', fallback: 'false' },
+            { key: 'allow-nether', label: 'Allow Nether', type: 'boolean', fallback: 'true' },
+            { key: 'allow-flight', label: 'Allow Flight', type: 'boolean', fallback: 'false' },
+            { key: 'enable-command-block', label: 'Enable Command Blocks', type: 'boolean', fallback: 'false' },
+            { key: 'spawn-protection', label: 'Spawn Protection', type: 'number', min: 0, max: 32, fallback: '16' },
+            { key: 'view-distance', label: 'View Distance', type: 'number', min: 2, max: 32, fallback: '10' },
+            { key: 'simulation-distance', label: 'Simulation Distance', type: 'number', min: 2, max: 32, fallback: '10' }
+        ]
+    }
+];
+
+const MINECRAFT_PROPERTIES_KEYS = MINECRAFT_PROPERTIES_FIELD_GROUPS
+    .flatMap((group) => group.fields.map((field) => field.key));
+
+const MINECRAFT_CONFIG_PATHS = Object.freeze({
+    serverProperties: '/server.properties',
+    eula: '/eula.txt',
+    whitelist: '/whitelist.json',
+    ops: '/ops.json',
+    permissions: '/permissions.yml'
+});
+
+function normalizeMinecraftBooleanString(value, fallback = 'false') {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(normalized)) return 'true';
+    if (['false', '0', 'no', 'off'].includes(normalized)) return 'false';
+    return fallback;
+}
+
+function parseMinecraftProperties(content) {
+    const parsed = {};
+    const lines = String(content || '').replace(/\r\n/g, '\n').split('\n');
+    const kvRegex = /^\s*([A-Za-z0-9_.-]+)\s*[:=]\s*(.*?)\s*$/;
+    lines.forEach((line) => {
+        const trimmed = String(line || '').trim();
+        if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('!')) return;
+        const match = line.match(kvRegex);
+        if (!match) return;
+        const key = String(match[1] || '').trim();
+        const value = String(match[2] || '').trim();
+        if (!key) return;
+        parsed[key] = value;
+    });
+    return parsed;
+}
+
+function upsertMinecraftPropertiesContent(existingContent, updates) {
+    const normalizedUpdates = {};
+    Object.entries(updates || {}).forEach(([key, value]) => {
+        const safeKey = String(key || '').trim();
+        if (!safeKey) return;
+        normalizedUpdates[safeKey] = String(value === undefined || value === null ? '' : value);
+    });
+
+    const lines = String(existingContent || '').replace(/\r\n/g, '\n').split('\n');
+    const kvRegex = /^\s*([A-Za-z0-9_.-]+)\s*[:=]\s*(.*?)\s*$/;
+    const seen = new Set();
+    const out = lines.map((line) => {
+        const match = line.match(kvRegex);
+        if (!match) return line;
+        const key = String(match[1] || '').trim();
+        if (!Object.prototype.hasOwnProperty.call(normalizedUpdates, key)) return line;
+        seen.add(key);
+        return `${key}=${normalizedUpdates[key]}`;
+    });
+
+    Object.entries(normalizedUpdates).forEach(([key, value]) => {
+        if (seen.has(key)) return;
+        out.push(`${key}=${value}`);
+    });
+
+    let result = out.join('\n');
+    if (!result.endsWith('\n')) result += '\n';
+    return result;
+}
+
+function parseMinecraftEulaAccepted(content) {
+    const lines = String(content || '').replace(/\r\n/g, '\n').split('\n');
+    for (const rawLine of lines) {
+        const line = String(rawLine || '').trim();
+        if (!line || line.startsWith('#')) continue;
+        if (/^eula\s*=\s*true$/i.test(line)) return true;
+        if (/^eula\s*=\s*false$/i.test(line)) return false;
+    }
+    return false;
+}
+
+function buildMinecraftEulaContent(accepted) {
+    const value = accepted ? 'true' : 'false';
+    return [
+        '# Generated by CPanel Minecraft Configs',
+        '# https://www.minecraft.net/eula',
+        `eula=${value}`,
+        ''
+    ].join('\n');
+}
+
+function parseJSONArray(content) {
+    try {
+        const parsed = JSON.parse(String(content || '').trim() || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
+function parseUniqueNamesMultiline(rawValue, limit = 500) {
+    const lines = String(rawValue || '')
+        .replace(/\r\n/g, '\n')
+        .split('\n')
+        .map((line) => String(line || '').trim())
+        .filter(Boolean);
+    const dedupe = new Set();
+    const names = [];
+    for (const line of lines) {
+        const safe = line.replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 16);
+        if (!safe) continue;
+        const key = safe.toLowerCase();
+        if (dedupe.has(key)) continue;
+        dedupe.add(key);
+        names.push(safe);
+        if (names.length >= limit) break;
+    }
+    return names;
+}
+
+function formatWhitelistNamesForTextarea(entries) {
+    return (Array.isArray(entries) ? entries : [])
+        .map((entry) => String(entry && entry.name ? entry.name : '').trim())
+        .filter(Boolean)
+        .join('\n');
+}
+
+function buildWhitelistEntriesFromNames(names, existingEntries = []) {
+    const existingMap = new Map();
+    (Array.isArray(existingEntries) ? existingEntries : []).forEach((entry) => {
+        const name = String(entry && entry.name ? entry.name : '').trim();
+        if (!name) return;
+        existingMap.set(name.toLowerCase(), entry);
+    });
+
+    return names.map((name) => {
+        const existing = existingMap.get(String(name).toLowerCase()) || {};
+        return {
+            uuid: String(existing.uuid || '').trim(),
+            name: String(name)
+        };
+    });
+}
+
+function formatOpsEntriesForTextarea(entries) {
+    return (Array.isArray(entries) ? entries : [])
+        .map((entry) => {
+            const name = String(entry && entry.name ? entry.name : '').trim();
+            if (!name) return '';
+            const level = Math.min(4, Math.max(1, Number.parseInt(entry.level, 10) || 4));
+            const bypass = entry && entry.bypassesPlayerLimit === false ? 'false' : 'true';
+            return `${name}:${level}:${bypass}`;
+        })
+        .filter(Boolean)
+        .join('\n');
+}
+
+function parseOpsEntriesMultiline(rawValue) {
+    const lines = String(rawValue || '').replace(/\r\n/g, '\n').split('\n');
+    const dedupe = new Set();
+    const entries = [];
+    for (const rawLine of lines) {
+        const line = String(rawLine || '').trim();
+        if (!line) continue;
+        const parts = line.split(':');
+        const rawName = String(parts[0] || '').trim();
+        const name = rawName.replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 16);
+        if (!name) continue;
+        const key = name.toLowerCase();
+        if (dedupe.has(key)) continue;
+        dedupe.add(key);
+
+        const level = Math.min(4, Math.max(1, Number.parseInt(parts[1], 10) || 4));
+        const bypass = normalizeMinecraftBooleanString(parts[2], 'true') === 'true';
+        entries.push({ name, level, bypassesPlayerLimit: bypass });
+        if (entries.length >= 500) break;
+    }
+    return entries;
+}
+
+function buildOpsEntriesFromParsed(parsedEntries, existingEntries = []) {
+    const existingMap = new Map();
+    (Array.isArray(existingEntries) ? existingEntries : []).forEach((entry) => {
+        const name = String(entry && entry.name ? entry.name : '').trim();
+        if (!name) return;
+        existingMap.set(name.toLowerCase(), entry);
+    });
+
+    return parsedEntries.map((entry) => {
+        const existing = existingMap.get(String(entry.name || '').toLowerCase()) || {};
+        return {
+            uuid: String(existing.uuid || '').trim(),
+            name: String(entry.name || ''),
+            level: Math.min(4, Math.max(1, Number.parseInt(entry.level, 10) || 4)),
+            bypassesPlayerLimit: Boolean(entry.bypassesPlayerLimit)
+        };
+    });
+}
+
+function normalizePermissionDefault(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (['true', 'false', 'op', 'notop'].includes(normalized)) return normalized;
+    return 'op';
+}
+
+function parseSimplePermissionsYaml(content) {
+    const lines = String(content || '').replace(/\r\n/g, '\n').split('\n');
+    const entries = [];
+    let inPermissions = false;
+    let current = null;
+
+    const flushCurrent = () => {
+        if (!current || !current.node) return;
+        entries.push({
+            node: String(current.node).slice(0, 120),
+            default: normalizePermissionDefault(current.default),
+            description: String(current.description || '').slice(0, 200)
+        });
+    };
+
+    for (const rawLine of lines) {
+        const line = String(rawLine || '');
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+
+        if (!inPermissions) {
+            if (/^permissions\s*:/.test(trimmed)) {
+                inPermissions = true;
+            }
+            continue;
+        }
+
+        if (/^\S/.test(line) && !/^permissions\s*:/.test(trimmed)) {
+            flushCurrent();
+            current = null;
+            inPermissions = false;
+            break;
+        }
+
+        const nodeMatch = line.match(/^\s{2}([^:#][^:]*):\s*$/);
+        if (nodeMatch) {
+            flushCurrent();
+            current = { node: String(nodeMatch[1] || '').trim(), default: 'op', description: '' };
+            continue;
+        }
+
+        if (!current) continue;
+
+        const defaultMatch = line.match(/^\s{4}default:\s*(.*?)\s*$/);
+        if (defaultMatch) {
+            current.default = normalizePermissionDefault(String(defaultMatch[1] || '').replace(/^["']|["']$/g, ''));
+            continue;
+        }
+
+        const descriptionMatch = line.match(/^\s{4}description:\s*(.*?)\s*$/);
+        if (descriptionMatch) {
+            current.description = String(descriptionMatch[1] || '').replace(/^["']|["']$/g, '');
+            continue;
+        }
+    }
+    flushCurrent();
+    return entries.slice(0, 500);
+}
+
+function formatPermissionsEntriesForTextarea(entries) {
+    return (Array.isArray(entries) ? entries : [])
+        .map((entry) => {
+            const node = String(entry && entry.node ? entry.node : '').trim();
+            if (!node) return '';
+            const def = normalizePermissionDefault(entry.default);
+            const description = String(entry && entry.description ? entry.description : '').replace(/[|]/g, '/').trim();
+            return description ? `${node}|${def}|${description}` : `${node}|${def}`;
+        })
+        .filter(Boolean)
+        .join('\n');
+}
+
+function parsePermissionsEntriesMultiline(rawValue) {
+    const lines = String(rawValue || '').replace(/\r\n/g, '\n').split('\n');
+    const dedupe = new Set();
+    const entries = [];
+    for (const rawLine of lines) {
+        const line = String(rawLine || '').trim();
+        if (!line) continue;
+        const parts = line.split('|');
+        const node = String(parts[0] || '').trim().slice(0, 120);
+        if (!node || !/^[A-Za-z0-9._:*-]+$/.test(node)) continue;
+        const key = node.toLowerCase();
+        if (dedupe.has(key)) continue;
+        dedupe.add(key);
+
+        const defaultValue = normalizePermissionDefault(parts[1]);
+        const description = String(parts[2] || '').trim().slice(0, 200);
+        entries.push({
+            node,
+            default: defaultValue,
+            description
+        });
+        if (entries.length >= 500) break;
+    }
+    return entries;
+}
+
+function buildPermissionsYaml(entries) {
+    const list = Array.isArray(entries) ? entries : [];
+    if (list.length === 0) {
+        return [
+            '# Generated by CPanel Minecraft Configs',
+            'permissions: {}',
+            ''
+        ].join('\n');
+    }
+
+    const lines = ['# Generated by CPanel Minecraft Configs', 'permissions:'];
+    list.forEach((entry) => {
+        const node = String(entry.node || '').trim();
+        if (!node) return;
+        lines.push(`  ${node}:`);
+        if (String(entry.description || '').trim()) {
+            lines.push(`    description: ${JSON.stringify(String(entry.description || '').trim())}`);
+        }
+        lines.push(`    default: ${normalizePermissionDefault(entry.default)}`);
+    });
+    lines.push('');
+    return lines.join('\n');
+}
+
+function isLikelyNotFoundConnectorError(errorMessage) {
+    const msg = String(errorMessage || '').toLowerCase();
+    return msg.includes('not found') || msg.includes('no such file') || msg.includes('does not exist');
+}
+
+async function readConnectorTextFile(connectorWs, serverId, filePath, timeoutMs = 12000) {
+    if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+        return { success: false, error: 'Connector is offline.', content: '', missing: false };
+    }
+    try {
+        connectorWs.send(JSON.stringify({
+            type: 'read_file',
+            serverId,
+            filePath
+        }));
+    } catch (error) {
+        return {
+            success: false,
+            error: error && error.message ? error.message : 'Failed to send read request to connector.',
+            content: '',
+            missing: false
+        };
+    }
+
+    const response = await waitForConnectorMessage(connectorWs, (message) => {
+        if (Number.parseInt(message.serverId, 10) !== Number.parseInt(serverId, 10)) return null;
+        if (String(message.type || '') === 'file_content' && String(message.filePath || '') === filePath) {
+            return {
+                success: true,
+                content: String(message.content || ''),
+                missing: false,
+                error: ''
+            };
+        }
+        if (String(message.type || '') === 'error') {
+            const messageText = String(message.message || 'Connector returned an error.');
+            if (isLikelyNotFoundConnectorError(messageText)) {
+                return { success: true, content: '', missing: true, error: '' };
+            }
+            return { success: false, error: messageText, content: '', missing: false };
+        }
+        return null;
+    }, timeoutMs);
+
+    return response || { success: false, error: 'Timed out waiting for connector file read.', content: '', missing: false };
+}
+
+async function writeConnectorTextFile(connectorWs, serverId, filePath, content, timeoutMs = 15000) {
+    if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+        return { success: false, error: 'Connector is offline.' };
+    }
+
+    try {
+        connectorWs.send(JSON.stringify({
+            type: 'write_file',
+            serverId,
+            filePath,
+            content: String(content === undefined || content === null ? '' : content)
+        }));
+    } catch (error) {
+        return {
+            success: false,
+            error: error && error.message ? error.message : 'Failed to send write request to connector.'
+        };
+    }
+
+    const response = await waitForConnectorMessage(connectorWs, (message) => {
+        if (Number.parseInt(message.serverId, 10) !== Number.parseInt(serverId, 10)) return null;
+        if (String(message.type || '') === 'write_success' && String(message.filePath || '') === filePath) {
+            return { success: true };
+        }
+        if (String(message.type || '') === 'error') {
+            return {
+                success: false,
+                error: String(message.message || 'Connector returned an error.')
+            };
+        }
+        return null;
+    }, timeoutMs);
+
+    return response || { success: false, error: 'Timed out waiting for connector file write.' };
+}
+
 function sanitizeUploadFileName(rawName) {
     const name = String(rawName || '').trim();
     if (!name) return '';
@@ -6740,6 +7185,9 @@ app.get('/server/:containerId/minecraft', requireAuth, async (req, res) => {
         if (!hasServerPermission(access, 'server.minecraft')) {
             return res.redirect('/server/no-permissions');
         }
+        if (!isServerLikelyMinecraft(server)) {
+            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Minecraft tools are available only for Minecraft servers.')}`);
+        }
         if (server.isSuspended) {
             return res.redirect(`/server/${server.containerId}/suspended`);
         }
@@ -6768,6 +7216,251 @@ app.get('/server/:containerId/minecraft', requireAuth, async (req, res) => {
     } catch (err) {
         console.error('Error loading minecraft addons page:', err);
         res.redirect('/?error=Error loading Minecraft addons page');
+    }
+});
+
+app.get('/server/:containerId/minecraft-configs', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [
+                { model: Allocation, as: 'allocation', include: [{ model: Connector, as: 'connector' }] },
+                { model: Image, as: 'image' }
+            ]
+        });
+
+        if (!server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft')) {
+            return res.redirect('/server/no-permissions');
+        }
+        if (!isServerLikelyMinecraft(server)) {
+            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Minecraft Config Manager is available only for Minecraft servers.')}`);
+        }
+        if (server.isSuspended) {
+            return res.redirect(`/server/${server.containerId}/suspended`);
+        }
+        if (!server.allocation || !server.allocation.connectorId) {
+            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Server allocation is missing.')}`);
+        }
+
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Connector is offline. Cannot load config files.')}`);
+        }
+
+        const [serverPropertiesFile, eulaFile, whitelistFile, opsFile, permissionsFile] = await Promise.all([
+            readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.serverProperties),
+            readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.eula),
+            readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.whitelist),
+            readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.ops),
+            readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.permissions)
+        ]);
+
+        const readFailures = [serverPropertiesFile, eulaFile, whitelistFile, opsFile, permissionsFile]
+            .filter((result) => !result.success);
+        if (readFailures.length > 0) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent(readFailures[0].error || 'Failed to read one or more Minecraft config files.')}`);
+        }
+
+        const parsedProperties = parseMinecraftProperties(serverPropertiesFile.content);
+        const propertyValues = {};
+        MINECRAFT_PROPERTIES_FIELD_GROUPS.forEach((group) => {
+            group.fields.forEach((field) => {
+                let value = Object.prototype.hasOwnProperty.call(parsedProperties, field.key)
+                    ? String(parsedProperties[field.key] || '')
+                    : String(field.fallback === undefined || field.fallback === null ? '' : field.fallback);
+
+                if (field.key === 'server-port') {
+                    value = String(Number.parseInt(server.allocation && server.allocation.port, 10) || 25565);
+                }
+                if (field.type === 'boolean') {
+                    value = normalizeMinecraftBooleanString(value, normalizeMinecraftBooleanString(field.fallback || 'false'));
+                } else if (field.type === 'number') {
+                    const parsed = Number.parseInt(value, 10);
+                    if (Number.isInteger(parsed)) {
+                        const min = Number.isInteger(field.min) ? field.min : parsed;
+                        const max = Number.isInteger(field.max) ? field.max : parsed;
+                        value = String(Math.min(max, Math.max(min, parsed)));
+                    } else if (field.fallback !== undefined) {
+                        value = String(field.fallback);
+                    }
+                } else if (field.type === 'select') {
+                    const options = Array.isArray(field.options) ? field.options.map((entry) => String(entry)) : [];
+                    if (!options.includes(value)) {
+                        value = options.includes(String(field.fallback || '')) ? String(field.fallback) : (options[0] || '');
+                    }
+                }
+
+                propertyValues[field.key] = value;
+            });
+        });
+
+        const whitelistEntries = parseJSONArray(whitelistFile.content);
+        const opsEntries = parseJSONArray(opsFile.content);
+        const permissionsEntries = parseSimplePermissionsYaml(permissionsFile.content);
+        const permissionsRawTrimmed = String(permissionsFile.content || '').trim();
+        const permissionsDetectedComplex = permissionsRawTrimmed.length > 0
+            && permissionsEntries.length === 0
+            && permissionsRawTrimmed.includes(':')
+            && !/^permissions\s*:\s*\{\s*\}\s*$/i.test(permissionsRawTrimmed);
+
+        return res.render('server/minecraft-configs', {
+            server,
+            user: req.session.user,
+            title: `Minecraft Configs ${server.name}`,
+            path: '/servers',
+            minecraftPropertyFieldGroups: MINECRAFT_PROPERTIES_FIELD_GROUPS,
+            minecraftPropertyValues: propertyValues,
+            eulaAccepted: parseMinecraftEulaAccepted(eulaFile.content),
+            whitelistNamesText: formatWhitelistNamesForTextarea(whitelistEntries),
+            opsEntriesText: formatOpsEntriesForTextarea(opsEntries),
+            permissionsEntriesText: formatPermissionsEntriesForTextarea(permissionsEntries),
+            permissionsDetectedComplex,
+            permissionsFileMissing: Boolean(permissionsFile.missing),
+            success: req.query.success || null,
+            error: req.query.error || null
+        });
+    } catch (err) {
+        console.error('Error loading minecraft config manager:', err);
+        return res.redirect('/?error=' + encodeURIComponent('Error loading Minecraft config manager.'));
+    }
+});
+
+app.post('/server/:containerId/minecraft-configs', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [
+                { model: Allocation, as: 'allocation', include: [{ model: Connector, as: 'connector' }] },
+                { model: Image, as: 'image' }
+            ]
+        });
+
+        if (!server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft')) {
+            return res.redirect('/server/no-permissions');
+        }
+        if (!isServerLikelyMinecraft(server)) {
+            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Minecraft Config Manager is available only for Minecraft servers.')}`);
+        }
+        if (server.isSuspended) {
+            return res.redirect(`/server/${server.containerId}/suspended`);
+        }
+        if (!server.allocation || !server.allocation.connectorId) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Server allocation is missing.')}`);
+        }
+
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Connector is offline. Cannot save config files.')}`);
+        }
+
+        const existingProperties = await readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.serverProperties);
+        if (!existingProperties.success) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent(existingProperties.error || 'Failed to read server.properties before saving.')}`);
+        }
+
+        const propertyUpdates = {};
+        MINECRAFT_PROPERTIES_FIELD_GROUPS.forEach((group) => {
+            group.fields.forEach((field) => {
+                if (field.readonly && field.key === 'server-port') {
+                    propertyUpdates[field.key] = String(Number.parseInt(server.allocation && server.allocation.port, 10) || 25565);
+                    return;
+                }
+
+                const inputKey = `prop_${field.key}`;
+                let rawValue = req.body[inputKey];
+                if (Array.isArray(rawValue)) rawValue = rawValue[rawValue.length - 1];
+                rawValue = String(rawValue === undefined || rawValue === null ? '' : rawValue).trim();
+
+                if (field.type === 'boolean') {
+                    propertyUpdates[field.key] = normalizeMinecraftBooleanString(rawValue, normalizeMinecraftBooleanString(field.fallback || 'false'));
+                    return;
+                }
+
+                if (field.type === 'number') {
+                    const parsed = Number.parseInt(rawValue, 10);
+                    const fallbackParsed = Number.parseInt(String(field.fallback === undefined ? '' : field.fallback), 10);
+                    const effective = Number.isInteger(parsed)
+                        ? parsed
+                        : (Number.isInteger(fallbackParsed) ? fallbackParsed : 0);
+                    const min = Number.isInteger(field.min) ? field.min : effective;
+                    const max = Number.isInteger(field.max) ? field.max : effective;
+                    propertyUpdates[field.key] = String(Math.min(max, Math.max(min, effective)));
+                    return;
+                }
+
+                if (field.type === 'select') {
+                    const options = Array.isArray(field.options) ? field.options.map((entry) => String(entry)) : [];
+                    if (options.includes(rawValue)) {
+                        propertyUpdates[field.key] = rawValue;
+                    } else if (options.includes(String(field.fallback || ''))) {
+                        propertyUpdates[field.key] = String(field.fallback);
+                    } else {
+                        propertyUpdates[field.key] = options[0] || '';
+                    }
+                    return;
+                }
+
+                propertyUpdates[field.key] = rawValue.slice(0, 300);
+            });
+        });
+
+        propertyUpdates['server-port'] = String(Number.parseInt(server.allocation && server.allocation.port, 10) || 25565);
+        if (!propertyUpdates['query.port']) {
+            propertyUpdates['query.port'] = propertyUpdates['server-port'];
+        }
+
+        const nextServerProperties = upsertMinecraftPropertiesContent(existingProperties.content, propertyUpdates);
+        const eulaAccepted = normalizeMinecraftBooleanString(req.body.eulaAccepted, 'false') === 'true';
+        const nextEula = buildMinecraftEulaContent(eulaAccepted);
+
+        const existingWhitelist = await readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.whitelist);
+        const existingOps = await readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.ops);
+        const existingPermissions = await readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.permissions);
+        if (!existingWhitelist.success || !existingOps.success || !existingPermissions.success) {
+            const failure = [existingWhitelist, existingOps, existingPermissions].find((entry) => !entry.success);
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent((failure && failure.error) || 'Failed to read current config files.')}`);
+        }
+
+        const whitelistNames = parseUniqueNamesMultiline(req.body.whitelistNames, 500);
+        const whitelistCurrent = parseJSONArray(existingWhitelist.content);
+        const nextWhitelist = JSON.stringify(buildWhitelistEntriesFromNames(whitelistNames, whitelistCurrent), null, 2) + '\n';
+
+        const opsParsed = parseOpsEntriesMultiline(req.body.opsEntries);
+        const opsCurrent = parseJSONArray(existingOps.content);
+        const nextOps = JSON.stringify(buildOpsEntriesFromParsed(opsParsed, opsCurrent), null, 2) + '\n';
+
+        const applyPermissionsEditor = normalizeMinecraftBooleanString(req.body.applyPermissionsEditor, 'false') === 'true';
+        const permissionsParsed = parsePermissionsEntriesMultiline(req.body.permissionsEntries);
+        const nextPermissions = buildPermissionsYaml(permissionsParsed);
+
+        const writeOperations = [
+            { path: MINECRAFT_CONFIG_PATHS.serverProperties, content: nextServerProperties },
+            { path: MINECRAFT_CONFIG_PATHS.eula, content: nextEula },
+            { path: MINECRAFT_CONFIG_PATHS.whitelist, content: nextWhitelist },
+            { path: MINECRAFT_CONFIG_PATHS.ops, content: nextOps }
+        ];
+        if (applyPermissionsEditor) {
+            writeOperations.push({ path: MINECRAFT_CONFIG_PATHS.permissions, content: nextPermissions });
+        }
+
+        for (const operation of writeOperations) {
+            const writeResult = await writeConnectorTextFile(connectorWs, server.id, operation.path, operation.content, 20000);
+            if (!writeResult.success) {
+                return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent(writeResult.error || `Failed to write ${operation.path}.`)}`);
+            }
+        }
+
+        const successMessage = applyPermissionsEditor
+            ? 'Minecraft configs updated successfully.'
+            : 'Minecraft configs updated successfully. permissions.yml unchanged (toggle disabled).';
+        return res.redirect(`/server/${server.containerId}/minecraft-configs?success=${encodeURIComponent(successMessage)}`);
+    } catch (err) {
+        console.error('Error saving minecraft config manager:', err);
+        return res.redirect(`/server/${req.params.containerId}/minecraft-configs?error=${encodeURIComponent('Failed to save Minecraft configs.')}`);
     }
 });
 
