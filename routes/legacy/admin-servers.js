@@ -89,6 +89,25 @@ function formatSmartAllocationResponse(result) {
     };
 }
 
+async function resolvePrimaryAllocationForServer(server, options = {}) {
+    if (!server) return null;
+    const serverId = Number.parseInt(server.id, 10);
+    const allocationId = Number.parseInt(server.allocationId, 10);
+    if (!Number.isInteger(serverId) || serverId <= 0) return null;
+    if (!Number.isInteger(allocationId) || allocationId <= 0) return null;
+
+    const query = {
+        where: {
+            id: allocationId,
+            serverId
+        }
+    };
+    if (options.includeConnector) {
+        query.include = [{ model: Connector, as: 'connector' }];
+    }
+    return Allocation.findOne(query);
+}
+
 function extractStartupPlaceholders(startup) {
     const text = String(startup || '');
     const regex = /\{\{\s*([A-Z0-9_]+)\s*\}\}/g;
@@ -1191,9 +1210,12 @@ app.post('/admin/servers/reinstall/:containerId', requireAuth, requireAdmin, asy
             ]
         });
         if (!server) return res.redirect('/admin/servers?error=Server not found.');
-        if (!server.allocation || !server.image) return res.redirect(`/admin/servers/${server.containerId}/manage?error=Server is missing allocation or image configuration.`);
+        if (!server.image) return res.redirect(`/admin/servers/${server.containerId}/manage?error=Server is missing image configuration.`);
 
-        const connectorWs = server.allocation.connectorId ? connectorConnections.get(server.allocation.connectorId) : null;
+        const primaryAllocation = await resolvePrimaryAllocationForServer(server, { includeConnector: true });
+        if (!primaryAllocation) return res.redirect(`/admin/servers/${server.containerId}/manage?error=Server primary allocation is missing.`);
+
+        const connectorWs = primaryAllocation.connectorId ? connectorConnections.get(primaryAllocation.connectorId) : null;
         if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
             return res.redirect(`/admin/servers/${server.containerId}/manage?error=Connector is offline. Cannot start reinstall.`);
         }
@@ -1203,7 +1225,7 @@ app.post('/admin/servers/reinstall/:containerId', requireAuth, requireAdmin, asy
         const { resolvedVariables, env } = buildServerEnvironment(image, server.variables, {
             SERVER_MEMORY: String(server.memory),
             SERVER_IP: '0.0.0.0',
-            SERVER_PORT: String(server.allocation.port)
+            SERVER_PORT: String(primaryAllocation.port)
         });
         const startup = buildStartupCommand(server.startup || image.startup, env);
         const assignedAllocations = await Allocation.findAll({
@@ -1214,7 +1236,7 @@ app.post('/admin/servers/reinstall/:containerId', requireAuth, requireAdmin, asy
         const deploymentPorts = buildDeploymentPorts({
             imagePorts,
             env,
-            primaryAllocation: server.allocation,
+            primaryAllocation,
             allocations: assignedAllocations
         });
         const startupMode = shouldUseCommandStartup(image) ? 'command' : 'environment';

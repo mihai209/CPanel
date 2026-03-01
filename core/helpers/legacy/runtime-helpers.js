@@ -1075,13 +1075,28 @@ async function runServerScheduledScalingSweep() {
                     }
                 }
 
-                const connectorWs = connectorConnections.get(server.allocation.connectorId);
+                const primaryAllocationId = Number.parseInt(server.allocationId, 10);
+                const primaryAllocation = Number.isInteger(primaryAllocationId) && primaryAllocationId > 0
+                    ? await Allocation.findOne({
+                        where: {
+                            id: primaryAllocationId,
+                            serverId: server.id
+                        },
+                        attributes: ['id', 'ip', 'port', 'connectorId']
+                    })
+                    : null;
+
+                if (!primaryAllocation || !primaryAllocation.connectorId) {
+                    continue;
+                }
+
+                const connectorWs = connectorConnections.get(primaryAllocation.connectorId);
                 if (connectorWs && connectorWs.readyState === WebSocket.OPEN && typeof buildServerEnvironment === 'function' && typeof buildStartupCommand === 'function' && typeof resolveImagePorts === 'function') {
                     try {
                         const runtimeValues = {
                             SERVER_MEMORY: String(nextLimits.memory),
                             SERVER_IP: '0.0.0.0',
-                            SERVER_PORT: String(server.allocation.port || '')
+                            SERVER_PORT: String(primaryAllocation.port || '')
                         };
                         const built = buildServerEnvironment(server.image, server.variables || {}, runtimeValues);
                         const startup = buildStartupCommand(server.startup || server.image.startup, built.env);
@@ -1095,7 +1110,7 @@ async function runServerScheduledScalingSweep() {
                         const deploymentPorts = buildDeploymentPorts({
                             imagePorts,
                             env: built.env,
-                            primaryAllocation: server.allocation,
+                            primaryAllocation,
                             allocations: assignedAllocations
                         });
 

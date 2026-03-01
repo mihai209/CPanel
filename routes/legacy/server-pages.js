@@ -4757,10 +4757,11 @@ app.get('/server/:containerId/overview', requireAuth, async (req, res) => {
         let resolvedStartup = server.image ? server.image.startup : '';
         try {
             if (server.image) {
+                const primaryAllocation = await resolvePrimaryAllocationForServer(server);
                 const runtimeValues = {
                     SERVER_MEMORY: String(server.memory),
                     SERVER_IP: '0.0.0.0',
-                    SERVER_PORT: server.allocation ? String(server.allocation.port) : ''
+                    SERVER_PORT: primaryAllocation ? String(primaryAllocation.port) : ''
                 };
                 const built = buildServerEnvironment(server.image, server.variables || {}, runtimeValues);
                 resolvedStartup = buildStartupCommand(server.startup || server.image.startup, built.env);
@@ -5391,6 +5392,25 @@ function normalizeAllocationNotes(raw) {
         .trim();
     const sliced = compact.slice(0, 20);
     return sliced || null;
+}
+
+async function resolvePrimaryAllocationForServer(server, options = {}) {
+    if (!server) return null;
+    const serverId = Number.parseInt(server.id, 10);
+    const allocationId = Number.parseInt(server.allocationId, 10);
+    if (!Number.isInteger(serverId) || serverId <= 0) return null;
+    if (!Number.isInteger(allocationId) || allocationId <= 0) return null;
+
+    const query = {
+        where: {
+            id: allocationId,
+            serverId
+        }
+    };
+    if (options.includeConnector) {
+        query.include = [{ model: Connector, as: 'connector' }];
+    }
+    return Allocation.findOne(query);
 }
 
 app.get('/server/:containerId/network', requireAuth, async (req, res) => {
@@ -7190,6 +7210,11 @@ app.get('/server/:containerId/startup', requireAuth, async (req, res) => {
             return res.redirect(`/server/${server.containerId}/suspended`);
         }
 
+        const primaryAllocation = await resolvePrimaryAllocationForServer(server, { includeConnector: true });
+        if (!primaryAllocation) {
+            return res.redirect(`/server/${server.containerId}/startup?error=${encodeURIComponent('Primary allocation is missing for this server.')}`);
+        }
+
         const image = server.image;
         const dockerChoices = resolveImageDockerChoices(image);
         const variableDefinitions = resolveImageVariableDefinitions(image).filter((v) => {
@@ -7204,7 +7229,7 @@ app.get('/server/:containerId/startup', requireAuth, async (req, res) => {
         const runtimeValues = {
             SERVER_MEMORY: String(server.memory),
             SERVER_IP: '0.0.0.0',
-            SERVER_PORT: server.allocation ? String(server.allocation.port) : ''
+            SERVER_PORT: String(primaryAllocation.port || '')
         };
 
         let resolvedVariables = {};
@@ -7258,11 +7283,16 @@ app.post('/server/:containerId/startup', requireAuth, async (req, res) => {
             return res.redirect(`/server/${server.containerId}/suspended`);
         }
 
+        const primaryAllocation = await resolvePrimaryAllocationForServer(server, { includeConnector: true });
+        if (!primaryAllocation) {
+            return res.redirect(`/server/${server.containerId}/startup?error=${encodeURIComponent('Primary allocation is missing for this server.')}`);
+        }
+
         const image = server.image;
         const runtimeValues = {
             SERVER_MEMORY: String(server.memory),
             SERVER_IP: '0.0.0.0',
-            SERVER_PORT: server.allocation ? String(server.allocation.port) : ''
+            SERVER_PORT: String(primaryAllocation.port || '')
         };
         const imagePorts = resolveImagePorts(image.ports);
         const startupMode = shouldUseCommandStartup(image) ? 'command' : 'environment';
@@ -7317,11 +7347,11 @@ app.post('/server/:containerId/startup', requireAuth, async (req, res) => {
             return res.redirect(`/server/${server.containerId}/startup?success=${encodeURIComponent(savedMessage)}`);
         }
 
-        if (!server.allocation || !server.allocation.connectorId) {
+        if (!primaryAllocation || !primaryAllocation.connectorId) {
             return res.redirect(`/server/${server.containerId}/startup?error=Server allocation is missing.`);
         }
 
-        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        const connectorWs = connectorConnections.get(primaryAllocation.connectorId);
         if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
             await server.update(updatePayload);
             return res.redirect(`/server/${server.containerId}/startup?error=Connector is offline. Saved settings, but reinstall could not start.`);
@@ -7335,7 +7365,7 @@ app.post('/server/:containerId/startup', requireAuth, async (req, res) => {
         const deploymentPorts = buildDeploymentPorts({
             imagePorts,
             env,
-            primaryAllocation: server.allocation,
+            primaryAllocation,
             allocations: assignedAllocations
         });
 
