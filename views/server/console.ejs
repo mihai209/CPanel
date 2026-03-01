@@ -552,6 +552,8 @@
             let currentServerStatus = '<%= String(server.status || "stopped").toLowerCase() %>';
             const promptBrand = <%- JSON.stringify(String((settings && settings.brandName) ? settings.brandName : 'cpanel').toLowerCase()) %>;
             const showMinecraftEulaModal = <%- JSON.stringify(Boolean(showMinecraftEulaModal)) %>;
+            const eulaModalEl = showMinecraftEulaModal ? document.getElementById('eulaModal') : null;
+            const eulaModalInstance = eulaModalEl && window.bootstrap ? bootstrap.Modal.getOrCreateInstance(eulaModalEl) : null;
 
             let connectorOnline = true;
 
@@ -680,9 +682,12 @@
                             }
                             break;
                         case 'eula_status':
-                            if (showMinecraftEulaModal && !data.accepted) {
-                                const modal = new bootstrap.Modal(document.getElementById('eulaModal'));
-                                modal.show();
+                            if (showMinecraftEulaModal && eulaModalInstance) {
+                                if (data.accepted) {
+                                    eulaModalInstance.hide();
+                                } else {
+                                    eulaModalInstance.show();
+                                }
                             }
                             break;
                         case 'error':
@@ -805,8 +810,7 @@
             if (btnAcceptEula) {
                 btnAcceptEula.addEventListener('click', () => {
                     client.send('accept_eula');
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('eulaModal'));
-                    if (modal) modal.hide();
+                    if (eulaModalInstance) eulaModalInstance.hide();
                     term.writeln('\x1b[1;32m[*] EULA accepted! Please start your server now.\x1b[0m');
                 });
             }
