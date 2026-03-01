@@ -363,10 +363,15 @@ app.get('/admin/images', requireAuth, requireAdmin, async (req, res) => {
 app.post('/admin/images/import', requireAuth, requireAdmin, async (req, res) => {
     try {
         const jsonPayload = (req.body.jsonPayload || '').trim();
-        const packageId = req.body.packageId;
+        const packageIdRaw = req.body.packageId;
+        const packageId = Number.parseInt(packageIdRaw, 10);
 
-        if (!packageId) {
+        if (!Number.isInteger(packageId) || packageId <= 0) {
             return res.redirect('/admin/images?error=' + encodeURIComponent('You must select a package for the imported image.'));
+        }
+        const selectedPackage = await Package.findByPk(packageId);
+        if (!selectedPackage) {
+            return res.redirect('/admin/images?error=' + encodeURIComponent('Selected package does not exist anymore. Please refresh and try again.'));
         }
 
         if (!jsonPayload) {
@@ -380,29 +385,55 @@ app.post('/admin/images/import', requireAuth, requireAdmin, async (req, res) => 
             return res.redirect('/admin/images?error=' + encodeURIComponent('Invalid JSON format.'));
         }
 
-        if (Array.isArray(parsedJson)) {
-            if (parsedJson.length !== 1 || !parsedJson[0] || typeof parsedJson[0] !== 'object') {
-                return res.redirect('/admin/images?error=' + encodeURIComponent('JSON array imports must contain exactly one image object.'));
+        const payloadItems = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
+        if (payloadItems.length === 0) {
+            return res.redirect('/admin/images?error=' + encodeURIComponent('No image objects found in the provided JSON payload.'));
+        }
+
+        let createdCount = 0;
+        let updatedCount = 0;
+        const failedItems = [];
+
+        for (const [index, item] of payloadItems.entries()) {
+            try {
+                if (!item || typeof item !== 'object' || Array.isArray(item)) {
+                    throw new Error('Entry is not a JSON object.');
+                }
+
+                const normalized = parseImportedImageJson(item);
+                normalized.packageId = packageId;
+
+                const [image, created] = await Image.findOrCreate({
+                    where: { name: normalized.name },
+                    defaults: normalized
+                });
+
+                if (!created) {
+                    await image.update(normalized);
+                    updatedCount += 1;
+                } else {
+                    createdCount += 1;
+                }
+            } catch (entryError) {
+                const entryName = item && typeof item === 'object'
+                    ? String(item.name || (item.attributes && item.attributes.name) || `entry_${index + 1}`)
+                    : `entry_${index + 1}`;
+                failedItems.push(`${entryName}: ${entryError.message || 'invalid payload'}`);
             }
-            parsedJson = parsedJson[0];
         }
 
-        const normalized = parseImportedImageJson(parsedJson);
-        normalized.packageId = packageId; // Assign the selected package
-
-        const [image, created] = await Image.findOrCreate({
-            where: { name: normalized.name },
-            defaults: normalized
-        });
-
-        if (!created) {
-            await image.update(normalized);
+        if ((createdCount + updatedCount) === 0) {
+            const errorMessage = failedItems.length > 0
+                ? `Image import failed. ${failedItems.slice(0, 3).join(' | ')}`
+                : 'Image import failed.';
+            return res.redirect('/admin/images?error=' + encodeURIComponent(errorMessage));
         }
 
-        const message = created
-            ? `Image "${normalized.name}" imported successfully.`
-            : `Image "${normalized.name}" updated successfully from JSON import.`;
-        res.redirect('/admin/images?success=' + encodeURIComponent(message));
+        const summary = `Import complete. Created: ${createdCount}, Updated: ${updatedCount}, Failed: ${failedItems.length}.`;
+        if (failedItems.length > 0) {
+            return res.redirect('/admin/images?success=' + encodeURIComponent(summary) + '&warning=' + encodeURIComponent(failedItems.slice(0, 3).join(' | ')));
+        }
+        return res.redirect('/admin/images?success=' + encodeURIComponent(summary));
     } catch (error) {
         console.error('Failed to import image JSON:', error);
         res.redirect('/admin/images?error=' + encodeURIComponent(error.message || 'Image import failed.'));

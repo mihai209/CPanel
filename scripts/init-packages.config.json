@@ -1,0 +1,53 @@
+{
+  "imports": [
+    {
+      "package": "Database",
+      "description": "Production-ready database stack for game platforms and web apps. Includes MariaDB 10.3, PostgreSQL 16, and Redis 7 templates for persistent storage, caching, and queue/session workloads.",
+      "sources": [
+        "../images/database"
+      ]
+    },
+    {
+      "package": "Hytale",
+      "description": "Hytale-focused server image collection prepared for dedicated deployment and version experimentation, with startup settings aligned for sandbox testing and community server hosting.",
+      "sources": [
+        "../images/hytale"
+      ]
+    },
+    {
+      "package": "Minecraft",
+      "description": "Complete Minecraft ecosystem package: Vanilla, Paper, Forge, SpongeVanilla, and BungeeCord. Designed for survival, modded, and proxy-network deployments with broad version compatibility.",
+      "sources": [
+        "../images/minecraft"
+      ]
+    },
+    {
+      "package": "Misc",
+      "description": "General-purpose utility services and custom workloads. Includes web hosting, VPS-style runtime templates, and code-server workflows for lightweight dev environments and maintenance tasks.",
+      "sources": [
+        "../images/misc"
+      ]
+    },
+    {
+      "package": "Rust",
+      "description": "Dedicated Rust game server package optimized for quick provisioning, update/reinstall workflows, and community/modded gameplay environments.",
+      "sources": [
+        "../images/rust"
+      ]
+    },
+    {
+      "package": "Source Engine",
+      "description": "Classic Source/GoldSrc game hosting bundle including CS:GO, Garry's Mod, Team Fortress 2, Insurgency, ARK, and custom Source-engine templates for legacy and modern communities.",
+      "sources": [
+        "../images/source-engine"
+      ]
+    },
+    {
+      "package": "Voice",
+      "description": "Voice communication services for gaming communities, featuring TeamSpeak 3 and Mumble templates with persistent data support and easy connector-based deployment.",
+      "sources": [
+        "../images/voice"
+      ]
+    }
+  ]
+}
