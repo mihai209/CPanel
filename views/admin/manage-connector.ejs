@@ -146,6 +146,7 @@
                                                                 <th class="py-3">IP Address</th>
                                                                 <th class="py-3">Port</th>
                                                                 <th class="py-3">Alias</th>
+                                                                <th class="py-3">Notes</th>
                                                                 <th class="py-3">Assigned To</th>
                                                                 <th class="py-3 text-end pe-4">Actions</th>
                                                             </tr>
@@ -194,6 +195,31 @@
                                                                             </form>
                                                                         </td>
                                                                         <td>
+                                                                            <span class="notes-display"
+                                                                                data-id="<%= alloc.id %>"
+                                                                                style="cursor: pointer;"
+                                                                                title="Click to edit">
+                                                                                <%= alloc.notes || '-' %>
+                                                                                    <i class="bi bi-pencil-fill ms-1 text-muted"
+                                                                                        style="font-size: 0.7rem;"></i>
+                                                                            </span>
+                                                                            <form class="notes-edit d-none"
+                                                                                data-id="<%= alloc.id %>"
+                                                                                style="display: inline-block;">
+                                                                                <input type="text" maxlength="20"
+                                                                                    class="form-control form-control-sm d-inline-block"
+                                                                                    value="<%= alloc.notes || '' %>"
+                                                                                    style="width: 170px; background-color: #141419; border-color: #2d2d35; color: white;"
+                                                                                    placeholder="max 20 chars">
+                                                                                <button type="submit"
+                                                                                    class="btn btn-sm btn-success ms-1"><i
+                                                                                        class="bi bi-check"></i></button>
+                                                                                <button type="button"
+                                                                                    class="btn btn-sm btn-secondary notes-cancel"><i
+                                                                                        class="bi bi-x"></i></button>
+                                                                            </form>
+                                                                        </td>
+                                                                        <td>
                                                                             <% if (alloc.server) { %>
                                                                                 <a href="/server/<%= alloc.server.id %>"
                                                                                     class="text-decoration-none text-light"><i
@@ -221,7 +247,7 @@
                                                                     <% }); %>
                                                                         <% } else { %>
                                                                             <tr>
-                                                                                <td colspan="6"
+                                                                                <td colspan="7"
                                                                                     class="text-center py-5 text-muted">
                                                                                     <i
                                                                                         class="bi bi-inbox fs-1 d-block mb-3 opacity-50"></i>
@@ -401,6 +427,13 @@
                                     style="background-color: #141419; border-color: #2d2d35; color: white;"
                                     placeholder="play.example.com">
                             </div>
+                            <div class="mb-1">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Notes
+                                    (Optional)</label>
+                                <input type="text" name="notes" maxlength="20" class="form-control"
+                                    style="background-color: #141419; border-color: #2d2d35; color: white;"
+                                    placeholder="max 20 chars">
+                            </div>
                         </div>
                         <div class="modal-footer border-top border-secondary border-opacity-10">
                             <button type="button" class="btn btn-link text-muted text-decoration-none fw-medium"
@@ -548,6 +581,55 @@
                             }
                         } catch (err) {
                             alert('Error updating alias');
+                        }
+                    });
+                });
+
+                // Inline notes editing
+                document.querySelectorAll('.notes-display').forEach(span => {
+                    span.addEventListener('click', function () {
+                        const id = this.dataset.id;
+                        const form = document.querySelector(`.notes-edit[data-id="${id}"]`);
+                        if (!form) return;
+                        this.classList.add('d-none');
+                        form.classList.remove('d-none');
+                        const input = form.querySelector('input');
+                        if (input) input.focus();
+                    });
+                });
+
+                document.querySelectorAll('.notes-edit').forEach(form => {
+                    const id = form.dataset.id;
+                    const span = document.querySelector(`.notes-display[data-id="${id}"]`);
+                    const input = form.querySelector('input');
+                    const cancelBtn = form.querySelector('.notes-cancel');
+
+                    if (cancelBtn && span) {
+                        cancelBtn.addEventListener('click', function () {
+                            form.classList.add('d-none');
+                            span.classList.remove('d-none');
+                        });
+                    }
+
+                    form.addEventListener('submit', async function (e) {
+                        e.preventDefault();
+                        const nextValue = (input ? input.value : '').trim().slice(0, 20);
+                        try {
+                            const res = await fetch(`/admin/connectors/<%= connector.id %>/allocations/${id}/notes`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ notes: nextValue })
+                            });
+                            const data = await res.json();
+                            if (data.success && span) {
+                                span.childNodes[0].textContent = data.notes || '-';
+                                form.classList.add('d-none');
+                                span.classList.remove('d-none');
+                            } else {
+                                alert('Failed to update notes');
+                            }
+                        } catch (err) {
+                            alert('Error updating notes');
                         }
                     });
                 });

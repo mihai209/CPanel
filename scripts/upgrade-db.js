@@ -118,6 +118,7 @@ const Allocation = sequelize.define('Allocation', {
     ip: { type: DataTypes.STRING, allowNull: false },
     port: { type: DataTypes.INTEGER, allowNull: false },
     alias: { type: DataTypes.STRING, allowNull: true },
+    notes: { type: DataTypes.STRING(20), allowNull: true },
     connectorId: { type: DataTypes.INTEGER, allowNull: false },
     serverId: { type: DataTypes.INTEGER, allowNull: true }
 });

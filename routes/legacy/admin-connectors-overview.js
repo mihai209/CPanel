@@ -43,6 +43,14 @@ function renderWebServerTemplate(type, panelUrl) {
     return content;
 }
 
+function normalizeAllocationNotes(raw) {
+    const compact = String(raw || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const sliced = compact.slice(0, 20);
+    return sliced || null;
+}
+
 function registerAdminConnectorsOverviewRoutes(ctx) {
     for (const [key, value] of Object.entries(ctx || {})) {
         try {
@@ -395,6 +403,7 @@ app.get('/admin/connectors/:id/webserver-template', requireAuth, requireAdmin, a
 app.post('/admin/connectors/:id/allocations', requireAuth, requireAdmin, async (req, res) => {
     try {
         const { ip, port, portEnd, alias } = req.body;
+        const notes = normalizeAllocationNotes(req.body.notes);
 
         // Check if it's a port range
         if (portEnd && parseInt(portEnd) > parseInt(port)) {
@@ -407,6 +416,7 @@ app.post('/admin/connectors/:id/allocations', requireAuth, requireAdmin, async (
                     ip,
                     port: p,
                     alias: alias || null,
+                    notes,
                     connectorId: req.params.id
                 });
             }
@@ -419,6 +429,7 @@ app.post('/admin/connectors/:id/allocations', requireAuth, requireAdmin, async (
                 ip,
                 port: parseInt(port),
                 alias: alias || null,
+                notes,
                 connectorId: req.params.id
             });
             res.redirect(`/admin/connectors/${req.params.id}/allocations?success=Allocation created successfully!`);
@@ -457,6 +468,20 @@ app.post('/admin/connectors/:id/allocations/:allocId/alias', requireAuth, requir
     } catch (error) {
         console.error("Error updating alias:", error);
         res.status(500).json({ success: false, error: 'Failed to update alias' });
+    }
+});
+
+app.post('/admin/connectors/:id/allocations/:allocId/notes', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const notes = normalizeAllocationNotes(req.body.notes);
+        await Allocation.update(
+            { notes },
+            { where: { id: req.params.allocId, connectorId: req.params.id } }
+        );
+        res.json({ success: true, notes });
+    } catch (error) {
+        console.error('Error updating allocation notes:', error);
+        res.status(500).json({ success: false, error: 'Failed to update notes' });
     }
 });
 

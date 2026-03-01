@@ -81,6 +81,7 @@ function formatSmartAllocationResponse(result) {
         ip: String(allocation.ip || ''),
         port: Number.parseInt(allocation.port, 10) || 0,
         alias: allocation.alias || null,
+        notes: allocation.notes || null,
         score: Number(best.score || 0),
         estimatedCpuUsage: Number(best.cpuUsage || 0),
         projectedMemoryHeadroomMb: Number(best.cap && best.cap.memoryHeadroomMb || 0),
@@ -1028,10 +1029,8 @@ app.post('/admin/servers/delete/:containerId', requireAuth, requireAdmin, async 
             console.warn(`Connector ${server.allocation && server.allocation.connectorId} is offline, skipping resource deletion command.`);
         }
 
-        // Unlink allocation
-        if (server.allocationId) {
-            await Allocation.update({ serverId: null }, { where: { id: server.allocationId } });
-        }
+        // Unlink all allocations assigned to this server.
+        await Allocation.update({ serverId: null }, { where: { serverId: server.id } });
 
         await Settings.destroy({ where: { key: getServerSmartAlertsSettingKey(server.id) } });
         await Settings.destroy({ where: { key: getServerStartupPresetSettingKey(server.id) } });

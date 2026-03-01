@@ -1151,6 +1151,7 @@ function formatSmartAllocationResponse(result) {
         ip: String(allocation.ip || ''),
         port: Number.parseInt(allocation.port, 10) || 0,
         alias: allocation.alias || null,
+        notes: allocation.notes || null,
         connectorId: Number.parseInt(allocation.connectorId, 10) || 0,
         connectorName: connector ? String(connector.name || `Connector #${allocation.connectorId}`) : `Connector #${allocation.connectorId}`,
         locationId: location ? (Number.parseInt(location.id, 10) || 0) : (Number.parseInt(connector && connector.locationId, 10) || 0),
@@ -3853,9 +3854,7 @@ app.post('/user/server/:containerId/delete', requireAuth, async (req, res) => {
             }
         }
 
-        if (server.allocationId) {
-            await Allocation.update({ serverId: null }, { where: { id: server.allocationId } });
-        }
+        await Allocation.update({ serverId: null }, { where: { serverId: server.id } });
 
         const settingsKeysToDelete = [
             getStoreBillingSettingKeySafe(server.id),
@@ -5386,6 +5385,14 @@ app.post('/server/:containerId/backups/delete/:backupId', requireAuth, async (re
     }
 });
 
+function normalizeAllocationNotes(raw) {
+    const compact = String(raw || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const sliced = compact.slice(0, 20);
+    return sliced || null;
+}
+
 app.get('/server/:containerId/network', requireAuth, async (req, res) => {
     try {
         const server = await Server.findOne({
@@ -5559,6 +5566,9 @@ app.post('/server/:containerId/network/allocations/:allocationId/delete', requir
         if (!allocation) {
             return res.redirect(`/server/${server.containerId}/network?error=${encodeURIComponent('Allocation is not assigned to this server.')}`);
         }
+        if (server.allocation && Number.parseInt(allocation.connectorId, 10) !== Number.parseInt(server.allocation.connectorId, 10)) {
+            return res.redirect(`/server/${server.containerId}/network?error=${encodeURIComponent('Allocation is not on this server connector.')}`);
+        }
 
         const primaryAllocationId = Number.parseInt(server.allocationId, 10) || (server.allocation ? Number.parseInt(server.allocation.id, 10) : 0);
         if (primaryAllocationId === allocation.id) {
@@ -5571,6 +5581,86 @@ app.post('/server/:containerId/network/allocations/:allocationId/delete', requir
     } catch (error) {
         console.error('Error removing additional allocation:', error);
         return res.redirect(`/server/${req.params.containerId}/network?error=${encodeURIComponent('Failed to remove allocation.')}`);
+    }
+});
+
+app.post('/server/:containerId/network/allocations/:allocationId/primary', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }]
+        });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.network.manage')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const allocationId = Number.parseInt(req.params.allocationId, 10);
+        if (!Number.isInteger(allocationId) || allocationId <= 0) {
+            return res.redirect(`/server/${server.containerId}/network?error=${encodeURIComponent('Invalid allocation id.')}`);
+        }
+
+        const allocation = await Allocation.findOne({
+            where: {
+                id: allocationId,
+                serverId: server.id
+            }
+        });
+        if (!allocation) {
+            return res.redirect(`/server/${server.containerId}/network?error=${encodeURIComponent('Allocation is not assigned to this server.')}`);
+        }
+        if (server.allocation && Number.parseInt(allocation.connectorId, 10) !== Number.parseInt(server.allocation.connectorId, 10)) {
+            return res.redirect(`/server/${server.containerId}/network?error=${encodeURIComponent('Allocation is not on this server connector.')}`);
+        }
+
+        const currentPrimaryId = Number.parseInt(server.allocationId, 10) || (server.allocation ? Number.parseInt(server.allocation.id, 10) : 0);
+        if (currentPrimaryId === allocation.id) {
+            return res.redirect(`/server/${server.containerId}/network?success=${encodeURIComponent('Allocation is already primary.')}`);
+        }
+
+        await server.update({ allocationId: allocation.id });
+
+        return res.redirect(`/server/${server.containerId}/network?success=${encodeURIComponent('Primary allocation updated. Restart/reinstall may be required to refresh runtime port bindings.')}`);
+    } catch (error) {
+        console.error('Error switching primary allocation:', error);
+        return res.redirect(`/server/${req.params.containerId}/network?error=${encodeURIComponent('Failed to switch primary allocation.')}`);
+    }
+});
+
+app.post('/server/:containerId/network/allocations/:allocationId/notes', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.network.manage')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const allocationId = Number.parseInt(req.params.allocationId, 10);
+        if (!Number.isInteger(allocationId) || allocationId <= 0) {
+            return res.redirect(`/server/${server.containerId}/network?error=${encodeURIComponent('Invalid allocation id.')}`);
+        }
+
+        const allocation = await Allocation.findOne({
+            where: {
+                id: allocationId,
+                serverId: server.id
+            }
+        });
+        if (!allocation) {
+            return res.redirect(`/server/${server.containerId}/network?error=${encodeURIComponent('Allocation is not assigned to this server.')}`);
+        }
+
+        const notes = normalizeAllocationNotes(req.body.notes);
+        await allocation.update({ notes });
+
+        return res.redirect(`/server/${server.containerId}/network?success=${encodeURIComponent('Allocation notes updated.')}`);
+    } catch (error) {
+        console.error('Error updating allocation notes:', error);
+        return res.redirect(`/server/${req.params.containerId}/network?error=${encodeURIComponent('Failed to update allocation notes.')}`);
     }
 });
 
@@ -7539,7 +7629,8 @@ app.get('/api/client/servers/:containerId', async (req, res) => {
                 allocation: allocation ? {
                     ip: allocation.ip,
                     port: allocation.port,
-                    alias: allocation.alias || null
+                    alias: allocation.alias || null,
+                    notes: allocation.notes || null
                 } : null,
                 connector: connector ? {
                     id: connector.id,
