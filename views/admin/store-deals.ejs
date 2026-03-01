@@ -98,6 +98,10 @@
                                 <input type="number" name="resourceImages" min="0" step="1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
                             </div>
                             <div class="col-md-2">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Database Slots</label>
+                                <input type="number" name="resourceDatabases" min="0" step="1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
+                            </div>
+                            <div class="col-md-2">
                                 <label class="form-label text-muted small text-uppercase fw-bold">Package Tokens</label>
                                 <input type="number" name="resourcePackages" min="0" step="1" value="0" class="form-control" style="background-color:#1a1a20;border-color:#2d2d35;">
                             </div>
@@ -191,6 +195,10 @@
                                                 <div class="col-md-1">
                                                     <label class="form-label text-muted small text-uppercase fw-bold">Img</label>
                                                     <input type="number" name="resourceImages" min="0" step="1" value="<%= deal.resources && deal.resources.images ? deal.resources.images : 0 %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                                </div>
+                                                <div class="col-md-1">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">DB</label>
+                                                    <input type="number" name="resourceDatabases" min="0" step="1" value="<%= deal.resources && deal.resources.databases ? deal.resources.databases : 0 %>" class="form-control form-control-sm" style="background-color:#1a1a20;border-color:#2d2d35;">
                                                 </div>
                                                 <div class="col-md-1">
                                                     <label class="form-label text-muted small text-uppercase fw-bold">Pkg</label>

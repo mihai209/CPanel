@@ -11,6 +11,8 @@ const SERVER_API_KEY_PERMISSION_CATALOG = Object.freeze([
     'server.startup.write',
     'server.backups.view',
     'server.backups.manage',
+    'server.databases.view',
+    'server.databases.manage',
     'server.schedules.view',
     'server.schedules.manage',
     'server.network.view',

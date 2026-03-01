@@ -611,6 +611,12 @@ app.post('/admin/databases', requireAuth, requireAdmin, [
 
 app.post('/admin/databases/delete/:id', requireAuth, requireAdmin, async (req, res) => {
     try {
+        if (typeof ServerDatabase !== 'undefined' && ServerDatabase && typeof ServerDatabase.count === 'function') {
+            const linkedCount = await ServerDatabase.count({ where: { databaseHostId: req.params.id } });
+            if (linkedCount > 0) {
+                return res.redirect('/admin/databases?error=' + encodeURIComponent(`Cannot delete host: it is assigned to ${linkedCount} server database entr${linkedCount === 1 ? 'y' : 'ies'}.`));
+            }
+        }
         await DatabaseHost.destroy({ where: { id: req.params.id } });
         res.redirect('/admin/databases?success=Database host deleted successfully!');
     } catch (error) {

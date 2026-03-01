@@ -193,6 +193,11 @@ const statusBadgeClass = (() => {
                     <input type="hidden" name="swapLimit" id="swapLimit" value="0">
                     <div class="form-text text-muted">Optional, can be 0 GB</div>
                 </div>
+                <div class="col-md-3">
+                    <label class="form-label text-muted small text-uppercase fw-bold">Database Slots</label>
+                    <input type="number" class="form-control" name="databaseLimit" id="databaseLimit" value="0" min="0" step="1" style="background-color:#1a1a20;border-color:#2d2d35;">
+                    <div class="form-text text-muted">Optional, set to 0 if not needed</div>
+                </div>
 
                 <% if (inventoryAppliedMode) { %>
                     <div class="col-12">
@@ -208,6 +213,7 @@ const statusBadgeClass = (() => {
                                 <div class="col-6 col-md-3"><div class="text-muted small">Swap</div><div class="fw-semibold"><%= mbToGb(inventory.swapMb) %> GB</div></div>
                                 <div class="col-4 col-md-2"><div class="text-muted small">Alloc tokens</div><div class="fw-semibold"><%= Number(inventory.allocations || 0) %></div></div>
                                 <div class="col-4 col-md-2"><div class="text-muted small">Image tokens</div><div class="fw-semibold"><%= Number(inventory.images || 0) %></div></div>
+                                <div class="col-4 col-md-2"><div class="text-muted small">DB slots</div><div class="fw-semibold"><%= Number(inventory.databases || 0) %></div></div>
                                 <div class="col-4 col-md-2"><div class="text-muted small">Package tokens</div><div class="fw-semibold"><%= Number(inventory.packages || 0) %></div></div>
                             </div>
                         </div>
@@ -325,6 +331,7 @@ const statusBadgeClass = (() => {
     const $disk = document.getElementById('disk');
     const $swapGb = document.getElementById('swapLimitGb');
     const $swap = document.getElementById('swapLimit');
+    const $databaseLimit = document.getElementById('databaseLimit');
     const $createForm = document.getElementById('createForm');
     const $image = document.getElementById('imageId');
     const $location = document.getElementById('locationId');
@@ -564,6 +571,7 @@ const statusBadgeClass = (() => {
         const diskMb = gbToMb(diskGb, 1);
         const cpuCores = cpuPercent / 100;
         const swapGb = Math.max(0, toNum($swapGb, 0));
+        const databaseSlots = Math.max(0, Number.parseInt(String($databaseLimit && $databaseLimit.value ? $databaseLimit.value : '0'), 10) || 0);
         syncResourceHiddenFields();
         const hasPackage = $image && $image.selectedOptions && $image.selectedOptions[0]
             ? ($image.selectedOptions[0].getAttribute('data-package') === '1')
@@ -576,6 +584,7 @@ const statusBadgeClass = (() => {
             (diskGb * Number(pricing.storeDiskPerGbCoins || 0)) +
             Number(pricing.storeAllocationCoins || 0) +
             Number(pricing.storeImageCoins || 0) +
+            (databaseSlots * Number(pricing.storeDatabaseCoins || 0)) +
             (hasPackage ? Number(pricing.storePackageCoins || 0) : 0);
 
         const renewRaw = pricing.recurringEnabled
@@ -632,7 +641,7 @@ const statusBadgeClass = (() => {
         }
     };
 
-    [$memoryGb, $cpu, $diskGb, $swapGb, $image].forEach((node) => {
+    [$memoryGb, $cpu, $diskGb, $swapGb, $databaseLimit, $image].forEach((node) => {
         if (node) node.addEventListener('input', update);
         if (node) node.addEventListener('change', update);
     });

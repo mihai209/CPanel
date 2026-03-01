@@ -385,9 +385,10 @@ const parseDealFormInput = (body, existingDeal = null) => {
         swapMb: Math.max(0, Math.round(parseDealFloat(body.resourceSwapGb, 0, 0, 1000000) * 1024)),
         allocations: parseDealInteger(body.resourceAllocations, 0, 0, 1000000000),
         images: parseDealInteger(body.resourceImages, 0, 0, 1000000000),
+        databases: parseDealInteger(body.resourceDatabases, 0, 0, 1000000000),
         packages: parseDealInteger(body.resourcePackages, 0, 0, 1000000000)
     };
-    const totalResourceUnits = resources.ramMb + resources.cpuPercent + resources.diskMb + resources.swapMb + resources.allocations + resources.images + resources.packages;
+    const totalResourceUnits = resources.ramMb + resources.cpuPercent + resources.diskMb + resources.swapMb + resources.allocations + resources.images + resources.databases + resources.packages;
     if (totalResourceUnits <= 0) {
         return { ok: false, error: 'Deal must include at least one resource.' };
     }
@@ -452,6 +453,7 @@ const parseRedeemFormInput = (body, existingCode = null, catalog = []) => {
         swapMb: Math.max(0, Math.round(parseDealFloat(body.rewardSwapGb, existing && existing.rewards ? (Number(existing.rewards.swapMb || 0) / 1024) : 0, 0, 1000000) * 1024)),
         allocations: parseDealInteger(body.rewardAllocations, existing && existing.rewards ? existing.rewards.allocations : 0, 0, 1000000000),
         images: parseDealInteger(body.rewardImages, existing && existing.rewards ? existing.rewards.images : 0, 0, 1000000000),
+        databases: parseDealInteger(body.rewardDatabases, existing && existing.rewards ? existing.rewards.databases : 0, 0, 1000000000),
         packages: parseDealInteger(body.rewardPackages, existing && existing.rewards ? existing.rewards.packages : 0, 0, 1000000000)
     };
 
@@ -462,6 +464,7 @@ const parseRedeemFormInput = (body, existingCode = null, catalog = []) => {
         + Number(rewards.swapMb || 0)
         + Number(rewards.allocations || 0)
         + Number(rewards.images || 0)
+        + Number(rewards.databases || 0)
         + Number(rewards.packages || 0);
     if (rewardTotal <= 0) {
         return { ok: false, error: 'Redeem code must provide at least one reward.' };
@@ -633,6 +636,7 @@ app.post('/admin/let-user-create', requireAuth, requireAdmin, async (req, res) =
         storeDiskPerGbCoins: toNumberString(req.body.storeDiskPerGbCoins, 2, 0, 100000),
         storeAllocationCoins: toNumberString(req.body.storeAllocationCoins, 5, 0, 100000),
         storeImageCoins: toNumberString(req.body.storeImageCoins, 15, 0, 100000),
+        storeDatabaseCoins: toNumberString(req.body.storeDatabaseCoins, 5, 0, 100000),
         storePackageCoins: toNumberString(req.body.storePackageCoins, 25, 0, 100000),
         storeRenewDays: toNumberString(req.body.storeRenewDays, 30, 1, 3650),
         storeDeleteGraceDays: toNumberString(req.body.storeDeleteGraceDays, 7, 1, 3650)

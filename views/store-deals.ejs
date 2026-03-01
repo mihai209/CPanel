@@ -18,6 +18,7 @@ const formatDealResources = (resources) => {
     const swapGb = Number(r.swapMb || 0) / 1024;
     const allocations = Number(r.allocations || 0);
     const images = Number(r.images || 0);
+    const databases = Number(r.databases || 0);
     const packages = Number(r.packages || 0);
     if (ramGb > 0) chunks.push(`${ramGb % 1 === 0 ? ramGb.toFixed(0) : ramGb.toFixed(2)} GB RAM`);
     if (cpuCores > 0) chunks.push(`${cpuCores % 1 === 0 ? cpuCores.toFixed(0) : cpuCores.toFixed(2)} CPU`);
@@ -25,6 +26,7 @@ const formatDealResources = (resources) => {
     if (swapGb > 0) chunks.push(`${swapGb % 1 === 0 ? swapGb.toFixed(0) : swapGb.toFixed(2)} GB Swap`);
     if (allocations > 0) chunks.push(`${allocations} Allocation`);
     if (images > 0) chunks.push(`${images} Image`);
+    if (databases > 0) chunks.push(`${databases} Database`);
     if (packages > 0) chunks.push(`${packages} Package`);
     return chunks.length ? chunks.join(' | ') : 'No resources';
 };

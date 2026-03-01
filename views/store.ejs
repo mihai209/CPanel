@@ -15,6 +15,7 @@ const inventory = inventoryState || {
     swapMb: 0,
     allocations: 0,
     images: 0,
+    databases: 0,
     packages: 0
 };
 const unitCosts = inventoryUnitCosts || {
@@ -24,6 +25,7 @@ const unitCosts = inventoryUnitCosts || {
     swapGb: 0,
     allocation: 0,
     image: 0,
+    database: 0,
     package: 0
 };
 const billingAuditRows = Array.isArray(billingLogs) ? billingLogs : [];
@@ -255,6 +257,7 @@ const formatAuditSummary = (row) => {
                     <div class="col-6 col-md-3"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">Swap</div><div class="fw-semibold"><%= formatMbToGb(inventory.swapMb) %> GB</div></div></div>
                     <div class="col-4 col-md-2"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">Allocations</div><div class="fw-semibold"><%= Number(inventory.allocations || 0) %></div></div></div>
                     <div class="col-4 col-md-2"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">Images</div><div class="fw-semibold"><%= Number(inventory.images || 0) %></div></div></div>
+                    <div class="col-4 col-md-2"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">Databases</div><div class="fw-semibold"><%= Number(inventory.databases || 0) %></div></div></div>
                     <div class="col-4 col-md-2"><div class="p-2 rounded border border-secondary border-opacity-25"><div class="text-muted small">Packages</div><div class="fw-semibold"><%= Number(inventory.packages || 0) %></div></div></div>
                 </div>
                 <div class="row g-2">
@@ -266,6 +269,7 @@ const formatAuditSummary = (row) => {
                         { type: 'swap_gb', label: 'Swap GB', cost: unitCosts.swapGb },
                         { type: 'allocation', label: 'Allocation Token', cost: unitCosts.allocation },
                         { type: 'image', label: 'Image Token', cost: unitCosts.image },
+                        { type: 'database', label: 'Database Slot', cost: unitCosts.database },
                         { type: 'package', label: 'Package Token', cost: unitCosts.package }
                     ];
                     %>

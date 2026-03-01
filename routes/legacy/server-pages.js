@@ -624,6 +624,8 @@ const SERVER_PERMISSIONS = Object.freeze([
     'server.minecraft',
     'server.backups.view',
     'server.backups.manage',
+    'server.databases.view',
+    'server.databases.manage',
     'server.schedules.view',
     'server.schedules.manage',
     'server.network.view',
@@ -648,6 +650,8 @@ const SERVER_API_KEY_PERMISSIONS = Array.isArray(SERVER_API_KEY_PERMISSION_CATAL
         'server.startup.write',
         'server.backups.view',
         'server.backups.manage',
+        'server.databases.view',
+        'server.databases.manage',
         'server.schedules.view',
         'server.schedules.manage',
         'server.network.view',
@@ -1676,7 +1680,8 @@ function calculateStoreCreateCostSafe(input, settingsMap = {}) {
         (swapGb * features.storeSwapPerGbCoins) +
         (input.hasAllocation ? features.storeAllocationCoins : 0) +
         (input.hasImage ? features.storeImageCoins : 0) +
-        (input.hasPackage ? features.storePackageCoins : 0)
+        (input.hasPackage ? features.storePackageCoins : 0) +
+        (Math.max(0, Number.parseInt(input.databaseLimit, 10) || 0) * Number(features.storeDatabaseCoins || 0))
     ));
     return { total, breakdown: {} };
 }
@@ -1706,6 +1711,7 @@ function defaultUserInventoryState() {
         swapMb: 0,
         allocations: 0,
         images: 0,
+        databases: 0,
         packages: 0,
         updatedAtMs: 0
     };
@@ -1730,6 +1736,7 @@ function normalizeUserInventoryState(raw) {
         swapMb: toInt(parsed.swapMb ?? base.swapMb),
         allocations: toInt(parsed.allocations ?? base.allocations),
         images: toInt(parsed.images ?? base.images),
+        databases: toInt(parsed.databases ?? base.databases),
         packages: toInt(parsed.packages ?? base.packages),
         updatedAtMs: toInt(parsed.updatedAtMs ?? Date.now())
     };
@@ -1773,6 +1780,7 @@ function normalizeServerInventoryProvisioningState(raw) {
             swapMb: toInt(resourcesRaw.swapMb),
             allocations: toInt(resourcesRaw.allocations),
             images: toInt(resourcesRaw.images),
+            databases: toInt(resourcesRaw.databases),
             packages: toInt(resourcesRaw.packages)
         },
         createdAtMs: toInt(parsed.createdAtMs) || Date.now(),
@@ -1813,6 +1821,7 @@ function buildServerInventoryRefundResources(serverLike) {
         swapMb: toInt(serverLike && serverLike.swapLimit),
         allocations: (serverLike && serverLike.allocationId) ? 1 : 0,
         images: (serverLike && serverLike.imageId) ? 1 : 0,
+        databases: Math.max(0, Number.parseInt(serverLike && serverLike.databaseLimit, 10) || 0),
         packages: hasPackageToken ? 1 : 0
     };
 }
@@ -1861,6 +1870,7 @@ function getInventoryUnitCostAndDelta(resourceType, quantity, featureFlags) {
         swapMb: 0,
         allocations: 0,
         images: 0,
+        databases: 0,
         packages: 0
     };
 
@@ -1889,6 +1899,10 @@ function getInventoryUnitCostAndDelta(resourceType, quantity, featureFlags) {
         case 'image':
             unitCost = Number(featureFlags.storeImageCoins || 0);
             delta.images = qty;
+            break;
+        case 'database':
+            unitCost = Number(featureFlags.storeDatabaseCoins || 0);
+            delta.databases = qty;
             break;
         case 'package':
             unitCost = Number(featureFlags.storePackageCoins || 0);
@@ -1923,6 +1937,7 @@ function calculateInventoryResourceCoinValue(resources, featureFlags) {
         (swapGb * Number(featureFlags.storeSwapPerGbCoins || 0)) +
         (toInt(normalized.allocations) * Number(featureFlags.storeAllocationCoins || 0)) +
         (toInt(normalized.images) * Number(featureFlags.storeImageCoins || 0)) +
+        (toInt(normalized.databases) * Number(featureFlags.storeDatabaseCoins || 0)) +
         (toInt(normalized.packages) * Number(featureFlags.storePackageCoins || 0))
     ));
 }
@@ -2713,6 +2728,7 @@ app.get('/store', requireAuth, async (req, res) => {
                 swapGb: Number(featureFlags.storeSwapPerGbCoins || 0),
                 allocation: Number(featureFlags.storeAllocationCoins || 0),
                 image: Number(featureFlags.storeImageCoins || 0),
+                database: Number(featureFlags.storeDatabaseCoins || 0),
                 package: Number(featureFlags.storePackageCoins || 0)
             },
             storeRows: storeRowsFinal,
@@ -3045,6 +3061,7 @@ app.post('/store/redeem/claim', requireAuth, async (req, res) => {
             swapMb: Math.max(0, Number.parseInt(rewards.swapMb, 10) || 0),
             allocations: Math.max(0, Number.parseInt(rewards.allocations, 10) || 0),
             images: Math.max(0, Number.parseInt(rewards.images, 10) || 0),
+            databases: Math.max(0, Number.parseInt(rewards.databases, 10) || 0),
             packages: Math.max(0, Number.parseInt(rewards.packages, 10) || 0)
         };
         const rewardResourceTotal = rewardResources.ramMb
@@ -3053,6 +3070,7 @@ app.post('/store/redeem/claim', requireAuth, async (req, res) => {
             + rewardResources.swapMb
             + rewardResources.allocations
             + rewardResources.images
+            + rewardResources.databases
             + rewardResources.packages;
 
         if (rewardResourceTotal > 0 && !featureFlags.inventoryEnabled) {
@@ -3079,6 +3097,7 @@ app.post('/store/redeem/claim', requireAuth, async (req, res) => {
                 swapMb: inventory.swapMb + rewardResources.swapMb,
                 allocations: inventory.allocations + rewardResources.allocations,
                 images: inventory.images + rewardResources.images,
+                databases: inventory.databases + rewardResources.databases,
                 packages: inventory.packages + rewardResources.packages
             });
             await setUserInventoryState(account.id, nextInventory);
@@ -3192,6 +3211,7 @@ app.post('/store/deals/:dealId/purchase', requireAuth, async (req, res) => {
             swapMb: inventory.swapMb + (Math.max(0, Number.parseInt(resources.swapMb, 10) || 0) * quantity),
             allocations: inventory.allocations + (Math.max(0, Number.parseInt(resources.allocations, 10) || 0) * quantity),
             images: inventory.images + (Math.max(0, Number.parseInt(resources.images, 10) || 0) * quantity),
+            databases: inventory.databases + (Math.max(0, Number.parseInt(resources.databases, 10) || 0) * quantity),
             packages: inventory.packages + (Math.max(0, Number.parseInt(resources.packages, 10) || 0) * quantity)
         });
         await setUserInventoryState(account.id, nextInventory);
@@ -3273,6 +3293,7 @@ app.post('/store/inventory/buy', requireAuth, async (req, res) => {
             swapMb: inventory.swapMb + pricing.delta.swapMb,
             allocations: inventory.allocations + pricing.delta.allocations,
             images: inventory.images + pricing.delta.images,
+            databases: inventory.databases + pricing.delta.databases,
             packages: inventory.packages + pricing.delta.packages
         });
         await setUserInventoryState(account.id, nextInventory);
@@ -3340,6 +3361,7 @@ app.post('/store/inventory/sell', requireAuth, async (req, res) => {
         if (pricing.delta.swapMb > 0 && inventory.swapMb < pricing.delta.swapMb) needs.push(`Swap ${pricing.delta.swapMb}MB (available ${inventory.swapMb}MB)`);
         if (pricing.delta.allocations > 0 && inventory.allocations < pricing.delta.allocations) needs.push(`Allocation tokens ${pricing.delta.allocations} (available ${inventory.allocations})`);
         if (pricing.delta.images > 0 && inventory.images < pricing.delta.images) needs.push(`Image tokens ${pricing.delta.images} (available ${inventory.images})`);
+        if (pricing.delta.databases > 0 && inventory.databases < pricing.delta.databases) needs.push(`Database slots ${pricing.delta.databases} (available ${inventory.databases})`);
         if (pricing.delta.packages > 0 && inventory.packages < pricing.delta.packages) needs.push(`Package tokens ${pricing.delta.packages} (available ${inventory.packages})`);
         if (needs.length > 0) {
             return res.redirect('/store?error=' + encodeURIComponent(`Not enough inventory to sell: ${needs.join(', ')}`));
@@ -3353,6 +3375,7 @@ app.post('/store/inventory/sell', requireAuth, async (req, res) => {
             swapMb: Math.max(0, inventory.swapMb - pricing.delta.swapMb),
             allocations: Math.max(0, inventory.allocations - pricing.delta.allocations),
             images: Math.max(0, inventory.images - pricing.delta.images),
+            databases: Math.max(0, inventory.databases - pricing.delta.databases),
             packages: Math.max(0, inventory.packages - pricing.delta.packages)
         });
         await setUserInventoryState(account.id, nextInventory);
@@ -3667,6 +3690,7 @@ app.post('/user/server/:containerId/delete', requireAuth, async (req, res) => {
                 + Number(refundResources.swapMb || 0)
                 + Number(refundResources.allocations || 0)
                 + Number(refundResources.images || 0)
+                + Number(refundResources.databases || 0)
                 + Number(refundResources.packages || 0))
             : 0;
 
@@ -3710,6 +3734,26 @@ app.post('/user/server/:containerId/delete', requireAuth, async (req, res) => {
         }
         if (ServerApiKey) {
             await ServerApiKey.destroy({ where: { serverId: server.id } }).catch(() => {});
+        }
+        if (typeof ServerDatabase !== 'undefined' && ServerDatabase) {
+            const serverDatabases = await ServerDatabase.findAll({
+                where: { serverId: server.id },
+                include: [{ model: DatabaseHost, as: 'host', required: false }]
+            }).catch(() => []);
+            if (Array.isArray(serverDatabases)) {
+                for (const entry of serverDatabases) {
+                    if (!entry || !entry.host) continue;
+                    try {
+                        await dropServerDatabaseFromHost(entry.host, {
+                            databaseName: String(entry.name || ''),
+                            databaseUser: String(entry.username || '')
+                        });
+                    } catch (databaseCleanupError) {
+                        console.warn(`Failed to drop remote database during server delete (serverId=${server.id}, dbId=${entry.id}):`, databaseCleanupError.message);
+                    }
+                }
+            }
+            await ServerDatabase.destroy({ where: { serverId: server.id } }).catch(() => {});
         }
 
         if (typeof consumeServerPowerIntent === 'function') {
@@ -3758,6 +3802,7 @@ app.post('/user/server/:containerId/delete', requireAuth, async (req, res) => {
                     swapMb: inventory.swapMb + Number(refundResources.swapMb || 0),
                     allocations: inventory.allocations + Number(refundResources.allocations || 0),
                     images: inventory.images + Number(refundResources.images || 0),
+                    databases: inventory.databases + Number(refundResources.databases || 0),
                     packages: inventory.packages + Number(refundResources.packages || 0)
                 });
                 appliedRefundMode = 'inventory';
@@ -3792,6 +3837,7 @@ app.post('/user/server/:containerId/delete', requireAuth, async (req, res) => {
             if (Number(refundResources.swapMb || 0) > 0) refundSummaryParts.push(`Swap ${toGb(refundResources.swapMb)} GB`);
             if (Number(refundResources.allocations || 0) > 0) refundSummaryParts.push(`Allocations ${refundResources.allocations}`);
             if (Number(refundResources.images || 0) > 0) refundSummaryParts.push(`Images ${refundResources.images}`);
+            if (Number(refundResources.databases || 0) > 0) refundSummaryParts.push(`Databases ${refundResources.databases}`);
             if (Number(refundResources.packages || 0) > 0) refundSummaryParts.push(`Packages ${refundResources.packages}`);
         }
         const refundSummaryText = appliedRefundMode === 'coins'
@@ -3967,6 +4013,7 @@ app.get('/user/create', requireAuth, async (req, res) => {
                 storeDiskPerGbCoins: Number(featureFlags.storeDiskPerGbCoins || 0),
                 storeAllocationCoins: Number(featureFlags.storeAllocationCoins || 0),
                 storeImageCoins: Number(featureFlags.storeImageCoins || 0),
+                storeDatabaseCoins: Number(featureFlags.storeDatabaseCoins || 0),
                 storePackageCoins: Number(featureFlags.storePackageCoins || 0),
                 recurringEnabled: Boolean(featureFlags.costPerServerEnabled),
                 recurringBase: Number(featureFlags.costBasePerServerMonthly || 0),
@@ -4081,6 +4128,7 @@ app.post('/user/create', requireAuth, async (req, res) => {
         const cpu = Number.parseInt(req.body.cpu, 10);
         const disk = parseResourceMb(req.body.disk, req.body.diskGb, 10240, 1);
         const swapLimit = parseResourceMb(req.body.swapLimit, req.body.swapLimitGb, 0, 0);
+        const databaseLimit = Math.max(0, Number.parseInt(req.body.databaseLimit, 10) || 0);
         const dockerImage = String(req.body.dockerImage || '').trim();
 
         if (!name) {
@@ -4103,6 +4151,15 @@ app.post('/user/create', requireAuth, async (req, res) => {
         }
         if (memory < 1 || cpu < 1 || disk < 1) {
             return res.redirect('/user/create?error=' + encodeURIComponent('Resource limits must be greater than 0.'));
+        }
+        if (!Number.isInteger(databaseLimit) || databaseLimit < 0 || databaseLimit > 1000) {
+            return res.redirect('/user/create?error=' + encodeURIComponent('Database slots must be between 0 and 1000.'));
+        }
+        if (databaseLimit > 0) {
+            const dbHostCount = await DatabaseHost.count({ where: { locationId: selectedLocationId } });
+            if (dbHostCount <= 0) {
+                return res.redirect('/user/create?error=' + encodeURIComponent('Selected location has no database host configured by admin.'));
+            }
         }
 
         let isRevenueManagedProvisioning = false;
@@ -4214,6 +4271,7 @@ app.post('/user/create', requireAuth, async (req, res) => {
             cpu,
             disk,
             swapLimit,
+            databaseLimit,
             hasAllocation: true,
             hasImage: true,
             hasPackage: Boolean(image.packageId)
@@ -4230,6 +4288,7 @@ app.post('/user/create', requireAuth, async (req, res) => {
             if (inventoryState.swapMb < swapLimit) needs.push(`Swap ${swapLimit}MB (available ${inventoryState.swapMb}MB)`);
             if (inventoryState.allocations < 1) needs.push(`Allocation token x1 (available ${inventoryState.allocations})`);
             if (inventoryState.images < 1) needs.push(`Image token x1 (available ${inventoryState.images})`);
+            if (inventoryState.databases < databaseLimit) needs.push(`Database slots ${databaseLimit} (available ${inventoryState.databases})`);
             if (image.packageId && inventoryState.packages < 1) needs.push(`Package token x1 (available ${inventoryState.packages})`);
             if (needs.length > 0) {
                 return res.redirect('/user/create?error=' + encodeURIComponent(`Not enough inventory resources: ${needs.join(', ')}`));
@@ -4268,6 +4327,7 @@ app.post('/user/create', requireAuth, async (req, res) => {
             ownerId: account.id,
             imageId: image.id,
             allocationId: allocation.id,
+            databaseLimit,
             memory,
             cpu,
             disk,
@@ -4344,6 +4404,7 @@ app.post('/user/create', requireAuth, async (req, res) => {
                 swapMb: Math.max(0, inventoryState.swapMb - swapLimit),
                 allocations: Math.max(0, inventoryState.allocations - 1),
                 images: Math.max(0, inventoryState.images - 1),
+                databases: Math.max(0, inventoryState.databases - databaseLimit),
                 packages: image.packageId ? Math.max(0, inventoryState.packages - 1) : inventoryState.packages
             });
         }
@@ -4359,6 +4420,7 @@ app.post('/user/create', requireAuth, async (req, res) => {
                         swapMb: swapLimit,
                         allocations: 1,
                         images: 1,
+                        databases: databaseLimit,
                         packages: image.packageId ? 1 : 0
                     },
                     createdAtMs: Date.now()
@@ -4395,6 +4457,7 @@ app.post('/user/create', requireAuth, async (req, res) => {
                 walletBefore: userCoins,
                 walletAfter: newCoins,
                 resources: { memory, cpu, disk, swapLimit },
+                databaseLimit,
                 allocationId: allocation.id,
                 imageId: image.id
             }
@@ -5367,25 +5430,420 @@ app.post('/server/:containerId/network/allocations/:allocationId/delete', requir
     }
 });
 
+function sanitizeDatabaseObjectName(value, fallback = 'db', maxLen = 48) {
+    const source = String(value || '').trim().toLowerCase();
+    const clean = source.replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+    const normalized = (clean || String(fallback || 'db')).slice(0, Math.max(4, maxLen));
+    return normalized || 'db';
+}
+
+function trimIdentifierLength(value, maxLen) {
+    return String(value || '').slice(0, Math.max(4, Number.parseInt(maxLen, 10) || 32));
+}
+
+function buildUniqueDatabaseObjectName(baseValue, usedNames, maxLen) {
+    const used = usedNames instanceof Set ? usedNames : new Set();
+    const normalizedBase = trimIdentifierLength(sanitizeDatabaseObjectName(baseValue, 'db', maxLen), maxLen);
+    if (!used.has(normalizedBase)) return normalizedBase;
+
+    for (let i = 0; i < 24; i += 1) {
+        const suffix = nodeCrypto.randomBytes(2).toString('hex');
+        const candidateBase = trimIdentifierLength(normalizedBase, maxLen - (suffix.length + 1));
+        const candidate = trimIdentifierLength(`${candidateBase}_${suffix}`, maxLen);
+        if (!used.has(candidate)) return candidate;
+    }
+
+    return trimIdentifierLength(`${normalizedBase}_${Date.now().toString(36)}`, maxLen);
+}
+
+function getDatabaseHostDialect(hostType) {
+    const normalized = String(hostType || '').trim().toLowerCase();
+    if (normalized === 'postgres' || normalized === 'postgresql') return 'postgres';
+    if (normalized === 'mariadb') return 'mariadb';
+    return 'mysql';
+}
+
+function getDatabaseNameMaxLen(hostType) {
+    return getDatabaseHostDialect(hostType) === 'postgres' ? 63 : 64;
+}
+
+function getDatabaseUserMaxLen(hostType) {
+    return getDatabaseHostDialect(hostType) === 'postgres' ? 63 : 32;
+}
+
+function quoteMysqlIdentifier(value) {
+    return `\`${String(value || '').replace(/`/g, '``')}\``;
+}
+
+function quotePgIdentifier(value) {
+    return `"${String(value || '').replace(/"/g, '""')}"`;
+}
+
+function escapeSqlLiteral(value) {
+    return `'${String(value === undefined || value === null ? '' : value)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "''")}'`;
+}
+
+async function withDatabaseHostConnection(host, callback) {
+    const dialect = getDatabaseHostDialect(host && host.type);
+    const hostPort = Math.max(1, Number.parseInt(host && host.port, 10) || (dialect === 'postgres' ? 5432 : 3306));
+    const rootDatabase = String(host && host.database
+        ? host.database
+        : (dialect === 'postgres' ? 'postgres' : 'mysql')).trim();
+
+    const dbClient = new Sequelize(
+        rootDatabase,
+        String(host && host.username ? host.username : ''),
+        String(host && host.password ? host.password : ''),
+        {
+            host: String(host && host.host ? host.host : ''),
+            port: hostPort,
+            dialect,
+            logging: false,
+            dialectOptions: { connectTimeout: 10000 }
+        }
+    );
+
+    try {
+        await dbClient.authenticate();
+        return await callback(dbClient, dialect);
+    } finally {
+        try {
+            await dbClient.close();
+        } catch {
+            // Best effort cleanup.
+        }
+    }
+}
+
+async function provisionServerDatabaseOnHost(host, { databaseName, databaseUser, databasePassword }) {
+    return withDatabaseHostConnection(host, async (dbClient, dialect) => {
+        if (dialect === 'postgres') {
+            const dbName = quotePgIdentifier(databaseName);
+            const roleName = quotePgIdentifier(databaseUser);
+            const roleNameLiteral = escapeSqlLiteral(databaseUser);
+            const rolePassLiteral = escapeSqlLiteral(databasePassword);
+            const dbNameLiteral = escapeSqlLiteral(databaseName);
+            const rows = await dbClient.query(
+                `SELECT 1 FROM pg_database WHERE datname = ${dbNameLiteral} LIMIT 1`,
+                { type: Sequelize.QueryTypes.SELECT }
+            );
+            if (!Array.isArray(rows) || rows.length === 0) {
+                await dbClient.query(`CREATE DATABASE ${dbName}`);
+            }
+            await dbClient.query(
+                `DO $$ BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${roleNameLiteral}) THEN
+                        CREATE ROLE ${roleName} LOGIN PASSWORD ${rolePassLiteral};
+                    ELSE
+                        ALTER ROLE ${roleName} WITH LOGIN PASSWORD ${rolePassLiteral};
+                    END IF;
+                END $$;`
+            );
+            await dbClient.query(`GRANT ALL PRIVILEGES ON DATABASE ${dbName} TO ${roleName}`);
+            return;
+        }
+
+        const dbName = quoteMysqlIdentifier(databaseName);
+        const userLiteral = escapeSqlLiteral(databaseUser);
+        const passLiteral = escapeSqlLiteral(databasePassword);
+        await dbClient.query(`CREATE DATABASE IF NOT EXISTS ${dbName}`);
+        await dbClient.query(`CREATE USER IF NOT EXISTS ${userLiteral}@'%' IDENTIFIED BY ${passLiteral}`);
+        await dbClient.query(`ALTER USER ${userLiteral}@'%' IDENTIFIED BY ${passLiteral}`);
+        await dbClient.query(`GRANT ALL PRIVILEGES ON ${dbName}.* TO ${userLiteral}@'%'`);
+        await dbClient.query('FLUSH PRIVILEGES');
+    });
+}
+
+async function rotateServerDatabaseUserPasswordOnHost(host, dbUser, nextPassword) {
+    return withDatabaseHostConnection(host, async (dbClient, dialect) => {
+        if (dialect === 'postgres') {
+            await dbClient.query(
+                `ALTER ROLE ${quotePgIdentifier(dbUser)} WITH LOGIN PASSWORD ${escapeSqlLiteral(nextPassword)}`
+            );
+            return;
+        }
+
+        const userLiteral = escapeSqlLiteral(dbUser);
+        const passLiteral = escapeSqlLiteral(nextPassword);
+        await dbClient.query(`ALTER USER ${userLiteral}@'%' IDENTIFIED BY ${passLiteral}`);
+        await dbClient.query('FLUSH PRIVILEGES');
+    });
+}
+
+async function dropServerDatabaseFromHost(host, { databaseName, databaseUser }) {
+    return withDatabaseHostConnection(host, async (dbClient, dialect) => {
+        if (dialect === 'postgres') {
+            const dbNameLiteral = escapeSqlLiteral(databaseName);
+            await dbClient.query(
+                `SELECT pg_terminate_backend(pid)
+                 FROM pg_stat_activity
+                 WHERE datname = ${dbNameLiteral} AND pid <> pg_backend_pid()`
+            );
+            await dbClient.query(`DROP DATABASE IF EXISTS ${quotePgIdentifier(databaseName)}`);
+            await dbClient.query(`DROP ROLE IF EXISTS ${quotePgIdentifier(databaseUser)}`);
+            return;
+        }
+
+        await dbClient.query(`DROP DATABASE IF EXISTS ${quoteMysqlIdentifier(databaseName)}`);
+        await dbClient.query(`DROP USER IF EXISTS ${escapeSqlLiteral(databaseUser)}@'%'`);
+        await dbClient.query('FLUSH PRIVILEGES');
+    });
+}
+
+async function resolveServerDatabasesState(containerId) {
+    const server = await Server.findOne({
+        where: { containerId },
+        include: [
+            {
+                model: Allocation,
+                as: 'allocation',
+                include: [
+                    {
+                        model: Connector,
+                        as: 'connector',
+                        include: [{ model: Location, as: 'location' }]
+                    }
+                ]
+            }
+        ]
+    });
+    if (!server) return null;
+
+    const locationId = Number.parseInt(server && server.allocation && server.allocation.connector
+        ? server.allocation.connector.locationId
+        : 0, 10) || 0;
+
+    const [hosts, databases] = await Promise.all([
+        locationId > 0
+            ? DatabaseHost.findAll({
+                where: { locationId },
+                order: [['name', 'ASC']]
+            })
+            : Promise.resolve([]),
+        ServerDatabase.findAll({
+            where: { serverId: server.id },
+            include: [{ model: DatabaseHost, as: 'host', required: false }],
+            order: [['createdAt', 'DESC']]
+        })
+    ]);
+
+    return { server, locationId, hosts, databases };
+}
+
 app.get('/server/:containerId/databases', requireAuth, async (req, res) => {
     try {
-        const server = await Server.findOne({ where: { containerId: req.params.containerId } });
-        if (!server) return res.redirect('/server/notfound');
-        const access = await resolveServerAccess(server, req.session.user);
-        if (!hasServerPermission(access, 'server.view')) {
+        const state = await resolveServerDatabasesState(req.params.containerId);
+        if (!state || !state.server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(state.server, req.session.user);
+        if (!hasServerPermission(access, 'server.databases.view') && !hasServerPermission(access, 'server.view')) {
             return res.redirect('/server/no-permissions');
         }
 
+        const databaseLimit = Math.max(0, Number.parseInt(state.server.databaseLimit, 10) || 0);
         return res.render('server/databases', {
-            server,
+            server: state.server,
             user: req.session.user,
-            title: `Databases ${server.name}`,
+            title: `Databases ${state.server.name}`,
             path: '/servers',
-            active: 'dbs'
+            active: 'dbs',
+            hosts: state.hosts,
+            databases: state.databases,
+            locationId: state.locationId,
+            databaseLimit,
+            canManageDatabases: hasServerPermission(access, 'server.databases.manage'),
+            success: req.query.success || null,
+            error: req.query.error || null
         });
     } catch (error) {
         console.error('Error loading databases page:', error);
         return res.redirect('/?error=' + encodeURIComponent('Failed to load databases page.'));
+    }
+});
+
+app.post('/server/:containerId/databases/create', requireAuth, async (req, res) => {
+    try {
+        const state = await resolveServerDatabasesState(req.params.containerId);
+        if (!state || !state.server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(state.server, req.session.user);
+        if (!hasServerPermission(access, 'server.databases.manage')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const databaseLimit = Math.max(0, Number.parseInt(state.server.databaseLimit, 10) || 0);
+        if (databaseLimit <= 0) {
+            return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('Database slots are 0 for this server. Increase limit from create/store first.')}`);
+        }
+        if (state.databases.length >= databaseLimit) {
+            return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('Database limit reached for this server.')}`);
+        }
+        if (!Array.isArray(state.hosts) || state.hosts.length === 0) {
+            return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('No database host is configured for this server location.')}`);
+        }
+
+        const requestedHostId = Number.parseInt(req.body.databaseHostId, 10);
+        const selectedHost = state.hosts.find((entry) => Number(entry.id) === requestedHostId) || state.hosts[0];
+        if (!selectedHost) {
+            return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('Select a valid database host.')}`);
+        }
+
+        const maxDbNameLen = getDatabaseNameMaxLen(selectedHost.type);
+        const maxDbUserLen = getDatabaseUserMaxLen(selectedHost.type);
+        const requestedDatabaseName = sanitizeDatabaseObjectName(req.body.databaseName, 'db', 24);
+        const requestedDatabaseUser = sanitizeDatabaseObjectName(req.body.databaseUser, 'user', 24);
+        const dbNameBase = sanitizeDatabaseObjectName(`s${state.server.id}_${requestedDatabaseName}`, `s${state.server.id}_db`, maxDbNameLen);
+        const dbUserBase = sanitizeDatabaseObjectName(`u${state.server.id}_${requestedDatabaseUser}`, `u${state.server.id}_user`, maxDbUserLen);
+
+        const hostEntries = await ServerDatabase.findAll({
+            where: { databaseHostId: selectedHost.id },
+            attributes: ['name', 'username']
+        });
+        const usedNames = new Set(hostEntries.map((entry) => String(entry.name || '').toLowerCase()));
+        const usedUsers = new Set(hostEntries.map((entry) => String(entry.username || '').toLowerCase()));
+        const databaseName = buildUniqueDatabaseObjectName(dbNameBase, usedNames, maxDbNameLen);
+        const databaseUser = buildUniqueDatabaseObjectName(dbUserBase, usedUsers, maxDbUserLen);
+        const providedPassword = String(req.body.databasePassword || '').trim();
+        const databasePassword = providedPassword
+            ? providedPassword.slice(0, 128)
+            : nodeCrypto.randomBytes(12).toString('base64url').slice(0, 20);
+
+        await provisionServerDatabaseOnHost(selectedHost, {
+            databaseName,
+            databaseUser,
+            databasePassword
+        });
+
+        await ServerDatabase.create({
+            serverId: state.server.id,
+            databaseHostId: selectedHost.id,
+            name: databaseName,
+            username: databaseUser,
+            password: databasePassword,
+            remoteDatabaseId: `${selectedHost.type}:${selectedHost.host}:${selectedHost.port}:${databaseName}`
+        });
+
+        await createBillingAuditLog({
+            actorUserId: req.session.user.id,
+            action: 'server.database.create',
+            targetType: 'server',
+            targetId: state.server.id,
+            req,
+            metadata: {
+                serverId: state.server.id,
+                serverContainerId: state.server.containerId,
+                databaseHostId: selectedHost.id,
+                databaseName,
+                databaseUser
+            }
+        });
+
+        return res.redirect(`/server/${state.server.containerId}/databases?success=${encodeURIComponent(`Database ${databaseName} created on host ${selectedHost.name}.`)}`);
+    } catch (error) {
+        console.error('Error creating server database:', error);
+        return res.redirect(`/server/${req.params.containerId}/databases?error=${encodeURIComponent(error.message || 'Failed to create database.')}`);
+    }
+});
+
+app.post('/server/:containerId/databases/:databaseId/password', requireAuth, async (req, res) => {
+    try {
+        const state = await resolveServerDatabasesState(req.params.containerId);
+        if (!state || !state.server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(state.server, req.session.user);
+        if (!hasServerPermission(access, 'server.databases.manage')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const databaseId = Number.parseInt(req.params.databaseId, 10);
+        if (!Number.isInteger(databaseId) || databaseId <= 0) {
+            return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('Invalid database id.')}`);
+        }
+
+        const entry = await ServerDatabase.findOne({
+            where: { id: databaseId, serverId: state.server.id },
+            include: [{ model: DatabaseHost, as: 'host', required: false }]
+        });
+        if (!entry || !entry.host) {
+            return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('Database entry not found.')}`);
+        }
+
+        const nextPasswordRaw = String(req.body.newPassword || '').trim();
+        const nextPassword = nextPasswordRaw
+            ? nextPasswordRaw.slice(0, 128)
+            : nodeCrypto.randomBytes(12).toString('base64url').slice(0, 20);
+
+        await rotateServerDatabaseUserPasswordOnHost(entry.host, entry.username, nextPassword);
+        await entry.update({ password: nextPassword });
+
+        await createBillingAuditLog({
+            actorUserId: req.session.user.id,
+            action: 'server.database.password_rotate',
+            targetType: 'server',
+            targetId: state.server.id,
+            req,
+            metadata: {
+                serverId: state.server.id,
+                serverContainerId: state.server.containerId,
+                databaseId: entry.id,
+                databaseName: entry.name,
+                databaseUser: entry.username
+            }
+        });
+
+        return res.redirect(`/server/${state.server.containerId}/databases?success=${encodeURIComponent(`Password rotated for ${entry.name}.`)}`);
+    } catch (error) {
+        console.error('Error rotating database password:', error);
+        return res.redirect(`/server/${req.params.containerId}/databases?error=${encodeURIComponent(error.message || 'Failed to rotate password.')}`);
+    }
+});
+
+app.post('/server/:containerId/databases/:databaseId/delete', requireAuth, async (req, res) => {
+    try {
+        const state = await resolveServerDatabasesState(req.params.containerId);
+        if (!state || !state.server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(state.server, req.session.user);
+        if (!hasServerPermission(access, 'server.databases.manage')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const databaseId = Number.parseInt(req.params.databaseId, 10);
+        if (!Number.isInteger(databaseId) || databaseId <= 0) {
+            return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('Invalid database id.')}`);
+        }
+
+        const entry = await ServerDatabase.findOne({
+            where: { id: databaseId, serverId: state.server.id },
+            include: [{ model: DatabaseHost, as: 'host', required: false }]
+        });
+        if (!entry || !entry.host) {
+            return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('Database entry not found.')}`);
+        }
+
+        await dropServerDatabaseFromHost(entry.host, {
+            databaseName: entry.name,
+            databaseUser: entry.username
+        });
+        await entry.destroy();
+
+        await createBillingAuditLog({
+            actorUserId: req.session.user.id,
+            action: 'server.database.delete',
+            targetType: 'server',
+            targetId: state.server.id,
+            req,
+            metadata: {
+                serverId: state.server.id,
+                serverContainerId: state.server.containerId,
+                databaseId,
+                databaseName: entry.name,
+                databaseUser: entry.username
+            }
+        });
+
+        return res.redirect(`/server/${state.server.containerId}/databases?success=${encodeURIComponent(`Database ${entry.name} deleted.`)}`);
+    } catch (error) {
+        console.error('Error deleting server database:', error);
+        return res.redirect(`/server/${req.params.containerId}/databases?error=${encodeURIComponent(error.message || 'Failed to delete database.')}`);
     }
 });
 

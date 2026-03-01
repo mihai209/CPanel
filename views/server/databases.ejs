@@ -9,28 +9,194 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
         body { background:#0f0f12; color:#e1e1e6; margin:0; font-family:Inter,system-ui,-apple-system,sans-serif; height:100vh; overflow:hidden; }
-        .wrapper{display:flex;height:100vh}.sidebar{width:260px;background:#121216;border-right:1px solid #2d2d35;overflow-y:auto}.sidebar.collapsed{margin-left:-260px}
-        .content{flex:1;display:flex;flex-direction:column;min-width:0}.top{background:#121216;border-bottom:1px solid #2d2d35;padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem}
-        .scroll{flex:1;overflow:auto;padding:1rem}.cardx{background:#121216;border:1px solid #2d2d35;border-radius:.8rem}.btn-icon{background:transparent;border:0;color:#8b8b9a;font-size:1.2rem}
+        .wrapper{display:flex;height:100vh}
+        .sidebar{width:260px;background:#121216;border-right:1px solid #2d2d35;overflow-y:auto}
+        .sidebar.collapsed{margin-left:-260px}
+        .content{flex:1;display:flex;flex-direction:column;min-width:0}
+        .top{background:#121216;border-bottom:1px solid #2d2d35;padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem}
+        .scroll{flex:1;overflow:auto;padding:1rem}
+        .cardx{background:#121216;border:1px solid #2d2d35;border-radius:.8rem}
+        .btn-icon{background:transparent;border:0;color:#8b8b9a;font-size:1.2rem}
+        .muted-2 { color:#9ea0aa; }
+        .table-dark { --bs-table-bg: transparent; }
+        .form-control, .form-select { background:#1a1a20; border-color:#2d2d35; color:#e1e1e6; }
+        .form-control:focus, .form-select:focus { background:#1a1a20; color:#fff; border-color:#3b82f6; box-shadow:none; }
+        .badge-soft { background: rgba(59,130,246,.16); border:1px solid rgba(59,130,246,.26); color:#8bb8ff; }
     </style>
 </head>
 <body>
+<%- include('../partials/error-modal') %>
+<%
+const hostsList = Array.isArray(hosts) ? hosts : [];
+const dbList = Array.isArray(databases) ? databases : [];
+const limit = Math.max(0, Number.parseInt(databaseLimit, 10) || 0);
+const used = dbList.length;
+const remaining = Math.max(0, limit - used);
+const canCreate = Boolean(canManageDatabases) && hostsList.length > 0 && remaining > 0;
+const canManage = Boolean(canManageDatabases);
+%>
 <div class="wrapper">
     <nav class="sidebar" id="sidebar"><div class="p-3"><%- include('../partials/server-sidebar', { server, active: 'dbs' }) %></div></nav>
     <main class="content">
         <header class="top">
             <button class="btn-icon" id="sidebarToggle"><i class="bi bi-list"></i></button>
             <h1 class="h5 mb-0">Databases / <span class="text-secondary"><%= server.name %></span></h1>
+            <div class="ms-auto d-flex align-items-center gap-2">
+                <span class="badge bg-secondary">Used: <%= used %> / <%= limit %></span>
+                <span class="badge <%= remaining > 0 ? 'bg-success' : 'bg-danger' %>">Remaining: <%= remaining %></span>
+            </div>
         </header>
         <section class="scroll">
-            <div class="cardx p-4 text-center">
-                <i class="bi bi-database" style="font-size:2rem;"></i>
-                <h2 class="h5 mt-3">Database management is not enabled yet</h2>
-                <p class="text-secondary mb-0">Next step: add per-server database provisioning and credentials lifecycle (create, rotate password, delete).</p>
+            <% if (!hostsList.length) { %>
+                <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning mb-3">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    No database host is configured on this server location. Ask admin to add one in <code>/admin/databases</code>.
+                </div>
+            <% } %>
+
+            <% if (limit <= 0) { %>
+                <div class="alert alert-info border-0 bg-info bg-opacity-10 text-info mb-3">
+                    <i class="bi bi-info-circle-fill me-2"></i>
+                    This server has <strong>0 database slots</strong>. Increase database slots from create/store flow before creating databases.
+                </div>
+            <% } %>
+
+            <div class="cardx p-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                    <h2 class="h6 mb-0">Create Database</h2>
+                    <% if (!canManage) { %>
+                        <span class="badge bg-secondary">Read Only</span>
+                    <% } %>
+                </div>
+
+                <form method="POST" action="/server/<%= server.containerId %>/databases/create" class="row g-2">
+                    <div class="col-md-3">
+                        <label class="form-label text-muted small">Host</label>
+                        <select name="databaseHostId" class="form-select" <%= canCreate ? '' : 'disabled' %>>
+                            <% hostsList.forEach((host) => { %>
+                                <option value="<%= host.id %>"><%= host.name %> (<%= host.type %>) - <%= host.host %>:<%= host.port %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-muted small">Database Name (optional)</label>
+                        <input type="text" name="databaseName" class="form-control" maxlength="64" placeholder="example_db" <%= canCreate ? '' : 'disabled' %>>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-muted small">Username (optional)</label>
+                        <input type="text" name="databaseUser" class="form-control" maxlength="64" placeholder="example_user" <%= canCreate ? '' : 'disabled' %>>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label text-muted small">Password (optional)</label>
+                        <input type="text" name="databasePassword" class="form-control" maxlength="128" placeholder="auto-generate if empty" <%= canCreate ? '' : 'disabled' %>>
+                    </div>
+                    <div class="col-12 d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary" <%= canCreate ? '' : 'disabled' %>>
+                            <i class="bi bi-plus-circle me-1"></i>Create Database
+                        </button>
+                    </div>
+                </form>
+                <div class="small muted-2 mt-2">
+                    Credentials are generated in Pterodactyl-style naming and bound to server slot limits.
+                </div>
+            </div>
+
+            <div class="cardx p-0">
+                <div class="px-3 py-2 border-bottom border-secondary border-opacity-25 d-flex justify-content-between align-items-center">
+                    <h2 class="h6 mb-0">Provisioned Databases</h2>
+                    <span class="small muted-2"><%= dbList.length %> item(s)</span>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width:18%">Host</th>
+                                <th style="width:18%">Database</th>
+                                <th style="width:18%">User</th>
+                                <th style="width:24%">Password</th>
+                                <th style="width:12%">Created</th>
+                                <th class="text-end" style="width:10%">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (!dbList.length) { %>
+                                <tr><td colspan="6" class="text-center muted-2 py-4">No databases created yet.</td></tr>
+                            <% } %>
+                            <% dbList.forEach((entry) => { %>
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold"><%= entry.host ? entry.host.name : 'Unknown host' %></div>
+                                        <div class="small muted-2"><%= entry.host ? entry.host.host + ':' + entry.host.port : '-' %></div>
+                                    </td>
+                                    <td><span class="badge badge-soft"><%= entry.name %></span></td>
+                                    <td><code><%= entry.username %></code></td>
+                                    <td>
+                                        <div class="input-group input-group-sm">
+                                            <input type="password" class="form-control db-pass" value="<%= entry.password %>" readonly>
+                                            <button type="button" class="btn btn-outline-light btn-sm btn-reveal-pass"><i class="bi bi-eye"></i></button>
+                                            <button type="button" class="btn btn-outline-info btn-sm btn-copy-pass"><i class="bi bi-clipboard"></i></button>
+                                        </div>
+                                    </td>
+                                    <td class="small muted-2"><%= new Date(entry.createdAt).toLocaleString() %></td>
+                                    <td class="text-end">
+                                        <% if (canManage) { %>
+                                            <form method="POST" action="/server/<%= server.containerId %>/databases/<%= entry.id %>/password" class="d-inline">
+                                                <button type="submit" class="btn btn-sm btn-outline-warning" title="Rotate Password"><i class="bi bi-key"></i></button>
+                                            </form>
+                                            <form method="POST" action="/server/<%= server.containerId %>/databases/<%= entry.id %>/delete" class="d-inline js-db-delete-form">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Database"><i class="bi bi-trash"></i></button>
+                                            </form>
+                                        <% } else { %>
+                                            <span class="muted-2 small">-</span>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
     </main>
 </div>
-<script>document.getElementById('sidebarToggle')?.addEventListener('click',()=>document.getElementById('sidebar')?.classList.toggle('collapsed'));</script>
+<script>
+(() => {
+    document.getElementById('sidebarToggle')?.addEventListener('click', () => document.getElementById('sidebar')?.classList.toggle('collapsed'));
+
+    document.querySelectorAll('.btn-reveal-pass').forEach((button) => {
+        button.addEventListener('click', () => {
+            const input = button.closest('.input-group')?.querySelector('.db-pass');
+            if (!input) return;
+            const hidden = input.type === 'password';
+            input.type = hidden ? 'text' : 'password';
+            button.innerHTML = hidden ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
+        });
+    });
+
+    document.querySelectorAll('.btn-copy-pass').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const input = button.closest('.input-group')?.querySelector('.db-pass');
+            if (!input) return;
+            try {
+                await navigator.clipboard.writeText(String(input.value || ''));
+                button.innerHTML = '<i class="bi bi-clipboard-check"></i>';
+                setTimeout(() => { button.innerHTML = '<i class="bi bi-clipboard"></i>'; }, 1200);
+            } catch {
+                // ignore clipboard errors
+            }
+        });
+    });
+
+    document.querySelectorAll('.js-db-delete-form').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+            if (!window.confirm('Delete this database and its DB user from host? This cannot be undone.')) {
+                event.preventDefault();
+            }
+        });
+    });
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
 </body>
 </html>

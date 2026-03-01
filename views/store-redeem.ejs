@@ -24,6 +24,7 @@ const rewardSummary = (rewards) => {
     if (Number(src.swapMb || 0) > 0) parts.push(`${(Number(src.swapMb || 0) / 1024).toFixed(2).replace(/\.00$/, '')} GB Swap`);
     if (Number(src.allocations || 0) > 0) parts.push(`${Number(src.allocations || 0)} Allocation`);
     if (Number(src.images || 0) > 0) parts.push(`${Number(src.images || 0)} Image`);
+    if (Number(src.databases || 0) > 0) parts.push(`${Number(src.databases || 0)} Database`);
     if (Number(src.packages || 0) > 0) parts.push(`${Number(src.packages || 0)} Package`);
     return parts.length ? parts.join(' | ') : 'No rewards';
 };

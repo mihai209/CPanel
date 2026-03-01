@@ -199,6 +199,11 @@
                                             value="<%= settings.storeImageCoins || '15' %>">
                                     </div>
                                     <div class="col-md-2">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Database Slot</label>
+                                        <input type="number" step="0.01" min="0" name="storeDatabaseCoins" class="form-control" style="background-color: #1a1a20; border-color: #2d2d35;"
+                                            value="<%= settings.storeDatabaseCoins || '5' %>">
+                                    </div>
+                                    <div class="col-md-2">
                                         <label class="form-label text-muted small text-uppercase fw-bold">Package</label>
                                         <input type="number" step="0.01" min="0" name="storePackageCoins" class="form-control" style="background-color: #1a1a20; border-color: #2d2d35;"
                                             value="<%= settings.storePackageCoins || '25' %>">

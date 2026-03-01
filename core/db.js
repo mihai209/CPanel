@@ -89,6 +89,7 @@ const Server = sequelize.define('Server', {
     allocationId: { type: DataTypes.INTEGER, allowNull: true },
     memory: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1024 },
     disk: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 10240 },
+    databaseLimit: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
     cpu: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 100 },
     swapLimit: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
     ioWeight: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 500 },
@@ -202,6 +203,23 @@ const DatabaseHost = sequelize.define('DatabaseHost', {
     type: { type: DataTypes.STRING, allowNull: false, defaultValue: 'mysql' }
 });
 
+const ServerDatabase = sequelize.define('ServerDatabase', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    serverId: { type: DataTypes.INTEGER, allowNull: false },
+    databaseHostId: { type: DataTypes.INTEGER, allowNull: false },
+    name: { type: DataTypes.STRING, allowNull: false },
+    username: { type: DataTypes.STRING, allowNull: false },
+    password: { type: DataTypes.STRING, allowNull: false },
+    remoteDatabaseId: { type: DataTypes.STRING, allowNull: true }
+}, {
+    indexes: [
+        { fields: ['serverId'] },
+        { fields: ['databaseHostId'] },
+        { fields: ['serverId', 'name'], unique: true },
+        { fields: ['databaseHostId', 'name'], unique: true }
+    ]
+});
+
 const Connector = sequelize.define('Connector', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     name: { type: DataTypes.STRING, allowNull: false },
@@ -293,6 +311,33 @@ Server.belongsTo(Allocation, { foreignKey: 'allocationId', as: 'allocation' });
 
 Location.hasMany(DatabaseHost, { foreignKey: 'locationId', as: 'databaseHosts' });
 DatabaseHost.belongsTo(Location, { foreignKey: 'locationId', as: 'location' });
+
+Server.hasMany(ServerDatabase, {
+    foreignKey: 'serverId',
+    as: 'databases',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+    hooks: true
+});
+ServerDatabase.belongsTo(Server, {
+    foreignKey: 'serverId',
+    as: 'server',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
+});
+DatabaseHost.hasMany(ServerDatabase, {
+    foreignKey: 'databaseHostId',
+    as: 'serverDatabases',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+    hooks: true
+});
+ServerDatabase.belongsTo(DatabaseHost, {
+    foreignKey: 'databaseHostId',
+    as: 'host',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
+});
 
 Location.hasMany(Connector, { foreignKey: 'locationId', as: 'connectors' });
 Connector.belongsTo(Location, { foreignKey: 'locationId', as: 'location' });
@@ -391,6 +436,7 @@ module.exports = {
     Settings,
     Location,
     DatabaseHost,
+    ServerDatabase,
     Connector,
     Allocation,
     Job,

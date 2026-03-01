@@ -79,6 +79,23 @@ const DatabaseHost = sequelize.define('DatabaseHost', {
     type: { type: DataTypes.STRING, allowNull: false, defaultValue: 'mysql' }
 });
 
+const ServerDatabase = sequelize.define('ServerDatabase', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    serverId: { type: DataTypes.INTEGER, allowNull: false },
+    databaseHostId: { type: DataTypes.INTEGER, allowNull: false },
+    name: { type: DataTypes.STRING, allowNull: false },
+    username: { type: DataTypes.STRING, allowNull: false },
+    password: { type: DataTypes.STRING, allowNull: false },
+    remoteDatabaseId: { type: DataTypes.STRING, allowNull: true }
+}, {
+    indexes: [
+        { fields: ['serverId'] },
+        { fields: ['databaseHostId'] },
+        { fields: ['serverId', 'name'], unique: true },
+        { fields: ['databaseHostId', 'name'], unique: true }
+    ]
+});
+
 const Connector = sequelize.define('Connector', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     name: { type: DataTypes.STRING, allowNull: false },
@@ -142,6 +159,7 @@ const Server = sequelize.define('Server', {
     allocationId: { type: DataTypes.INTEGER, allowNull: true },
     memory: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1024 },
     disk: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 10240 },
+    databaseLimit: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
     cpu: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 100 },
     swapLimit: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
     ioWeight: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 500 },
@@ -297,6 +315,32 @@ Server.belongsTo(Allocation, { foreignKey: 'allocationId', as: 'allocation' });
 
 Location.hasMany(DatabaseHost, { foreignKey: 'locationId', as: 'databaseHosts' });
 DatabaseHost.belongsTo(Location, { foreignKey: 'locationId', as: 'location' });
+Server.hasMany(ServerDatabase, {
+    foreignKey: 'serverId',
+    as: 'databases',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+    hooks: true
+});
+ServerDatabase.belongsTo(Server, {
+    foreignKey: 'serverId',
+    as: 'server',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
+});
+DatabaseHost.hasMany(ServerDatabase, {
+    foreignKey: 'databaseHostId',
+    as: 'serverDatabases',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+    hooks: true
+});
+ServerDatabase.belongsTo(DatabaseHost, {
+    foreignKey: 'databaseHostId',
+    as: 'host',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
+});
 
 Location.hasMany(Connector, { foreignKey: 'locationId', as: 'connectors' });
 Connector.belongsTo(Location, { foreignKey: 'locationId', as: 'location' });
@@ -436,6 +480,10 @@ async function upgrade() {
         await Server.sync({ alter: true });
         console.log('Server table synced.');
 
+        // Sync the ServerDatabase model
+        await ServerDatabase.sync({ alter: true });
+        console.log('ServerDatabase table synced.');
+
         // Sync the ServerSubuser model
         await ServerSubuser.sync({ alter: true });
         console.log('ServerSubuser table synced.');
@@ -484,6 +532,10 @@ async function upgrade() {
         await Server.update(
             { variables: {} },
             { where: { variables: null } }
+        );
+        await Server.update(
+            { databaseLimit: 0 },
+            { where: { databaseLimit: null } }
         );
         await ServerSubuser.update(
             { permissions: [] },
@@ -554,6 +606,7 @@ async function upgrade() {
         const auditLogTable = resolveTableName(AuditLog);
         const backupPolicyTable = resolveTableName(ServerBackupPolicy);
         const backupTable = resolveTableName(ServerBackup);
+        const serverDatabaseTable = resolveTableName(ServerDatabase);
 
         await addIndexIfMissing(serverApiKeyTable, ['serverId'], { name: 'server_api_keys_server_id_idx' });
         await addIndexIfMissing(serverApiKeyTable, ['ownerUserId'], { name: 'server_api_keys_owner_user_id_idx' });
@@ -593,6 +646,10 @@ async function upgrade() {
         await addIndexIfMissing(backupPolicyTable, ['serverId'], { name: 'server_backup_policies_server_id_idx' });
         await addIndexIfMissing(backupTable, ['serverId'], { name: 'server_backups_server_id_idx' });
         await addIndexIfMissing(backupTable, ['createdAt'], { name: 'server_backups_created_at_idx' });
+        await addIndexIfMissing(serverDatabaseTable, ['serverId'], { name: 'server_databases_server_id_idx' });
+        await addIndexIfMissing(serverDatabaseTable, ['databaseHostId'], { name: 'server_databases_host_id_idx' });
+        await addIndexIfMissing(serverDatabaseTable, ['serverId', 'name'], { name: 'server_databases_server_name_uq', unique: true });
+        await addIndexIfMissing(serverDatabaseTable, ['databaseHostId', 'name'], { name: 'server_databases_host_name_uq', unique: true });
         console.log('Defensive indexes verified.');
 
         if (sqliteForeignKeysDisabled) {
@@ -676,6 +733,7 @@ async function upgrade() {
             { key: 'storeAllocationCoins', value: '5' },
             { key: 'storeImageCoins', value: '15' },
             { key: 'storePackageCoins', value: '25' },
+            { key: 'storeDatabaseCoins', value: '5' },
             { key: 'storeRenewDays', value: '30' },
             { key: 'storeDeleteGraceDays', value: '7' },
             { key: 'storeDealsCatalog', value: '[]' },

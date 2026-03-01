@@ -102,6 +102,7 @@ const FEATURE_FLAG_SETTING_KEYS = [
     'storeDiskPerGbCoins',
     'storeAllocationCoins',
     'storeImageCoins',
+    'storeDatabaseCoins',
     'storePackageCoins',
     'storeRenewDays',
     'storeDeleteGraceDays'
@@ -280,6 +281,7 @@ function defaultPanelFeatureFlags() {
         storeDiskPerGbCoins: 2,
         storeAllocationCoins: 5,
         storeImageCoins: 15,
+        storeDatabaseCoins: 5,
         storePackageCoins: 25,
         storeRenewDays: 30,
         storeDeleteGraceDays: 7
@@ -337,6 +339,7 @@ function getPanelFeatureFlagsFromMap(settingsMap) {
         storeDiskPerGbCoins: parseFiniteNumberInput(source.storeDiskPerGbCoins, base.storeDiskPerGbCoins, 0, 1_000_000),
         storeAllocationCoins: parseFiniteNumberInput(source.storeAllocationCoins, base.storeAllocationCoins, 0, 1_000_000),
         storeImageCoins: parseFiniteNumberInput(source.storeImageCoins, base.storeImageCoins, 0, 1_000_000),
+        storeDatabaseCoins: parseFiniteNumberInput(source.storeDatabaseCoins, base.storeDatabaseCoins, 0, 1_000_000),
         storePackageCoins: parseFiniteNumberInput(source.storePackageCoins, base.storePackageCoins, 0, 1_000_000),
         storeRenewDays: Math.max(1, Number.parseInt(parseFiniteNumberInput(source.storeRenewDays, base.storeRenewDays, 1, 3650), 10) || base.storeRenewDays),
         storeDeleteGraceDays: Math.max(1, Number.parseInt(parseFiniteNumberInput(source.storeDeleteGraceDays, base.storeDeleteGraceDays, 1, 3650), 10) || base.storeDeleteGraceDays)
@@ -459,6 +462,7 @@ function defaultUserInventoryState() {
         swapMb: 0,
         allocations: 0,
         images: 0,
+        databases: 0,
         packages: 0,
         updatedAtMs: 0
     };
@@ -483,6 +487,7 @@ function normalizeUserInventoryState(raw) {
         swapMb: toInt(parsed.swapMb ?? base.swapMb),
         allocations: toInt(parsed.allocations ?? base.allocations),
         images: toInt(parsed.images ?? base.images),
+        databases: toInt(parsed.databases ?? base.databases),
         packages: toInt(parsed.packages ?? base.packages),
         updatedAtMs: toInt(parsed.updatedAtMs ?? Date.now())
     };
@@ -1156,8 +1161,10 @@ function calculateStoreCreateCoins(input, settingsMap = {}) {
     );
     const allocationCost = source.hasAllocation ? features.storeAllocationCoins : 0;
     const imageCost = source.hasImage ? features.storeImageCoins : 0;
+    const databaseSlots = Math.max(0, Number.parseInt(source.databaseLimit, 10) || 0);
+    const databaseCost = databaseSlots * Number(features.storeDatabaseCoins || 0);
     const packageCost = source.hasPackage ? features.storePackageCoins : 0;
-    const total = Math.max(0, Math.ceil(resourcesCost + allocationCost + imageCost + packageCost));
+    const total = Math.max(0, Math.ceil(resourcesCost + allocationCost + imageCost + databaseCost + packageCost));
 
     return {
         total,
@@ -1165,6 +1172,7 @@ function calculateStoreCreateCoins(input, settingsMap = {}) {
             resourcesCost: Math.max(0, Math.ceil(resourcesCost)),
             allocationCost: Math.max(0, Math.ceil(allocationCost)),
             imageCost: Math.max(0, Math.ceil(imageCost)),
+            databaseCost: Math.max(0, Math.ceil(databaseCost)),
             packageCost: Math.max(0, Math.ceil(packageCost))
         }
     };

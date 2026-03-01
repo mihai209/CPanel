@@ -56,6 +56,7 @@ function normalizeDealResources(raw) {
         swapMb: toNonNegativeInt(source.swapMb, 0),
         allocations: toNonNegativeInt(source.allocations, 0),
         images: toNonNegativeInt(source.images, 0),
+        databases: toNonNegativeInt(source.databases, 0),
         packages: toNonNegativeInt(source.packages, 0)
     };
 }
