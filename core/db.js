@@ -1,6 +1,10 @@
 const { Sequelize, DataTypes } = require('sequelize');
 
 const dbConnection = process.env.DB_CONNECTION || 'sqlite';
+const dbPort = Number.parseInt(process.env.DB_PORT, 10) || (dbConnection === 'postgres' ? 5432 : 3306);
+const dbConnectTimeoutMs = Math.max(1000, Number.parseInt(process.env.DB_CONNECT_TIMEOUT || '10000', 10) || 10000);
+const dbAcquireTimeoutMs = Math.max(1000, Number.parseInt(process.env.DB_POOL_ACQUIRE || '20000', 10) || 20000);
+const dbIdleTimeoutMs = Math.max(1000, Number.parseInt(process.env.DB_POOL_IDLE || '10000', 10) || 10000);
 
 let sequelize;
 if (dbConnection === 'sqlite') {
@@ -10,14 +14,28 @@ if (dbConnection === 'sqlite') {
         logging: false
     });
 } else {
+    const isPostgres = dbConnection === 'postgres';
+    const dialect = isPostgres ? 'postgres' : 'mysql';
+
     sequelize = new Sequelize(
         process.env.DB_DATABASE,
         process.env.DB_USERNAME,
         process.env.DB_PASSWORD,
         {
             host: process.env.DB_HOST,
-            dialect: dbConnection === 'postgres' ? 'postgres' : 'mysql',
-            port: process.env.DB_PORT,
+            dialect,
+            port: dbPort,
+            dialectOptions: isPostgres
+                ? {}
+                : {
+                    connectTimeout: dbConnectTimeoutMs
+                },
+            pool: {
+                max: 10,
+                min: 0,
+                acquire: dbAcquireTimeoutMs,
+                idle: dbIdleTimeoutMs
+            },
             logging: false
         }
     );
@@ -424,6 +442,10 @@ AdminApiKeyAudit.belongsTo(AdminApiKey, {
 sequelize.sync().then(() => {
     console.log(`Database synced (${dbConnection})`);
 }).catch((err) => {
+    if (dbConnection !== 'sqlite') {
+        const host = String(process.env.DB_HOST || '').trim() || '(unset)';
+        console.error(`Database sync failed (${dbConnection}) host=${host} port=${dbPort} database=${process.env.DB_DATABASE || '(unset)'}`);
+    }
     console.error("Database sync failed:", err);
 });
 

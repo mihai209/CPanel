@@ -39,7 +39,9 @@ function bootstrapApp(deps) {
         }
     }));
 
-    sessionStore.sync();
+    sessionStore.sync().catch((error) => {
+        console.error('Session store sync failed:', error);
+    });
 
     passport.serializeUser((user, done) => done(null, user.id));
     passport.deserializeUser(async (id, done) => {
