@@ -1404,6 +1404,150 @@ function sanitizeUploadFileName(rawName) {
     return cleaned;
 }
 
+function normalizeBufferToSearchableAscii(buffer, maxBytes = 2 * 1024 * 1024) {
+    if (!Buffer.isBuffer(buffer) || buffer.length === 0) return '';
+    const targetBytes = Math.min(buffer.length, Math.max(1024, maxBytes));
+    const headBytes = Math.floor(targetBytes * 0.7);
+    const tailBytes = targetBytes - headBytes;
+    const chunks = [];
+    chunks.push(buffer.subarray(0, headBytes));
+    if (tailBytes > 0 && buffer.length > headBytes) {
+        chunks.push(buffer.subarray(buffer.length - tailBytes));
+    }
+    const slice = Buffer.concat(chunks);
+    let out = '';
+    for (let i = 0; i < slice.length; i += 1) {
+        const byte = slice[i];
+        if (byte === 9 || byte === 10 || byte === 13 || (byte >= 32 && byte <= 126)) {
+            out += String.fromCharCode(byte);
+        } else {
+            out += ' ';
+        }
+    }
+    return out.toLowerCase();
+}
+
+function inspectUploadForMinerRisk(fileName, rawContent) {
+    const safeName = String(fileName || '').toLowerCase();
+    const ext = path.extname(safeName || '').toLowerCase();
+    const searchable = normalizeBufferToSearchableAscii(rawContent);
+    const isElf = Buffer.isBuffer(rawContent) && rawContent.length >= 4
+        && rawContent[0] === 0x7f && rawContent[1] === 0x45 && rawContent[2] === 0x4c && rawContent[3] === 0x46;
+    const isPe = Buffer.isBuffer(rawContent) && rawContent.length >= 2
+        && rawContent[0] === 0x4d && rawContent[1] === 0x5a;
+    const isExecutableSignature = isElf || isPe;
+    const executableLikeExt = ['.exe', '.bin', '.elf', '.run', '.out'].includes(ext);
+
+    const strongPatterns = [
+        /\bxmrig\b/i,
+        /\bxmr-stak\b/i,
+        /\bcpuminer\b/i,
+        /\bminerd\b/i,
+        /\bstratum\+tcp\b/i,
+        /\brandomx\b/i,
+        /\bcryptonight\b/i,
+        /\bmoneroocean\b/i,
+        /\bminexmr\b/i
+    ];
+    const mediumPatterns = [
+        /\bteamredminer\b/i,
+        /\bethminer\b/i,
+        /\bnbminer\b/i,
+        /\bgminer\b/i,
+        /\bsrbminer\b/i,
+        /\bhashvault\b/i,
+        /\b2miners\b/i,
+        /\bnicehash\b/i
+    ];
+
+    let score = 0;
+    const evidence = [];
+    let hasStrongMatch = false;
+
+    for (const pattern of strongPatterns) {
+        if (pattern.test(searchable) || pattern.test(safeName)) {
+            score += 6;
+            hasStrongMatch = true;
+            evidence.push(`strong:${pattern.source}`);
+        }
+    }
+    for (const pattern of mediumPatterns) {
+        if (pattern.test(searchable) || pattern.test(safeName)) {
+            score += 3;
+            evidence.push(`medium:${pattern.source}`);
+        }
+    }
+    if (isExecutableSignature) {
+        score += 2;
+        evidence.push(isElf ? 'sig:elf' : 'sig:pe');
+    }
+    if (executableLikeExt) {
+        score += 1;
+        evidence.push(`ext:${ext}`);
+    }
+
+    const confidence = score >= 8 && (hasStrongMatch || isExecutableSignature);
+    return {
+        flagged: confidence,
+        score,
+        evidence: Array.from(new Set(evidence)).slice(0, 12),
+        executableSignature: isExecutableSignature
+    };
+}
+
+function isTruthySettingValue(value) {
+    const normalized = String(value === undefined || value === null ? '' : value).trim().toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 'on' || normalized === 'yes';
+}
+
+async function suspendServerForUploadThreat(server, connectorWs, reason, req) {
+    if (!server || server.isSuspended) return false;
+
+    try {
+        if (connectorWs && connectorWs.readyState === WebSocket.OPEN) {
+            try {
+                rememberServerPowerIntent(server.id, 'kill');
+            } catch {
+                // Ignore intent cache errors.
+            }
+            connectorWs.send(JSON.stringify({
+                type: 'server_power',
+                serverId: server.id,
+                action: 'kill',
+                requestId: `upload_guard_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
+            }));
+        }
+    } catch {
+        // Continue with DB suspend even if connector send fails.
+    }
+
+    await server.update({
+        isSuspended: true,
+        status: 'suspended',
+        suspendReason: String(reason || 'Security policy: suspicious miner payload upload detected.').slice(0, 1000)
+    });
+    server.status = 'suspended';
+
+    if (typeof sendServerSmartAlert === 'function') {
+        sendServerSmartAlert(server, 'suspended', { reason: server.suspendReason });
+    }
+    if (typeof createBillingAuditLog === 'function') {
+        await createBillingAuditLog({
+            actorUserId: req && req.session && req.session.user ? req.session.user.id : null,
+            action: 'server.security.upload_miner_suspended',
+            targetType: 'server',
+            targetId: server.id,
+            req,
+            metadata: {
+                serverId: server.id,
+                containerId: server.containerId,
+                reason: server.suspendReason
+            }
+        });
+    }
+    return true;
+}
+
 function readBinaryRequestBody(req, maxBytes = 25 * 1024 * 1024) {
     return new Promise((resolve, reject) => {
         let totalBytes = 0;
@@ -8127,6 +8271,50 @@ app.post('/server/:containerId/files/upload', requireAuth, async (req, res) => {
         const directory = normalizeServerDirectoryInput(req.query.path || '/');
         const rawContent = await readBinaryRequestBody(req, uploadMaxBytes);
         const filePath = directory === '/' ? `/${fileName}` : `${directory}/${fileName}`;
+        const threatCheck = inspectUploadForMinerRisk(fileName, rawContent);
+
+        if (threatCheck.flagged) {
+            const securityReason = `Upload blocked by anti-miner guard: score=${threatCheck.score}; evidence=${threatCheck.evidence.join(', ') || 'n/a'}; file=${fileName}`;
+            await appendSecurityCenterAlert(
+                'Suspicious upload blocked (anti-miner)',
+                `Server: ${server.name} (#${server.id}, ${server.containerId})\nUser ID: ${req.session.user.id}\nPath: ${filePath}\n${securityReason}`,
+                'critical',
+                'security'
+            );
+
+            const antiMinerEnabled = isTruthySettingValue(res.locals.settings && res.locals.settings.featureAntiMinerEnabled);
+            if (antiMinerEnabled) {
+                await suspendServerForUploadThreat(
+                    server,
+                    connectorWs,
+                    `Security policy: anti-miner upload detection triggered (${fileName}).`,
+                    req
+                );
+            } else if (typeof createBillingAuditLog === 'function') {
+                await createBillingAuditLog({
+                    actorUserId: req.session.user.id,
+                    action: 'server.security.upload_miner_blocked',
+                    targetType: 'server',
+                    targetId: server.id,
+                    req,
+                    metadata: {
+                        serverId: server.id,
+                        containerId: server.containerId,
+                        filePath,
+                        score: threatCheck.score,
+                        evidence: threatCheck.evidence,
+                        suspended: false
+                    }
+                });
+            }
+
+            return res.status(422).json({
+                success: false,
+                error: antiMinerEnabled
+                    ? 'Upload blocked: suspicious miner payload detected. Server was suspended automatically.'
+                    : 'Upload blocked: suspicious miner payload detected.'
+            });
+        }
 
         connectorWs.send(JSON.stringify({
             type: 'write_file',

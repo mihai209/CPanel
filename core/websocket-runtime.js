@@ -50,6 +50,34 @@ const SERVER_CONSOLE_BUFFER_MAX_LINES = 1200;
 const SERVER_CONSOLE_BUFFER_MAX_BYTES = 1024 * 1024;
 const SERVER_DEBUG_LOG_TAIL_MAX_CHARS = 32 * 1024;
 const WEBHOOKS_SETTING_KEY = 'extensionWebhooksConfig';
+const ANTI_MINER_STATE = new Map(); // serverId -> runtime detection state
+const ANTI_MINER_CONFIG_CACHE_TTL_MS = 15 * 1000;
+const ANTI_MINER_CONFIG_CACHE = {
+    ts: 0,
+    config: null
+};
+const ANTI_MINER_CONFIG_SETTING_KEYS = [
+    'featureAntiMinerEnabled',
+    'antiMinerSuspendScore',
+    'antiMinerHighCpuPercent',
+    'antiMinerHighCpuSamples',
+    'antiMinerDecayMinutes',
+    'antiMinerCooldownSeconds'
+];
+const ANTI_MINER_STRONG_PATTERNS = [
+    /\b(?:xmrig|xmr-stak|cpuminer|minerd|nanominer|teamredminer|ethminer|nbminer|gminer|srbminer|wildrig)\b/i,
+    /\b(?:stratum\+tcp|stratum2\+tcp)\b/i,
+    /\b(?:cryptonight|randomx)\b/i
+];
+const ANTI_MINER_MEDIUM_PATTERNS = [
+    /\b(?:minexmr|supportxmr|moneroocean|herominers|hashvault|2miners|f2pool|nicehash|nanopool)\b/i,
+    /\b(?:coinhive|minergate)\b/i,
+    /--donate-level\b/i
+];
+const ANTI_MINER_WEAK_PATTERNS = [
+    /\b(?:wallet|payout)\b/i,
+    /\b(?:monero|xmr|bitcoin|btc|ethereum|eth)\b/i
+];
 
 const webhooksConfigCache = {
     ts: 0,
@@ -77,6 +105,131 @@ const MINECRAFT_DETECTION_KEYWORDS = [
 
 function parseBoolean(value) {
     return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
+function clampInteger(value, fallback, min, max) {
+    const parsed = Number.parseInt(String(value === undefined || value === null ? '' : value).trim(), 10);
+    if (!Number.isInteger(parsed)) return fallback;
+    return Math.max(min, Math.min(max, parsed));
+}
+
+function parseCpuPercentValue(value) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    const normalized = String(value === undefined || value === null ? '' : value).replace('%', '').trim();
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function detectMinerSignalsInText(textValue) {
+    const text = String(textValue || '');
+    if (!text.trim()) {
+        return { score: 0, evidence: [], hasSignature: false };
+    }
+
+    const evidence = [];
+    let score = 0;
+
+    for (const pattern of ANTI_MINER_STRONG_PATTERNS) {
+        if (pattern.test(text)) {
+            evidence.push(`strong:${pattern.source}`);
+            score += 5;
+        }
+    }
+    for (const pattern of ANTI_MINER_MEDIUM_PATTERNS) {
+        if (pattern.test(text)) {
+            evidence.push(`medium:${pattern.source}`);
+            score += 3;
+        }
+    }
+    for (const pattern of ANTI_MINER_WEAK_PATTERNS) {
+        if (pattern.test(text)) {
+            evidence.push(`weak:${pattern.source}`);
+            score += 1;
+        }
+    }
+
+    return {
+        score,
+        evidence: Array.from(new Set(evidence)).slice(0, 12),
+        hasSignature: evidence.some((entry) => entry.startsWith('strong:') || entry.startsWith('medium:'))
+    };
+}
+
+function getOrCreateAntiMinerState(serverId) {
+    const now = Date.now();
+    const existing = ANTI_MINER_STATE.get(serverId);
+    if (existing) return existing;
+
+    const state = {
+        score: 0,
+        evidence: [],
+        hasSignature: false,
+        highCpuHits: 0,
+        lastHitAtMs: now,
+        lastSuspendAtMs: 0,
+        startupCheckedAtMs: 0
+    };
+    ANTI_MINER_STATE.set(serverId, state);
+    return state;
+}
+
+function applyAntiMinerScoreDecay(state, decayMinutes) {
+    if (!state || !Number.isFinite(state.lastHitAtMs) || decayMinutes <= 0) return;
+    const now = Date.now();
+    const elapsedMs = Math.max(0, now - state.lastHitAtMs);
+    const decayStepMs = decayMinutes * 60 * 1000;
+    if (decayStepMs <= 0) return;
+    const decayPoints = Math.floor(elapsedMs / decayStepMs);
+    if (decayPoints <= 0) return;
+    state.score = Math.max(0, state.score - decayPoints);
+    state.lastHitAtMs = now;
+}
+
+async function getAntiMinerGuardConfig(forceRefresh = false) {
+    const now = Date.now();
+    if (!forceRefresh && ANTI_MINER_CONFIG_CACHE.config && (now - ANTI_MINER_CONFIG_CACHE.ts) <= ANTI_MINER_CONFIG_CACHE_TTL_MS) {
+        return ANTI_MINER_CONFIG_CACHE.config;
+    }
+
+    const defaults = {
+        enabled: false,
+        suspendScore: 10,
+        highCpuPercent: 95,
+        highCpuSamples: 8,
+        decayMinutes: 20,
+        cooldownSeconds: 600
+    };
+
+    if (!Settings || typeof Settings.findAll !== 'function') {
+        ANTI_MINER_CONFIG_CACHE.ts = now;
+        ANTI_MINER_CONFIG_CACHE.config = defaults;
+        return defaults;
+    }
+
+    const rows = await Settings.findAll({
+        where: { key: ANTI_MINER_CONFIG_SETTING_KEYS },
+        attributes: ['key', 'value']
+    }).catch(() => []);
+
+    const map = {};
+    if (Array.isArray(rows)) {
+        rows.forEach((row) => {
+            map[row.key] = row.value;
+        });
+    }
+
+    const config = {
+        enabled: parseBoolean(map.featureAntiMinerEnabled),
+        suspendScore: clampInteger(map.antiMinerSuspendScore, defaults.suspendScore, 5, 100),
+        highCpuPercent: clampInteger(map.antiMinerHighCpuPercent, defaults.highCpuPercent, 70, 100),
+        highCpuSamples: clampInteger(map.antiMinerHighCpuSamples, defaults.highCpuSamples, 3, 120),
+        decayMinutes: clampInteger(map.antiMinerDecayMinutes, defaults.decayMinutes, 1, 720),
+        cooldownSeconds: clampInteger(map.antiMinerCooldownSeconds, defaults.cooldownSeconds, 30, 86400)
+    };
+
+    ANTI_MINER_CONFIG_CACHE.ts = now;
+    ANTI_MINER_CONFIG_CACHE.config = config;
+    return config;
 }
 
 function isServerLikelyMinecraft(serverLike) {
@@ -349,6 +502,7 @@ function clearServerConsoleBuffer(serverId) {
     RESOURCE_ANOMALY_STATE.delete(serverId);
     RESOURCE_ANOMALY_SAMPLE_TS.delete(serverId);
     PLUGIN_CONFLICT_STATE.delete(serverId);
+    ANTI_MINER_STATE.delete(serverId);
 }
 
 async function writeServerAuditLog(payload) {
@@ -459,6 +613,198 @@ async function createRuntimeIncident({
     }
 
     return record;
+}
+
+async function getServerStartupSnapshotForAntiMiner(serverId) {
+    const parsedServerId = Number.parseInt(serverId, 10);
+    if (!Number.isInteger(parsedServerId) || parsedServerId <= 0) return '';
+
+    const serverRecord = await Server.findByPk(parsedServerId, {
+        attributes: ['id', 'name', 'dockerImage', 'variables'],
+        include: [
+            { model: Image, as: 'image', attributes: ['name', 'description', 'startup', 'dockerImage'], required: false }
+        ]
+    }).catch(() => null);
+    if (!serverRecord) return '';
+
+    const variables = serverRecord.variables && typeof serverRecord.variables === 'object'
+        ? serverRecord.variables
+        : {};
+    return [
+        serverRecord.name,
+        serverRecord.dockerImage,
+        variables.STARTUP,
+        variables.startup,
+        variables.start_command,
+        serverRecord.image ? serverRecord.image.name : '',
+        serverRecord.image ? serverRecord.image.description : '',
+        serverRecord.image ? serverRecord.image.startup : '',
+        serverRecord.image ? serverRecord.image.dockerImage : ''
+    ].filter(Boolean).join('\n');
+}
+
+async function suspendServerForAntiMinerDetection(serverId, detectionState, triggerMetadata = {}) {
+    const parsedServerId = Number.parseInt(serverId, 10);
+    if (!Number.isInteger(parsedServerId) || parsedServerId <= 0) return;
+
+    const serverRecord = await Server.findByPk(parsedServerId, {
+        attributes: ['id', 'name', 'status', 'isSuspended', 'suspendReason'],
+        include: [{ model: Allocation, as: 'allocation', attributes: ['connectorId'], required: false }]
+    }).catch(() => null);
+    if (!serverRecord) return;
+    if (serverRecord.isSuspended) return;
+
+    const reasonSummary = Array.isArray(detectionState && detectionState.evidence)
+        ? detectionState.evidence.slice(0, 6).join(', ')
+        : 'multiple miner indicators';
+    const suspendReason = `Anti-miner detection triggered (score ${Number(detectionState && detectionState.score || 0)}): ${reasonSummary}`.slice(0, 900);
+
+    await serverRecord.update({
+        isSuspended: true,
+        status: 'suspended',
+        suspendReason
+    });
+
+    const requestId = `antiminer_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+    const connectorId = serverRecord.allocation ? Number.parseInt(serverRecord.allocation.connectorId, 10) : 0;
+    if (Number.isInteger(connectorId) && connectorId > 0) {
+        const connectorWs = connectorConnections.get(connectorId);
+        if (connectorWs && connectorWs.readyState === WebSocket.OPEN) {
+            rememberServerPowerIntent(parsedServerId, 'kill');
+            connectorWs.send(JSON.stringify({
+                type: 'server_power',
+                serverId: parsedServerId,
+                action: 'kill',
+                stopCommand: null,
+                requestId
+            }));
+        }
+    }
+
+    sendToServerConsole(parsedServerId, {
+        type: 'server_status_update',
+        status: 'suspended'
+    });
+    sendToServerConsole(parsedServerId, {
+        type: 'console_output',
+        output: `[!] Anti-miner guard suspended this server automatically. Reason: ${reasonSummary}\n`
+    });
+
+    await writeServerAuditLog({
+        serverId: parsedServerId,
+        action: 'server:security.anti_miner_suspend',
+        metadata: {
+            score: Number(detectionState && detectionState.score || 0),
+            evidence: Array.isArray(detectionState && detectionState.evidence) ? detectionState.evidence : [],
+            trigger: triggerMetadata,
+            suspendReason,
+            capturedAt: new Date().toISOString(),
+            logTail: getServerConsoleTailForDebug(parsedServerId) || null
+        }
+    });
+
+    await createRuntimeIncident({
+        title: `Anti-miner suspension: ${serverRecord.name}`,
+        message: `Server #${serverRecord.id} was suspended automatically after miner indicators exceeded threshold.`,
+        severity: 'critical',
+        source: 'security',
+        serverId: parsedServerId,
+        connectorId: Number.isInteger(connectorId) && connectorId > 0 ? connectorId : null,
+        action: 'security.anti_miner.suspend',
+        metadata: {
+            score: Number(detectionState && detectionState.score || 0),
+            evidence: Array.isArray(detectionState && detectionState.evidence) ? detectionState.evidence : [],
+            trigger: triggerMetadata
+        }
+    });
+}
+
+async function evaluateAntiMinerGuardScore(serverId, signal, triggerMetadata = {}) {
+    const parsedServerId = Number.parseInt(serverId, 10);
+    if (!Number.isInteger(parsedServerId) || parsedServerId <= 0) return;
+
+    const config = await getAntiMinerGuardConfig();
+    if (!config.enabled) return;
+    if (!signal || Number(signal.score || 0) <= 0) return;
+
+    const state = getOrCreateAntiMinerState(parsedServerId);
+    applyAntiMinerScoreDecay(state, config.decayMinutes);
+
+    const now = Date.now();
+    state.score = Math.max(0, Number(state.score || 0) + Number(signal.score || 0));
+    state.lastHitAtMs = now;
+    state.hasSignature = Boolean(state.hasSignature || signal.hasSignature);
+    if (Array.isArray(signal.evidence) && signal.evidence.length) {
+        state.evidence = Array.from(new Set([...(state.evidence || []), ...signal.evidence])).slice(0, 16);
+    }
+    ANTI_MINER_STATE.set(parsedServerId, state);
+
+    const cooldownMs = Math.max(30, Number(config.cooldownSeconds || 600)) * 1000;
+    const inCooldown = Number.isFinite(state.lastSuspendAtMs) && state.lastSuspendAtMs > 0 && (now - state.lastSuspendAtMs) < cooldownMs;
+    if (inCooldown) return;
+
+    if (state.score >= Number(config.suspendScore || 10) && state.hasSignature) {
+        state.lastSuspendAtMs = now;
+        ANTI_MINER_STATE.set(parsedServerId, state);
+        await suspendServerForAntiMinerDetection(parsedServerId, state, triggerMetadata);
+    }
+}
+
+async function handleAntiMinerFromConsoleOutput(serverId, output) {
+    const signal = detectMinerSignalsInText(output);
+    if (signal.score <= 0) return;
+    await evaluateAntiMinerGuardScore(serverId, signal, {
+        source: 'console_output'
+    });
+}
+
+async function handleAntiMinerFromStats(serverId, cpu) {
+    const config = await getAntiMinerGuardConfig();
+    if (!config.enabled) return;
+
+    const parsedServerId = Number.parseInt(serverId, 10);
+    if (!Number.isInteger(parsedServerId) || parsedServerId <= 0) return;
+
+    const cpuValue = parseCpuPercentValue(cpu);
+    const state = getOrCreateAntiMinerState(parsedServerId);
+    applyAntiMinerScoreDecay(state, config.decayMinutes);
+
+    if (cpuValue >= Number(config.highCpuPercent || 95)) {
+        state.highCpuHits = Number(state.highCpuHits || 0) + 1;
+    } else {
+        state.highCpuHits = Math.max(0, Number(state.highCpuHits || 0) - 1);
+    }
+    ANTI_MINER_STATE.set(parsedServerId, state);
+
+    if (state.highCpuHits < Number(config.highCpuSamples || 8)) {
+        return;
+    }
+
+    const now = Date.now();
+    if (!state.startupCheckedAtMs || (now - state.startupCheckedAtMs) > (5 * 60 * 1000)) {
+        const snapshot = await getServerStartupSnapshotForAntiMiner(parsedServerId);
+        const startupSignal = detectMinerSignalsInText(snapshot);
+        state.startupCheckedAtMs = now;
+        if (startupSignal.score > 0) {
+            state.hasSignature = Boolean(state.hasSignature || startupSignal.hasSignature);
+            state.evidence = Array.from(new Set([...(state.evidence || []), ...startupSignal.evidence])).slice(0, 16);
+        }
+        ANTI_MINER_STATE.set(parsedServerId, state);
+    }
+
+    if (!state.hasSignature) {
+        // High CPU alone is not enough to suspend, avoids false positives on legit workloads.
+        return;
+    }
+
+    await evaluateAntiMinerGuardScore(parsedServerId, {
+        score: 2,
+        evidence: [`cpu:sustained>=${Number(config.highCpuPercent || 95)}%`],
+        hasSignature: true
+    }, {
+        source: 'server_stats',
+        cpu: cpuValue
+    });
 }
 
 wss.on('connection', (ws, request) => {
@@ -1063,6 +1409,7 @@ wss.on('connection', (ws, request) => {
                     appendToServerConsoleBuffer(data.serverId, data.output);
                     sendToServerConsole(data.serverId, { type: 'console_output', output: data.output });
                     handlePluginConflictAlert(data.serverId, data.output);
+                    await handleAntiMinerFromConsoleOutput(data.serverId, data.output);
                 }
             }
 
@@ -1241,6 +1588,7 @@ wss.on('connection', (ws, request) => {
                     disk: data.disk || '0'
                 });
                 await handleResourceAnomalyAlert(data.serverId, data.cpu, data.memory);
+                await handleAntiMinerFromStats(data.serverId, data.cpu);
                 if (typeof handlePolicyAnomalyRemediation === 'function') {
                     const remediation = await handlePolicyAnomalyRemediation(data.serverId, data.cpu, data.memory);
                     if (remediation && remediation.handled) {

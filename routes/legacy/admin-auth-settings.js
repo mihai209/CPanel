@@ -566,6 +566,7 @@ app.post('/admin/settings', requireAuth, requireAdmin, [
         faviconUrl: String(faviconUrl || '').trim(),
         featureAutoRemediationEnabled: toBooleanString(req.body.featureAutoRemediationEnabled),
         featurePolicyEngineEnabled: toBooleanString(req.body.featurePolicyEngineEnabled),
+        featureAntiMinerEnabled: toBooleanString(req.body.featureAntiMinerEnabled),
         featureSftpEnabled: toBooleanString(req.body.featureSftpEnabled),
         featureWebUploadEnabled: toBooleanString(req.body.featureWebUploadEnabled),
         featureAfkRewardsEnabled: toBooleanString(req.body.featureAfkRewardsEnabled),
@@ -583,7 +584,12 @@ app.post('/admin/settings', requireAuth, requireAdmin, [
         afkRewardYearCoins: toNumberString(req.body.afkRewardYearCoins, 36000, 0, 1000000),
         claimDailyStreakBonusCoins: toNumberString(req.body.claimDailyStreakBonusCoins, 5, 0, 1000000),
         claimDailyStreakMax: toNumberString(req.body.claimDailyStreakMax, 30, 1, 365),
-        autoRemediationCooldownSeconds: toNumberString(req.body.autoRemediationCooldownSeconds, 300, 10, 86400)
+        autoRemediationCooldownSeconds: toNumberString(req.body.autoRemediationCooldownSeconds, 300, 10, 86400),
+        antiMinerSuspendScore: toNumberString(req.body.antiMinerSuspendScore, 10, 5, 100),
+        antiMinerHighCpuPercent: toNumberString(req.body.antiMinerHighCpuPercent, 95, 70, 100),
+        antiMinerHighCpuSamples: toNumberString(req.body.antiMinerHighCpuSamples, 8, 3, 120),
+        antiMinerDecayMinutes: toNumberString(req.body.antiMinerDecayMinutes, 20, 1, 720),
+        antiMinerCooldownSeconds: toNumberString(req.body.antiMinerCooldownSeconds, 600, 30, 86400)
     };
 
     try {

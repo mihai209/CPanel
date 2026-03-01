@@ -682,6 +682,7 @@ async function upgrade() {
             { key: 'featureStoreDealsEnabled', value: 'false' },
             { key: 'featureStoreRedeemCodesEnabled', value: 'false' },
             { key: 'featureAutoRemediationEnabled', value: 'false' },
+            { key: 'featureAntiMinerEnabled', value: 'false' },
             { key: 'featurePolicyEngineEnabled', value: 'false' },
             { key: 'featureSftpEnabled', value: 'true' },
             { key: 'featureWebUploadEnabled', value: 'true' },
@@ -739,7 +740,12 @@ async function upgrade() {
             { key: 'storeDealsCatalog', value: '[]' },
             { key: 'storeRedeemCodesCatalog', value: '[]' },
             { key: 'revenuePlanCatalog', value: '[]' },
-            { key: 'autoRemediationCooldownSeconds', value: '300' }
+            { key: 'autoRemediationCooldownSeconds', value: '300' },
+            { key: 'antiMinerSuspendScore', value: '10' },
+            { key: 'antiMinerHighCpuPercent', value: '95' },
+            { key: 'antiMinerHighCpuSamples', value: '8' },
+            { key: 'antiMinerDecayMinutes', value: '20' },
+            { key: 'antiMinerCooldownSeconds', value: '600' }
         ];
 
         for (const item of defaults) {

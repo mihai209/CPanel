@@ -116,6 +116,15 @@
                                                             <div class="col-md-4">
                                                                 <div class="form-check form-switch">
                                                                     <input class="form-check-input" type="checkbox"
+                                                                        id="featureAntiMinerEnabled"
+                                                                        name="featureAntiMinerEnabled" value="1"
+                                                                        <%= String(settings.featureAntiMinerEnabled || 'false') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="featureAntiMinerEnabled">Anti-Miner Guard</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
                                                                         id="featureAfkRewardsEnabled"
                                                                         name="featureAfkRewardsEnabled" value="1"
                                                                         <%= String(settings.featureAfkRewardsEnabled || 'false') === 'true' ? 'checked' : '' %>>
@@ -172,6 +181,40 @@
                                                                 <input type="number" min="10" max="86400" name="autoRemediationCooldownSeconds" class="form-control"
                                                                     style="background-color: #1a1a20; border-color: #2d2d35;"
                                                                     value="<%= settings.autoRemediationCooldownSeconds || '300' %>">
+                                                            </div>
+                                                            <div class="col-12 mt-3">
+                                                                <h6 class="text-light mb-3"><i class="bi bi-shield-exclamation me-2"></i>Anti-Miner Guard</h6>
+                                                                <div class="form-text text-muted mb-2">Suspends only when multiple miner indicators are hit (score-based), to reduce false positives.</div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Suspend Score Threshold</label>
+                                                                <input type="number" min="5" max="100" name="antiMinerSuspendScore" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.antiMinerSuspendScore || '10' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">High CPU Percent</label>
+                                                                <input type="number" min="70" max="100" name="antiMinerHighCpuPercent" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.antiMinerHighCpuPercent || '95' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">High CPU Samples</label>
+                                                                <input type="number" min="3" max="120" name="antiMinerHighCpuSamples" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.antiMinerHighCpuSamples || '8' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Score Decay (minutes)</label>
+                                                                <input type="number" min="1" max="720" name="antiMinerDecayMinutes" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.antiMinerDecayMinutes || '20' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Suspend Cooldown (seconds)</label>
+                                                                <input type="number" min="30" max="86400" name="antiMinerCooldownSeconds" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.antiMinerCooldownSeconds || '600' %>">
                                                             </div>
                                                             <div class="col-md-4">
                                                                 <label class="form-label text-muted small text-uppercase fw-bold">AFK Timer Coins</label>
