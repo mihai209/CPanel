@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="turbo-visit-control" content="reload">
     <title>
         <%= title %> | <%= settings.brandName.toUpperCase() %>
     </title>
@@ -496,25 +497,27 @@
             </div>
         </div>
 
-        <!-- EULA Modal -->
-        <div class="modal fade" id="eulaModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content bg-dark text-white border-secondary">
-                    <div class="modal-header border-secondary">
-                        <h5 class="modal-title fw-bold">Minecraft EULA Agreement</h5>
-                    </div>
-                    <div class="modal-body">
-                        <p>To run a Minecraft server, you must agree to Minecraft's End User License Agreement.</p>
-                        <p class="small text-muted">By clicking "Agree", you explicitly accept the EULA found at <a
-                                href="https://www.minecraft.net/eula" target="_blank"
-                                class="text-info">minecraft.net/eula</a>.</p>
-                    </div>
-                    <div class="modal-footer border-secondary">
-                        <button type="button" id="btnAcceptEula" class="btn btn-primary w-100">I Agree</button>
+        <% if (showMinecraftEulaModal) { %>
+            <!-- EULA Modal -->
+            <div class="modal fade" id="eulaModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content bg-dark text-white border-secondary">
+                        <div class="modal-header border-secondary">
+                            <h5 class="modal-title fw-bold">Minecraft EULA Agreement</h5>
+                        </div>
+                        <div class="modal-body">
+                            <p>To run a Minecraft server, you must agree to Minecraft's End User License Agreement.</p>
+                            <p class="small text-muted">By clicking "Agree", you explicitly accept the EULA found at <a
+                                    href="https://www.minecraft.net/eula" target="_blank"
+                                    class="text-info">minecraft.net/eula</a>.</p>
+                        </div>
+                        <div class="modal-footer border-secondary">
+                            <button type="button" id="btnAcceptEula" class="btn btn-primary w-100">I Agree</button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        <% } %>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
         <script src="https://cdn.jsdelivr.net/npm/xterm@5.2.1/lib/xterm.js"></script>
@@ -548,6 +551,7 @@
             const serverDisk = <%= server.disk || 0 %>;
             let currentServerStatus = '<%= String(server.status || "stopped").toLowerCase() %>';
             const promptBrand = <%- JSON.stringify(String((settings && settings.brandName) ? settings.brandName : 'cpanel').toLowerCase()) %>;
+            const showMinecraftEulaModal = <%- JSON.stringify(Boolean(showMinecraftEulaModal)) %>;
 
             let connectorOnline = true;
 
@@ -676,7 +680,7 @@
                             }
                             break;
                         case 'eula_status':
-                            if (!data.accepted) {
+                            if (showMinecraftEulaModal && !data.accepted) {
                                 const modal = new bootstrap.Modal(document.getElementById('eulaModal'));
                                 modal.show();
                             }
@@ -797,12 +801,15 @@
             });
             document.getElementById('btnKill').addEventListener('click', () => sendPower('kill'));
 
-            document.getElementById('btnAcceptEula').addEventListener('click', () => {
-                client.send('accept_eula');
-                const modal = bootstrap.Modal.getInstance(document.getElementById('eulaModal'));
-                modal.hide();
-                term.writeln('\x1b[1;32m[*] EULA accepted! Please start your server now.\x1b[0m');
-            });
+            const btnAcceptEula = document.getElementById('btnAcceptEula');
+            if (btnAcceptEula) {
+                btnAcceptEula.addEventListener('click', () => {
+                    client.send('accept_eula');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('eulaModal'));
+                    if (modal) modal.hide();
+                    term.writeln('\x1b[1;32m[*] EULA accepted! Please start your server now.\x1b[0m');
+                });
+            }
 
             function sendPower(action) {
                 if (!connectorOnline) {

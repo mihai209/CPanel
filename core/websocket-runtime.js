@@ -57,9 +57,70 @@ const webhooksConfigCache = {
     moduleEnabled: false,
     brandName: 'CPanel'
 };
+const serverMinecraftEligibilityCache = new Map(); // serverId -> boolean
+const MINECRAFT_DETECTION_KEYWORDS = [
+    'minecraft',
+    'paper',
+    'purpur',
+    'spigot',
+    'bukkit',
+    'forge',
+    'fabric',
+    'neoforge',
+    'quilt',
+    'velocity',
+    'bungeecord',
+    'waterfall',
+    'bedrock',
+    'pufferfish'
+];
 
 function parseBoolean(value) {
     return ['1', 'true', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
+}
+
+function isServerLikelyMinecraft(serverLike) {
+    if (!serverLike || typeof serverLike !== 'object') return false;
+    const image = serverLike.image && typeof serverLike.image === 'object' ? serverLike.image : {};
+    const candidates = [
+        image.name,
+        image.description,
+        image.startup,
+        image.dockerImage,
+        serverLike.dockerImage
+    ];
+    const haystack = String(candidates.filter(Boolean).join(' ')).toLowerCase();
+    if (!haystack) return false;
+    return MINECRAFT_DETECTION_KEYWORDS.some((keyword) => haystack.includes(keyword));
+}
+
+async function canHandleMinecraftEula(serverOrId) {
+    if (serverOrId && typeof serverOrId === 'object') {
+        const id = Number.parseInt(serverOrId.id, 10);
+        const value = isServerLikelyMinecraft(serverOrId);
+        if (Number.isInteger(id) && id > 0) {
+            serverMinecraftEligibilityCache.set(id, value);
+        }
+        return value;
+    }
+
+    const serverId = Number.parseInt(serverOrId, 10);
+    if (!Number.isInteger(serverId) || serverId <= 0) return false;
+    if (serverMinecraftEligibilityCache.has(serverId)) {
+        return Boolean(serverMinecraftEligibilityCache.get(serverId));
+    }
+
+    try {
+        const serverRecord = await Server.findByPk(serverId, {
+            attributes: ['id', 'dockerImage'],
+            include: [{ model: Image, as: 'image', attributes: ['name', 'description', 'startup', 'dockerImage'], required: false }]
+        });
+        const value = isServerLikelyMinecraft(serverRecord);
+        serverMinecraftEligibilityCache.set(serverId, value);
+        return value;
+    } catch {
+        return false;
+    }
 }
 
 function normalizeWebhooksRuntimeConfig(raw) {
@@ -465,11 +526,15 @@ wss.on('connection', (ws, request) => {
             // Always initialize each client with current status + buffered console.
             setTimeout(async () => {
                 const serverObj = await Server.findByPk(serverId, {
-                    include: [{ model: Allocation, as: 'allocation' }]
+                    include: [
+                        { model: Allocation, as: 'allocation' },
+                        { model: Image, as: 'image', required: false }
+                    ]
                 });
                 if (!serverObj || !serverObj.allocation || ws.readyState !== WebSocket.OPEN) {
                     return;
                 }
+                const supportsMinecraftEula = await canHandleMinecraftEula(serverObj);
 
                 const connectorWs = connectorConnections.get(serverObj.allocation.connectorId);
                 const isOnline = connectorWs && connectorWs.readyState === WebSocket.OPEN;
@@ -498,7 +563,9 @@ wss.on('connection', (ws, request) => {
                 if (isOnline) {
                     // Keep status and EULA synced for every new browser session.
                     connectorWs.send(JSON.stringify({ type: 'check_server_status', serverId }));
-                    connectorWs.send(JSON.stringify({ type: 'check_eula', serverId }));
+                    if (supportsMinecraftEula) {
+                        connectorWs.send(JSON.stringify({ type: 'check_eula', serverId }));
+                    }
 
                     // Ensure log stream is attached when first browser client connects.
                     if (isFirstConsoleClient) {
@@ -542,6 +609,7 @@ wss.on('connection', (ws, request) => {
                         ws.send(JSON.stringify({ type: 'error', message: 'Server or connector not found.' }));
                         return;
                     }
+                    const supportsMinecraftEula = await canHandleMinecraftEula(serverObj);
 
                     if (serverObj.isSuspended && (data.type === 'power_action' || data.type === 'console_input')) {
                         ws.send(JSON.stringify({ type: 'error', message: 'This server is suspended and cannot be controlled.' }));
@@ -609,6 +677,10 @@ wss.on('connection', (ws, request) => {
                     } else if (data.type === 'accept_eula') {
                         if (!hasConsolePermission('server.power')) {
                             ws.send(JSON.stringify({ type: 'error', message: 'Missing permission: server.power' }));
+                            return;
+                        }
+                        if (!supportsMinecraftEula) {
+                            ws.send(JSON.stringify({ type: 'error', message: 'EULA is available only for Minecraft servers.' }));
                             return;
                         }
                         connectorWs.send(JSON.stringify({
@@ -1154,7 +1226,10 @@ wss.on('connection', (ws, request) => {
 
             // Handle EULA status from connector
             if (data.type === 'eula_status') {
-                sendToServerConsole(data.serverId, { type: 'eula_status', accepted: data.accepted });
+                const supportsMinecraftEula = await canHandleMinecraftEula(data.serverId);
+                if (supportsMinecraftEula) {
+                    sendToServerConsole(data.serverId, { type: 'eula_status', accepted: data.accepted });
+                }
             }
 
             // Handle server stats from connector (NEW)

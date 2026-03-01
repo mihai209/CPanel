@@ -35,8 +35,7 @@ if (String(settings.featurePolicyEngineEnabled || 'false') === 'true') {
 
     <!-- Navigation Items -->
     <% navItems.forEach(item=> { %>
-        <a href="<%= item.link %>" class="sidebar-item <%= active === item.id ? 'active' : '' %>"
-            <%= item.turbo === false ? 'data-turbo="false"' : '' %>
+        <a href="<%= item.link %>" class="sidebar-item <%= active === item.id ? 'active' : '' %>" data-turbo="false"
             data-bs-toggle="tooltip" data-bs-placement="right" title="<%= item.label %>">
             <div class="sidebar-icon">
                 <i class="bi <%= item.icon %>"></i>

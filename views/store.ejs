@@ -354,7 +354,11 @@ const formatAuditSummary = (row) => {
                                         <% if (!row.revenueManaged) { %>
                                             <a href="/user/server/<%= row.server.containerId %>/edit" class="btn btn-sm btn-outline-info">Edit</a>
                                         <% } %>
-                                        <form method="POST" action="/user/server/<%= row.server.containerId %>/delete" class="d-inline js-delete-server-form">
+                                        <form method="POST" action="/user/server/<%= row.server.containerId %>/delete" class="d-inline-flex align-items-center gap-1 js-delete-server-form">
+                                            <select name="refundMode" class="form-select form-select-sm bg-dark text-light border-secondary js-delete-refund-mode" title="Delete refund mode">
+                                                <option value="inventory" selected>Refund: Inventory</option>
+                                                <option value="coins">Refund: Coins (50%)</option>
+                                            </select>
                                             <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
                                         </form>
                                         <% if (canRenew) { %>
@@ -455,7 +459,12 @@ const formatAuditSummary = (row) => {
         const forms = Array.from(document.querySelectorAll('.js-delete-server-form'));
         forms.forEach((form) => {
             const handler = (event) => {
-                const confirmed = window.confirm('Delete this server? This action removes it from panel and attempts connector cleanup.');
+                const modeInput = form.querySelector('.js-delete-refund-mode');
+                const selectedMode = String(modeInput && modeInput.value ? modeInput.value : 'inventory').toLowerCase();
+                const refundText = selectedMode === 'coins'
+                    ? 'Inventory resources will be converted to coins at 50% value when eligible.'
+                    : 'Inventory resources will be restored when eligible.';
+                const confirmed = window.confirm(`Delete this server? This action removes it from panel and attempts connector cleanup. ${refundText}`);
                 if (!confirmed) {
                     event.preventDefault();
                 }

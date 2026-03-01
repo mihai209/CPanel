@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="turbo-visit-control" content="reload">
     <title>
         Minecraft <%= server.name %> | <%= settings.brandName.toUpperCase() %>
     </title>
@@ -327,7 +328,7 @@
     </style>
 </head>
 
-<body>
+<body data-turbo="false">
     <%- include ('../partials/error-modal') %>
     <div class="wrapper">
         <nav id="sidebar" class="sidebar">
@@ -657,6 +658,9 @@
 
                 renderResults(payload.results || []);
                 updatePagination();
+                if (payload.relaxedVersionFilter) {
+                    setAlert('warning', `No results were found for MC version "${filters.version}". Showing closest matches without version filter.`);
+                }
             } catch (error) {
                 renderResults([]);
                 state.total = 0;

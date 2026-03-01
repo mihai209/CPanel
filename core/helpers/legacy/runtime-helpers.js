@@ -1354,8 +1354,22 @@ function normalizeMinecraftLoader(value, kind) {
 function normalizeMinecraftVersion(value) {
     const normalized = String(value || '').trim();
     if (!normalized) return '';
-    if (!/^[A-Za-z0-9._+\-]{1,24}$/.test(normalized)) return '';
-    return normalized;
+    if (!/^[A-Za-z0-9._+\-]{1,40}$/.test(normalized)) return '';
+
+    const lower = normalized.toLowerCase();
+    const placeholders = new Set(['latest', 'release', 'stable', 'recommended', 'auto', 'default', 'current']);
+    if (placeholders.has(lower)) return '';
+
+    // Prefer explicit Minecraft versions if present inside mixed strings (e.g. "paper-1.20.4").
+    const explicitVersionMatch = lower.match(/\b\d+\.\d+(?:\.\d+)?\b/);
+    if (explicitVersionMatch) return explicitVersionMatch[0];
+
+    // Keep common snapshot/pre-release formats.
+    if (/^\d{2}w\d{2}[a-z]$/i.test(lower)) return lower;
+    if (/^\d+\.\d+(?:\.\d+)?-(?:pre|rc)\d+$/i.test(lower)) return lower;
+
+    // Unknown token: skip version facet instead of forcing zero-result searches.
+    return '';
 }
 
 function sanitizeServerDirectoryPath(value, fallback = '/') {

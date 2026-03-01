@@ -1360,6 +1360,36 @@ function normalizeServerDirectoryInput(rawDirectory) {
     return directoryRaw.startsWith('/') ? directoryRaw : `/${directoryRaw}`;
 }
 
+function isServerLikelyMinecraft(serverLike) {
+    const image = serverLike && serverLike.image ? serverLike.image : {};
+    const candidates = [
+        image.name,
+        image.description,
+        image.startup,
+        image.dockerImage,
+        serverLike && serverLike.dockerImage
+    ];
+    const haystack = String(candidates.filter(Boolean).join(' ')).toLowerCase();
+    if (!haystack) return false;
+    const keywords = [
+        'minecraft',
+        'paper',
+        'purpur',
+        'spigot',
+        'bukkit',
+        'forge',
+        'fabric',
+        'neoforge',
+        'quilt',
+        'velocity',
+        'bungeecord',
+        'waterfall',
+        'bedrock',
+        'pufferfish'
+    ];
+    return keywords.some((keyword) => haystack.includes(keyword));
+}
+
 function sanitizeUploadFileName(rawName) {
     const name = String(rawName || '').trim();
     if (!name) return '';
@@ -1664,6 +1694,10 @@ function getUserInventorySettingKey(userId) {
     return `user_store_inventory_${userId}`;
 }
 
+function getServerInventoryProvisioningSettingKey(serverId) {
+    return `server_inventory_provisioning_${serverId}`;
+}
+
 function defaultUserInventoryState() {
     return {
         ramMb: 0,
@@ -1715,6 +1749,72 @@ async function setUserInventoryState(userId, state) {
         value: JSON.stringify(normalized)
     });
     return normalized;
+}
+
+function normalizeServerInventoryProvisioningState(raw) {
+    let parsed = raw;
+    if (typeof parsed === 'string') {
+        try {
+            parsed = JSON.parse(parsed);
+        } catch {
+            parsed = {};
+        }
+    }
+    if (!parsed || typeof parsed !== 'object') parsed = {};
+    const toInt = (value) => Math.max(0, Number.parseInt(value, 10) || 0);
+    const mode = String(parsed.mode || '').trim().toLowerCase() === 'inventory' ? 'inventory' : 'none';
+    const resourcesRaw = parsed.resources && typeof parsed.resources === 'object' ? parsed.resources : {};
+    return {
+        mode,
+        resources: {
+            ramMb: toInt(resourcesRaw.ramMb),
+            cpuPercent: toInt(resourcesRaw.cpuPercent),
+            diskMb: toInt(resourcesRaw.diskMb),
+            swapMb: toInt(resourcesRaw.swapMb),
+            allocations: toInt(resourcesRaw.allocations),
+            images: toInt(resourcesRaw.images),
+            packages: toInt(resourcesRaw.packages)
+        },
+        createdAtMs: toInt(parsed.createdAtMs) || Date.now(),
+        updatedAtMs: Date.now()
+    };
+}
+
+async function getServerInventoryProvisioningState(serverId) {
+    const setting = await Settings.findByPk(getServerInventoryProvisioningSettingKey(serverId));
+    if (!setting || !setting.value) return null;
+    return normalizeServerInventoryProvisioningState(setting.value);
+}
+
+async function setServerInventoryProvisioningState(serverId, state) {
+    const normalized = normalizeServerInventoryProvisioningState(state);
+    await Settings.upsert({
+        key: getServerInventoryProvisioningSettingKey(serverId),
+        value: JSON.stringify(normalized)
+    });
+    return normalized;
+}
+
+async function removeServerInventoryProvisioningState(serverId) {
+    await Settings.destroy({
+        where: {
+            key: getServerInventoryProvisioningSettingKey(serverId)
+        }
+    });
+}
+
+function buildServerInventoryRefundResources(serverLike) {
+    const toInt = (value) => Math.max(0, Number.parseInt(value, 10) || 0);
+    const hasPackageToken = Boolean(serverLike && serverLike.image && serverLike.image.packageId);
+    return {
+        ramMb: toInt(serverLike && serverLike.memory),
+        cpuPercent: toInt(serverLike && serverLike.cpu),
+        diskMb: toInt(serverLike && serverLike.disk),
+        swapMb: toInt(serverLike && serverLike.swapLimit),
+        allocations: (serverLike && serverLike.allocationId) ? 1 : 0,
+        images: (serverLike && serverLike.imageId) ? 1 : 0,
+        packages: hasPackageToken ? 1 : 0
+    };
 }
 
 function buildScalingInventoryDelta(currentLimits, targetLimits) {
@@ -1807,6 +1907,24 @@ function getInventoryUnitCostAndDelta(resourceType, quantity, featureFlags) {
         totalCost,
         delta
     };
+}
+
+function calculateInventoryResourceCoinValue(resources, featureFlags) {
+    const toInt = (value) => Math.max(0, Number.parseInt(value, 10) || 0);
+    const normalized = resources && typeof resources === 'object' ? resources : {};
+    const ramGb = toInt(normalized.ramMb) / 1024;
+    const cpuCores = toInt(normalized.cpuPercent) / 100;
+    const diskGb = toInt(normalized.diskMb) / 1024;
+    const swapGb = toInt(normalized.swapMb) / 1024;
+    return Math.max(0, Math.ceil(
+        (ramGb * Number(featureFlags.storeRamPerGbCoins || 0)) +
+        (cpuCores * Number(featureFlags.storeCpuPerCoreCoins || 0)) +
+        (diskGb * Number(featureFlags.storeDiskPerGbCoins || 0)) +
+        (swapGb * Number(featureFlags.storeSwapPerGbCoins || 0)) +
+        (toInt(normalized.allocations) * Number(featureFlags.storeAllocationCoins || 0)) +
+        (toInt(normalized.images) * Number(featureFlags.storeImageCoins || 0)) +
+        (toInt(normalized.packages) * Number(featureFlags.storePackageCoins || 0))
+    ));
 }
 
 function getStoreBillingRemainingSeconds(state, nowMs = Date.now()) {
@@ -2631,7 +2749,7 @@ app.post('/store/revenue/start-trial', requireAuth, async (req, res) => {
         }
 
         const account = await User.findByPk(req.session.user.id, {
-            attributes: ['id', 'isSuspended']
+            attributes: ['id', 'coins', 'isSuspended']
         });
         if (!account) {
             req.session.destroy(() => {});
@@ -3504,7 +3622,7 @@ app.post('/user/server/:containerId/delete', requireAuth, async (req, res) => {
         }
 
         const account = await User.findByPk(req.session.user.id, {
-            attributes: ['id', 'isSuspended']
+            attributes: ['id', 'coins', 'isSuspended']
         });
         if (!account) {
             req.session.destroy(() => {});
@@ -3516,11 +3634,41 @@ app.post('/user/server/:containerId/delete', requireAuth, async (req, res) => {
 
         const server = await Server.findOne({
             where: { containerId: req.params.containerId, ownerId: account.id },
-            include: [{ model: Allocation, as: 'allocation' }]
+            include: [
+                { model: Allocation, as: 'allocation' },
+                { model: Image, as: 'image', required: false }
+            ]
         });
         if (!server) {
             return res.redirect('/store?error=' + encodeURIComponent('Server not found.'));
         }
+
+        const requestedRefundModeRaw = String(req.body.refundMode || '').trim().toLowerCase();
+        const requestedRefundMode = requestedRefundModeRaw === 'coins'
+            ? 'coins'
+            : (requestedRefundModeRaw === 'none' ? 'none' : 'inventory');
+        const revenueManagedState = await getServerRevenueManagedState(server.id);
+        const inventoryProvisioningState = await getServerInventoryProvisioningState(server.id);
+
+        let refundResources = null;
+        let refundSource = 'none';
+        if (inventoryProvisioningState && inventoryProvisioningState.mode === 'inventory') {
+            refundResources = { ...inventoryProvisioningState.resources };
+            refundSource = 'provisioning_marker';
+        } else if (featureFlags.inventoryEnabled && !(revenueManagedState && revenueManagedState.managed)) {
+            refundResources = buildServerInventoryRefundResources(server);
+            refundSource = 'legacy_fallback';
+        }
+
+        const refundResourceTotal = refundResources
+            ? (Number(refundResources.ramMb || 0)
+                + Number(refundResources.cpuPercent || 0)
+                + Number(refundResources.diskMb || 0)
+                + Number(refundResources.swapMb || 0)
+                + Number(refundResources.allocations || 0)
+                + Number(refundResources.images || 0)
+                + Number(refundResources.packages || 0))
+            : 0;
 
         let connectorOnline = false;
         if (server.allocation && server.allocation.connectorId) {
@@ -3544,6 +3692,7 @@ app.post('/user/server/:containerId/delete', requireAuth, async (req, res) => {
         const settingsKeysToDelete = [
             getStoreBillingSettingKeySafe(server.id),
             getServerRevenueManagedSettingKey(server.id),
+            getServerInventoryProvisioningSettingKey(server.id),
             getServerSchedulesSettingKey(server.id),
             getServerConfigBaselineSettingKey(server.id),
             typeof getServerScheduledScalingSettingKey === 'function' ? getServerScheduledScalingSettingKey(server.id) : null,
@@ -3584,6 +3733,37 @@ app.post('/user/server/:containerId/delete', requireAuth, async (req, res) => {
 
         await server.destroy();
 
+        let appliedRefundMode = 'none';
+        let refundedCoins = 0;
+        let refundCoinValue = 0;
+        if (refundResources && refundResourceTotal > 0 && requestedRefundMode !== 'none') {
+            if (requestedRefundMode === 'coins') {
+                refundCoinValue = calculateInventoryResourceCoinValue(refundResources, featureFlags);
+                refundedCoins = Math.max(0, Math.floor(refundCoinValue / 2));
+                if (refundedCoins > 0) {
+                    const userCoins = Number.isFinite(Number(account.coins)) ? Number(account.coins) : 0;
+                    const nextCoins = userCoins + refundedCoins;
+                    await account.update({ coins: nextCoins });
+                    req.session.user.coins = nextCoins;
+                    await new Promise((resolve) => req.session.save(resolve));
+                    appliedRefundMode = 'coins';
+                }
+            } else {
+                const inventory = await getUserInventoryState(account.id);
+                await setUserInventoryState(account.id, {
+                    ...inventory,
+                    ramMb: inventory.ramMb + Number(refundResources.ramMb || 0),
+                    cpuPercent: inventory.cpuPercent + Number(refundResources.cpuPercent || 0),
+                    diskMb: inventory.diskMb + Number(refundResources.diskMb || 0),
+                    swapMb: inventory.swapMb + Number(refundResources.swapMb || 0),
+                    allocations: inventory.allocations + Number(refundResources.allocations || 0),
+                    images: inventory.images + Number(refundResources.images || 0),
+                    packages: inventory.packages + Number(refundResources.packages || 0)
+                });
+                appliedRefundMode = 'inventory';
+            }
+        }
+
         await createBillingAuditLog({
             actorUserId: account.id,
             action: 'billing.server.delete',
@@ -3593,13 +3773,35 @@ app.post('/user/server/:containerId/delete', requireAuth, async (req, res) => {
             metadata: {
                 serverName: server.name,
                 containerId: server.containerId,
-                connectorOnline
+                connectorOnline,
+                requestedRefundMode,
+                appliedRefundMode,
+                refundSource,
+                refundedCoins,
+                refundCoinValue,
+                refundResources
             }
         });
 
+        const refundSummaryParts = [];
+        if (appliedRefundMode === 'inventory' && refundResources) {
+            const toGb = (mb) => (Number(mb || 0) / 1024).toFixed(2).replace(/\.00$/, '');
+            if (Number(refundResources.ramMb || 0) > 0) refundSummaryParts.push(`RAM ${toGb(refundResources.ramMb)} GB`);
+            if (Number(refundResources.cpuPercent || 0) > 0) refundSummaryParts.push(`CPU ${(Number(refundResources.cpuPercent || 0) / 100).toFixed(2).replace(/\.00$/, '')}`);
+            if (Number(refundResources.diskMb || 0) > 0) refundSummaryParts.push(`Disk ${toGb(refundResources.diskMb)} GB`);
+            if (Number(refundResources.swapMb || 0) > 0) refundSummaryParts.push(`Swap ${toGb(refundResources.swapMb)} GB`);
+            if (Number(refundResources.allocations || 0) > 0) refundSummaryParts.push(`Allocations ${refundResources.allocations}`);
+            if (Number(refundResources.images || 0) > 0) refundSummaryParts.push(`Images ${refundResources.images}`);
+            if (Number(refundResources.packages || 0) > 0) refundSummaryParts.push(`Packages ${refundResources.packages}`);
+        }
+        const refundSummaryText = appliedRefundMode === 'coins'
+            ? ` Refunded ${refundedCoins} ${normalizeEconomyUnit(featureFlags.economyUnit)} (convert mode, 50%).`
+            : (appliedRefundMode === 'inventory'
+                ? ` Resources returned to inventory${refundSummaryParts.length ? `: ${refundSummaryParts.join(', ')}` : ''}.`
+                : (requestedRefundMode === 'none' ? '' : ' No refundable inventory resources were found for this server.'));
         const message = connectorOnline
-            ? `Server "${server.name}" deleted successfully.`
-            : `Server "${server.name}" deleted from panel. Connector offline, so remote files may still exist.`;
+            ? `Server "${server.name}" deleted successfully.${refundSummaryText}`
+            : `Server "${server.name}" deleted from panel. Connector offline, so remote files may still exist.${refundSummaryText}`;
         return res.redirect('/store?success=' + encodeURIComponent(message));
     } catch (error) {
         console.error('Error deleting user server:', error);
@@ -4146,6 +4348,28 @@ app.post('/user/create', requireAuth, async (req, res) => {
             });
         }
 
+        try {
+            if (inventoryApplied) {
+                await setServerInventoryProvisioningState(server.id, {
+                    mode: 'inventory',
+                    resources: {
+                        ramMb: memory,
+                        cpuPercent: cpu,
+                        diskMb: disk,
+                        swapMb: swapLimit,
+                        allocations: 1,
+                        images: 1,
+                        packages: image.packageId ? 1 : 0
+                    },
+                    createdAtMs: Date.now()
+                });
+            } else {
+                await removeServerInventoryProvisioningState(server.id);
+            }
+        } catch (inventoryProvisioningError) {
+            console.warn(`Failed to persist inventory provisioning marker for server ${server.id}:`, inventoryProvisioningError.message);
+        }
+
         const newCoins = userCoins - totalCost;
         await account.update({ coins: newCoins });
         req.session.user.coins = newCoins;
@@ -4262,7 +4486,8 @@ app.get('/server/:containerId', requireAuth, async (req, res) => {
             user: req.session.user,
             title: `Manage ${server.name}`,
             path: '/servers',
-            wsToken
+            wsToken,
+            showMinecraftEulaModal: isServerLikelyMinecraft(server)
         });
     } catch (err) {
         console.error("Error fetching console:", err);
@@ -5826,26 +6051,40 @@ app.get('/server/:containerId/minecraft/search', requireAuth, async (req, res) =
         const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 12, 1), MODRINTH_MAX_SEARCH_LIMIT);
         const offset = Math.max(Number.parseInt(req.query.offset, 10) || 0, 0);
 
-        const facets = [[`project_type:${kind}`]];
-        if (loader) facets.push([`categories:${loader}`]);
-        if (gameVersion) facets.push([`versions:${gameVersion}`]);
+        const executeModrinthSearch = async (includeVersionFacet) => {
+            const facets = [[`project_type:${kind}`]];
+            if (loader) facets.push([`categories:${loader}`]);
+            if (includeVersionFacet && gameVersion) facets.push([`versions:${gameVersion}`]);
+            const response = await axios.get(`${MODRINTH_API_BASE_URL}/search`, {
+                params: {
+                    query,
+                    limit,
+                    offset,
+                    index: 'downloads',
+                    facets: JSON.stringify(facets)
+                },
+                timeout: MODRINTH_REQUEST_TIMEOUT_MS,
+                headers: {
+                    'User-Agent': buildModrinthUserAgent(res.locals.settings)
+                }
+            });
+            const payload = response.data || {};
+            const hits = Array.isArray(payload.hits) ? payload.hits : [];
+            return { payload, hits };
+        };
 
-        const response = await axios.get(`${MODRINTH_API_BASE_URL}/search`, {
-            params: {
-                query,
-                limit,
-                offset,
-                index: 'downloads',
-                facets: JSON.stringify(facets)
-            },
-            timeout: MODRINTH_REQUEST_TIMEOUT_MS,
-            headers: {
-                'User-Agent': buildModrinthUserAgent(res.locals.settings)
+        let relaxedVersionFilter = false;
+        let searchResult = await executeModrinthSearch(true);
+        if (gameVersion && searchResult.hits.length === 0) {
+            const relaxedResult = await executeModrinthSearch(false);
+            if (relaxedResult.hits.length > 0) {
+                searchResult = relaxedResult;
+                relaxedVersionFilter = true;
             }
-        });
+        }
 
-        const payload = response.data || {};
-        const hits = Array.isArray(payload.hits) ? payload.hits : [];
+        const payload = searchResult.payload;
+        const hits = searchResult.hits;
 
         const results = hits.map((hit) => ({
             id: String(hit.project_id || hit.id || ''),
@@ -5867,6 +6106,7 @@ app.get('/server/:containerId/minecraft/search', requireAuth, async (req, res) =
             kind,
             loader,
             version: gameVersion,
+            relaxedVersionFilter,
             pagination: {
                 total: Number.parseInt(payload.total_hits, 10) || 0,
                 offset,

@@ -94,6 +94,33 @@
         return false;
     }
 
+    function shouldForceHardNavigationPath(pathname) {
+        const path = String(pathname || '').trim();
+        if (!path.startsWith('/server/')) return false;
+        if (/^\/server\/[^/]+\/?$/.test(path)) return true; // console
+        if (/^\/server\/[^/]+\/files(?:\/.*)?$/.test(path)) return true; // file manager + file editor
+        if (/^\/server\/[^/]+\/edit(?:\/.*)?$/.test(path)) return true; // direct editor route
+        if (/^\/server\/[^/]+\/minecraft(?:\/.*)?$/.test(path)) return true; // addon catalog page
+        return false;
+    }
+
+    function applyHardNavigationBypass(root = document) {
+        if (!root || typeof root.querySelectorAll !== 'function') return;
+
+        const links = root.querySelectorAll('a[href]');
+        links.forEach((anchor) => {
+            if (!(anchor instanceof HTMLAnchorElement)) return;
+            let targetUrl;
+            try {
+                targetUrl = new URL(anchor.getAttribute('href'), window.location.origin);
+            } catch {
+                return;
+            }
+            if (!shouldForceHardNavigationPath(targetUrl.pathname)) return;
+            anchor.setAttribute('data-turbo', 'false');
+        });
+    }
+
     function isolateInlineScriptScopesInBody(bodyEl) {
         if (!bodyEl) return;
         const scripts = bodyEl.querySelectorAll('script');
@@ -126,6 +153,7 @@
     document.addEventListener('turbo:load', () => {
         patchRuntimeResources();
         applyFormTurboCompatibility();
+        applyHardNavigationBypass(document);
         dispatchCompatDOMContentLoaded();
         dispatchPageLifecycleEvents();
     });
@@ -137,13 +165,28 @@
 
     document.addEventListener('turbo:before-render', (event) => {
         const newBody = event && event.detail ? event.detail.newBody : null;
+        applyHardNavigationBypass(newBody);
         isolateInlineScriptScopesInBody(newBody);
+    });
+
+    document.addEventListener('turbo:click', (event) => {
+        try {
+            const destination = event && event.detail ? event.detail.url : null;
+            if (!destination) return;
+            const destinationUrl = new URL(destination, window.location.origin);
+            if (!shouldForceHardNavigationPath(destinationUrl.pathname)) return;
+            event.preventDefault();
+            window.location.assign(destinationUrl.toString());
+        } catch {
+            // ignore
+        }
     });
 
     // Non-Turbo fallback for direct loads or pages with data-turbo disabled.
     document.addEventListener('DOMContentLoaded', () => {
         patchRuntimeResources();
         applyFormTurboCompatibility();
+        applyHardNavigationBypass(document);
         if (document.documentElement.hasAttribute('data-turbo-preview')) return;
         dispatchPageLifecycleEvents();
     });
