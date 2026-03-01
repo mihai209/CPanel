@@ -4023,7 +4023,13 @@ app.get('/user/create', requireAuth, async (req, res) => {
             }),
             Allocation.findAll({
                 where: { serverId: null },
-                include: [{ model: Connector, as: 'connector', include: [{ model: Location, as: 'location' }] }],
+                include: [{
+                    model: Connector,
+                    as: 'connector',
+                    where: { isPublic: true },
+                    required: true,
+                    include: [{ model: Location, as: 'location' }]
+                }],
                 order: [['id', 'ASC']]
             }),
             getUserInventoryState(req.session.user.id),
@@ -4199,7 +4205,13 @@ app.get('/user/create/smart-allocation', requireAuth, async (req, res) => {
 
         const allocations = await Allocation.findAll({
             where: { serverId: null },
-            include: [{ model: Connector, as: 'connector', include: [{ model: Location, as: 'location' }] }],
+            include: [{
+                model: Connector,
+                as: 'connector',
+                where: { isPublic: true },
+                required: true,
+                include: [{ model: Location, as: 'location' }]
+            }],
             order: [['id', 'ASC']]
         });
         const usageByConnector = await buildConnectorUsageMap(allocations.map((entry) => entry.connectorId));
@@ -4286,6 +4298,13 @@ app.post('/user/create', requireAuth, async (req, res) => {
         if (!Number.isInteger(selectedConnectorId) || selectedConnectorId <= 0) {
             return res.redirect('/user/create?error=' + encodeURIComponent('Select a valid connector.'));
         }
+        const selectedConnector = await Connector.findOne({
+            where: { id: selectedConnectorId, isPublic: true },
+            attributes: ['id', 'isPublic']
+        });
+        if (!selectedConnector) {
+            return res.redirect('/user/create?error=' + encodeURIComponent('Selected connector is private and cannot be used for user provisioning.'));
+        }
         if (!smartAllocationEnabled && (!Number.isInteger(requestedAllocationId) || requestedAllocationId <= 0)) {
             return res.redirect('/user/create?error=' + encodeURIComponent('Select a valid allocation or enable Smart Allocation.'));
         }
@@ -4346,7 +4365,13 @@ app.post('/user/create', requireAuth, async (req, res) => {
         if (smartAllocationEnabled) {
             const freeAllocations = await Allocation.findAll({
                 where: { serverId: null },
-                include: [{ model: Connector, as: 'connector', include: [{ model: Location, as: 'location' }] }],
+                include: [{
+                    model: Connector,
+                    as: 'connector',
+                    where: { isPublic: true },
+                    required: true,
+                    include: [{ model: Location, as: 'location' }]
+                }],
                 order: [['id', 'ASC']]
             });
             const usageByConnector = await buildConnectorUsageMap(freeAllocations.map((entry) => entry.connectorId));
@@ -4375,7 +4400,13 @@ app.post('/user/create', requireAuth, async (req, res) => {
             }
         } else {
             allocation = await Allocation.findByPk(requestedAllocationId, {
-                include: [{ model: Connector, as: 'connector', include: [{ model: Location, as: 'location' }] }]
+                include: [{
+                    model: Connector,
+                    as: 'connector',
+                    where: { isPublic: true },
+                    required: true,
+                    include: [{ model: Location, as: 'location' }]
+                }]
             });
             if (!allocation || allocation.serverId) {
                 return res.redirect('/user/create?error=' + encodeURIComponent('Allocation invalid or already taken.'));

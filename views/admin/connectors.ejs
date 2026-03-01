@@ -140,7 +140,10 @@
                                                                                     title="Connector Description:  <%= conn.description %>"
                                                                                     style="font-weight: bold;">
                                                                                     <%= conn.name %>
-
+                                                                                    <% const connectorPublic = conn.isPublic !== false; %>
+                                                                                    <span class="ms-2 badge <%= connectorPublic ? 'bg-success bg-opacity-10 text-success border border-success border-opacity-25' : 'bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25' %>">
+                                                                                        <%= connectorPublic ? 'PUBLIC' : 'PRIVATE' %>
+                                                                                    </span>
                                                                                 </td>
                                                                                 <td class="text-muted small">
                                                                                     <%= conn.fqdn %>:<%= conn.port %>
@@ -407,6 +410,19 @@
                                                                                                             </div>
                                                                                                             <div
                                                                                                                 class="col-12">
+                                                                                                                <div class="form-check form-switch p-3 rounded-3 mb-2"
+                                                                                                                    style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);">
+                                                                                                                    <input
+                                                                                                                        class="form-check-input ms-0 me-2"
+                                                                                                                        type="checkbox"
+                                                                                                                        name="isPublic"
+                                                                                                                        id="isPublicSwitch<%= conn.id %>"
+                                                                                                                        value="1"
+                                                                                                                        <%= conn.isPublic !== false ? 'checked' : '' %>>
+                                                                                                                    <label
+                                                                                                                        class="form-check-label text-light fw-bold"
+                                                                                                                        for="isPublicSwitch<%= conn.id %>">Public connector (visible in <code>/user/create</code>)</label>
+                                                                                                                </div>
                                                                                                                 <div class="form-check form-switch p-3 rounded-3"
                                                                                                                     style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);">
                                                                                                                     <input
@@ -573,6 +589,13 @@
                                                     Connector accepts only these panel origins.</small>
                                             </div>
                                             <div class="col-12">
+                                                <div class="form-check form-switch p-3 rounded-3 mb-2"
+                                                    style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);">
+                                                    <input class="form-check-input ms-0 me-2" type="checkbox" name="isPublic"
+                                                        id="isPublicSwitchNew" value="1" checked>
+                                                    <label class="form-check-label text-light fw-bold"
+                                                        for="isPublicSwitchNew">Public connector (visible in <code>/user/create</code>)</label>
+                                                </div>
                                                 <div class="form-check form-switch p-3 rounded-3"
                                                     style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);">
                                                     <input class="form-check-input ms-0 me-2" type="checkbox" name="ssl"

@@ -420,8 +420,8 @@
                 const connector = connectors.find((c) => Number.parseInt(c.id, 10) === connectorId);
                 const statusData = connectorStatuses[connectorId] || { status: 'offline', lastSeen: null };
 
-                // Check online status (online if last seen < 30s ago)
-                const isOnline = statusData.status === 'online' && (new Date() - new Date(statusData.lastSeen)) < 30000;
+                // Backend already computes effective online/offline using heartbeat + socket state.
+                const isOnline = statusData.status === 'online';
 
                 // Clear previous message if any
                 const existingMsg = connectorSelect.parentNode.querySelector('.status-msg');

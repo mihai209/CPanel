@@ -109,6 +109,7 @@ const Connector = sequelize.define('Connector', {
     memoryOverAllocation: { type: DataTypes.INTEGER, defaultValue: 0 },
     totalDisk: { type: DataTypes.INTEGER, allowNull: false },
     diskOverAllocation: { type: DataTypes.INTEGER, defaultValue: 0 },
+    isPublic: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
     description: { type: DataTypes.STRING(50), allowNull: true },
     token: { type: DataTypes.STRING(255), allowNull: true }
 });
@@ -537,6 +538,10 @@ async function upgrade() {
         await Server.update(
             { databaseLimit: 0 },
             { where: { databaseLimit: null } }
+        );
+        await Connector.update(
+            { isPublic: true },
+            { where: { isPublic: null } }
         );
         await ServerSubuser.update(
             { permissions: [] },

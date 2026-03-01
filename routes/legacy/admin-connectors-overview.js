@@ -51,6 +51,12 @@ function normalizeAllocationNotes(raw) {
     return sliced || null;
 }
 
+function normalizeBooleanInput(value, fallback = false) {
+    if (value === undefined || value === null || value === '') return fallback;
+    const normalized = String(value).trim().toLowerCase();
+    return ['1', 'true', 'yes', 'on'].includes(normalized);
+}
+
 function registerAdminConnectorsOverviewRoutes(ctx) {
     for (const [key, value] of Object.entries(ctx || {})) {
         try {
@@ -148,7 +154,7 @@ app.post('/admin/connectors', requireAuth, requireAdmin, [
     }
 
     try {
-        const { name, fqdn, port, sftpPort, ssl, locationId, fileDirectory, totalMemory, memoryOverAllocation, totalDisk, diskOverAllocation, description, allowedUrls } = req.body;
+        const { name, fqdn, port, sftpPort, ssl, isPublic, locationId, fileDirectory, totalMemory, memoryOverAllocation, totalDisk, diskOverAllocation, description, allowedUrls } = req.body;
         const panelOrigin = extractOriginFromUrl(resolvePanelBaseUrl(req));
         const { origins: allowedOrigins, invalid } = parseAllowedOriginsInput(allowedUrls, panelOrigin);
         if (invalid.length > 0) {
@@ -170,6 +176,7 @@ app.post('/admin/connectors', requireAuth, requireAdmin, [
             memoryOverAllocation: parseInt(memoryOverAllocation) || 0,
             totalDisk: parseInt(totalDisk),
             diskOverAllocation: parseInt(diskOverAllocation) || 0,
+            isPublic: normalizeBooleanInput(isPublic, false),
             description,
             token
         });
@@ -218,6 +225,7 @@ app.post('/admin/connectors/edit/:id', requireAuth, requireAdmin, [
             memoryOverAllocation: req.body.memoryOverAllocation || 0,
             totalDisk: req.body.totalDisk,
             diskOverAllocation: req.body.diskOverAllocation || 0,
+            isPublic: normalizeBooleanInput(req.body.isPublic, false),
             description: req.body.description
         }, { where: { id: req.params.id } });
 

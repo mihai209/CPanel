@@ -89,6 +89,65 @@ function formatSmartAllocationResponse(result) {
     };
 }
 
+const CONNECTOR_STATUS_STALE_MS = Math.max(
+    30000,
+    Number.parseInt(process.env.CONNECTOR_ONLINE_STALE_MS || '120000', 10) || 120000
+);
+
+function getConnectorSocket(connectorId) {
+    if (!connectorConnections || !connectorConnections.get) return null;
+    return connectorConnections.get(connectorId) || connectorConnections.get(String(connectorId)) || null;
+}
+
+function getConnectorStatusEntry(connectorStatusMap, connectorId) {
+    const source = connectorStatusMap && typeof connectorStatusMap === 'object'
+        ? connectorStatusMap
+        : (global.connectorStatus || {});
+    if (!source || typeof source !== 'object') return null;
+    return source[connectorId] || source[String(connectorId)] || null;
+}
+
+function buildEffectiveConnectorStatus(connectorId, connectorStatusMap = null) {
+    const parsedConnectorId = Number.parseInt(connectorId, 10);
+    const nowMs = Date.now();
+    const statusEntry = getConnectorStatusEntry(connectorStatusMap, parsedConnectorId);
+    const socket = getConnectorSocket(parsedConnectorId);
+    const socketOnline = Boolean(socket && socket.readyState === WebSocket.OPEN);
+    const lastSeenMs = new Date(statusEntry && statusEntry.lastSeen ? statusEntry.lastSeen : 0).getTime();
+    const heartbeatOnline = Boolean(
+        statusEntry
+        && String(statusEntry.status || '').toLowerCase() === 'online'
+        && Number.isFinite(lastSeenMs)
+        && lastSeenMs > 0
+        && (nowMs - lastSeenMs) < CONNECTOR_STATUS_STALE_MS
+    );
+    const isOnline = socketOnline || heartbeatOnline;
+
+    return {
+        status: isOnline ? 'online' : 'offline',
+        lastSeen: Number.isFinite(lastSeenMs) && lastSeenMs > 0
+            ? new Date(lastSeenMs).toISOString()
+            : (isOnline ? new Date(nowMs).toISOString() : null),
+        usage: statusEntry && statusEntry.usage ? statusEntry.usage : null
+    };
+}
+
+function buildEffectiveConnectorStatusMap(connectorIds = []) {
+    const map = {};
+    const source = global.connectorStatus || {};
+    Object.keys(source).forEach((key) => {
+        const parsedConnectorId = Number.parseInt(key, 10);
+        if (!Number.isInteger(parsedConnectorId) || parsedConnectorId <= 0) return;
+        map[parsedConnectorId] = buildEffectiveConnectorStatus(parsedConnectorId, source);
+    });
+    (Array.isArray(connectorIds) ? connectorIds : []).forEach((entry) => {
+        const parsedConnectorId = Number.parseInt(entry, 10);
+        if (!Number.isInteger(parsedConnectorId) || parsedConnectorId <= 0) return;
+        map[parsedConnectorId] = buildEffectiveConnectorStatus(parsedConnectorId, source);
+    });
+    return map;
+}
+
 async function resolvePrimaryAllocationForServer(server, options = {}) {
     if (!server) return null;
     const serverId = Number.parseInt(server.id, 10);
@@ -303,7 +362,7 @@ app.get('/admin/servers/create', requireAuth, requireAdmin, async (req, res) => 
             users,
             images,
             connectors,
-            connectorStatus: global.connectorStatus || {},
+            connectorStatus: buildEffectiveConnectorStatusMap(connectors.map((connector) => connector.id)),
             user: req.session.user,
             title: 'Create Server',
             path: '/admin/servers'
@@ -328,7 +387,7 @@ app.get('/api/admin/servers/smart-allocation', requireAuth, requireAdmin, async 
         const usageByConnector = await buildConnectorUsageMap(allocations.map((entry) => entry.connectorId));
         const result = pickSmartAllocation({
             allocations,
-            connectorStatusMap: global.connectorStatus || {},
+            connectorStatusMap: buildEffectiveConnectorStatusMap(allocations.map((entry) => entry.connectorId)),
             usageByConnector,
             requestedMemoryMb,
             requestedDiskMb,
@@ -377,7 +436,7 @@ app.get('/admin/migrations/pterodactyl', requireAuth, requireAdmin, async (req, 
             users,
             images,
             allocations,
-            connectorStatus: global.connectorStatus || {},
+            connectorStatus: buildEffectiveConnectorStatusMap(allocations.map((allocation) => allocation.connectorId)),
             remotePanelUrl: migrationDraft ? String(migrationDraft.remotePanelUrl || '') : '',
             remoteServerRef: migrationDraft ? String(migrationDraft.remoteServerRef || '') : '',
             remoteSftpHost: migrationDraft ? String(migrationDraft.remoteSftpHost || '') : '',
@@ -520,9 +579,8 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
             return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Selected allocation is no longer free.'));
         }
 
-        const statusData = (global.connectorStatus && global.connectorStatus[allocation.connectorId]) || { status: 'offline', lastSeen: null };
-        const isOnline = statusData.status === 'online' && (new Date() - new Date(statusData.lastSeen)) < 30000;
-        if (!isOnline) {
+        const effectiveConnectorStatus = buildEffectiveConnectorStatus(allocation.connectorId);
+        if (effectiveConnectorStatus.status !== 'online') {
             return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Selected connector is offline.'));
         }
 
@@ -733,7 +791,7 @@ app.post('/admin/servers', requireAuth, requireAdmin, async (req, res) => {
             const usageByConnector = await buildConnectorUsageMap(freeAllocations.map((entry) => entry.connectorId));
             const result = pickSmartAllocation({
                 allocations: freeAllocations,
-                connectorStatusMap: global.connectorStatus || {},
+                connectorStatusMap: buildEffectiveConnectorStatusMap(freeAllocations.map((entry) => entry.connectorId)),
                 usageByConnector,
                 requestedMemoryMb: parsedMemory,
                 requestedDiskMb: parsedDisk,
@@ -754,10 +812,8 @@ app.post('/admin/servers', requireAuth, requireAdmin, async (req, res) => {
         }
 
         // Validate Connector is online
-        const statusData = (global.connectorStatus && global.connectorStatus[allocation.connectorId]) || { status: 'offline', lastSeen: null };
-        const isOnline = statusData.status === 'online' && (new Date() - new Date(statusData.lastSeen)) < 30000;
-
-        if (!isOnline) {
+        const effectiveConnectorStatus = buildEffectiveConnectorStatus(allocation.connectorId);
+        if (effectiveConnectorStatus.status !== 'online') {
             return res.redirect('/admin/servers?error=Selected node is currently offline. Cannot deploy server.');
         }
 
