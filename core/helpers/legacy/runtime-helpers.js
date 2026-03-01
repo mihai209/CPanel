@@ -1080,7 +1080,7 @@ async function runServerScheduledScalingSweep() {
                     try {
                         const runtimeValues = {
                             SERVER_MEMORY: String(nextLimits.memory),
-                            SERVER_IP: String(server.allocation.ip || ''),
+                            SERVER_IP: '0.0.0.0',
                             SERVER_PORT: String(server.allocation.port || '')
                         };
                         const built = buildServerEnvironment(server.image, server.variables || {}, runtimeValues);

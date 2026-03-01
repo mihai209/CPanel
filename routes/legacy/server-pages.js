@@ -4452,7 +4452,7 @@ app.post('/user/create', requireAuth, async (req, res) => {
         const imagePorts = resolveImagePorts(image.ports);
         const { resolvedVariables, env } = buildServerEnvironment(image, req.body.variables || {}, {
             SERVER_MEMORY: String(memory),
-            SERVER_IP: allocation.ip,
+            SERVER_IP: '0.0.0.0',
             SERVER_PORT: String(allocation.port)
         });
         const startup = buildStartupCommand(image.startup, env);
@@ -4760,7 +4760,7 @@ app.get('/server/:containerId/overview', requireAuth, async (req, res) => {
             if (server.image) {
                 const runtimeValues = {
                     SERVER_MEMORY: String(server.memory),
-                    SERVER_IP: server.allocation ? server.allocation.ip : '',
+                    SERVER_IP: '0.0.0.0',
                     SERVER_PORT: server.allocation ? String(server.allocation.port) : ''
                 };
                 const built = buildServerEnvironment(server.image, server.variables || {}, runtimeValues);
@@ -7113,7 +7113,7 @@ app.get('/server/:containerId/startup', requireAuth, async (req, res) => {
 
         const runtimeValues = {
             SERVER_MEMORY: String(server.memory),
-            SERVER_IP: server.allocation ? server.allocation.ip : '',
+            SERVER_IP: '0.0.0.0',
             SERVER_PORT: server.allocation ? String(server.allocation.port) : ''
         };
 
@@ -7171,7 +7171,7 @@ app.post('/server/:containerId/startup', requireAuth, async (req, res) => {
         const image = server.image;
         const runtimeValues = {
             SERVER_MEMORY: String(server.memory),
-            SERVER_IP: server.allocation ? server.allocation.ip : '',
+            SERVER_IP: '0.0.0.0',
             SERVER_PORT: server.allocation ? String(server.allocation.port) : ''
         };
         const imagePorts = resolveImagePorts(image.ports);

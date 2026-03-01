@@ -159,14 +159,11 @@ function buildMigrationPrecheckMatrix(snapshot, images) {
 
         let startupPreviewError = '';
         try {
-            const defaultIp = (snapshot && snapshot.defaultAllocation && snapshot.defaultAllocation.ip)
-                ? String(snapshot.defaultAllocation.ip)
-                : '127.0.0.1';
             const defaultPort = Number.parseInt(snapshot && snapshot.defaultAllocation ? snapshot.defaultAllocation.port : '', 10) || 25565;
             const defaultMemory = Number.parseInt(snapshot && snapshot.memory ? snapshot.memory : '', 10) || 1024;
             const { env: previewEnv } = buildServerEnvironment(image, remoteVariables, {
                 SERVER_MEMORY: String(defaultMemory),
-                SERVER_IP: defaultIp,
+                SERVER_IP: '0.0.0.0',
                 SERVER_PORT: String(defaultPort)
             });
             buildStartupCommand(image && image.startup ? image.startup : '', previewEnv);
@@ -546,7 +543,7 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
 
         const { resolvedVariables, env } = buildServerEnvironment(image, migratedVariables, {
             SERVER_MEMORY: String(memory),
-            SERVER_IP: allocation.ip,
+            SERVER_IP: '0.0.0.0',
             SERVER_PORT: String(allocation.port)
         });
         const startup = buildStartupCommand(image.startup, env);
@@ -761,7 +758,7 @@ app.post('/admin/servers', requireAuth, requireAdmin, async (req, res) => {
         const imagePorts = resolveImagePorts(image.ports);
         const { resolvedVariables, env } = buildServerEnvironment(image, req.body.variables, {
             SERVER_MEMORY: parsedMemory.toString(),
-            SERVER_IP: allocation.ip,
+            SERVER_IP: '0.0.0.0',
             SERVER_PORT: allocation.port.toString()
         });
         const startup = buildStartupCommand(image.startup, env);
@@ -1206,7 +1203,7 @@ app.post('/admin/servers/reinstall/:containerId', requireAuth, requireAdmin, asy
         const imagePorts = resolveImagePorts(image.ports);
         const { resolvedVariables, env } = buildServerEnvironment(image, server.variables, {
             SERVER_MEMORY: String(server.memory),
-            SERVER_IP: server.allocation.ip,
+            SERVER_IP: '0.0.0.0',
             SERVER_PORT: String(server.allocation.port)
         });
         const startup = buildStartupCommand(server.startup || image.startup, env);
