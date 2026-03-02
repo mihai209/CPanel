@@ -32,6 +32,22 @@ npm run dev
 
 Default URL: `http://localhost:3000`
 
+### MySQL via Docker (Port 5757)
+
+```bash
+cd /home/mihai/Desktop/cpanel/panel
+cp .env.mysql-docker.example .env
+docker compose -f docker-compose.mysql.yml up -d
+npm run upgrade-db
+npm run create-user
+npm run dev
+```
+
+Use `docker compose -f docker-compose.mysql.yml ps` to check DB health.
+
+Default Docker DB credentials are defined in `docker-compose.mysql.yml`.
+Change all passwords before production use.
+
 ### Main Scripts
 
 - `npm run dev` - start with nodemon

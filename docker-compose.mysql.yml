@@ -1,0 +1,29 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: cpanel-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-change_me_root_password}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE:-panel}"
+      MYSQL_USER: "${MYSQL_USER:-cpanel}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD:-change_me_panel_password}"
+      MYSQL_TCP_PORT: "5757"
+      MYSQL_INITDB_SKIP_TZINFO: "1"
+      DB_HOST_USER: "${DB_HOST_USER:-cpanelhost}"
+      DB_HOST_PASSWORD: "${DB_HOST_PASSWORD:-change_me_host_password}"
+    ports:
+      - "5757:5757"
+    volumes:
+      - cpanel_mysql_data:/var/lib/mysql
+      - ./docker/mysql/conf.d/cpanel.cnf:/etc/mysql/conf.d/cpanel.cnf:ro
+      - ./docker/mysql/init/01-create-db-host-user.sh:/docker-entrypoint-initdb.d/01-create-db-host-user.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -P 5757 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  cpanel_mysql_data:
