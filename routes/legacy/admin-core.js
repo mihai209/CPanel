@@ -510,6 +510,43 @@ app.post('/admin/images/edit/:id', requireAuth, requireAdmin, async (req, res) =
     }
 });
 
+// Admin Images (Visibility Toggle - POST)
+app.post('/admin/images/visibility/:id', requireAuth, requireAdmin, async (req, res) => {
+    const packageId = Number.parseInt(req.body.packageId || req.query.packageId, 10);
+    const redirectBase = Number.isInteger(packageId) && packageId > 0
+        ? `/admin/images?packageId=${encodeURIComponent(String(packageId))}`
+        : '/admin/images';
+    const redirectWith = (key, value) => `${redirectBase}${redirectBase.includes('?') ? '&' : '?'}${key}=${encodeURIComponent(value)}`;
+    const wantsJson = (req.headers.accept || '').includes('application/json');
+
+    try {
+        const image = await Image.findByPk(req.params.id);
+        if (!image) {
+            if (wantsJson) return res.status(404).json({ ok: false, error: 'Image not found.' });
+            return res.redirect(redirectWith('error', 'Image not found.'));
+        }
+
+        const rawVisibility = String(req.body.isPublic || '').trim().toLowerCase();
+        const isPublic = ['1', 'true', 'on', 'yes'].includes(rawVisibility);
+        await image.update({ isPublic });
+
+        if (wantsJson) {
+            return res.json({
+                ok: true,
+                imageId: image.id,
+                isPublic,
+                label: isPublic ? 'Public' : 'Private'
+            });
+        }
+
+        res.redirect(redirectWith('success', `Image "${image.name}" visibility updated to ${isPublic ? 'Public' : 'Private'}.`));
+    } catch (error) {
+        console.error('Error toggling image visibility:', error);
+        if (wantsJson) return res.status(500).json({ ok: false, error: 'Failed to update visibility.' });
+        res.redirect(redirectWith('error', 'Failed to update image visibility.'));
+    }
+});
+
 // Admin Images (Delete - POST)
 app.post('/admin/images/delete/:id', requireAuth, requireAdmin, async (req, res) => {
     const packageId = Number.parseInt(req.body.packageId || req.query.packageId, 10);

@@ -4,399 +4,447 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>
-        <%= (settings.brandName || 'CPanel' ).toUpperCase() %> - Images
-    </title>
+    <title><%= (settings.brandName || 'CPanel').toUpperCase() %> - Images</title>
     <%- include('../partials/favicon') %>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
-            rel="stylesheet">
-        <link rel="stylesheet" href="/css/style.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
 </head>
 
-<body> <%- include ('../partials/error-modal') %>
-        <div class="admin-wrapper">
-            <%- include('../partials/admin-sidebar') %>
-                <div class="admin-content">
-                    <div class="admin-header">
-                        <div class="d-flex align-items-baseline gap-3">
-                            <h4 class="mb-0 text-light fw-normal">Images</h4>
-                            <small class="text-muted">Manage and import image JSON definitions.</small>
-                        </div>
-                        <div class="breadcrumb-admin">
-                            <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span
-                                class="text-light">Images</span>
-                        </div>
-                    </div>
-
-                    <div class="container-fluid py-4 px-lg-4">
-                        <% if (success) { %>
-                            <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
-                                <i class="bi bi-check-circle-fill me-2"></i>
-                                <%= success %>
-                            </div>
-                            <% } %>
-                                <% if (error) { %>
-                                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
-                                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
-                                        <%= error %>
-                                    </div>
-                                    <% } %>
-
-                                        <div class="row g-4">
-                                            <div class="col-lg-5">
-                                                <div class="card border-0 shadow-sm" style="background-color: #141419;">
-                                                    <div
-                                                        class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
-                                                        <h5 class="card-title mb-0 fs-6 fw-bold text-light">
-                                                            <i class="bi bi-filetype-json me-2"></i>Import JSON
-                                                        </h5>
-                                                    </div>
-                                                    <div class="card-body">
-                                                        <form method="POST" action="/admin/images/import">
-                                                            <input type="hidden" name="isPublicSubmitted" value="1">
-                                                            <div class="mb-3">
-                                                                <label
-                                                                    class="form-label text-muted small text-uppercase fw-bold">Select
-                                                                    JSON File</label>
-                                                                <input id="imageJsonFile" type="file"
-                                                                    accept=".json,application/json" multiple class="form-control"
-                                                                    style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
-                                                                <small class="text-muted">You can select multiple egg JSON files for bulk import.</small>
-                                                            </div>
-
-                                                            <div class="mb-3">
-                                                                <label
-                                                                    class="form-label text-muted small text-uppercase fw-bold">Package
-                                                                    (Nest)</label>
-                                                                <div class="input-group">
-                                                                    <select name="packageId" class="form-select"
-                                                                        required
-                                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
-                                                                        <option value="" disabled selected>Select a
-                                                                            package...</option>
-                                                                        <% if (packages && packages.length> 0) { %>
-                                                                            <% packages.forEach(pkg=> { %>
-                                                                                <option value="<%= pkg.id %>">
-                                                                                    <%= pkg.name %>
-                                                                                </option>
-                                                                                <% }) %>
-                                                                                    <% } %>
-                                                                    </select>
-                                                                    <button type="button"
-                                                                        class="btn btn-outline-secondary border-secondary border-opacity-20"
-                                                                        data-bs-toggle="modal"
-                                                                        data-bs-target="#createPackageModal">
-                                                                        <i class="bi bi-plus-lg"></i>
-                                                                    </button>
-                                                                </div>
-                                                                <small class="text-muted">Images must be assigned to a
-                                                                    package.</small>
-                                                            </div>
-
-                                                            <div class="mb-3">
-                                                                <label
-                                                                    class="form-label text-muted small text-uppercase fw-bold">JSON
-                                                                    Content</label>
-                                                                <textarea id="jsonPayload" name="jsonPayload"
-                                                                    class="form-control font-monospace" rows="14"
-                                                                    required
-                                                                    placeholder="Paste CPanel JSON or Pterodactyl egg export JSON here..."
-                                                                    style="background-color: #1a1a20; border-color: #2d2d35; color: white;"></textarea>
-                                                                <small class="text-muted">Supports local image JSON,
-                                                                    Pterodactyl egg export (PTDL), and API-style
-                                                                    payloads with <code>attributes</code>. Arrays are imported in bulk.</small>
-                                                            </div>
-
-                                                            <div class="mb-3 form-check form-switch">
-                                                                <input class="form-check-input" type="checkbox" role="switch" id="importImagePublic" name="isPublic" value="1" checked>
-                                                                <label class="form-check-label text-light small" for="importImagePublic">
-                                                                    Public image (visible in <code>/user/create</code>)
-                                                                </label>
-                                                            </div>
-
-                                                            <button type="submit" class="btn btn-primary w-100 fw-bold">
-                                                                <i class="bi bi-cloud-arrow-up me-2"></i>Import Image
-                                                            </button>
-                                                        </form>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div class="col-lg-7">
-                                                <div class="card border-0 shadow-sm" style="background-color: #141419;">
-                                                    <div
-                                                        class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
-                                                        <h5 class="card-title mb-0 fs-6 fw-bold text-light">
-                                                            <i class="bi bi-grid-3x3-gap me-2"></i>Available Images
-                                                        </h5>
-                                                    </div>
-                                                    <div class="card-body p-0">
-                                                        <div class="table-responsive">
-                                                            <table class="table table-dark table-hover mb-0"
-                                                                style="--bs-table-bg: transparent;">
-                                                                <thead class="text-muted small text-uppercase">
-                                                                    <tr>
-                                                                        <th class="ps-4 py-3">Name / Package</th>
-                                                                        <th class="py-3">Docker</th>
-                                                                        <th class="py-3">Visibility</th>
-                                                                        <th class="py-3">Vars</th>
-                                                                        <th class="py-3">Ports</th>
-                                                                        <th class="py-3">Config</th>
-                                                                        <th class="py-3">Install</th>
-                                                                        <th class="pe-4 py-3 text-end">Actions</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody class="border-top-0">
-                                                                    <% if (images && images.length> 0) { %>
-                                                                        <% images.forEach((img)=> { %>
-                                                                            <% const vars=(img.environment && typeof
-                                                                                img.environment==='object' ) ?
-                                                                                Object.keys(img.environment) : []; const
-                                                                                ports=Array.isArray(img.ports) ?
-                                                                                img.ports : []; const
-                                                                                hasInstall=(img.installation && typeof
-                                                                                img.installation==='object' &&
-                                                                                img.installation.script); const
-                                                                                hasConfigFiles=(img.configFiles &&
-                                                                                typeof img.configFiles==='object' &&
-                                                                                Object.keys(img.configFiles).length> 0);
-                                                                                %>
-                                                                                <tr
-                                                                                    class="align-middle border-bottom border-secondary border-opacity-10">
-                                                                                    <td class="ps-4">
-                                                                                        <div class="fw-bold text-light">
-                                                                                            <%= img.name %>
-                                                                                        </div>
-                                                                                        <div class="small text-primary">
-                                                                                            <i
-                                                                                                class="bi bi-box me-1"></i>
-                                                                                            <%= img.package ?
-                                                                                                img.package.name
-                                                                                                : 'No Package' %>
-                                                                                        </div>
-                                                                                        <small class="text-muted">
-                                                                                            <%= img.description
-                                                                                                || 'No description' %>
-                                                                                        </small>
-                                                                                    </td>
-                                                                                    <td class="small text-muted">
-                                                                                        <code><%= img.dockerImage %></code>
-                                                                                    </td>
-                                                                                    <td class="small">
-                                                                                        <% if (img.isPublic === false) { %>
-                                                                                            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25">Private</span>
-                                                                                        <% } else { %>
-                                                                                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">Public</span>
-                                                                                        <% } %>
-                                                                                    </td>
-                                                                                    <td class="small text-muted">
-                                                                                        <%= vars.length %>
-                                                                                    </td>
-                                                                                    <td class="small text-muted">
-                                                                                        <% if (ports && ports.length> 0)
-                                                                                            { %>
-                                                                                            <%= ports.map(p=>
-                                                                                                `${p.container}/${p.protocol
-                                                                                                || 'tcp'}`).join(', ')
-                                                                                                %>
-                                                                                                <% } else { %>
-                                                                                                    default (25565/tcp)
-                                                                                                    <% } %>
-                                                                                    </td>
-                                                                                    <td class="small text-muted">
-                                                                                        <%= hasConfigFiles ? 'enabled'
-                                                                                            : 'none' %>
-                                                                                    </td>
-                                                                                    <td class="small text-muted">
-                                                                                        <%= hasInstall ? 'egg script'
-                                                                                            : 'none' %>
-                                                                                    </td>
-                                                                                    <td class="pe-4 text-end">
-                                                                                        <div
-                                                                                            class="d-flex gap-2 justify-content-end">
-                                                                                            <a href="/admin/images/export/<%= img.id %>"
-                                                                                                class="btn btn-sm btn-outline-light"
-                                                                                                title="Export JSON">
-                                                                                                <i
-                                                                                                    class="bi bi-download"></i>
-                                                                                            </a>
-                                                                                            <a href="/admin/images/edit/<%= img.id %>"
-                                                                                                class="btn btn-sm btn-outline-light"
-                                                                                                title="Edit">
-                                                                                                <i
-                                                                                                    class="bi bi-pencil"></i>
-                                                                                            </a>
-                                                                                            <form
-                                                                                                action="/admin/images/delete/<%= img.id %>"
-                                                                                                method="POST"
-                                                                                                class="delete-image-form"
-                                                                                                style="display: inline;">
-                                                                                                <% if (currentPackageId) { %>
-                                                                                                    <input type="hidden" name="packageId" value="<%= currentPackageId %>">
-                                                                                                <% } %>
-                                                                                                <button type="submit"
-                                                                                                    class="btn btn-sm btn-outline-danger"
-                                                                                                    title="Delete">
-                                                                                                    <i
-                                                                                                        class="bi bi-trash"></i>
-                                                                                                </button>
-                                                                                            </form>
-                                                                                        </div>
-                                                                                    </td>
-                                                                                </tr>
-                                                                                <% }) %>
-                                                                                    <% } else { %>
-                                                                                        <tr>
-                                                                                            <td colspan="8"
-                                                                                                class="py-5 text-center text-muted italic">
-                                                                                                No images imported yet.
-                                                                                            </td>
-                                                                                        </tr>
-                                                                                        <% } %>
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                    </div>
-                    <%- include('../partials/footer') %>
+<body>
+    <%- include('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3 flex-wrap">
+                    <h4 class="mb-0 text-light fw-normal">Images</h4>
+                    <small class="text-muted">Import, organize and control image visibility fast.</small>
                 </div>
-        </div>
+                <div class="breadcrumb-admin">
+                    <a href="/admin/overview">Admin</a>
+                    <span class="mx-2">&gt;</span>
+                    <span class="text-light">Images</span>
+                </div>
+            </div>
 
-        <!-- Delete Confirmation Modal -->
-        <div class="modal fade" id="deleteImageModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content border-0 shadow-lg"
-                    style="background-color: #1a1a20; border: 1px solid #2d2d35 !important;">
-                    <div class="modal-header border-bottom border-secondary border-opacity-10">
-                        <h5 class="modal-title fs-6 fw-bold text-light">Confirmare Ștergere</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="container-fluid py-4 px-lg-4">
+                <% const totalImages = Array.isArray(images) ? images.length : 0; %>
+                <% const publicImages = (images || []).filter((img) => img.isPublic !== false).length; %>
+                <% const privateImages = totalImages - publicImages; %>
+                <% const totalPackages = Array.isArray(packages) ? packages.length : 0; %>
+
+                <% if (success) { %>
+                    <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
+                        <i class="bi bi-check-circle-fill me-2"></i><%= success %>
                     </div>
-                    <div class="modal-body p-4 text-center">
-                        <img src="/assets/sad-rocky.png" alt="Sad Rocky" class="img-fluid mb-4"
-                            style="max-height: 150px;">
-                        <h6 class="text-light fw-bold mb-2">Ești sigur că vrei să ștergi această imagine?</h6>
-                        <p class="text-muted small mb-0">Această acțiune este ireversibilă și nu poate fi anulată.</p>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i><%= error %>
+                    </div>
+                <% } %>
+
+                <div id="imagesPageNotice" class="alert border-0 d-none" role="alert"></div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-sm-6 col-xl-3">
+                        <div class="card border-0 shadow-sm h-100" style="background:#141419;">
+                            <div class="card-body">
+                                <div class="small text-muted text-uppercase">Total Images</div>
+                                <div class="fs-3 fw-bold text-light"><%= totalImages %></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-3">
+                        <div class="card border-0 shadow-sm h-100" style="background:#141419;">
+                            <div class="card-body">
+                                <div class="small text-muted text-uppercase">Public</div>
+                                <div class="fs-3 fw-bold text-success"><%= publicImages %></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-3">
+                        <div class="card border-0 shadow-sm h-100" style="background:#141419;">
+                            <div class="card-body">
+                                <div class="small text-muted text-uppercase">Private</div>
+                                <div class="fs-3 fw-bold text-warning"><%= privateImages %></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-3">
+                        <div class="card border-0 shadow-sm h-100" style="background:#141419;">
+                            <div class="card-body">
+                                <div class="small text-muted text-uppercase">Packages</div>
+                                <div class="fs-3 fw-bold text-info"><%= totalPackages %></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-12 col-xxl-4">
+                        <div class="card border-0 shadow-sm" style="background:#141419;">
+                            <div class="card-header border-bottom border-secondary border-opacity-10 bg-transparent py-3">
+                                <h5 class="card-title mb-0 fs-6 fw-bold text-light">
+                                    <i class="bi bi-file-earmark-arrow-up me-2"></i>Import JSON
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST" action="/admin/images/import">
+                                    <input type="hidden" name="isPublicSubmitted" value="1">
+
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Package</label>
+                                        <div class="input-group">
+                                            <select name="packageId" class="form-select" required style="background:#1a1a20;border-color:#2d2d35;color:#fff;">
+                                                <option value="" disabled selected>Select a package...</option>
+                                                <% if (packages && packages.length > 0) { %>
+                                                    <% packages.forEach((pkg) => { %>
+                                                        <option value="<%= pkg.id %>"><%= pkg.name %></option>
+                                                    <% }) %>
+                                                <% } %>
+                                            </select>
+                                            <button type="button" class="btn btn-outline-secondary border-secondary border-opacity-25" data-bs-toggle="modal" data-bs-target="#createPackageModal" title="Create Package">
+                                                <i class="bi bi-plus-lg"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Load From Files</label>
+                                        <input id="imageJsonFile" type="file" accept=".json,application/json" multiple class="form-control" style="background:#1a1a20;border-color:#2d2d35;color:#fff;">
+                                        <small class="text-muted">Pick one or multiple JSON files. Their contents will be merged below.</small>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">JSON Content</label>
+                                        <textarea id="jsonPayload" name="jsonPayload" class="form-control font-monospace" rows="14" required placeholder="Paste CPanel JSON or Pterodactyl egg export JSON here..." style="background:#1a1a20;border-color:#2d2d35;color:#fff;"></textarea>
+                                        <small class="text-muted">Supports CPanel image JSON, PTDL exports and API payloads.</small>
+                                    </div>
+
+                                    <div class="mb-3 form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="importImagePublic" name="isPublic" value="1" checked>
+                                        <label class="form-check-label text-light small" for="importImagePublic">Public image (visible in <code>/user/create</code>)</label>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary w-100 fw-bold">
+                                        <i class="bi bi-cloud-arrow-up me-2"></i>Import Image
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-xxl-8">
+                        <div class="card border-0 shadow-sm" style="background:#141419;">
+                            <div class="card-header border-bottom border-secondary border-opacity-10 bg-transparent py-3">
+                                <div class="d-flex flex-wrap gap-3 justify-content-between align-items-center">
+                                    <h5 class="card-title mb-0 fs-6 fw-bold text-light">
+                                        <i class="bi bi-grid-3x3-gap me-2"></i>Image Library
+                                    </h5>
+                                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                                        <form method="GET" action="/admin/images" class="d-flex align-items-center gap-2">
+                                            <select name="packageId" class="form-select form-select-sm" style="min-width:220px;background:#1a1a20;border-color:#2d2d35;color:#fff;">
+                                                <option value="">All packages</option>
+                                                <% packages.forEach((pkg) => { %>
+                                                    <option value="<%= pkg.id %>" <%= String(currentPackageId || '') === String(pkg.id) ? 'selected' : '' %>><%= pkg.name %></option>
+                                                <% }) %>
+                                            </select>
+                                            <button type="submit" class="btn btn-sm btn-outline-light">Filter</button>
+                                        </form>
+                                        <div class="input-group input-group-sm" style="width:240px;">
+                                            <span class="input-group-text border-secondary border-opacity-25" style="background:#1a1a20;color:#8b8b99;">
+                                                <i class="bi bi-search"></i>
+                                            </span>
+                                            <input id="imagesSearch" type="text" class="form-control" placeholder="Search images..." style="background:#1a1a20;border-color:#2d2d35;color:#fff;">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-hover mb-0" style="--bs-table-bg: transparent;">
+                                        <thead class="text-muted small text-uppercase">
+                                            <tr>
+                                                <th class="ps-4 py-3">Image</th>
+                                                <th class="py-3">Docker</th>
+                                                <th class="py-3">Visibility</th>
+                                                <th class="py-3">Vars</th>
+                                                <th class="py-3">Ports</th>
+                                                <th class="py-3">Install</th>
+                                                <th class="pe-4 py-3 text-end">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <% if (images && images.length > 0) { %>
+                                                <% images.forEach((img) => { %>
+                                                    <% const vars = (img.environment && typeof img.environment === 'object') ? Object.keys(img.environment) : []; %>
+                                                    <% const ports = Array.isArray(img.ports) ? img.ports : []; %>
+                                                    <% const hasInstall = !!(img.installation && typeof img.installation === 'object' && img.installation.script); %>
+                                                    <tr class="align-middle border-bottom border-secondary border-opacity-10" data-image-row data-search="<%= [img.name, img.package ? img.package.name : '', img.description || '', img.dockerImage || ''].join(' ').toLowerCase() %>">
+                                                        <td class="ps-4">
+                                                            <div class="fw-semibold text-light"><%= img.name %></div>
+                                                            <div class="small text-primary"><i class="bi bi-box me-1"></i><%= img.package ? img.package.name : 'No Package' %></div>
+                                                            <small class="text-muted"><%= img.description || 'No description provided.' %></small>
+                                                        </td>
+                                                        <td class="small text-muted"><code><%= img.dockerImage %></code></td>
+                                                        <td>
+                                                            <div class="d-flex align-items-center gap-2">
+                                                                <div class="form-check form-switch m-0">
+                                                                    <input class="form-check-input image-visibility-switch" type="checkbox" role="switch" id="visibility-<%= img.id %>" data-image-id="<%= img.id %>" <%= img.isPublic === false ? '' : 'checked' %>>
+                                                                </div>
+                                                                <span class="badge visibility-state <%= img.isPublic === false ? 'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25' : 'bg-success bg-opacity-10 text-success border border-success border-opacity-25' %>">
+                                                                    <%= img.isPublic === false ? 'Private' : 'Public' %>
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td class="small text-muted"><%= vars.length %></td>
+                                                        <td class="small text-muted">
+                                                            <% if (ports.length > 0) { %>
+                                                                <%= ports.map((p) => `${p.container}/${p.protocol || 'tcp'}`).join(', ') %>
+                                                            <% } else { %>
+                                                                default (25565/tcp)
+                                                            <% } %>
+                                                        </td>
+                                                        <td class="small text-muted"><%= hasInstall ? 'egg script' : 'none' %></td>
+                                                        <td class="pe-4 text-end">
+                                                            <div class="d-flex gap-2 justify-content-end">
+                                                                <a href="/admin/images/export/<%= img.id %>" class="btn btn-sm btn-outline-light" title="Export JSON"><i class="bi bi-download"></i></a>
+                                                                <a href="/admin/images/edit/<%= img.id %>" class="btn btn-sm btn-outline-light" title="Edit"><i class="bi bi-pencil"></i></a>
+                                                                <form action="/admin/images/delete/<%= img.id %>" method="POST" class="delete-image-form d-inline-block m-0 p-0">
+                                                                    <% if (currentPackageId) { %>
+                                                                        <input type="hidden" name="packageId" value="<%= currentPackageId %>">
+                                                                    <% } %>
+                                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></button>
+                                                                </form>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                <% }) %>
+                                            <% } else { %>
+                                                <tr>
+                                                    <td colspan="7" class="py-5 text-center text-muted">No images imported yet.</td>
+                                                </tr>
+                                            <% } %>
+                                            <tr id="imagesSearchEmpty" class="d-none">
+                                                <td colspan="7" class="py-5 text-center text-muted">No images match your search.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <%- include('../partials/footer') %>
+        </div>
+    </div>
+
+    <div class="modal fade" id="deleteImageModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="background:#1a1a20;border:1px solid #2d2d35 !important;">
+                <div class="modal-header border-bottom border-secondary border-opacity-10">
+                    <h5 class="modal-title fs-6 fw-bold text-light">Confirm Delete</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <img src="/assets/sad-rocky.png" alt="Sad Rocky" class="img-fluid mb-4" style="max-height:150px;">
+                    <h6 class="text-light fw-bold mb-2">Delete this image?</h6>
+                    <p class="text-muted small mb-0">This action is permanent and cannot be undone.</p>
+                </div>
+                <div class="modal-footer border-top border-secondary border-opacity-10">
+                    <button type="button" class="btn btn-link text-muted text-decoration-none" data-bs-dismiss="modal">Cancel</button>
+                    <button id="confirmDeleteBtn" type="button" class="btn btn-danger px-4 fw-bold">Delete Image</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="createPackageModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="background:#141419;border:1px solid rgba(255,255,255,0.08) !important;">
+                <div class="modal-header border-bottom border-secondary border-opacity-10">
+                    <h5 class="modal-title fs-6 fw-bold text-light">Create New Package</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form action="/admin/packages" method="POST">
+                    <input type="hidden" name="redirect" value="/admin/images">
+                    <div class="modal-body p-4">
+                        <div class="mb-3">
+                            <label class="form-label text-muted small text-uppercase fw-bold">Package Name</label>
+                            <input type="text" name="name" class="form-control" placeholder="e.g. Minecraft Servers" required style="background:#0b0b0e;border-color:#2d2d35;color:#fff;">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-muted small text-uppercase fw-bold">Description</label>
+                            <textarea name="description" class="form-control" rows="3" maxlength="150" placeholder="Small description (max 150 chars)" style="background:#0b0b0e;border-color:#2d2d35;color:#fff;"></textarea>
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label text-muted small text-uppercase fw-bold">Image URL</label>
+                            <input type="url" name="imageUrl" class="form-control" placeholder="https://example.com/icon.png" style="background:#0b0b0e;border-color:#2d2d35;color:#fff;">
+                        </div>
                     </div>
                     <div class="modal-footer border-top border-secondary border-opacity-10">
-                        <button type="button" class="btn btn-link text-muted text-decoration-none"
-                            data-bs-dismiss="modal">Anulează</button>
-                        <button id="confirmDeleteBtn" type="button" class="btn btn-danger px-4 fw-bold">Șterge
-                            Imaginea</button>
+                        <button type="button" class="btn btn-link text-muted text-decoration-none" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary px-4 fw-bold">Create Package</button>
                     </div>
-                </div>
+                </form>
             </div>
         </div>
+    </div>
 
-        <!-- Create Package Modal -->
-        <div class="modal fade" id="createPackageModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content border-0 shadow-lg"
-                    style="background-color: #141419; border: 1px solid rgba(255,255,255,0.08) !important;">
-                    <div class="modal-header border-bottom border-secondary border-opacity-10">
-                        <h5 class="modal-title fs-6 fw-bold text-light">Create New Package</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <form action="/admin/packages" method="POST">
-                        <input type="hidden" name="redirect" value="/admin/images">
-                        <div class="modal-body p-4">
-                            <div class="mb-3">
-                                <label class="form-label text-muted small text-uppercase fw-bold">Package Name</label>
-                                <input type="text" name="name" class="form-control" placeholder="e.g. Minecraft Servers"
-                                    required style="background: #0b0b0e; border-color: #2d2d35; color: white;">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label text-muted small text-uppercase fw-bold">Description</label>
-                                <textarea name="description" class="form-control" rows="3" maxlength="150"
-                                    placeholder="Small description (max 150 chars)"
-                                    style="background: #0b0b0e; border-color: #2d2d35; color: white;"></textarea>
-                            </div>
-                            <div class="mb-0">
-                                <label class="form-label text-muted small text-uppercase fw-bold">Image URL</label>
-                                <input type="url" name="imageUrl" class="form-control"
-                                    placeholder="https://example.com/icon.png"
-                                    style="background: #0b0b0e; border-color: #2d2d35; color: white;">
-                            </div>
-                        </div>
-                        <div class="modal-footer border-top border-secondary border-opacity-10">
-                            <button type="button" class="btn btn-link text-muted text-decoration-none"
-                                data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary px-4 fw-bold">Create Package</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
+    <script>
+        (function () {
+            const notice = document.getElementById('imagesPageNotice');
+            const currentPackageId = '<%= String(currentPackageId || '') %>';
 
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
-        <script>
-            (function () {
-                const fileInput = document.getElementById('imageJsonFile');
-                const payload = document.getElementById('jsonPayload');
+            function showNotice(type, message) {
+                if (!notice) return;
+                notice.className = 'alert border-0';
+                notice.classList.add(type === 'success' ? 'alert-success' : 'alert-danger');
+                notice.classList.add(type === 'success' ? 'bg-success' : 'bg-danger');
+                notice.classList.add('bg-opacity-10');
+                notice.classList.add(type === 'success' ? 'text-success' : 'text-danger');
+                notice.textContent = message;
+                notice.classList.remove('d-none');
+                window.setTimeout(() => notice.classList.add('d-none'), 2600);
+            }
 
-                if (fileInput && payload) {
-                    fileInput.addEventListener('change', async (event) => {
-                        const files = event.target.files ? Array.from(event.target.files) : [];
-                        if (files.length === 0) return;
+            const fileInput = document.getElementById('imageJsonFile');
+            const payload = document.getElementById('jsonPayload');
+            if (fileInput && payload) {
+                fileInput.addEventListener('change', async (event) => {
+                    const files = event.target.files ? Array.from(event.target.files) : [];
+                    if (files.length === 0) return;
 
-                        try {
-                            const mergedEntries = [];
-                            for (const file of files) {
-                                const content = await file.text();
-                                const parsed = JSON.parse(content);
-                                if (Array.isArray(parsed)) {
-                                    parsed.forEach((entry) => {
-                                        if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
-                                            mergedEntries.push(entry);
-                                        }
-                                    });
-                                } else if (parsed && typeof parsed === 'object') {
-                                    mergedEntries.push(parsed);
-                                }
+                    try {
+                        const mergedEntries = [];
+                        for (const file of files) {
+                            const content = await file.text();
+                            const parsed = JSON.parse(content);
+                            if (Array.isArray(parsed)) {
+                                parsed.forEach((entry) => {
+                                    if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+                                        mergedEntries.push(entry);
+                                    }
+                                });
+                            } else if (parsed && typeof parsed === 'object') {
+                                mergedEntries.push(parsed);
                             }
-
-                            if (mergedEntries.length === 0) {
-                                alert('No valid image objects were found in selected files.');
-                                return;
-                            }
-
-                            payload.value = mergedEntries.length === 1
-                                ? JSON.stringify(mergedEntries[0], null, 2)
-                                : JSON.stringify(mergedEntries, null, 2);
-                        } catch (error) {
-                            alert('Failed to read one or more JSON files.');
                         }
-                    });
-                }
 
-                // Delete Confirmation Logic
-                let formToSubmit = null;
-                const deleteModal = new bootstrap.Modal(document.getElementById('deleteImageModal'));
-                const confirmBtn = document.getElementById('confirmDeleteBtn');
+                        if (mergedEntries.length === 0) {
+                            alert('No valid image objects were found in selected files.');
+                            return;
+                        }
 
-                document.querySelectorAll('.delete-image-form').forEach(form => {
-                    form.addEventListener('submit', function (e) {
-                        e.preventDefault();
-                        formToSubmit = this;
-                        deleteModal.show();
-                    });
+                        payload.value = mergedEntries.length === 1
+                            ? JSON.stringify(mergedEntries[0], null, 2)
+                            : JSON.stringify(mergedEntries, null, 2);
+                    } catch (error) {
+                        alert('Failed to read one or more JSON files.');
+                    }
                 });
+            }
 
-                if (confirmBtn) {
-                    confirmBtn.addEventListener('click', function () {
-                        if (formToSubmit) {
-                            this.disabled = true;
-                            this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Se șterge...';
-                            formToSubmit.submit();
+            let formToSubmit = null;
+            const deleteModalEl = document.getElementById('deleteImageModal');
+            const confirmBtn = document.getElementById('confirmDeleteBtn');
+            const deleteModal = deleteModalEl ? new bootstrap.Modal(deleteModalEl) : null;
+
+            document.querySelectorAll('.delete-image-form').forEach((form) => {
+                form.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    formToSubmit = form;
+                    if (deleteModal) deleteModal.show();
+                });
+            });
+
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', function () {
+                    if (!formToSubmit) return;
+                    this.disabled = true;
+                    this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deleting...';
+                    formToSubmit.submit();
+                });
+            }
+
+            function updateVisibilityBadge(row, isPublic) {
+                const badge = row.querySelector('.visibility-state');
+                if (!badge) return;
+                badge.textContent = isPublic ? 'Public' : 'Private';
+                badge.className = isPublic
+                    ? 'badge visibility-state bg-success bg-opacity-10 text-success border border-success border-opacity-25'
+                    : 'badge visibility-state bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25';
+            }
+
+            document.querySelectorAll('.image-visibility-switch').forEach((input) => {
+                input.addEventListener('change', async () => {
+                    const imageId = input.dataset.imageId;
+                    const row = input.closest('tr');
+                    const nextState = input.checked;
+                    const previousState = !nextState;
+
+                    input.disabled = true;
+                    try {
+                        const body = new URLSearchParams();
+                        body.set('isPublic', nextState ? '1' : '0');
+                        if (currentPackageId) body.set('packageId', currentPackageId);
+
+                        const response = await fetch(`/admin/images/visibility/${imageId}`, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+                            },
+                            body: body.toString()
+                        });
+
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok || !data.ok) {
+                            throw new Error(data.error || 'Failed to update image visibility.');
                         }
+
+                        if (row) updateVisibilityBadge(row, nextState);
+                        showNotice('success', 'Image visibility updated.');
+                    } catch (error) {
+                        input.checked = previousState;
+                        if (row) updateVisibilityBadge(row, previousState);
+                        showNotice('error', error.message || 'Failed to update image visibility.');
+                    } finally {
+                        input.disabled = false;
+                    }
+                });
+            });
+
+            const searchInput = document.getElementById('imagesSearch');
+            const rows = Array.from(document.querySelectorAll('tr[data-image-row]'));
+            const emptyRow = document.getElementById('imagesSearchEmpty');
+
+            if (searchInput && rows.length > 0) {
+                searchInput.addEventListener('input', () => {
+                    const term = searchInput.value.trim().toLowerCase();
+                    let visible = 0;
+
+                    rows.forEach((row) => {
+                        const haystack = row.dataset.search || '';
+                        const match = term === '' || haystack.includes(term);
+                        row.classList.toggle('d-none', !match);
+                        if (match) visible += 1;
                     });
-                }
-            })();
-        </script>
+
+                    if (emptyRow) {
+                        emptyRow.classList.toggle('d-none', visible !== 0);
+                    }
+                });
+            }
+        })();
+    </script>
 </body>
 
 </html>

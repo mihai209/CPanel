@@ -2,11 +2,14 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 const SequelizeStore = require('connect-session-sequelize')(session.Store);
+const { bootInfo, bootWarn } = require('./boot');
 
 function bootstrapApp(deps) {
     const {
         app,
         sequelize,
+        redisClient,
+        settingsCache,
         settingsModel,
         userModel,
         secretKey,
@@ -19,11 +22,34 @@ function bootstrapApp(deps) {
 
     registerSecurityMiddleware(app);
 
-    const sessionStore = new SequelizeStore({
-        db: sequelize,
-        checkExpirationInterval: 15 * 60 * 1000,
-        expiration: 7 * 24 * 60 * 60 * 1000
-    });
+    let sessionStore = null;
+    let usingRedisSessionStore = false;
+
+    if (redisClient) {
+        try {
+            const redisModule = require('connect-redis');
+            const RedisStore = redisModule.RedisStore || redisModule.default || redisModule;
+            const prefix = String(process.env.REDIS_SESSION_PREFIX || 'cpanel:sess:');
+            sessionStore = new RedisStore({
+                client: redisClient,
+                prefix
+            });
+            usingRedisSessionStore = true;
+            bootInfo('configured session store type=redis prefix=%s', prefix);
+        } catch (error) {
+            bootWarn('failed to initialize redis session store; using database session store error=%s', error.message || error);
+            sessionStore = null;
+        }
+    }
+
+    if (!sessionStore) {
+        sessionStore = new SequelizeStore({
+            db: sequelize,
+            checkExpirationInterval: 15 * 60 * 1000,
+            expiration: 7 * 24 * 60 * 60 * 1000
+        });
+        bootInfo('configured session store type=database');
+    }
 
     app.use(session({
         secret: secretKey,
@@ -39,9 +65,11 @@ function bootstrapApp(deps) {
         }
     }));
 
-    sessionStore.sync().catch((error) => {
-        console.error('Session store sync failed:', error);
-    });
+    if (!usingRedisSessionStore && typeof sessionStore.sync === 'function') {
+        sessionStore.sync().catch((error) => {
+            console.error('Session store sync failed:', error);
+        });
+    }
 
     passport.serializeUser((user, done) => done(null, user.id));
     passport.deserializeUser(async (id, done) => {
@@ -77,7 +105,7 @@ function bootstrapApp(deps) {
         message: 'Too many login attempts from this IP, please try again after 15 minutes.'
     });
 
-    registerLocalsMiddleware(app, settingsModel, userModel);
+    registerLocalsMiddleware(app, settingsModel, userModel, settingsCache);
 
     return {
         loginLimiter

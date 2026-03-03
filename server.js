@@ -13,6 +13,8 @@ const WebSocket = require('ws');
 const { app, server } = require('./core/app');
 const { bootstrapApp } = require('./core/bootstrap');
 const { printStartupBoot, bootInfo, bootWarn } = require('./core/boot');
+const { createRedisClient } = require('./core/redis');
+const { createSettingsCache, bindSettingsInvalidation } = require('./core/settings-cache');
 const { registerAuditMiddleware } = require('./core/audit');
 const { createRequirePermission } = require('./core/rbac');
 const { createJobQueue } = require('./core/jobs/queue');
@@ -100,9 +102,18 @@ printStartupBoot({
     debugEnabled: DEBUG_ENABLED
 });
 
+const redisClient = createRedisClient();
+const settingsCache = createSettingsCache({
+    Settings,
+    redisClient
+});
+bindSettingsInvalidation(Settings, settingsCache);
+
 const { loginLimiter } = bootstrapApp({
     app,
     sequelize,
+    redisClient,
+    settingsCache,
     settingsModel: Settings,
     userModel: User,
     secretKey: SECRET_KEY,

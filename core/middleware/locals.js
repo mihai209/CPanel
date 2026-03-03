@@ -6,14 +6,20 @@ const {
     getUserThemeId
 } = require('../themes');
 
-function registerLocalsMiddleware(app, Settings, User) {
+function registerLocalsMiddleware(app, Settings, User, settingsCache = null) {
     app.use(async (req, res, next) => {
         try {
-            const allSettings = await Settings.findAll();
-            const settingsMap = {};
-            allSettings.forEach((s) => {
-                settingsMap[s.key] = s.value;
-            });
+            let settingsMap = null;
+            if (settingsCache && typeof settingsCache.getSettingsMap === 'function') {
+                settingsMap = await settingsCache.getSettingsMap();
+            }
+            if (!settingsMap) {
+                const allSettings = await Settings.findAll();
+                settingsMap = {};
+                allSettings.forEach((s) => {
+                    settingsMap[s.key] = s.value;
+                });
+            }
             res.locals.settings = settingsMap;
             next();
         } catch (error) {
