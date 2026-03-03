@@ -41,7 +41,7 @@ function registerWebSocketRuntime(deps) {
     } = deps;
 
 // WebSocket Server for Connectors & UI
-const wss = new WebSocket.Server({ noServer: true });
+const wss = new WebSocket.Server({ noServer: true, maxPayload: 2 * 1024 * 1024 });
 const uiClients = new Set();
 const serverConsoleClients = new Map(); // serverId -> Set<ws>
 const recentConsolePayloads = new Map(); // serverId -> { output: string, ts: number }
@@ -86,6 +86,43 @@ const webhooksConfigCache = {
     brandName: 'CPanel'
 };
 const serverMinecraftEligibilityCache = new Map(); // serverId -> boolean
+const connectorServerOwnershipCache = new Map(); // serverId -> { connectorId: number|null, ts: number }
+const CONNECTOR_SERVER_OWNERSHIP_CACHE_TTL_MS = Math.max(
+    5000,
+    Number.parseInt(process.env.CONNECTOR_SERVER_SCOPE_CACHE_TTL_MS || '15000', 10) || 15000
+);
+const CONNECTOR_HEARTBEAT_STALE_MS = Math.max(
+    15000,
+    Number.parseInt(process.env.CONNECTOR_HEARTBEAT_STALE_MS || '45000', 10) || 45000
+);
+const CONNECTOR_HEARTBEAT_SWEEP_MS = Math.max(
+    5000,
+    Number.parseInt(process.env.CONNECTOR_HEARTBEAT_SWEEP_MS || '15000', 10) || 15000
+);
+const CONNECTOR_SERVER_SCOPED_MESSAGE_TYPES = new Set([
+    'install_success',
+    'install_fail',
+    'console_output',
+    'server_status_update',
+    'server_debug_event',
+    'server_action_ack',
+    'eula_status',
+    'server_stats',
+    'file_list',
+    'file_content',
+    'write_success',
+    'extract_started',
+    'extract_complete',
+    'file_versions',
+    'file_version_content',
+    'resource_limits_result',
+    'log_cleanup_result',
+    'sftp_import_progress',
+    'sftp_import_result',
+    'error',
+    'delete_success',
+    'delete_fail'
+]);
 const MINECRAFT_DETECTION_KEYWORDS = [
     'minecraft',
     'paper',
@@ -273,6 +310,121 @@ async function canHandleMinecraftEula(serverOrId) {
         return value;
     } catch {
         return false;
+    }
+}
+
+function parseServerIdFromConnectorPayload(data) {
+    const parsed = Number.parseInt(data && data.serverId, 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+async function getServerConnectorOwnerCached(serverId) {
+    const nowMs = Date.now();
+    const cached = connectorServerOwnershipCache.get(serverId);
+    if (cached && Number.isFinite(cached.ts) && (nowMs - cached.ts) < CONNECTOR_SERVER_OWNERSHIP_CACHE_TTL_MS) {
+        return cached.connectorId;
+    }
+
+    const serverRecord = await Server.findByPk(serverId, {
+        attributes: ['id'],
+        include: [{ model: Allocation, as: 'allocation', attributes: ['connectorId'], required: false }]
+    }).catch(() => null);
+
+    let connectorId = null;
+    if (serverRecord && serverRecord.allocation) {
+        const parsed = Number.parseInt(serverRecord.allocation.connectorId, 10);
+        if (Number.isInteger(parsed) && parsed > 0) {
+            connectorId = parsed;
+        }
+    }
+
+    connectorServerOwnershipCache.set(serverId, { connectorId, ts: nowMs });
+    if (connectorServerOwnershipCache.size > 5000) {
+        const firstKey = connectorServerOwnershipCache.keys().next();
+        if (!firstKey.done) connectorServerOwnershipCache.delete(firstKey.value);
+    }
+
+    return connectorId;
+}
+
+async function validateConnectorServerScope(connectorId, data) {
+    const type = String((data && data.type) || '').trim().toLowerCase();
+    if (!type || !CONNECTOR_SERVER_SCOPED_MESSAGE_TYPES.has(type)) {
+        return { ok: true, serverId: null };
+    }
+
+    const serverId = parseServerIdFromConnectorPayload(data);
+    if (!serverId) {
+        return { ok: false, reason: 'missing_server_id', serverId: null, type };
+    }
+
+    const ownerConnectorId = await getServerConnectorOwnerCached(serverId);
+    if (!Number.isInteger(ownerConnectorId) || ownerConnectorId <= 0) {
+        return { ok: false, reason: 'server_not_bound', serverId, type };
+    }
+
+    if (Number.parseInt(connectorId, 10) !== ownerConnectorId) {
+        return { ok: false, reason: 'connector_mismatch', serverId, type, ownerConnectorId };
+    }
+
+    return { ok: true, serverId, type };
+}
+
+function parseConnectorId(rawId) {
+    const parsed = Number.parseInt(rawId, 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function markConnectorOffline(connectorId, reason = 'stale_heartbeat') {
+    if (!global.connectorStatus) global.connectorStatus = {};
+    const current = global.connectorStatus[connectorId] || {};
+    const wasOnline = String(current.status || '').toLowerCase() === 'online';
+
+    global.connectorStatus[connectorId] = {
+        ...current,
+        status: 'offline',
+        lastSeen: current.lastSeen || new Date(),
+        usage: current.usage || null
+    };
+
+    if (wasOnline) {
+        broadcastToUI({
+            type: 'status_update',
+            connectorId,
+            status: 'offline',
+            reason,
+            lastSeen: global.connectorStatus[connectorId].lastSeen
+        });
+    }
+}
+
+function sweepStaleConnectorHeartbeats() {
+    if (!global.connectorStatus || typeof global.connectorStatus !== 'object') return;
+
+    const nowMs = Date.now();
+    const entries = Object.entries(global.connectorStatus);
+    for (const [rawConnectorId, statusData] of entries) {
+        const connectorId = parseConnectorId(rawConnectorId);
+        if (!connectorId) continue;
+
+        const status = String((statusData && statusData.status) || '').toLowerCase();
+        const lastSeenMs = new Date(statusData && statusData.lastSeen ? statusData.lastSeen : 0).getTime();
+        if (!Number.isFinite(lastSeenMs) || lastSeenMs <= 0) continue;
+
+        const stale = (nowMs - lastSeenMs) > CONNECTOR_HEARTBEAT_STALE_MS;
+        if (!stale || status !== 'online') continue;
+
+        markConnectorOffline(connectorId, 'heartbeat_timeout');
+
+        const socket = connectorConnections.get(connectorId);
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            try {
+                socket.close(4000, 'Heartbeat timeout');
+            } catch (error) {
+                console.warn(`Failed closing stale connector socket ${connectorId}:`, error.message);
+            }
+        }
+        connectorConnections.delete(connectorId);
     }
 }
 
@@ -1238,6 +1390,19 @@ wss.on('connection', (ws, request) => {
                 return;
             }
 
+            const scopeValidation = await validateConnectorServerScope(connectorId, data);
+            if (!scopeValidation.ok) {
+                console.warn(`[WS] Connector ${connectorId} blocked from message type=${scopeValidation.type || 'unknown'} serverId=${scopeValidation.serverId || 'n/a'} reason=${scopeValidation.reason}`);
+                if (scopeValidation.reason === 'connector_mismatch' && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'error',
+                        serverId: scopeValidation.serverId,
+                        message: `Connector mismatch: server ${scopeValidation.serverId} belongs to connector ${scopeValidation.ownerConnectorId}`
+                    }));
+                }
+                return;
+            }
+
             // Re-validate connector token on heartbeat so rotated/revoked tokens are forced offline.
             if (data.type === 'heartbeat' && connectorId) {
                 const connector = await Connector.findByPk(connectorId, { attributes: ['id', 'token'] });
@@ -1773,16 +1938,7 @@ wss.on('connection', (ws, request) => {
         if (connectorId && connectorConnections.get(connectorId) === ws) {
             connectorConnections.delete(connectorId);
             console.log(`Connector ${connectorId} disconnected from WebSocket`);
-            if (global.connectorStatus && global.connectorStatus[connectorId]) {
-                global.connectorStatus[connectorId].status = 'offline';
-
-                broadcastToUI({
-                    type: 'status_update',
-                    connectorId: connectorId,
-                    status: 'offline',
-                    lastSeen: new Date()
-                });
-            }
+            markConnectorOffline(connectorId, 'socket_closed');
         }
     });
 });
@@ -1798,12 +1954,20 @@ setInterval(() => {
     if (typeof runServerScheduledScalingSweep === 'function') runServerScheduledScalingSweep();
 }, 60 * 1000);
 
+setInterval(() => {
+    sweepStaleConnectorHeartbeats();
+}, CONNECTOR_HEARTBEAT_SWEEP_MS);
+
 setTimeout(() => {
     runScheduledLogCleanupSweep();
     runServerStoreBillingSweep();
     if (typeof runRevenueModeSweep === 'function') runRevenueModeSweep();
     if (typeof runServerScheduledScalingSweep === 'function') runServerScheduledScalingSweep();
 }, 15 * 1000);
+
+setTimeout(() => {
+    sweepStaleConnectorHeartbeats();
+}, Math.min(CONNECTOR_HEARTBEAT_SWEEP_MS, 10000));
 
     return { wss };
 }
