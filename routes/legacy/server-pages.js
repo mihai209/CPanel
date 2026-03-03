@@ -4466,6 +4466,7 @@ app.get('/user/create', requireAuth, async (req, res) => {
 
         const [images, allocations, inventoryState, ownedUsage, revenuePlanCatalog, revenueProfileRaw, quotaBurnLogs] = await Promise.all([
             Image.findAll({
+                where: { isPublic: true },
                 include: [{ model: Package, as: 'package', required: false }],
                 order: [['name', 'ASC']]
             }),
@@ -4804,9 +4805,12 @@ app.post('/user/create', requireAuth, async (req, res) => {
             }
         }
 
-        const image = await Image.findByPk(imageId, { include: [{ model: Package, as: 'package', required: false }] });
+        const image = await Image.findOne({
+            where: { id: imageId, isPublic: true },
+            include: [{ model: Package, as: 'package', required: false }]
+        });
         if (!image) {
-            return res.redirect('/user/create?error=' + encodeURIComponent('Selected image not found.'));
+            return res.redirect('/user/create?error=' + encodeURIComponent('Selected image not found or is private.'));
         }
 
         let allocation = null;

@@ -367,6 +367,10 @@ app.post('/admin/images/import', requireAuth, requireAdmin, async (req, res) => 
         const jsonPayload = (req.body.jsonPayload || '').trim();
         const packageIdRaw = req.body.packageId;
         const packageId = Number.parseInt(packageIdRaw, 10);
+        const isPublicSubmitted = ['1', 'true', 'on', 'yes'].includes(String(req.body.isPublicSubmitted || '').trim().toLowerCase());
+        const isPublic = !isPublicSubmitted
+            ? true
+            : ['1', 'true', 'on', 'yes'].includes(String(req.body.isPublic || '').trim().toLowerCase());
 
         if (!Number.isInteger(packageId) || packageId <= 0) {
             return res.redirect('/admin/images?error=' + encodeURIComponent('You must select a package for the imported image.'));
@@ -404,6 +408,7 @@ app.post('/admin/images/import', requireAuth, requireAdmin, async (req, res) => 
 
                 const normalized = parseImportedImageJson(item);
                 normalized.packageId = packageId;
+                normalized.isPublic = isPublic;
 
                 const [image, created] = await Image.findOrCreate({
                     where: { name: normalized.name },
@@ -468,6 +473,10 @@ app.get('/admin/images/edit/:id', requireAuth, requireAdmin, async (req, res) =>
 app.post('/admin/images/edit/:id', requireAuth, requireAdmin, async (req, res) => {
     try {
         const { name, description, dockerImage, startup, environment, dockerImages, packageId } = req.body;
+        const isPublicSubmitted = ['1', 'true', 'on', 'yes'].includes(String(req.body.isPublicSubmitted || '').trim().toLowerCase());
+        const isPublic = !isPublicSubmitted
+            ? true
+            : ['1', 'true', 'on', 'yes'].includes(String(req.body.isPublic || '').trim().toLowerCase());
 
         let envParsed = {};
         try {
@@ -490,6 +499,7 @@ app.post('/admin/images/edit/:id', requireAuth, requireAdmin, async (req, res) =
             startup,
             environment: envParsed,
             dockerImages: imagesParsed,
+            isPublic,
             packageId: packageId || null
         }, { where: { id: req.params.id } });
 
@@ -566,6 +576,10 @@ app.get('/admin/images/edit-json/:id', requireAuth, requireAdmin, async (req, re
 app.post('/admin/images/edit-json/:id', requireAuth, requireAdmin, async (req, res) => {
     try {
         const { jsonPayload, packageId } = req.body;
+        const isPublicSubmitted = ['1', 'true', 'on', 'yes'].includes(String(req.body.isPublicSubmitted || '').trim().toLowerCase());
+        const isPublic = !isPublicSubmitted
+            ? true
+            : ['1', 'true', 'on', 'yes'].includes(String(req.body.isPublic || '').trim().toLowerCase());
         let parsed;
         try {
             parsed = JSON.parse(jsonPayload);
@@ -588,6 +602,7 @@ app.post('/admin/images/edit-json/:id', requireAuth, requireAdmin, async (req, r
         const normalized = parseImportedImageJson(parsed);
         normalized.configPath = image.configPath || normalized.configPath;
         normalized.packageId = packageId || image.packageId;
+        normalized.isPublic = isPublic;
         await image.update(normalized);
         res.redirect(`/admin/images/edit-json/${req.params.id}?success=Image JSON updated successfully!`);
     } catch (error) {

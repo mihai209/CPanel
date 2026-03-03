@@ -60,6 +60,7 @@
                                                 <div class="card border-0 shadow-sm" style="background-color: #141419;">
                                                     <div class="card-body">
                                                         <form method="POST" action="/admin/images/edit/<%= image.id %>">
+                                                            <input type="hidden" name="isPublicSubmitted" value="1">
                                                             <div class="row g-3">
                                                                 <div class="col-md-6">
                                                                     <label
@@ -96,6 +97,14 @@
                                                                     </select>
                                                                     <div class="form-text text-muted">The package this
                                                                         image belongs to.</div>
+                                                                </div>
+                                                                <div class="col-12">
+                                                                    <div class="form-check form-switch mt-1">
+                                                                        <input class="form-check-input" type="checkbox" role="switch" id="imagePublicSwitch" name="isPublic" value="1" <%= image.isPublic === false ? '' : 'checked' %>>
+                                                                        <label class="form-check-label text-light small" for="imagePublicSwitch">
+                                                                            Public image (visible in <code>/user/create</code>)
+                                                                        </label>
+                                                                    </div>
                                                                 </div>
                                                                 <div class="col-12">
                                                                     <label

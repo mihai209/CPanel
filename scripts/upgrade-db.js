@@ -135,6 +135,7 @@ const Image = sequelize.define('Image', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
     name: { type: DataTypes.STRING, allowNull: false },
     description: { type: DataTypes.TEXT },
+    isPublic: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
     dockerImage: { type: DataTypes.STRING, allowNull: false },
     dockerImages: { type: DataTypes.JSON, defaultValue: {} },
     startup: { type: DataTypes.TEXT, allowNull: false },
@@ -562,6 +563,10 @@ async function upgrade() {
         await AdminApiKey.update(
             { rotationIntervalDays: 0 },
             { where: { rotationIntervalDays: null } }
+        );
+        await Image.update(
+            { isPublic: true },
+            { where: { isPublic: null } }
         );
         await Image.update(
             { dockerImages: {} },

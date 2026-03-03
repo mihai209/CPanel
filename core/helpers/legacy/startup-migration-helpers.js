@@ -1133,9 +1133,16 @@ function parseImportedImageJson(rawPayload) {
         ports = [{ container: 25565, protocol: 'tcp' }];
     }
 
+    const rawIsPublic = payload.isPublic;
+    const rawPrivate = payload.private;
+    const isPublic = rawPrivate !== undefined
+        ? !['1', 'true', 'yes', 'on'].includes(String(rawPrivate).trim().toLowerCase())
+        : ['1', 'true', 'yes', 'on'].includes(String(rawIsPublic).trim().toLowerCase()) || rawIsPublic === undefined;
+
     return {
         name,
         description,
+        isPublic,
         dockerImage,
         dockerImages,
         startup,
