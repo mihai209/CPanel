@@ -2,7 +2,8 @@
 
 body {
     background: linear-gradient(rgba(10, 24, 10, 0.72), rgba(8, 20, 8, 0.84)),
-        url('https://images2.alphacoders.com/137/thumb-1920-1370592.jpeg') center/cover fixed no-repeat !important;
+        url('https://images2.alphacoders.com/137/thumb-1920-1370592.jpeg') center/cover no-repeat !important;
+    background-attachment: scroll !important;
 }
 
 h1,
@@ -24,7 +25,6 @@ h6,
 .bg-dark {
     background: rgba(21, 30, 17, 0.82) !important;
     border-color: rgba(114, 179, 82, 0.35) !important;
-    backdrop-filter: blur(3px);
 }
 
 .form-control,

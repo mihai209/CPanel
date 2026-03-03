@@ -7,7 +7,6 @@ body {
 .card, .modal-content, .bg-dark {
     background: rgba(28, 14, 39, 0.78) !important;
     border-color: rgba(255, 121, 182, 0.35) !important;
-    backdrop-filter: blur(5px);
 }
 
 .navbar {
@@ -16,7 +15,7 @@ body {
 }
 
 .btn-primary, .btn-success, .btn-danger {
-    box-shadow: 0 0 14px rgba(255, 98, 179, 0.5);
+    box-shadow: 0 0 8px rgba(255, 98, 179, 0.3);
 }
 
 .btn-primary {

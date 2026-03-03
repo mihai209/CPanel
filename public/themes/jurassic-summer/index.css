@@ -3,7 +3,8 @@
 body {
     background:
         linear-gradient(rgba(18, 42, 18, 0.55), rgba(32, 23, 8, 0.75)),
-        url('https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1920&q=80') center/cover fixed no-repeat !important;
+        url('https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1280&q=60&fm=webp') center/cover no-repeat !important;
+    background-attachment: scroll !important;
 }
 
 h1, h2, h3, h4, h5, h6, .btn {
@@ -14,7 +15,6 @@ h1, h2, h3, h4, h5, h6, .btn {
 .card, .modal-content, .bg-dark {
     background: rgba(20, 46, 20, 0.82) !important;
     border-color: rgba(238, 137, 45, 0.35) !important;
-    backdrop-filter: blur(3px);
 }
 
 .navbar {

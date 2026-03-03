@@ -1,6 +1,7 @@
 body {
     background: linear-gradient(rgba(18, 23, 37, 0.7), rgba(12, 15, 24, 0.86)),
-        url('https://cdn.prod.website-files.com/5f9072399b2640f14d6a2bf4/67d0c4e0932bb59c7f6271e5_2024_10_DiscordBlog_UsingDiscord-1.png') center/cover fixed no-repeat !important;
+        url('https://cdn.prod.website-files.com/5f9072399b2640f14d6a2bf4/67d0c4e0932bb59c7f6271e5_2024_10_DiscordBlog_UsingDiscord-1.png') center/cover no-repeat !important;
+    background-attachment: scroll !important;
 }
 
 .card,
@@ -8,7 +9,6 @@ body {
 .bg-dark {
     background: rgba(34, 39, 62, 0.85) !important;
     border-color: rgba(132, 142, 255, 0.3) !important;
-    backdrop-filter: blur(3px);
 }
 
 .form-control,

@@ -3,11 +3,10 @@
 body {
     background-image:
         linear-gradient(rgba(7, 36, 45, 0.55), rgba(8, 25, 36, 0.75)),
-        url('/assets/theme-tropical-island.png'),
-        url('https://images2.alphacoders.com/137/thumb-1920-1370592.jpeg') !important;
+        url('/assets/theme-tropical-island.png') !important;
     background-size: cover !important;
     background-position: center !important;
-    background-attachment: fixed !important;
+    background-attachment: scroll !important;
 }
 
 .navbar-brand::after,
@@ -22,7 +21,6 @@ h1, h2, h3, h4, h5, h6, .btn {
 .card, .modal-content, .bg-dark {
     background: rgba(10, 34, 46, 0.84) !important;
     border-color: rgba(56, 217, 169, 0.34) !important;
-    backdrop-filter: blur(4px);
 }
 
 .btn-primary {
