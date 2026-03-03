@@ -44,6 +44,14 @@
     </p>
 </div>
 
+<script>
+    window.__CPANEL_I18N = Object.assign(window.__CPANEL_I18N || {}, {
+        lang: '<%= locals.langCode || "english" %>',
+        fallback: 'english'
+    });
+</script>
+<script src="/js/i18n-runtime.js"></script>
+
 <!-- Copyright Info Modal -->
 <div class="modal fade" id="copyrightInfoModal" tabindex="-1" aria-labelledby="copyrightInfoModalLabel"
     aria-hidden="true">

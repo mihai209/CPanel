@@ -85,6 +85,30 @@
                         <a class="btn btn-dark text-start" href="/user/create"><i class="bi bi-plus-square me-2"></i>Create Server</a>
                     <% } %>
 
+                    <% const languageCodes = Array.isArray(locals.availableLanguages) ? locals.availableLanguages : ['english']; %>
+                    <% const currentLang = String(locals.langCode || 'english'); %>
+                    <% const languageLabel = (code) => {
+                        if (code === 'english') return 'English';
+                        if (code === 'espanol') return 'Español';
+                        if (code === 'romana') return 'Română';
+                        return code;
+                    }; %>
+                    <hr class="my-1 border-secondary border-opacity-25">
+                    <div class="px-2 py-1">
+                        <small class="text-muted text-uppercase d-block mb-2">Language</small>
+                        <div class="d-flex flex-wrap gap-1">
+                            <% languageCodes.forEach((code) => { %>
+                                <form method="POST" action="/language" class="m-0">
+                                    <input type="hidden" name="languageCode" value="<%= code %>">
+                                    <input type="hidden" name="redirect" value="<%= locals.currentPath || '/' %>">
+                                    <button type="submit" class="btn btn-sm <%= currentLang === code ? 'btn-primary' : 'btn-outline-light' %>">
+                                        <%= languageLabel(code) %>
+                                    </button>
+                                </form>
+                            <% }); %>
+                        </div>
+                    </div>
+
                     <% if (user.isAdmin) { %>
                         <hr class="my-1 border-secondary border-opacity-25">
                         <a class="btn btn-outline-danger text-start" href="/admin"><i class="bi bi-shield-lock-fill me-2"></i>Admin Panel</a>

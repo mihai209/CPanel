@@ -38,3 +38,10 @@
 </head>
 
 <body>
+    <script>
+        window.__CPANEL_I18N = Object.assign(window.__CPANEL_I18N || {}, {
+            lang: '<%= locals.langCode || "english" %>',
+            fallback: 'english'
+        });
+    </script>
+    <script src="/js/i18n-runtime.js"></script>

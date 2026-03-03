@@ -56,6 +56,7 @@ const { registerSecurityMiddleware } = require('./core/middleware/security');
 const { registerLocalsMiddleware } = require('./core/middleware/locals');
 const { createSessionAuthGuards, createTokenAuthenticator } = require('./core/middleware/auth');
 const { createRequireAdminApiPermission } = require('./core/middleware/admin-api');
+const { resolveLanguageCode } = require('./core/i18n');
 const { registerInternalApiRoutes } = require('./routes/internal/api');
 const { registerSystemRoutes } = require('./routes/internal/system');
 const { registerPlatformRoutes } = require('./routes/internal/platform');
@@ -207,7 +208,8 @@ registerSystemRoutes({
     User,
     Settings,
     requireAuth,
-    requireAdmin
+    requireAdmin,
+    resolveLanguageCode
 });
 
 const connectorConnections = new Map(); // connectorId -> ws

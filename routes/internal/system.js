@@ -6,8 +6,53 @@ function registerSystemRoutes(deps) {
         User,
         Settings,
         requireAuth,
-        requireAdmin
+        requireAdmin,
+        resolveLanguageCode
     } = deps;
+
+    const sanitizeRedirectTarget = (rawTarget) => {
+        const target = String(rawTarget || '').trim();
+        if (!target) return '/';
+        if (!target.startsWith('/')) return '/';
+        if (target.startsWith('//')) return '/';
+        return target;
+    };
+
+    const applyLanguageSelection = (req, res, requestedCode, requestedRedirect) => {
+        const selectedCode = typeof resolveLanguageCode === 'function'
+            ? resolveLanguageCode(requestedCode)
+            : 'english';
+        if (req.session) {
+            req.session.uiLanguage = selectedCode;
+        }
+        res.cookie('cpanel_lang', selectedCode, {
+            httpOnly: false,
+            sameSite: 'lax',
+            maxAge: 365 * 24 * 60 * 60 * 1000
+        });
+        const redirectTarget = sanitizeRedirectTarget(
+            requestedRedirect || req.get('referer') || '/'
+        );
+        return res.redirect(303, redirectTarget);
+    };
+
+    app.post('/language', (req, res) => {
+        return applyLanguageSelection(
+            req,
+            res,
+            req.body.languageCode || req.body.lang || req.query.lang,
+            req.body.redirect || req.query.redirect
+        );
+    });
+
+    app.get('/language/:code', (req, res) => {
+        return applyLanguageSelection(
+            req,
+            res,
+            req.params.code,
+            req.query.redirect
+        );
+    });
 
     app.post('/check', async (req, res) => {
         if (!req.session.user) {

@@ -5,6 +5,12 @@ const {
     getThemeCatalog,
     getUserThemeId
 } = require('../themes');
+const {
+    getAvailableLanguageCodes,
+    resolveRequestLanguage,
+    translateByKey,
+    translateText
+} = require('../i18n');
 
 function registerLocalsMiddleware(app, Settings, User, settingsCache = null) {
     app.use(async (req, res, next) => {
@@ -30,8 +36,32 @@ function registerLocalsMiddleware(app, Settings, User, settingsCache = null) {
     });
 
     app.use(async (req, res, next) => {
-        res.locals.error = req.query.error || null;
-        res.locals.success = req.query.success || null;
+        const activeLanguage = resolveRequestLanguage(req);
+        if (req.session) {
+            req.session.uiLanguage = activeLanguage;
+        }
+        res.cookie('cpanel_lang', activeLanguage, {
+            httpOnly: false,
+            sameSite: 'lax',
+            maxAge: 365 * 24 * 60 * 60 * 1000
+        });
+
+        const translateLiteral = (value) => {
+            if (value === undefined || value === null) return value;
+            return translateText(activeLanguage, String(value));
+        };
+
+        res.locals.langCode = activeLanguage;
+        res.locals.availableLanguages = getAvailableLanguageCodes();
+        res.locals.currentPath = req.originalUrl || req.path || '/';
+        res.locals.t = (key, fallback = '') => translateByKey(activeLanguage, key, fallback);
+        res.locals.translateText = translateLiteral;
+        req.t = res.locals.t;
+        req.translateText = translateLiteral;
+
+        res.locals.error = req.query.error ? translateLiteral(req.query.error) : null;
+        res.locals.warning = req.query.warning ? translateLiteral(req.query.warning) : null;
+        res.locals.success = req.query.success ? translateLiteral(req.query.success) : null;
         res.locals.themeCatalog = getThemeCatalog();
 
         let activeThemeId = DEFAULT_THEME_ID;
