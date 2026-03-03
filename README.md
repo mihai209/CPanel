@@ -54,6 +54,14 @@ Change all passwords before production use.
 - `npm start` - start in normal mode
 - `npm run upgrade-db` - apply schema/data upgrades
 - `npm run create-user` - create initial user/admin
+- `npm run lang:sync` - sync `espanol.json` and `romana.json` from `english.json` (auto-translate only missing/unchanged keys)
+
+Language sync options:
+
+- `npm run lang:sync -- --force` - re-translate all keys
+- `npm run lang:sync -- --only=es` - sync only Spanish
+- `npm run lang:sync -- --only=ro` - sync only Romanian
+- `npm run lang:sync -- --limit=50` - translate only first 50 pending keys (test mode)
 
 ### Core Features
 
@@ -128,6 +136,14 @@ URL implicit: `http://localhost:3000`
 - `npm start` - pornire normala
 - `npm run upgrade-db` - aplica upgrade-uri de schema/date
 - `npm run create-user` - creeaza utilizator initial/admin
+- `npm run lang:sync` - sincronizeaza `espanol.json` si `romana.json` din `english.json` (traduce doar cheile lipsa/nesincronizate)
+
+Optiuni pentru sincronizare limbi:
+
+- `npm run lang:sync -- --force` - retraduce toate cheile
+- `npm run lang:sync -- --only=es` - sincronizeaza doar spaniola
+- `npm run lang:sync -- --only=ro` - sincronizeaza doar romana
+- `npm run lang:sync -- --limit=50` - traduce doar primele 50 chei pendinte (test)
 
 ### Functionalitati
 

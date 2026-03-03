@@ -9,6 +9,7 @@
     "fix-schema": "node scripts/fix-schema.js",
     "init:packages": "node scripts/init-packages.js",
     "upgrade-db": "node scripts/upgrade-db.js",
+    "lang:sync": "node scripts/lang-sync.js",
     "sync-images": "node scripts/sync-images.js",
     "ngrok": "ngrok http 3000 --url https://default.internal",
     "kill3000": "npx kill-port 3000",
