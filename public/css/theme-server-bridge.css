@@ -1,0 +1,87 @@
+:root {
+    --cp-panel-bg: var(--bg-dark, #0f0f12);
+    --cp-panel-sidebar-bg: var(--bg-sidebar, #121216);
+    --cp-panel-border: var(--border-color, #2d2d35);
+    --cp-panel-text: var(--text-primary, #e1e1e6);
+    --cp-panel-text-muted: var(--text-secondary, #8b8b9a);
+    --cp-panel-accent: var(--accent-blue, #3b82f6);
+    --cp-panel-surface: rgba(24, 24, 32, 0.9);
+    --cp-panel-surface-2: rgba(24, 24, 32, 0.86);
+    --cp-panel-input: var(--cp-panel-surface-2);
+}
+
+body {
+    color: var(--cp-panel-text) !important;
+    background-color: var(--cp-panel-bg) !important;
+}
+
+.sidebar,
+#sidebar,
+.top-navbar,
+.top,
+header.top,
+.terminal-header,
+.navbar {
+    background: var(--cp-panel-sidebar-bg) !important;
+    border-color: var(--cp-panel-border) !important;
+}
+
+.content,
+.scroll,
+.scroll-area,
+.main-content,
+.terminal-wrapper {
+    background: transparent !important;
+}
+
+.cardx,
+.stat-card,
+.terminal-container,
+.context-menu,
+.modal-content,
+.card,
+.settings-card,
+.file-manager-card,
+.table-card {
+    background: var(--cp-panel-surface) !important;
+    border-color: var(--cp-panel-border) !important;
+    color: var(--cp-panel-text) !important;
+}
+
+.sidebar-item,
+.server-address,
+.text-secondary {
+    color: var(--cp-panel-text-muted) !important;
+}
+
+.sidebar-item.active,
+.nav-link.active {
+    color: var(--cp-panel-accent) !important;
+}
+
+a,
+.text-primary,
+.btn-link,
+.link-primary {
+    color: var(--cp-panel-accent) !important;
+}
+
+.form-control,
+.form-select,
+textarea {
+    background: var(--cp-panel-input) !important;
+    border-color: var(--cp-panel-border) !important;
+    color: var(--cp-panel-text) !important;
+}
+
+.form-control::placeholder,
+textarea::placeholder {
+    color: var(--cp-panel-text-muted) !important;
+}
+
+.table,
+.table-dark,
+.table-dark> :not(caption)>*>* {
+    color: var(--cp-panel-text) !important;
+    border-color: var(--cp-panel-border) !important;
+}
