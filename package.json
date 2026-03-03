@@ -12,7 +12,7 @@
     "sync-images": "node scripts/sync-images.js",
     "ngrok": "ngrok http 3000 --url https://default.internal",
     "kill3000": "npx kill-port 3000",
-    "update-panel": "git fetch origin ; git pull --rebase origin main"
+    "update-panel": "git pull --rebase --autostash origin main"
   },
   "keywords": [],
   "author": "",
