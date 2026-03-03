@@ -17,6 +17,11 @@ const REDIS_SETTING_KEYS = [
     'redisTls',
     'redisSessionPrefix'
 ];
+const nodeFs = require('fs');
+const nodeFsPromises = nodeFs.promises;
+const nodePath = require('path');
+const LANG_DIRECTORY = nodePath.join(process.cwd(), 'public', 'lang');
+const MAX_LANGUAGE_JSON_SIZE_BYTES = 2 * 1024 * 1024;
 
 const toRedisBoolString = (value) => (
     value === true || value === 'true' || value === '1' || value === 1 || value === 'on'
@@ -28,6 +33,59 @@ const toRedisInt = (value, fallback, min, max) => {
     const parsed = Number.parseInt(String(value === undefined || value === null ? '' : value).trim(), 10);
     if (!Number.isInteger(parsed)) return fallback;
     return Math.min(max, Math.max(min, parsed));
+};
+
+const sanitizeLanguageCode = (value) => {
+    const trimmed = String(value || '').trim().replace(/\.json$/i, '');
+    const normalized = trimmed.toLowerCase();
+    if (!/^[a-z0-9_-]{2,40}$/.test(normalized)) return '';
+    return normalized;
+};
+
+const sanitizeLanguageFilename = (value) => {
+    const base = nodePath.basename(String(value || '').trim());
+    if (!/^[a-z0-9_-]{2,40}\.json$/i.test(base)) return '';
+    return base.toLowerCase();
+};
+
+const ensureLanguageDirectory = async () => {
+    await nodeFsPromises.mkdir(LANG_DIRECTORY, { recursive: true });
+};
+
+const readLanguageCatalog = async () => {
+    await ensureLanguageDirectory();
+    const entries = await nodeFsPromises.readdir(LANG_DIRECTORY, { withFileTypes: true });
+    const files = entries
+        .filter((entry) => entry && entry.isFile() && entry.name && entry.name.toLowerCase().endsWith('.json'))
+        .map((entry) => entry.name)
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+    const languages = [];
+    for (const fileName of files) {
+        const filePath = nodePath.join(LANG_DIRECTORY, fileName);
+        const stat = await nodeFsPromises.stat(filePath);
+        let valid = true;
+        let keyCount = 0;
+        try {
+            const parsed = JSON.parse(await nodeFsPromises.readFile(filePath, 'utf8'));
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                keyCount = Object.keys(parsed).length;
+            } else {
+                valid = false;
+            }
+        } catch {
+            valid = false;
+        }
+        languages.push({
+            fileName,
+            languageCode: fileName.replace(/\.json$/i, ''),
+            sizeBytes: Number(stat.size || 0),
+            updatedAtMs: Number(stat.mtimeMs || Date.now()),
+            valid,
+            keyCount
+        });
+    }
+    return languages;
 };
 
 const normalizeRedisSessionPrefix = (value) => {
@@ -300,6 +358,118 @@ app.post('/admin/redis/test', requireAuth, requireAdmin, async (req, res) => {
     } catch (error) {
         console.error('Error testing redis connection:', error);
         return res.redirect('/admin/redis?error=' + encodeURIComponent('Failed to test Redis connection.'));
+    }
+});
+
+// Admin Languages
+app.get('/admin/lang', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const selectedFileQuery = sanitizeLanguageFilename(req.query.file);
+        const languages = await readLanguageCatalog();
+
+        let selectedLanguage = null;
+        if (selectedFileQuery) {
+            const selectedPath = nodePath.join(LANG_DIRECTORY, selectedFileQuery);
+            if (nodeFs.existsSync(selectedPath)) {
+                const contentRaw = await nodeFsPromises.readFile(selectedPath, 'utf8');
+                selectedLanguage = {
+                    fileName: selectedFileQuery,
+                    languageCode: selectedFileQuery.replace(/\.json$/i, ''),
+                    contentRaw
+                };
+            }
+        } else if (languages.length > 0) {
+            const defaultFile = languages[0].fileName;
+            const defaultPath = nodePath.join(LANG_DIRECTORY, defaultFile);
+            const contentRaw = await nodeFsPromises.readFile(defaultPath, 'utf8');
+            selectedLanguage = {
+                fileName: defaultFile,
+                languageCode: defaultFile.replace(/\.json$/i, ''),
+                contentRaw
+            };
+        }
+
+        return res.render('admin/lang', {
+            user: req.session.user,
+            path: '/admin/lang',
+            title: 'Languages',
+            success: req.query.success || null,
+            warning: req.query.warning || null,
+            error: req.query.error || null,
+            languages,
+            selectedLanguage
+        });
+    } catch (error) {
+        console.error('Error loading language admin page:', error);
+        return res.render('admin/lang', {
+            user: req.session.user,
+            path: '/admin/lang',
+            title: 'Languages',
+            success: null,
+            warning: null,
+            error: 'Failed to load language files.',
+            languages: [],
+            selectedLanguage: null
+        });
+    }
+});
+
+app.post('/admin/lang/save', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const languageCode = sanitizeLanguageCode(req.body.languageCode);
+        if (!languageCode) {
+            return res.redirect('/admin/lang?error=' + encodeURIComponent('Language code must contain only a-z, 0-9, "_" or "-".'));
+        }
+
+        const jsonPayload = String(req.body.jsonPayload || '').trim();
+        if (!jsonPayload) {
+            return res.redirect('/admin/lang?error=' + encodeURIComponent('JSON payload is required.'));
+        }
+        if (Buffer.byteLength(jsonPayload, 'utf8') > MAX_LANGUAGE_JSON_SIZE_BYTES) {
+            return res.redirect('/admin/lang?error=' + encodeURIComponent('JSON file is too large (max 2 MB).'));
+        }
+
+        let parsed;
+        try {
+            parsed = JSON.parse(jsonPayload);
+        } catch (error) {
+            return res.redirect('/admin/lang?error=' + encodeURIComponent('Invalid JSON format.'));
+        }
+
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return res.redirect('/admin/lang?error=' + encodeURIComponent('Language file must be a JSON object with key/value pairs.'));
+        }
+
+        const pretty = JSON.stringify(parsed, null, 2) + '\n';
+        await ensureLanguageDirectory();
+        const fileName = `${languageCode}.json`;
+        const filePath = nodePath.join(LANG_DIRECTORY, fileName);
+        await nodeFsPromises.writeFile(filePath, pretty, 'utf8');
+
+        return res.redirect('/admin/lang?success=' + encodeURIComponent(`Language "${fileName}" saved.`) + '&file=' + encodeURIComponent(fileName));
+    } catch (error) {
+        console.error('Error saving language file:', error);
+        return res.redirect('/admin/lang?error=' + encodeURIComponent('Failed to save language file.'));
+    }
+});
+
+app.post('/admin/lang/delete/:fileName', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const fileName = sanitizeLanguageFilename(req.params.fileName);
+        if (!fileName) {
+            return res.redirect('/admin/lang?error=' + encodeURIComponent('Invalid language filename.'));
+        }
+
+        const filePath = nodePath.join(LANG_DIRECTORY, fileName);
+        if (!nodeFs.existsSync(filePath)) {
+            return res.redirect('/admin/lang?error=' + encodeURIComponent('Language file not found.'));
+        }
+
+        await nodeFsPromises.unlink(filePath);
+        return res.redirect('/admin/lang?success=' + encodeURIComponent(`Language "${fileName}" deleted.`));
+    } catch (error) {
+        console.error('Error deleting language file:', error);
+        return res.redirect('/admin/lang?error=' + encodeURIComponent('Failed to delete language file.'));
     }
 });
 

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= (settings.brandName || 'CPanel').toUpperCase() %> - Languages</title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <%- include('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3 flex-wrap">
+                    <h4 class="mb-0 text-light fw-normal">Languages</h4>
+                    <small class="text-muted">Dynamic JSON language files from <code>/public/lang</code>.</small>
+                </div>
+                <div class="breadcrumb-admin">
+                    <a href="/admin/overview">Admin</a>
+                    <span class="mx-2">&gt;</span>
+                    <span class="text-light">Languages</span>
+                </div>
+            </div>
+
+            <div class="container-fluid py-4 px-lg-4">
+                <% const langList = Array.isArray(languages) ? languages : []; %>
+                <% const selected = selectedLanguage || null; %>
+                <% const selectedFile = selected ? String(selected.fileName || '') : ''; %>
+
+                <% if (success) { %>
+                    <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
+                        <i class="bi bi-check-circle-fill me-2"></i><%= success %>
+                    </div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i><%= error %>
+                    </div>
+                <% } %>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4 col-xl-3">
+                        <div class="card border-0 shadow-sm h-100" style="background:#141419;">
+                            <div class="card-body">
+                                <div class="small text-muted text-uppercase">Language Files</div>
+                                <div class="fs-3 fw-bold text-light"><%= langList.length %></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-xl-3">
+                        <div class="card border-0 shadow-sm h-100" style="background:#141419;">
+                            <div class="card-body">
+                                <div class="small text-muted text-uppercase">Valid JSON</div>
+                                <div class="fs-3 fw-bold text-success"><%= langList.filter((lang) => lang.valid).length %></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-xl-3">
+                        <div class="card border-0 shadow-sm h-100" style="background:#141419;">
+                            <div class="card-body">
+                                <div class="small text-muted text-uppercase">Invalid JSON</div>
+                                <div class="fs-3 fw-bold text-danger"><%= langList.filter((lang) => !lang.valid).length %></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-12 col-xl-3">
+                        <div class="card border-0 shadow-sm h-100" style="background:#141419;">
+                            <div class="card-body d-flex align-items-center justify-content-between gap-2">
+                                <div>
+                                    <div class="small text-muted text-uppercase">Directory</div>
+                                    <div class="small text-light">public/lang</div>
+                                </div>
+                                <a href="/admin/lang" class="btn btn-sm btn-outline-light">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-12 col-xxl-4">
+                        <div class="card border-0 shadow-sm" style="background:#141419;">
+                            <div class="card-header border-bottom border-secondary border-opacity-10 bg-transparent py-3">
+                                <h5 class="card-title mb-0 fs-6 fw-bold text-light">
+                                    <i class="bi bi-translate me-2"></i>Available Languages
+                                </h5>
+                            </div>
+                            <div class="card-body p-0">
+                                <% if (langList.length > 0) { %>
+                                    <div class="list-group list-group-flush">
+                                        <% langList.forEach((lang) => { %>
+                                            <% const isSelected = selectedFile && selectedFile === String(lang.fileName); %>
+                                            <div class="list-group-item border-bottom border-secondary border-opacity-10 <%= isSelected ? 'active' : '' %>" style="background: <%= isSelected ? 'rgba(59,130,246,0.18)' : 'transparent' %>; color: #fff;">
+                                                <div class="d-flex align-items-start justify-content-between gap-2">
+                                                    <div>
+                                                        <a href="/admin/lang?file=<%= encodeURIComponent(lang.fileName) %>" class="fw-semibold text-decoration-none <%= isSelected ? 'text-light' : 'text-light' %>"><%= lang.languageCode %></a>
+                                                        <div class="small text-muted"><%= lang.fileName %></div>
+                                                        <div class="small text-muted"><%= lang.keyCount %> keys • <%= (lang.sizeBytes / 1024).toFixed(1) %> KB</div>
+                                                    </div>
+                                                    <div class="d-flex flex-column align-items-end gap-2">
+                                                        <% if (lang.valid) { %>
+                                                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">Valid</span>
+                                                        <% } else { %>
+                                                            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25">Invalid</span>
+                                                        <% } %>
+                                                        <form method="POST" action="/admin/lang/delete/<%= encodeURIComponent(lang.fileName) %>" class="delete-lang-form m-0 p-0 d-inline-block" data-file-name="<%= lang.fileName %>">
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                                <i class="bi bi-trash"></i>
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        <% }); %>
+                                    </div>
+                                <% } else { %>
+                                    <div class="p-4 text-center text-muted">No language JSON files found yet.</div>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-xxl-8">
+                        <div class="card border-0 shadow-sm" style="background:#141419;">
+                            <div class="card-header border-bottom border-secondary border-opacity-10 bg-transparent py-3">
+                                <h5 class="card-title mb-0 fs-6 fw-bold text-light">
+                                    <i class="bi bi-file-earmark-code me-2"></i>Create / Update Language
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST" action="/admin/lang/save" id="languageSaveForm">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label text-muted small text-uppercase fw-bold">Language Code</label>
+                                            <input type="text" name="languageCode" class="form-control" maxlength="40" pattern="[a-zA-Z0-9_-]{2,40}" value="<%= selected ? selected.languageCode : '' %>" placeholder="english / romana / en_US" required style="background:#1a1a20;border-color:#2d2d35;color:#fff;">
+                                            <small class="text-muted">Allowed: <code>a-z</code> <code>0-9</code> <code>_</code> <code>-</code>.</small>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label text-muted small text-uppercase fw-bold">Load JSON from file</label>
+                                            <input id="langJsonFile" type="file" accept=".json,application/json" class="form-control" style="background:#1a1a20;border-color:#2d2d35;color:#fff;">
+                                            <small class="text-muted">Optional, will replace editor content.</small>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label text-muted small text-uppercase fw-bold">JSON Payload</label>
+                                            <textarea id="langJsonPayload" name="jsonPayload" rows="20" class="form-control font-monospace" placeholder='{"dashboard.title":"Servers"}' required style="background:#1a1a20;border-color:#2d2d35;color:#fff;"><%= selected ? selected.contentRaw : '' %></textarea>
+                                        </div>
+                                    </div>
+
+                                    <div class="alert alert-info border-0 bg-info bg-opacity-10 text-info mt-3 mb-3">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        Files are stored in <code>/public/lang/{language}.json</code>. Any JSON dropped manually in that folder is auto-detected on refresh.
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-save me-1"></i>Save Language
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <%- include('../partials/footer') %>
+        </div>
+    </div>
+
+    <div class="modal fade" id="deleteLangModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg" style="background:#1a1a20;border:1px solid #2d2d35 !important;">
+                <div class="modal-header border-bottom border-secondary border-opacity-10">
+                    <h5 class="modal-title fs-6 fw-bold text-light">Delete Language File</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <img src="/assets/sad-rocky.png" alt="Sad Rocky" class="img-fluid mb-4" style="max-height:130px;">
+                    <h6 class="text-light fw-bold mb-2">Delete <span id="deleteLangName" class="text-danger"></span>?</h6>
+                    <p class="text-muted small mb-0">This removes the JSON file from <code>/public/lang</code>.</p>
+                </div>
+                <div class="modal-footer border-top border-secondary border-opacity-10">
+                    <button type="button" class="btn btn-link text-muted text-decoration-none" data-bs-dismiss="modal">Cancel</button>
+                    <button id="confirmLangDeleteBtn" type="button" class="btn btn-danger px-4 fw-bold">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
+    <script>
+        (() => {
+            const fileInput = document.getElementById('langJsonFile');
+            const payload = document.getElementById('langJsonPayload');
+            if (fileInput && payload) {
+                fileInput.addEventListener('change', async (event) => {
+                    const file = event.target.files && event.target.files[0] ? event.target.files[0] : null;
+                    if (!file) return;
+                    try {
+                        payload.value = await file.text();
+                    } catch {
+                        alert('Failed to read selected JSON file.');
+                    }
+                });
+            }
+
+            const deleteModalEl = document.getElementById('deleteLangModal');
+            const confirmBtn = document.getElementById('confirmLangDeleteBtn');
+            const deleteLangName = document.getElementById('deleteLangName');
+            const deleteModal = deleteModalEl ? new bootstrap.Modal(deleteModalEl) : null;
+            let selectedDeleteForm = null;
+
+            document.querySelectorAll('.delete-lang-form').forEach((form) => {
+                form.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    selectedDeleteForm = form;
+                    if (deleteLangName) {
+                        deleteLangName.textContent = String(form.getAttribute('data-file-name') || 'this file');
+                    }
+                    if (deleteModal) deleteModal.show();
+                });
+            });
+
+            if (confirmBtn) {
+                confirmBtn.addEventListener('click', function () {
+                    if (!selectedDeleteForm) return;
+                    this.disabled = true;
+                    this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Deleting...';
+                    selectedDeleteForm.submit();
+                });
+            }
+        })();
+    </script>
+</body>
+
+</html>
