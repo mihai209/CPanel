@@ -231,8 +231,57 @@ const formatLimit = (value) => {
     }
 
     @media (max-width: 767px) {
+        .dashboard-hero {
+            padding: 1rem;
+        }
+
+        .dashboard-hero .d-flex {
+            flex-direction: column;
+            align-items: flex-start !important;
+        }
+
+        .dashboard-hero .d-flex > div:last-child {
+            width: 100%;
+            justify-content: flex-start !important;
+        }
+
+        .dashboard-hero .btn {
+            width: 100%;
+        }
+
+        .metric-card {
+            padding: 0.85rem;
+        }
+
+        .metric-value {
+            font-size: 1.45rem;
+        }
+
+        .server-card {
+            padding: 0.85rem;
+        }
+
+        .server-name {
+            font-size: 0.98rem;
+            line-height: 1.3;
+            word-break: break-word;
+        }
+
+        .server-subtext {
+            font-size: 0.72rem;
+            word-break: break-word;
+        }
+
         .resource-grid {
             grid-template-columns: 1fr;
+        }
+
+        .ops-feed-card {
+            padding: 0.75rem;
+        }
+
+        .ops-feed-item {
+            padding: 0.55rem 0.6rem;
         }
     }
 </style>

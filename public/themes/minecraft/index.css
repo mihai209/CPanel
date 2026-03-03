@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+body {
+    background: linear-gradient(rgba(10, 24, 10, 0.72), rgba(8, 20, 8, 0.84)),
+        url('https://images2.alphacoders.com/137/thumb-1920-1370592.jpeg') center/cover fixed no-repeat !important;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.navbar-brand,
+.sidebar-brand,
+.btn,
+.badge {
+    font-family: 'Press Start 2P', 'Inter', sans-serif !important;
+    letter-spacing: 0.02em;
+}
+
+.card,
+.modal-content,
+.bg-dark {
+    background: rgba(21, 30, 17, 0.82) !important;
+    border-color: rgba(114, 179, 82, 0.35) !important;
+    backdrop-filter: blur(3px);
+}
+
+.form-control,
+.form-select {
+    background: rgba(10, 16, 10, 0.9) !important;
+    border-color: rgba(114, 179, 82, 0.45) !important;
+    color: #e9fbe2 !important;
+}
+
+.navbar {
+    background: rgba(16, 25, 14, 0.92) !important;
+    border-bottom-color: rgba(114, 179, 82, 0.4) !important;
+}
+
+a,
+.text-primary {
+    color: #9ce45f !important;
+}

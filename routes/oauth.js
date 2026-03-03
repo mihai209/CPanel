@@ -4,6 +4,7 @@ const RedditStrategy = require('passport-reddit').Strategy;
 const GitHubStrategy = require('passport-github2').Strategy;
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
+const { getUserThemeId } = require('../core/themes');
 
 function registerOAuthRoutes({ app, passport, User, LinkedAccount, md5 }) {
     const APP_OAUTH_URL = (process.env.APP_URL || '').replace(/\/$/, '');
@@ -195,7 +196,8 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, md5 }) {
                 coins: Number.isFinite(Number(user.coins)) ? Number(user.coins) : 0,
                 gravatarHash: md5(user.email.trim().toLowerCase()),
                 avatarUrl: user.avatarUrl,
-                avatarProvider: user.avatarProvider
+                avatarProvider: user.avatarProvider,
+                uiTheme: getUserThemeId(user.toJSON ? user.toJSON() : user)
             };
 
             await new Promise((resolve, reject) => {
@@ -219,7 +221,8 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, md5 }) {
                 coins: Number.isFinite(Number(user.coins)) ? Number(user.coins) : 0,
                 avatarUrl: user.avatarUrl,
                 avatarProvider: user.avatarProvider,
-                gravatarHash: md5(user.email.trim().toLowerCase())
+                gravatarHash: md5(user.email.trim().toLowerCase()),
+                uiTheme: getUserThemeId(user.toJSON ? user.toJSON() : user)
             };
             req.session.save(() => res.redirect('/'));
         });

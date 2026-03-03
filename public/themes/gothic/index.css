@@ -1,0 +1,29 @@
+body {
+    background: linear-gradient(rgba(19, 7, 13, 0.72), rgba(12, 6, 10, 0.88)),
+        url('https://t4.ftcdn.net/jpg/02/00/99/09/360_F_200990953_ZUQhJDEQGCmJ10H9mLq8XjEckDQQjau9.jpg') center/cover fixed no-repeat !important;
+}
+
+.card,
+.modal-content,
+.bg-dark {
+    background: rgba(26, 14, 22, 0.86) !important;
+    border-color: rgba(147, 102, 174, 0.32) !important;
+    backdrop-filter: blur(3px);
+}
+
+.form-control,
+.form-select {
+    background: rgba(20, 11, 18, 0.92) !important;
+    border-color: rgba(164, 117, 196, 0.45) !important;
+    color: #f5eafb !important;
+}
+
+.navbar {
+    background: rgba(22, 11, 18, 0.94) !important;
+    border-bottom-color: rgba(147, 102, 174, 0.35) !important;
+}
+
+a,
+.text-primary {
+    color: #d7a3ff !important;
+}

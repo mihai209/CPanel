@@ -1,6 +1,7 @@
 function registerServerPagesRoutes(ctx) {
     const fs = require('fs');
     const nodeCrypto = require('crypto');
+    const { getUserThemeId } = require('../../core/themes');
     const { pickSmartAllocation } = require('../../core/helpers/smart-allocation');
     const {
         STORE_DEALS_SETTING_KEY,
@@ -142,7 +143,8 @@ app.post('/login',
                     coins: Number.isFinite(Number(user.coins)) ? Number(user.coins) : 0,
                     gravatarHash: md5(user.email.trim().toLowerCase()),
                     avatarUrl: user.avatarUrl,
-                    avatarProvider: user.avatarProvider
+                    avatarProvider: user.avatarProvider,
+                    uiTheme: getUserThemeId(user.toJSON ? user.toJSON() : user)
                 };
 
                 await new Promise((resolve, reject) => {
@@ -165,7 +167,8 @@ app.post('/login',
                 gravatarHash: md5(user.email.trim().toLowerCase()),
                 avatarUrl: user.avatarUrl,
                 avatarProvider: user.avatarProvider,
-                twoFactorEnabled: user.twoFactorEnabled
+                twoFactorEnabled: user.twoFactorEnabled,
+                uiTheme: getUserThemeId(user.toJSON ? user.toJSON() : user)
             };
 
             await new Promise((resolve, reject) => {

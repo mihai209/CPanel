@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap');
+
+body {
+    background:
+        linear-gradient(rgba(14, 33, 52, 0.48), rgba(18, 30, 41, 0.62)),
+        url('https://images.unsplash.com/photo-1578926375605-eaf7559b1458?auto=format&fit=crop&w=1920&q=80') center/cover fixed no-repeat !important;
+}
+
+h1, h2, h3, h4, h5, h6, .btn, .badge {
+    font-family: 'Fredoka', 'Inter', sans-serif !important;
+}
+
+.card, .modal-content, .bg-dark {
+    background: rgba(23, 45, 62, 0.82) !important;
+    border-color: rgba(120, 219, 115, 0.32) !important;
+    backdrop-filter: blur(3px);
+}
+
+.navbar {
+    background: rgba(20, 42, 57, 0.92) !important;
+}
+
+.btn-primary {
+    background: #69d870 !important;
+    border-color: #69d870 !important;
+    color: #103b1b !important;
+}
+
+.sidebar-brand::after {
+    content: ' 🦕🪽';
+}
+
+a, .text-primary {
+    color: #83e3ff !important;
+}

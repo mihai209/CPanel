@@ -9,8 +9,10 @@
                 class="rounded-circle border border-secondary border-opacity-25 me-2" style="object-fit: cover;"
                 width="40" height="40">
             <a class="navbar-brand text-uppercase fw-bold mb-0" href="/">
-                <%= (settings.brandName || 'CPanel' ).toUpperCase() %>
-                <%= locals.title ? ' - ' + title.toUpperCase() : '' %>
+                <span class="brand-main"><%= (settings.brandName || 'CPanel' ).toUpperCase() %></span>
+                <% if (locals.title) { %>
+                    <span class="brand-section d-none d-md-inline"> - <%= title.toUpperCase() %></span>
+                <% } %>
             </a>
         </div>
 

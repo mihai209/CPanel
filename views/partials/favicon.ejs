@@ -1,4 +1,9 @@
 <link rel="icon" type="image/png" href="<%= settings.faviconUrl %>">
 <link rel="icon" type="image/x-icon" href="<%= settings.faviconUrl %>">
+<% if (activeThemeCssPath) { %>
+<link id="cpanel-theme-css" rel="stylesheet" href="<%= activeThemeCssPath %>" data-theme="<%= activeTheme || 'default' %>" data-turbo-track="reload">
+<% } %>
 <script src="/js/page-lifecycle.js"></script>
+<script src="/js/mobile-layout.js"></script>
 <script src="/js/hello.js"></script>
+<script src="/js/theme-loader.js"></script>

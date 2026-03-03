@@ -1,3 +1,10 @@
+const {
+    getThemeCatalog,
+    normalizeThemeId,
+    getUserThemeId,
+    withThemeInPermissions
+} = require('../core/themes');
+
 function registerAccountRoutes({
     app,
     requireAuth,
@@ -55,9 +62,17 @@ function registerAccountRoutes({
             console.log(`[Account Debug] Rendering for user: ${userData.username} (ID: ${userData.id})`);
             console.log(`[Account Debug] Linked Accounts:`, JSON.stringify(normalizedLinkedAccounts, null, 2));
 
+            const themeCatalog = getThemeCatalog();
+            const activeTheme = getUserThemeId(userData);
+            if (req.session && req.session.user) {
+                req.session.user.uiTheme = activeTheme;
+            }
+
             res.render('account', {
                 user: userData,
                 linkedAccounts: normalizedLinkedAccounts,
+                themeCatalog,
+                activeTheme,
                 title: 'Account Settings',
                 appUrl: APP_URL,
                 success: req.query.success || null,
@@ -137,6 +152,34 @@ function registerAccountRoutes({
         } catch (err) {
             console.error("Failed to update account:", err);
             return res.redirect('/account?error=' + encodeURIComponent('Failed to update account details.'));
+        }
+    });
+
+    // Update Theme Preference (POST)
+    app.post('/account/theme', requireAuth, async (req, res) => {
+        const rawTheme = String((req.body && req.body.theme) || '').trim().toLowerCase();
+        const allowedThemeIds = new Set(getThemeCatalog().map((entry) => entry.id));
+        if (rawTheme && !allowedThemeIds.has(rawTheme)) {
+            return res.redirect('/account?error=' + encodeURIComponent('Invalid theme selected.'));
+        }
+
+        const nextTheme = normalizeThemeId(rawTheme);
+
+        try {
+            const user = await User.findByPk(req.session.user.id);
+            if (!user) return res.redirect('/login');
+
+            user.permissions = withThemeInPermissions(user.permissions, nextTheme);
+            await user.save();
+
+            if (req.session && req.session.user) {
+                req.session.user.uiTheme = nextTheme;
+            }
+
+            return res.redirect('/account?success=' + encodeURIComponent('Theme updated successfully.'));
+        } catch (err) {
+            console.error('Failed to update theme:', err);
+            return res.redirect('/account?error=' + encodeURIComponent('Failed to update theme.'));
         }
     });
 

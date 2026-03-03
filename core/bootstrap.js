@@ -77,7 +77,7 @@ function bootstrapApp(deps) {
         message: 'Too many login attempts from this IP, please try again after 15 minutes.'
     });
 
-    registerLocalsMiddleware(app, settingsModel);
+    registerLocalsMiddleware(app, settingsModel, userModel);
 
     return {
         loginLimiter

@@ -1,0 +1,41 @@
+body {
+    background: linear-gradient(150deg, #fff3ef 0%, #f0fff9 45%, #eef9ff 100%) !important;
+    color: #1d2a33 !important;
+}
+
+.navbar {
+    background: rgba(255, 255, 255, 0.92) !important;
+    border-bottom: 1px solid #d7e9e9 !important;
+}
+
+.card, .modal-content, .bg-dark {
+    background: rgba(255, 255, 255, 0.88) !important;
+    border: 1px solid #d6ece8 !important;
+    color: #24343d !important;
+    backdrop-filter: blur(2px);
+}
+
+.form-control, .form-select {
+    background: #f8fffd !important;
+    border-color: #cde7e2 !important;
+    color: #223139 !important;
+}
+
+h1, h2, h3, h4, h5, h6, .text-light, .card-title, .card-header, .nav-link, .sidebar-brand {
+    color: #233742 !important;
+}
+
+.text-muted {
+    color: #547079 !important;
+}
+
+.btn-primary {
+    background: #ff7f6b !important;
+    border-color: #ff7f6b !important;
+}
+
+.btn-success {
+    background: #4dd6be !important;
+    border-color: #4dd6be !important;
+    color: #08342b !important;
+}

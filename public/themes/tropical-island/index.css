@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&display=swap');
+
+body {
+    background-image:
+        linear-gradient(rgba(7, 36, 45, 0.55), rgba(8, 25, 36, 0.75)),
+        url('/assets/theme-tropical-island.png'),
+        url('https://images2.alphacoders.com/137/thumb-1920-1370592.jpeg') !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-attachment: fixed !important;
+}
+
+.navbar-brand::after,
+.sidebar-brand::after {
+    content: ' 😎';
+}
+
+h1, h2, h3, h4, h5, h6, .btn {
+    font-family: 'Baloo 2', 'Inter', sans-serif !important;
+}
+
+.card, .modal-content, .bg-dark {
+    background: rgba(10, 34, 46, 0.84) !important;
+    border-color: rgba(56, 217, 169, 0.34) !important;
+    backdrop-filter: blur(4px);
+}
+
+.btn-primary {
+    background-color: #2ad1c9 !important;
+    border-color: #2ad1c9 !important;
+    color: #052023 !important;
+}
+
+.btn-warning,
+.btn-outline-warning {
+    color: #3b2900 !important;
+    border-color: #f8d06b !important;
+    background-color: #f8d06b !important;
+}
+
+.form-control, .form-select {
+    background: rgba(8, 29, 39, 0.9) !important;
+    border-color: rgba(90, 232, 216, 0.4) !important;
+    color: #f0ffff !important;
+}

@@ -1,4 +1,12 @@
-function registerLocalsMiddleware(app, Settings) {
+const {
+    DEFAULT_THEME_ID,
+    normalizeThemeId,
+    getThemeCssPath,
+    getThemeCatalog,
+    getUserThemeId
+} = require('../themes');
+
+function registerLocalsMiddleware(app, Settings, User) {
     app.use(async (req, res, next) => {
         try {
             const allSettings = await Settings.findAll();
@@ -15,9 +23,28 @@ function registerLocalsMiddleware(app, Settings) {
         }
     });
 
-    app.use((req, res, next) => {
+    app.use(async (req, res, next) => {
         res.locals.error = req.query.error || null;
         res.locals.success = req.query.success || null;
+        res.locals.themeCatalog = getThemeCatalog();
+
+        let activeThemeId = DEFAULT_THEME_ID;
+        try {
+            if (req.session && req.session.user) {
+                if (!req.session.user.uiTheme && User && req.session.user.id) {
+                    const account = await User.findByPk(req.session.user.id, { attributes: ['id', 'permissions'] });
+                    if (account) {
+                        req.session.user.uiTheme = getUserThemeId(account.toJSON());
+                    }
+                }
+                activeThemeId = normalizeThemeId(req.session.user.uiTheme);
+            }
+        } catch (error) {
+            console.warn('Failed to resolve user theme from session/db:', error.message || error);
+        }
+
+        res.locals.activeTheme = activeThemeId;
+        res.locals.activeThemeCssPath = getThemeCssPath(activeThemeId);
         next();
     });
 }

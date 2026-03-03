@@ -227,10 +227,16 @@
     </div>
 </div>
 
+<button type="button" class="admin-mobile-toggle" id="adminSidebarMobileToggle" aria-label="Toggle admin sidebar">
+    <i class="bi bi-list fs-5"></i>
+</button>
+<div class="admin-mobile-backdrop" id="adminSidebarBackdrop" aria-hidden="true"></div>
+
 <script>
     (function () {
         const sidebar = document.getElementById('adminSidebar');
         const toggleBtn = document.getElementById('sidebarToggle');
+        if (!sidebar) return;
 
         const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
         if (isCollapsed) {

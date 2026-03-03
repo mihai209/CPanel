@@ -1,0 +1,29 @@
+body {
+    background: linear-gradient(rgba(5, 26, 45, 0.68), rgba(6, 20, 36, 0.84)),
+        url('https://wallpapers.com/images/featured/azure-dw6cswed15qk49l2.jpg') center/cover fixed no-repeat !important;
+}
+
+.card,
+.modal-content,
+.bg-dark {
+    background: rgba(13, 35, 54, 0.84) !important;
+    border-color: rgba(107, 185, 255, 0.28) !important;
+    backdrop-filter: blur(3px);
+}
+
+.form-control,
+.form-select {
+    background: rgba(8, 24, 38, 0.92) !important;
+    border-color: rgba(100, 181, 246, 0.45) !important;
+    color: #e5f6ff !important;
+}
+
+.navbar {
+    background: rgba(10, 31, 49, 0.94) !important;
+    border-bottom-color: rgba(107, 185, 255, 0.32) !important;
+}
+
+a,
+.text-primary {
+    color: #77d0ff !important;
+}

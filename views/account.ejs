@@ -134,6 +134,47 @@
                         </div>
                     </div>
 
+                    <!-- Theme Preferences -->
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm"
+                            style="background-color: #141419; border: 1px solid rgba(255,255,255,0.05) !important; border-radius: 15px;">
+                            <div
+                                class="card-header border-bottom border-secondary border-opacity-10 bg-transparent py-3 d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0 fs-6 fw-bold text-light">
+                                    <i class="bi bi-palette2 me-2 text-primary"></i>Panel Theme
+                                </h5>
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3">
+                                    Active: <%= (activeTheme || 'default') %>
+                                </span>
+                            </div>
+                            <div class="card-body p-4">
+                                <% const availableThemes = Array.isArray(themeCatalog) ? themeCatalog : (Array.isArray(locals.themeCatalog) ? locals.themeCatalog : []); %>
+                                <form method="POST" action="/account/theme">
+                                    <div class="row g-3 align-items-end">
+                                        <div class="col-lg-8">
+                                            <label class="form-label text-muted small text-uppercase">Select Theme</label>
+                                            <select class="form-select bg-dark border-secondary text-light" name="theme" required>
+                                                <% availableThemes.forEach((theme) => { %>
+                                                    <option value="<%= theme.id %>" <%= String(activeTheme || '').toLowerCase() === String(theme.id || '').toLowerCase() ? 'selected' : '' %>>
+                                                        <%= theme.label %>
+                                                    </option>
+                                                <% }) %>
+                                            </select>
+                                        </div>
+                                        <div class="col-lg-4 text-lg-end">
+                                            <button type="submit" class="btn btn-primary px-4 fw-bold w-100 w-lg-auto">
+                                                Save Theme
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="form-text text-muted small mt-2">
+                                        Theme is saved per account and loaded automatically on next page views.
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Update Account Details -->
                     <div class="col-md-6">
                         <div class="card border-0 shadow-sm h-100"
@@ -546,7 +587,7 @@
                 }
 
                 const initAccountPage = () => {
-                    const profileForm = document.querySelector('form[action="/account/profile"]');
+                    const profileForm = document.querySelector('form[action="/account/update"]');
                     if (!profileForm) return;
                     if (profileForm.dataset.cpanelAccountInit === '1') return;
                     profileForm.dataset.cpanelAccountInit = '1';
