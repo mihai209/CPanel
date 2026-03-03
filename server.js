@@ -13,7 +13,15 @@ const WebSocket = require('ws');
 const { app, server } = require('./core/app');
 const { bootstrapApp } = require('./core/bootstrap');
 const { printStartupBoot, bootInfo, bootWarn } = require('./core/boot');
-const { createRedisClient } = require('./core/redis');
+const {
+    createRedisClient,
+    getRedisClient,
+    reconfigureRedis,
+    testRedisConnection,
+    getRedisRuntimeInfo,
+    normalizeRedisConfig,
+    getEnvRedisConfig
+} = require('./core/redis');
 const { createSettingsCache, bindSettingsInvalidation } = require('./core/settings-cache');
 const { registerAuditMiddleware } = require('./core/audit');
 const { createRequirePermission } = require('./core/rbac');
@@ -102,12 +110,49 @@ printStartupBoot({
     debugEnabled: DEBUG_ENABLED
 });
 
-const redisClient = createRedisClient();
+const redisClient = createRedisClient(getEnvRedisConfig(), 'env');
 const settingsCache = createSettingsCache({
     Settings,
-    redisClient
+    redisClient,
+    getRedisClient
 });
 bindSettingsInvalidation(Settings, settingsCache);
+
+const REDIS_SETTINGS_KEYS = [
+    'redisEnabled',
+    'redisUrl',
+    'redisHost',
+    'redisPort',
+    'redisDb',
+    'redisUsername',
+    'redisPassword',
+    'redisTls',
+    'redisSessionPrefix'
+];
+
+async function loadRedisConfigFromSettings() {
+    const rows = await Settings.findAll({
+        where: { key: REDIS_SETTINGS_KEYS }
+    });
+    const map = {};
+    rows.forEach((row) => {
+        if (!row || !row.key) return;
+        map[row.key] = row.value;
+    });
+    const hasAny = REDIS_SETTINGS_KEYS.some((key) => map[key] !== undefined && map[key] !== null && String(map[key]).trim() !== '');
+    if (!hasAny) return null;
+    return normalizeRedisConfig({
+        enabled: map.redisEnabled,
+        url: map.redisUrl,
+        host: map.redisHost,
+        port: map.redisPort,
+        db: map.redisDb,
+        username: map.redisUsername,
+        password: map.redisPassword,
+        tls: map.redisTls,
+        sessionPrefix: map.redisSessionPrefix
+    }, { fallbackToEnv: false });
+}
 
 const { loginLimiter } = bootstrapApp({
     app,
@@ -358,6 +403,12 @@ const legacyRouteContextData = {
     loginLimiter,
     connectorConnections,
     jobQueue,
+    getRedisClient,
+    reconfigureRedis,
+    testRedisConnection,
+    getRedisRuntimeInfo,
+    normalizeRedisConfig,
+    getEnvRedisConfig,
     ...legacyHelpers
 };
 
@@ -390,6 +441,23 @@ registerOAuthRoutes({
 registerAdminCoreRoutes(legacyRouteContext);
 
 registerAdminConnectorsOverviewRoutes(legacyRouteContext);
+
+loadRedisConfigFromSettings().then(async (storedRedisConfig) => {
+    if (!storedRedisConfig) return;
+    const envRedisEnabled = ['1', 'true', 'yes', 'on'].includes(String(process.env.REDIS_ENABLED || '').trim().toLowerCase());
+    if (envRedisEnabled) {
+        bootInfo('redis env configuration detected; skipping auto-apply from database settings');
+        return;
+    }
+    const applyResult = await reconfigureRedis(storedRedisConfig, 'settings');
+    if (!applyResult.ok && storedRedisConfig.enabled) {
+        bootWarn('redis settings from database failed to apply error=%s', applyResult.error || 'unknown');
+    } else {
+        bootInfo('redis configuration source set to settings enabled=%s', applyResult.enabled ? 'true' : 'false');
+    }
+}).catch((error) => {
+    bootWarn('failed to load redis settings from database error=%s', error.message || error);
+});
 
 registerAccountRoutes({
     app,

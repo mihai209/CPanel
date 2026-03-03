@@ -1,4 +1,4 @@
-function createSettingsCache({ Settings, redisClient = null } = {}) {
+function createSettingsCache({ Settings, redisClient = null, getRedisClient = null } = {}) {
     const memoryTtlMs = Math.max(1000, Number.parseInt(process.env.SETTINGS_CACHE_TTL_MS || '5000', 10) || 5000);
     const redisTtlSec = Math.max(1, Number.parseInt(process.env.SETTINGS_CACHE_REDIS_TTL_SEC || String(Math.ceil(memoryTtlMs / 1000)), 10) || Math.ceil(memoryTtlMs / 1000));
     const redisKey = String(process.env.SETTINGS_CACHE_KEY || 'cpanel:settings:all:v1');
@@ -8,6 +8,16 @@ function createSettingsCache({ Settings, redisClient = null } = {}) {
     let memoPromise = null;
 
     const nowMs = () => Date.now();
+    const resolveRedisClient = () => {
+        if (typeof getRedisClient === 'function') {
+            try {
+                return getRedisClient();
+            } catch {
+                return null;
+            }
+        }
+        return redisClient;
+    };
 
     const mapRows = (rows) => {
         const result = {};
@@ -32,9 +42,10 @@ function createSettingsCache({ Settings, redisClient = null } = {}) {
     };
 
     const getFromRedis = async () => {
-        if (!redisClient || !redisClient.isReady) return null;
+        const client = resolveRedisClient();
+        if (!client || !client.isReady) return null;
         try {
-            const raw = await redisClient.get(redisKey);
+            const raw = await client.get(redisKey);
             if (!raw) return null;
             const parsed = JSON.parse(raw);
             if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
@@ -45,9 +56,10 @@ function createSettingsCache({ Settings, redisClient = null } = {}) {
     };
 
     const writeToRedis = async (value) => {
-        if (!redisClient || !redisClient.isReady) return;
+        const client = resolveRedisClient();
+        if (!client || !client.isReady) return;
         try {
-            await redisClient.set(redisKey, JSON.stringify(value), { EX: redisTtlSec });
+            await client.set(redisKey, JSON.stringify(value), { EX: redisTtlSec });
         } catch {
             // ignore cache write errors
         }
@@ -87,9 +99,10 @@ function createSettingsCache({ Settings, redisClient = null } = {}) {
         memoValue = null;
         memoExpiresAt = 0;
         memoPromise = null;
-        if (!redisClient || !redisClient.isReady) return;
+        const client = resolveRedisClient();
+        if (!client || !client.isReady) return;
         try {
-            await redisClient.del(redisKey);
+            await client.del(redisKey);
         } catch {
             // ignore
         }

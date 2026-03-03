@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= (settings.brandName || 'CPanel').toUpperCase() %> - Redis</title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <%- include('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3 flex-wrap">
+                    <h4 class="mb-0 text-light fw-normal">Redis</h4>
+                    <small class="text-muted">Configure Redis directly from panel settings (no .env edit required).</small>
+                </div>
+                <div class="breadcrumb-admin">
+                    <a href="/admin/overview">Admin</a>
+                    <span class="mx-2">&gt;</span>
+                    <span class="text-light">Redis</span>
+                </div>
+            </div>
+
+            <div class="container-fluid py-4 px-lg-4">
+                <% const runtime = redisRuntime || {}; %>
+                <% const config = redisConfig || {}; %>
+                <% const mode = String(config.mode || (config.url ? 'url' : 'host')).toLowerCase() === 'url' ? 'url' : 'host'; %>
+                <% const enabled = !!config.enabled; %>
+                <% const statusBadgeClass = runtime.ready ? 'bg-success bg-opacity-10 text-success border border-success border-opacity-25' : runtime.enabled ? 'bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25' : 'bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25'; %>
+                <% const statusLabel = runtime.ready ? 'Connected' : runtime.enabled ? 'Enabled (not connected)' : 'Disabled'; %>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-lg-4">
+                        <div class="card border-0 shadow-sm h-100" style="background:#141419;">
+                            <div class="card-body">
+                                <div class="small text-muted text-uppercase mb-2">Runtime Status</div>
+                                <span class="badge <%= statusBadgeClass %>"><%= statusLabel %></span>
+                                <div class="small text-muted mt-3">Source: <span class="text-light"><%= runtime.source || 'unknown' %></span></div>
+                                <div class="small text-muted">Last Error: <span class="text-warning"><%= runtime.lastError || 'none' %></span></div>
+                                <div class="small text-muted">Password Saved: <span class="text-light"><%= runtime.config && runtime.config.hasPassword ? 'yes' : 'no' %></span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card border-0 shadow-sm h-100" style="background:#141419;">
+                            <div class="card-body">
+                                <div class="small text-muted text-uppercase mb-2">Stored Config</div>
+                                <div class="small text-muted">Using DB Settings: <span class="text-light"><%= hasStoredRedisConfig ? 'yes' : 'no (env fallback)' %></span></div>
+                                <div class="small text-muted">Mode: <span class="text-light"><%= mode.toUpperCase() %></span></div>
+                                <div class="small text-muted">Endpoint: <span class="text-light"><%= mode === 'url' ? (config.url || '-') : `${config.host || '127.0.0.1'}:${config.port || 6379}` %></span></div>
+                                <div class="small text-muted">DB: <span class="text-light"><%= Number.isFinite(Number(config.db)) ? Number(config.db) : 0 %></span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card border-0 shadow-sm h-100" style="background:#141419;">
+                            <div class="card-body">
+                                <div class="small text-muted text-uppercase mb-2">Quick Connect</div>
+                                <div class="small text-muted mb-2">Pick a Redis server created in CPanel and auto-fill host/port.</div>
+                                <select id="redisSuggestionSelect" class="form-select form-select-sm" style="background:#1a1a20;border-color:#2d2d35;color:#fff;">
+                                    <option value="">Select Redis server...</option>
+                                    <% (redisSuggestions || []).forEach((entry) => { %>
+                                        <option value="<%= entry.id %>" data-host="<%= entry.host %>" data-port="<%= entry.port %>"><%= entry.label %></option>
+                                    <% }) %>
+                                </select>
+                                <button id="applyRedisSuggestionBtn" type="button" class="btn btn-sm btn-outline-info mt-2" <%= (redisSuggestions || []).length ? '' : 'disabled' %>>
+                                    <i class="bi bi-magic me-1"></i>Use Selected
+                                </button>
+                                <a href="/admin/servers/create" class="btn btn-sm btn-outline-light mt-2 ms-1">
+                                    <i class="bi bi-plus-circle me-1"></i>Create Redis Server
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm" style="background:#141419;">
+                    <div class="card-header border-bottom border-secondary border-opacity-10 bg-transparent py-3">
+                        <h5 class="card-title mb-0 fs-6 fw-bold text-light">
+                            <i class="bi bi-hdd-network me-2"></i>Redis Configuration
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="/admin/redis" id="redisConfigForm">
+                            <input type="hidden" id="redisKeepPassword" name="redisKeepPassword" value="1">
+
+                            <div class="mb-3 form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="redisEnabledSwitch" name="redisEnabled" value="1" <%= enabled ? 'checked' : '' %>>
+                                <label class="form-check-label text-light" for="redisEnabledSwitch">Enable Redis integration</label>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Connection Mode</label>
+                                <div class="d-flex gap-3 flex-wrap">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="redisMode" id="redisModeHost" value="host" <%= mode === 'host' ? 'checked' : '' %>>
+                                        <label class="form-check-label text-light" for="redisModeHost">Host + Port</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="redisMode" id="redisModeUrl" value="url" <%= mode === 'url' ? 'checked' : '' %>>
+                                        <label class="form-check-label text-light" for="redisModeUrl">Redis URL</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="redisUrlGroup" class="mb-3" style="display:<%= mode === 'url' ? 'block' : 'none' %>;">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Redis URL</label>
+                                <input type="text" class="form-control" name="redisUrl" id="redisUrl" placeholder="redis://:password@127.0.0.1:6379/0" value="<%= config.url || '' %>" style="background:#1a1a20;border-color:#2d2d35;color:#fff;">
+                            </div>
+
+                            <div id="redisHostGroup" style="display:<%= mode === 'host' ? 'block' : 'none' %>;">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Host</label>
+                                        <input type="text" class="form-control" name="redisHost" id="redisHost" value="<%= config.host || '127.0.0.1' %>" style="background:#1a1a20;border-color:#2d2d35;color:#fff;">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Port</label>
+                                        <input type="number" min="1" max="65535" class="form-control" name="redisPort" id="redisPort" value="<%= Number.isFinite(Number(config.port)) ? Number(config.port) : 6379 %>" style="background:#1a1a20;border-color:#2d2d35;color:#fff;">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">DB</label>
+                                        <input type="number" min="0" max="16" class="form-control" name="redisDb" id="redisDb" value="<%= Number.isFinite(Number(config.db)) ? Number(config.db) : 0 %>" style="background:#1a1a20;border-color:#2d2d35;color:#fff;">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Username (optional)</label>
+                                        <input type="text" class="form-control" name="redisUsername" id="redisUsername" value="<%= config.username || '' %>" style="background:#1a1a20;border-color:#2d2d35;color:#fff;">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Password (optional)</label>
+                                        <input type="password" class="form-control" name="redisPassword" id="redisPassword" placeholder="Leave empty to keep current" style="background:#1a1a20;border-color:#2d2d35;color:#fff;">
+                                        <div class="form-check mt-2">
+                                            <input class="form-check-input" type="checkbox" id="redisClearPassword" name="redisClearPassword" value="1">
+                                            <label class="form-check-label small text-muted" for="redisClearPassword">Clear saved password</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mt-1">
+                                <div class="col-md-6">
+                                    <label class="form-label text-muted small text-uppercase fw-bold">Session Prefix</label>
+                                    <input type="text" class="form-control" name="redisSessionPrefix" id="redisSessionPrefix" value="<%= config.sessionPrefix || 'cpanel:sess:' %>" style="background:#1a1a20;border-color:#2d2d35;color:#fff;">
+                                    <small class="text-muted">Used for Redis-backed session keys.</small>
+                                </div>
+                                <div class="col-md-6 d-flex align-items-end">
+                                    <div class="form-check form-switch mb-3">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="redisTls" name="redisTls" value="1" <%= config.tls ? 'checked' : '' %>>
+                                        <label class="form-check-label text-light" for="redisTls">TLS</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info border-0 bg-info bg-opacity-10 text-info mt-3 mb-3">
+                                <i class="bi bi-info-circle me-2"></i>
+                                Redis config is stored in database settings and auto-loaded at startup. If you also use Redis sessions,
+                                changing endpoints may require panel restart for session store rebinding.
+                            </div>
+
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-save me-1"></i>Save & Apply
+                                </button>
+                                <button type="submit" formaction="/admin/redis/test" class="btn btn-outline-success">
+                                    <i class="bi bi-plug me-1"></i>Test Connection
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <%- include('../partials/footer') %>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
+    <script>
+        (function () {
+            const modeHost = document.getElementById('redisModeHost');
+            const modeUrl = document.getElementById('redisModeUrl');
+            const urlGroup = document.getElementById('redisUrlGroup');
+            const hostGroup = document.getElementById('redisHostGroup');
+            const keepPasswordInput = document.getElementById('redisKeepPassword');
+            const passwordInput = document.getElementById('redisPassword');
+            const clearPasswordInput = document.getElementById('redisClearPassword');
+
+            function syncModeUi() {
+                const useUrl = !!(modeUrl && modeUrl.checked);
+                if (urlGroup) urlGroup.style.display = useUrl ? 'block' : 'none';
+                if (hostGroup) hostGroup.style.display = useUrl ? 'none' : 'block';
+            }
+
+            if (modeHost) modeHost.addEventListener('change', syncModeUi);
+            if (modeUrl) modeUrl.addEventListener('change', syncModeUi);
+            syncModeUi();
+
+            if (passwordInput && keepPasswordInput) {
+                passwordInput.addEventListener('input', () => {
+                    keepPasswordInput.value = passwordInput.value.trim() ? '0' : '1';
+                });
+            }
+
+            if (clearPasswordInput && keepPasswordInput && passwordInput) {
+                clearPasswordInput.addEventListener('change', () => {
+                    if (clearPasswordInput.checked) {
+                        keepPasswordInput.value = '0';
+                        passwordInput.value = '';
+                    } else if (!passwordInput.value.trim()) {
+                        keepPasswordInput.value = '1';
+                    }
+                });
+            }
+
+            const suggestionSelect = document.getElementById('redisSuggestionSelect');
+            const applySuggestionBtn = document.getElementById('applyRedisSuggestionBtn');
+            const hostInput = document.getElementById('redisHost');
+            const portInput = document.getElementById('redisPort');
+
+            if (applySuggestionBtn && suggestionSelect) {
+                applySuggestionBtn.addEventListener('click', () => {
+                    const selected = suggestionSelect.options[suggestionSelect.selectedIndex];
+                    if (!selected) return;
+
+                    const host = String(selected.getAttribute('data-host') || '').trim();
+                    const port = String(selected.getAttribute('data-port') || '').trim();
+                    if (!host) return;
+
+                    if (modeHost) {
+                        modeHost.checked = true;
+                        syncModeUi();
+                    }
+                    if (hostInput) hostInput.value = host;
+                    if (portInput && port) portInput.value = port;
+                });
+            }
+        })();
+    </script>
+</body>
+
+</html>

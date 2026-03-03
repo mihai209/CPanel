@@ -443,17 +443,21 @@ function normalizeDashboardSecurityAlerts(raw) {
 // Dashboard (Home)
 app.get('/', requireAuth, async (req, res) => {
     try {
+        const isAdminDashboard = Boolean(req.session.user && req.session.user.isAdmin);
+        const showOthersServers = isAdminDashboard && ['1', 'true', 'yes', 'on'].includes(String(req.query.others || '').trim().toLowerCase());
+
+        const membershipRows = ServerSubuser
+            ? await ServerSubuser.findAll({
+                where: { userId: req.session.user.id },
+                attributes: ['serverId']
+            })
+            : [];
+        const membershipServerIds = membershipRows
+            .map((row) => Number.parseInt(row.serverId, 10))
+            .filter((id) => Number.isInteger(id) && id > 0);
+
         let where = {};
-        if (!(req.session.user && req.session.user.isAdmin)) {
-            const membershipRows = ServerSubuser
-                ? await ServerSubuser.findAll({
-                    where: { userId: req.session.user.id },
-                    attributes: ['serverId']
-                })
-                : [];
-            const membershipServerIds = membershipRows
-                .map((row) => Number.parseInt(row.serverId, 10))
-                .filter((id) => Number.isInteger(id) && id > 0);
+        if (!(isAdminDashboard && showOthersServers)) {
             if (membershipServerIds.length > 0) {
                 where = {
                     [Op.or]: [
@@ -465,6 +469,7 @@ app.get('/', requireAuth, async (req, res) => {
                 where = { ownerId: req.session.user.id };
             }
         }
+
         const servers = await Server.findAll({
             where,
             order: [['id', 'DESC']]
@@ -484,6 +489,8 @@ app.get('/', requireAuth, async (req, res) => {
         res.render('dashboard', {
             user: req.session.user,
             servers,
+            isAdminDashboard,
+            showOthersServers,
             openIncidents,
             pendingMaintenance,
             openSecurityAlerts,

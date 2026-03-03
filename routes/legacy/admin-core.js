@@ -6,6 +6,303 @@ function registerAdminCoreRoutes(ctx) {
             // Ignore non-writable globals (e.g. crypto on newer Node versions).
         }
     }
+const REDIS_SETTING_KEYS = [
+    'redisEnabled',
+    'redisUrl',
+    'redisHost',
+    'redisPort',
+    'redisDb',
+    'redisUsername',
+    'redisPassword',
+    'redisTls',
+    'redisSessionPrefix'
+];
+
+const toRedisBoolString = (value) => (
+    value === true || value === 'true' || value === '1' || value === 1 || value === 'on'
+        ? 'true'
+        : 'false'
+);
+
+const toRedisInt = (value, fallback, min, max) => {
+    const parsed = Number.parseInt(String(value === undefined || value === null ? '' : value).trim(), 10);
+    if (!Number.isInteger(parsed)) return fallback;
+    return Math.min(max, Math.max(min, parsed));
+};
+
+const normalizeRedisSessionPrefix = (value) => {
+    const normalized = String(value || '').trim();
+    return normalized || 'cpanel:sess:';
+};
+
+const getStoredRedisConfig = async () => {
+    const rows = await Settings.findAll({ where: { key: REDIS_SETTING_KEYS } });
+    const map = {};
+    rows.forEach((row) => {
+        if (!row || !row.key) return;
+        map[row.key] = row.value;
+    });
+
+    const hasAny = REDIS_SETTING_KEYS.some((key) => map[key] !== undefined && map[key] !== null && String(map[key]).trim() !== '');
+    if (!hasAny) return null;
+
+    if (typeof normalizeRedisConfig === 'function') {
+        return normalizeRedisConfig({
+            enabled: map.redisEnabled,
+            url: map.redisUrl,
+            host: map.redisHost,
+            port: map.redisPort,
+            db: map.redisDb,
+            username: map.redisUsername,
+            password: map.redisPassword,
+            tls: map.redisTls,
+            sessionPrefix: map.redisSessionPrefix
+        }, { fallbackToEnv: false });
+    }
+
+    return {
+        enabled: toRedisBoolString(map.redisEnabled) === 'true',
+        url: String(map.redisUrl || '').trim(),
+        host: String(map.redisHost || '127.0.0.1').trim(),
+        port: toRedisInt(map.redisPort, 6379, 1, 65535),
+        db: toRedisInt(map.redisDb, 0, 0, 16),
+        username: String(map.redisUsername || '').trim(),
+        password: String(map.redisPassword || '').trim(),
+        tls: toRedisBoolString(map.redisTls) === 'true',
+        sessionPrefix: normalizeRedisSessionPrefix(map.redisSessionPrefix),
+        mode: String(map.redisUrl || '').trim() ? 'url' : 'host'
+    };
+};
+
+const persistRedisConfig = async (config) => {
+    const payload = {
+        redisEnabled: toRedisBoolString(config && config.enabled),
+        redisUrl: String(config && config.url || '').trim(),
+        redisHost: String(config && config.host || '127.0.0.1').trim(),
+        redisPort: String(toRedisInt(config && config.port, 6379, 1, 65535)),
+        redisDb: String(toRedisInt(config && config.db, 0, 0, 16)),
+        redisUsername: String(config && config.username || '').trim(),
+        redisPassword: String(config && config.password || '').trim(),
+        redisTls: toRedisBoolString(config && config.tls),
+        redisSessionPrefix: normalizeRedisSessionPrefix(config && config.sessionPrefix)
+    };
+
+    for (const [key, value] of Object.entries(payload)) {
+        await Settings.upsert({ key, value });
+    }
+    return payload;
+};
+
+const buildRedisConfigFromBody = (body, existingConfig = null) => {
+    const existing = existingConfig && typeof existingConfig === 'object' ? existingConfig : {};
+    const keepExistingPassword = String(body.redisKeepPassword || '1').trim() !== '0';
+    const clearPassword = toRedisBoolString(body.redisClearPassword) === 'true';
+    const passwordInput = String(body.redisPassword || '').trim();
+    let password = passwordInput;
+
+    if (!passwordInput && keepExistingPassword) {
+        password = String(existing.password || '').trim();
+    }
+    if (clearPassword) {
+        password = '';
+    }
+
+    const payload = {
+        enabled: body.redisEnabled,
+        url: body.redisUrl,
+        host: body.redisHost,
+        port: body.redisPort,
+        db: body.redisDb,
+        username: body.redisUsername,
+        password,
+        tls: body.redisTls,
+        sessionPrefix: body.redisSessionPrefix
+    };
+
+    if (typeof normalizeRedisConfig === 'function') {
+        return normalizeRedisConfig(payload, { fallbackToEnv: false });
+    }
+
+    const url = String(payload.url || '').trim();
+    return {
+        enabled: toRedisBoolString(payload.enabled) === 'true',
+        url,
+        host: String(payload.host || '127.0.0.1').trim(),
+        port: toRedisInt(payload.port, 6379, 1, 65535),
+        db: toRedisInt(payload.db, 0, 0, 16),
+        username: String(payload.username || '').trim(),
+        password: String(payload.password || '').trim(),
+        tls: toRedisBoolString(payload.tls) === 'true',
+        sessionPrefix: normalizeRedisSessionPrefix(payload.sessionPrefix),
+        mode: url ? 'url' : 'host'
+    };
+};
+
+const findRedisServerSuggestions = async () => {
+    try {
+        const servers = await Server.findAll({
+            attributes: ['id', 'name', 'containerId'],
+            include: [
+                { model: Image, as: 'image', attributes: ['name', 'dockerImage'] },
+                {
+                    model: Allocation,
+                    as: 'allocation',
+                    attributes: ['ip', 'port'],
+                    include: [{ model: Connector, as: 'connector', attributes: ['fqdn'] }]
+                }
+            ],
+            order: [['createdAt', 'DESC']]
+        });
+
+        return servers
+            .map((server) => {
+                const imageName = String(server && server.image && server.image.name || '').toLowerCase();
+                const dockerImage = String(server && server.image && server.image.dockerImage || '').toLowerCase();
+                const isRedis = imageName.includes('redis') || dockerImage.includes('redis');
+                if (!isRedis) return null;
+
+                const allocationIp = String(server && server.allocation && server.allocation.ip || '').trim();
+                const connectorFqdn = String(
+                    server && server.allocation && server.allocation.connector && server.allocation.connector.fqdn || ''
+                ).trim();
+                const host = connectorFqdn || allocationIp;
+                const port = Number.parseInt(server && server.allocation && server.allocation.port, 10) || 6379;
+                if (!host) return null;
+
+                return {
+                    id: server.id,
+                    name: server.name,
+                    containerId: server.containerId,
+                    host,
+                    port,
+                    label: `${server.name} (${host}:${port})`
+                };
+            })
+            .filter(Boolean)
+            .slice(0, 50);
+    } catch {
+        return [];
+    }
+};
+
+// Admin Redis
+app.get('/admin/redis', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const storedConfig = await getStoredRedisConfig();
+        const runtimeInfo = typeof getRedisRuntimeInfo === 'function'
+            ? getRedisRuntimeInfo()
+            : { enabled: false, ready: false, source: 'unknown', lastError: '', config: {} };
+        const fallbackConfig = typeof getEnvRedisConfig === 'function'
+            ? getEnvRedisConfig()
+            : {
+                enabled: false,
+                url: '',
+                host: '127.0.0.1',
+                port: 6379,
+                db: 0,
+                username: '',
+                password: '',
+                tls: false,
+                sessionPrefix: 'cpanel:sess:',
+                mode: 'host'
+            };
+        const redisConfig = storedConfig || fallbackConfig;
+        const suggestions = await findRedisServerSuggestions();
+
+        res.render('admin/redis', {
+            user: req.session.user,
+            path: '/admin/redis',
+            title: 'Redis',
+            success: req.query.success || null,
+            warning: req.query.warning || null,
+            error: req.query.error || null,
+            redisConfig,
+            redisRuntime: runtimeInfo,
+            redisSuggestions: suggestions,
+            hasStoredRedisConfig: Boolean(storedConfig),
+            nowMs: Date.now()
+        });
+    } catch (error) {
+        console.error('Error loading redis admin page:', error);
+        res.render('admin/redis', {
+            user: req.session.user,
+            path: '/admin/redis',
+            title: 'Redis',
+            success: null,
+            warning: null,
+            error: 'Failed to load Redis settings.',
+            redisConfig: {
+                enabled: false,
+                url: '',
+                host: '127.0.0.1',
+                port: 6379,
+                db: 0,
+                username: '',
+                password: '',
+                tls: false,
+                sessionPrefix: 'cpanel:sess:',
+                mode: 'host'
+            },
+            redisRuntime: { enabled: false, ready: false, source: 'unknown', lastError: '', config: {} },
+            redisSuggestions: [],
+            hasStoredRedisConfig: false,
+            nowMs: Date.now()
+        });
+    }
+});
+
+app.post('/admin/redis', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const existingConfig = await getStoredRedisConfig();
+        const nextConfig = buildRedisConfigFromBody(req.body, existingConfig);
+        await persistRedisConfig(nextConfig);
+
+        const envRedisEnabled = ['1', 'true', 'yes', 'on'].includes(String(process.env.REDIS_ENABLED || '').trim().toLowerCase());
+        if (envRedisEnabled) {
+            return res.redirect(
+                '/admin/redis?success=' + encodeURIComponent('Redis settings saved to database.') +
+                '&warning=' + encodeURIComponent('Redis is currently booted from environment config. Restart panel or disable REDIS_ENABLED in .env to apply DB-managed Redis.')
+            );
+        }
+
+        if (typeof reconfigureRedis === 'function') {
+            const applyResult = await reconfigureRedis(nextConfig, 'settings');
+            if (nextConfig.enabled && !applyResult.ok) {
+                return res.redirect(
+                    '/admin/redis?success=' + encodeURIComponent('Redis settings saved to database.') +
+                    '&warning=' + encodeURIComponent(`Redis apply warning: ${applyResult.error || 'connection timeout'}`)
+                );
+            }
+        }
+
+        return res.redirect('/admin/redis?success=' + encodeURIComponent('Redis settings saved and applied.'));
+    } catch (error) {
+        console.error('Error saving redis settings:', error);
+        return res.redirect('/admin/redis?error=' + encodeURIComponent('Failed to save Redis settings.'));
+    }
+});
+
+app.post('/admin/redis/test', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const existingConfig = await getStoredRedisConfig();
+        const nextConfig = buildRedisConfigFromBody(req.body, existingConfig);
+
+        if (typeof testRedisConnection !== 'function') {
+            return res.redirect('/admin/redis?error=' + encodeURIComponent('Redis test runtime is not available.'));
+        }
+
+        const testResult = await testRedisConnection(nextConfig);
+        if (!testResult.ok) {
+            return res.redirect('/admin/redis?error=' + encodeURIComponent(`Redis test failed: ${testResult.message}`));
+        }
+
+        return res.redirect('/admin/redis?success=' + encodeURIComponent(`Redis test success: ${testResult.message}`));
+    } catch (error) {
+        console.error('Error testing redis connection:', error);
+        return res.redirect('/admin/redis?error=' + encodeURIComponent('Failed to test Redis connection.'));
+    }
+});
+
 // Admin Locations
 app.get('/admin/locations', requireAuth, requireAdmin, async (req, res) => {
     try {
