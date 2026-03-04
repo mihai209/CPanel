@@ -6502,12 +6502,22 @@ app.get('/server/:containerId/activity', requireAuth, async (req, res) => {
             return res.redirect('/server/no-permissions');
         }
 
+        const serverPathBase = `/server/${server.containerId}`;
+        const serverCreatedAt = (server.createdAt instanceof Date && !Number.isNaN(server.createdAt.getTime()))
+            ? server.createdAt
+            : new Date(0);
         const logs = await AuditLog.findAll({
             where: {
-                [Op.or]: [
-                    { targetType: 'server', targetId: String(server.id) },
-                    { targetId: String(server.id) },
-                    { path: { [Op.like]: `%/server/${server.containerId}%` } }
+                [Op.and]: [
+                    { createdAt: { [Op.gte]: serverCreatedAt } },
+                    {
+                        [Op.or]: [
+                            { targetType: 'server', targetId: String(server.id) },
+                            { path: serverPathBase },
+                            { path: { [Op.like]: `${serverPathBase}/%` } },
+                            { path: { [Op.like]: `${serverPathBase}?%` } }
+                        ]
+                    }
                 ]
             },
             include: [{ model: User, as: 'actor', attributes: ['id', 'username', 'email'], required: false }],
@@ -6539,11 +6549,15 @@ app.get('/server/:containerId/debug-logs', requireAuth, async (req, res) => {
             return res.redirect('/server/no-permissions');
         }
 
+        const serverCreatedAt = (server.createdAt instanceof Date && !Number.isNaN(server.createdAt.getTime()))
+            ? server.createdAt
+            : new Date(0);
         const rawLogs = await AuditLog.findAll({
             where: {
                 targetType: 'server',
                 targetId: String(server.id),
-                action: { [Op.like]: 'server:debug.%' }
+                action: { [Op.like]: 'server:debug.%' },
+                createdAt: { [Op.gte]: serverCreatedAt }
             },
             order: [['createdAt', 'DESC']],
             limit: 120
