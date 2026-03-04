@@ -125,6 +125,24 @@
                                                             <div class="col-md-4">
                                                                 <div class="form-check form-switch">
                                                                     <input class="form-check-input" type="checkbox"
+                                                                        id="featureAbuseScoreEnabled"
+                                                                        name="featureAbuseScoreEnabled" value="1"
+                                                                        <%= String(settings.featureAbuseScoreEnabled || 'false') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="featureAbuseScoreEnabled">Abuse Score Engine</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                        id="featureServiceHealthChecksEnabled"
+                                                                        name="featureServiceHealthChecksEnabled" value="1"
+                                                                        <%= String(settings.featureServiceHealthChecksEnabled || 'false') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="featureServiceHealthChecksEnabled">Service Health Checks</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
                                                                         id="featureAfkRewardsEnabled"
                                                                         name="featureAfkRewardsEnabled" value="1"
                                                                         <%= String(settings.featureAfkRewardsEnabled || 'false') === 'true' ? 'checked' : '' %>>
@@ -215,6 +233,24 @@
                                                                 <input type="number" min="30" max="86400" name="antiMinerCooldownSeconds" class="form-control"
                                                                     style="background-color: #1a1a20; border-color: #2d2d35;"
                                                                     value="<%= settings.antiMinerCooldownSeconds || '600' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Abuse Window (hours)</label>
+                                                                <input type="number" min="1" max="720" name="abuseScoreWindowHours" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.abuseScoreWindowHours || '72' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Abuse Alert Threshold</label>
+                                                                <input type="number" min="1" max="1000" name="abuseScoreAlertThreshold" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.abuseScoreAlertThreshold || '80' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Health Check Interval (seconds)</label>
+                                                                <input type="number" min="30" max="86400" name="serviceHealthCheckIntervalSeconds" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.serviceHealthCheckIntervalSeconds || '300' %>">
                                                             </div>
                                                             <div class="col-md-4">
                                                                 <label class="form-label text-muted small text-uppercase fw-bold">AFK Timer Coins</label>

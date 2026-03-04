@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= (settings.brandName || 'CPanel').toUpperCase() %> - Abuse Scores</title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<%- include('../partials/error-modal') %>
+<div class="admin-wrapper">
+    <%- include('../partials/admin-sidebar') %>
+    <div class="admin-content">
+        <div class="admin-header">
+            <div>
+                <h4 class="mb-0 text-light fw-normal">Abuse Score Engine</h4>
+                <small class="text-muted">Weighted risk scoring based on security/debug activity.</small>
+            </div>
+            <div class="breadcrumb-admin">
+                <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span class="text-light">Abuse Scores</span>
+            </div>
+        </div>
+
+        <div class="container-fluid py-4 px-lg-4">
+            <% if (success) { %><div class="alert alert-success border-0 bg-success bg-opacity-10 text-success"><%= success %></div><% } %>
+            <% if (error) { %><div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger"><%= error %></div><% } %>
+
+            <div class="card border-0 shadow-sm mb-3" style="background-color:#141419;">
+                <div class="card-body d-flex flex-wrap gap-3 justify-content-between align-items-center">
+                    <div>
+                        <div class="text-muted small">Window</div>
+                        <div class="text-light fw-semibold"><%= report.windowHours %> hours</div>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Alert Threshold</div>
+                        <div class="text-light fw-semibold"><%= report.threshold %> points</div>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Flagged Servers</div>
+                        <div class="text-light fw-semibold"><%= report.flaggedServers %></div>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Flagged Users</div>
+                        <div class="text-light fw-semibold"><%= report.flaggedUsers %></div>
+                    </div>
+                    <div>
+                        <div class="text-muted small">Generated</div>
+                        <div class="text-light fw-semibold"><%= new Date(report.generatedAtMs || Date.now()).toLocaleString() %></div>
+                    </div>
+                </div>
+            </div>
+
+            <% if (!report.enabled) { %>
+                <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning">Abuse score engine is disabled in admin settings.</div>
+            <% } %>
+
+            <div class="row g-3">
+                <div class="col-xl-6">
+                    <div class="card border-0 shadow-sm" style="background-color:#141419;">
+                        <div class="card-body">
+                            <h5 class="text-light mb-3"><i class="bi bi-hdd-rack me-2"></i>Top Servers</h5>
+                            <div class="table-responsive">
+                                <table class="table table-dark table-sm mb-0 align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Server</th>
+                                            <th>Score</th>
+                                            <th>Hits</th>
+                                            <th>Recent</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    <% (report.topServers || []).forEach((item) => { %>
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold"><%= item.serverName %></div>
+                                                <% if (item.containerId) { %><div class="text-muted small">/<%= item.containerId %></div><% } %>
+                                            </td>
+                                            <td>
+                                                <span class="badge <%= item.score >= report.threshold ? 'bg-danger' : (item.score >= (report.threshold * 0.6) ? 'bg-warning text-dark' : 'bg-success') %>">
+                                                    <%= item.score %>
+                                                </span>
+                                            </td>
+                                            <td><%= item.hits %></td>
+                                            <td class="text-nowrap"><%= item.recentAtMs ? new Date(item.recentAtMs).toLocaleString() : '-' %></td>
+                                        </tr>
+                                    <% }) %>
+                                    <% if (!(report.topServers || []).length) { %>
+                                        <tr><td colspan="4" class="text-muted">No server abuse events in selected window.</td></tr>
+                                    <% } %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-6">
+                    <div class="card border-0 shadow-sm" style="background-color:#141419;">
+                        <div class="card-body">
+                            <h5 class="text-light mb-3"><i class="bi bi-people me-2"></i>Top Users</h5>
+                            <div class="table-responsive">
+                                <table class="table table-dark table-sm mb-0 align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>User</th>
+                                            <th>Score</th>
+                                            <th>Hits</th>
+                                            <th>Recent</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    <% (report.topUsers || []).forEach((item) => { %>
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold"><%= item.username %></div>
+                                                <% if (item.email) { %><div class="text-muted small"><%= item.email %></div><% } %>
+                                            </td>
+                                            <td>
+                                                <span class="badge <%= item.score >= report.threshold ? 'bg-danger' : (item.score >= (report.threshold * 0.6) ? 'bg-warning text-dark' : 'bg-success') %>">
+                                                    <%= item.score %>
+                                                </span>
+                                            </td>
+                                            <td><%= item.hits %></td>
+                                            <td class="text-nowrap"><%= item.recentAtMs ? new Date(item.recentAtMs).toLocaleString() : '-' %></td>
+                                        </tr>
+                                    <% }) %>
+                                    <% if (!(report.topUsers || []).length) { %>
+                                        <tr><td colspan="4" class="text-muted">No user abuse events in selected window.</td></tr>
+                                    <% } %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <%- include('../partials/footer') %>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
+</body>
+</html>

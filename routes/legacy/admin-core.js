@@ -243,6 +243,394 @@ const findRedisServerSuggestions = async () => {
     }
 };
 
+const SERVICE_HEALTH_HISTORY_KEY = 'serviceHealthChecksHistory';
+const SERVICE_HEALTH_HISTORY_LIMIT = 120;
+const ABUSE_ACTION_WEIGHTS = Object.freeze({
+    'server:security.anti_miner_suspend': 60,
+    'server.security.upload_miner_suspended': 55,
+    'server.security.upload_miner_blocked': 25,
+    'server:debug.crash': 20,
+    'server:debug.event.die': 12,
+    'server:debug.install_fail': 18,
+    'server:debug.connector_error': 10,
+    'server:action.command': 2
+});
+
+const parseJsonSafe = (raw, fallback) => {
+    if (!raw) return fallback;
+    try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        return parsed === undefined || parsed === null ? fallback : parsed;
+    } catch {
+        return fallback;
+    }
+};
+
+const resolveHealthStatus = (checks) => {
+    if (!Array.isArray(checks) || checks.length === 0) return 'unknown';
+    if (checks.some((item) => item.status === 'fail')) return 'fail';
+    if (checks.some((item) => item.status === 'warn')) return 'warn';
+    return 'ok';
+};
+
+const withTimeout = async (promise, timeoutMs, timeoutMessage) => {
+    let timer = null;
+    try {
+        return await Promise.race([
+            promise,
+            new Promise((_, reject) => {
+                timer = setTimeout(() => reject(new Error(timeoutMessage || 'Timeout')), timeoutMs);
+            })
+        ]);
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
+};
+
+const getServiceHealthHistory = async (limit = 30) => {
+    const row = await Settings.findByPk(SERVICE_HEALTH_HISTORY_KEY);
+    const parsed = parseJsonSafe(row && row.value ? row.value : '[]', []);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(0, Math.max(1, Math.min(500, Number.parseInt(limit, 10) || 30)));
+};
+
+const appendServiceHealthHistory = async (entry) => {
+    const existing = await getServiceHealthHistory(SERVICE_HEALTH_HISTORY_LIMIT);
+    const next = [entry, ...existing].slice(0, SERVICE_HEALTH_HISTORY_LIMIT);
+    await Settings.upsert({
+        key: SERVICE_HEALTH_HISTORY_KEY,
+        value: JSON.stringify(next)
+    });
+    return next;
+};
+
+const runServiceHealthSnapshot = async (settingsMap = {}) => {
+    const startedAt = Date.now();
+    const checks = [];
+
+    checks.push({
+        id: 'panel_runtime',
+        label: 'Panel Runtime',
+        status: process.uptime() > 0 ? 'ok' : 'warn',
+        message: `Uptime ${Math.round(process.uptime())}s`
+    });
+
+    try {
+        await withTimeout(sequelize.authenticate(), 4000, 'DB auth timed out');
+        checks.push({ id: 'database', label: 'Database', status: 'ok', message: 'Connection healthy' });
+    } catch (error) {
+        checks.push({ id: 'database', label: 'Database', status: 'fail', message: error.message || 'Database unreachable' });
+    }
+
+    const redisRuntime = typeof getRedisRuntimeInfo === 'function'
+        ? getRedisRuntimeInfo()
+        : { enabled: false, ready: false, source: 'none', lastError: '' };
+    if (redisRuntime.enabled) {
+        checks.push({
+            id: 'redis',
+            label: 'Redis',
+            status: redisRuntime.ready ? 'ok' : 'warn',
+            message: redisRuntime.ready ? `Ready (${redisRuntime.source || 'runtime'})` : (redisRuntime.lastError || 'Redis not ready')
+        });
+    } else {
+        checks.push({
+            id: 'redis',
+            label: 'Redis',
+            status: 'warn',
+            message: 'Redis disabled'
+        });
+    }
+
+    const connectors = await Connector.findAll({ attributes: ['id'] }).catch(() => []);
+    const connectorStatusMap = global.connectorStatus || {};
+    const onlineConnectors = Array.isArray(connectors)
+        ? connectors.filter((connector) => {
+            const data = connectorStatusMap[connector.id] || null;
+            if (!data || data.status !== 'online' || !data.lastSeen) return false;
+            return (Date.now() - new Date(data.lastSeen).getTime()) < 30000;
+        }).length
+        : 0;
+    checks.push({
+        id: 'connectors',
+        label: 'Connectors',
+        status: connectors.length > 0 && onlineConnectors === 0 ? 'warn' : 'ok',
+        message: `${onlineConnectors}/${connectors.length} online`
+    });
+
+    const [queueFailed, queueRetrying] = await Promise.all([
+        Job.count({ where: { status: 'failed' } }).catch(() => 0),
+        Job.count({ where: { status: 'retrying' } }).catch(() => 0)
+    ]);
+    checks.push({
+        id: 'job_queue',
+        label: 'Background Queue',
+        status: queueFailed > 0 ? 'warn' : 'ok',
+        message: `${queueRetrying} retrying, ${queueFailed} failed`
+    });
+
+    const snapshot = {
+        id: `hc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+        createdAtMs: Date.now(),
+        durationMs: Math.max(1, Date.now() - startedAt),
+        status: resolveHealthStatus(checks),
+        checks,
+        settings: {
+            enabled: String(settingsMap.featureServiceHealthChecksEnabled || 'false') === 'true',
+            intervalSeconds: Number.parseInt(settingsMap.serviceHealthCheckIntervalSeconds, 10) || 300
+        }
+    };
+    return snapshot;
+};
+
+const buildAbuseScoreReport = async (settingsMap = {}) => {
+    const enabled = String(settingsMap.featureAbuseScoreEnabled || 'false') === 'true';
+    const windowHours = Math.max(1, Math.min(720, Number.parseInt(settingsMap.abuseScoreWindowHours, 10) || 72));
+    const threshold = Math.max(1, Math.min(1000, Number.parseInt(settingsMap.abuseScoreAlertThreshold, 10) || 80));
+    const since = new Date(Date.now() - (windowHours * 60 * 60 * 1000));
+
+    const logs = await AuditLog.findAll({
+        where: {
+            createdAt: { [Op.gte]: since }
+        },
+        include: [
+            { model: User, as: 'actor', attributes: ['id', 'username'], required: false }
+        ],
+        order: [['createdAt', 'DESC']],
+        limit: 3000
+    }).catch(() => []);
+
+    const serverScores = new Map();
+    const userScores = new Map();
+
+    const pushHit = (container, key, base) => {
+        const current = container.get(key) || { score: 0, hits: 0, recentAt: 0, reasons: [] };
+        current.score += base.score;
+        current.hits += 1;
+        current.recentAt = Math.max(current.recentAt, base.ts);
+        if (base.reason) {
+            current.reasons.push(base.reason);
+            if (current.reasons.length > 6) current.reasons.shift();
+        }
+        container.set(key, current);
+    };
+
+    for (const row of logs) {
+        const action = String(row.action || '').trim();
+        const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+        const createdAtMs = new Date(row.createdAt).getTime();
+        let score = 0;
+
+        if (Object.prototype.hasOwnProperty.call(ABUSE_ACTION_WEIGHTS, action)) {
+            score += ABUSE_ACTION_WEIGHTS[action];
+        }
+        if (action.startsWith('billing.') && Number(metadata.amount || 0) > 0) {
+            score += 0.5; // billing churn contributes lightly
+        }
+        if (action === 'server:debug.event.die') {
+            const exitCode = Number.parseInt(metadata.exitCode, 10);
+            if (Number.isInteger(exitCode) && exitCode !== 0) {
+                score += Math.min(20, Math.max(0, exitCode));
+            }
+        }
+        if (action.includes('anti_miner') || action.includes('upload_miner')) {
+            score += 10;
+        }
+
+        if (score <= 0) continue;
+
+        const targetServerId = row.targetType === 'server' ? Number.parseInt(row.targetId, 10) : NaN;
+        if (Number.isInteger(targetServerId) && targetServerId > 0) {
+            pushHit(serverScores, targetServerId, {
+                score,
+                ts: createdAtMs,
+                reason: action
+            });
+        }
+
+        const actorUserId = Number.isInteger(Number(row.actorUserId)) ? Number(row.actorUserId) : 0;
+        if (actorUserId > 0) {
+            pushHit(userScores, actorUserId, {
+                score,
+                ts: createdAtMs,
+                reason: action
+            });
+        }
+    }
+
+    const [servers, users] = await Promise.all([
+        Server.findAll({ attributes: ['id', 'name', 'containerId', 'ownerId'] }),
+        User.findAll({ attributes: ['id', 'username', 'email'] })
+    ]);
+    const serverMap = new Map(servers.map((server) => [Number(server.id), server]));
+    const userMap = new Map(users.map((user) => [Number(user.id), user]));
+
+    const topServers = Array.from(serverScores.entries())
+        .map(([serverId, data]) => {
+            const server = serverMap.get(Number(serverId));
+            return {
+                serverId: Number(serverId),
+                score: Math.round((data.score || 0) * 10) / 10,
+                hits: data.hits || 0,
+                recentAtMs: data.recentAt || 0,
+                reasons: data.reasons || [],
+                serverName: server ? server.name : `Server #${serverId}`,
+                containerId: server && server.containerId ? server.containerId : null,
+                ownerId: server ? Number(server.ownerId || 0) : 0
+            };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 100);
+
+    const topUsers = Array.from(userScores.entries())
+        .map(([userId, data]) => {
+            const user = userMap.get(Number(userId));
+            return {
+                userId: Number(userId),
+                score: Math.round((data.score || 0) * 10) / 10,
+                hits: data.hits || 0,
+                recentAtMs: data.recentAt || 0,
+                reasons: data.reasons || [],
+                username: user ? user.username : `User #${userId}`,
+                email: user ? user.email : null
+            };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 100);
+
+    return {
+        enabled,
+        windowHours,
+        threshold,
+        generatedAtMs: Date.now(),
+        topServers,
+        topUsers,
+        flaggedServers: topServers.filter((entry) => entry.score >= threshold).length,
+        flaggedUsers: topUsers.filter((entry) => entry.score >= threshold).length
+    };
+};
+
+const buildForecastingReport = async (settingsMap = {}) => {
+    const enabled = String(settingsMap.featureQuotaForecastingEnabled || 'true') === 'true';
+    const lookbackDays = 30;
+    const since = new Date(Date.now() - (lookbackDays * 24 * 60 * 60 * 1000));
+    const economyUnit = String(settingsMap.economyUnit || 'Coins').trim() || 'Coins';
+
+    const [users, servers, billingLogs] = await Promise.all([
+        User.findAll({ attributes: ['id', 'username', 'coins', 'isSuspended'] }),
+        Server.findAll({ attributes: ['id', 'ownerId', 'memory', 'cpu', 'disk'] }),
+        AuditLog.findAll({
+            where: {
+                action: { [Op.like]: 'billing.%' },
+                createdAt: { [Op.gte]: since }
+            },
+            attributes: ['id', 'actorUserId', 'action', 'createdAt', 'metadata'],
+            order: [['createdAt', 'DESC']],
+            limit: 4000
+        })
+    ]);
+
+    const serverUsageByOwner = new Map();
+    for (const server of servers) {
+        const ownerId = Number.parseInt(server.ownerId, 10);
+        if (!Number.isInteger(ownerId) || ownerId <= 0) continue;
+        const current = serverUsageByOwner.get(ownerId) || { serverCount: 0, memoryMb: 0, cpuPercent: 0, diskMb: 0 };
+        current.serverCount += 1;
+        current.memoryMb += Math.max(0, Number.parseInt(server.memory, 10) || 0);
+        current.cpuPercent += Math.max(0, Number.parseInt(server.cpu, 10) || 0);
+        current.diskMb += Math.max(0, Number.parseInt(server.disk, 10) || 0);
+        serverUsageByOwner.set(ownerId, current);
+    }
+
+    const spendByUser = new Map();
+    for (const row of billingLogs) {
+        const userId = Number.parseInt(row.actorUserId, 10);
+        if (!Number.isInteger(userId) || userId <= 0) continue;
+        const meta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+        const amount = Number(meta.amount || 0);
+        if (!Number.isFinite(amount) || amount <= 0) continue;
+        spendByUser.set(userId, (spendByUser.get(userId) || 0) + amount);
+    }
+
+    const rows = users.map((user) => {
+        const userId = Number.parseInt(user.id, 10);
+        const wallet = Number.isFinite(Number(user.coins)) ? Number(user.coins) : 0;
+        const usage = serverUsageByOwner.get(userId) || { serverCount: 0, memoryMb: 0, cpuPercent: 0, diskMb: 0 };
+        const observedDailyBurn = (spendByUser.get(userId) || 0) / lookbackDays;
+        const recurringEnabled = String(settingsMap.featureCostPerServerEnabled || 'false') === 'true';
+        const renewDays = Math.max(1, Number.parseInt(settingsMap.storeRenewDays, 10) || 30);
+        const recurringEstimate = recurringEnabled
+            ? (
+                (usage.serverCount * (Number(settingsMap.costBasePerServerMonthly || 0))) +
+                ((usage.memoryMb / 1024) * Number(settingsMap.costPerGbRamMonthly || 0)) +
+                ((usage.cpuPercent / 100) * Number(settingsMap.costPerCpuCoreMonthly || 0)) +
+                ((usage.diskMb / 1024) * Number(settingsMap.costPerGbDiskMonthly || 0))
+            ) / renewDays
+            : 0;
+        const projectedDailyBurn = Math.max(observedDailyBurn, recurringEstimate);
+        const runwayDays = projectedDailyBurn > 0 ? (wallet / projectedDailyBurn) : null;
+        return {
+            userId,
+            username: user.username,
+            suspended: Boolean(user.isSuspended),
+            wallet,
+            serverCount: usage.serverCount,
+            observedDailyBurn: Math.round(observedDailyBurn * 100) / 100,
+            recurringDailyBurn: Math.round(recurringEstimate * 100) / 100,
+            projectedDailyBurn: Math.round(projectedDailyBurn * 100) / 100,
+            projectedMonthlyBurn: Math.round(projectedDailyBurn * 30 * 100) / 100,
+            runwayDays: Number.isFinite(runwayDays) ? Math.round(runwayDays * 10) / 10 : null
+        };
+    }).sort((a, b) => {
+        const aRunway = Number.isFinite(a.runwayDays) ? a.runwayDays : Number.POSITIVE_INFINITY;
+        const bRunway = Number.isFinite(b.runwayDays) ? b.runwayDays : Number.POSITIVE_INFINITY;
+        return aRunway - bRunway;
+    });
+
+    return {
+        enabled,
+        generatedAtMs: Date.now(),
+        economyUnit,
+        rows
+    };
+};
+
+let serviceHealthSweepInFlight = false;
+let serviceHealthSweepLastRunAtMs = 0;
+
+const maybeRunServiceHealthSweep = async () => {
+    if (serviceHealthSweepInFlight) return;
+    serviceHealthSweepInFlight = true;
+    try {
+        const [enabledRow, intervalRow] = await Promise.all([
+            Settings.findByPk('featureServiceHealthChecksEnabled'),
+            Settings.findByPk('serviceHealthCheckIntervalSeconds')
+        ]);
+        const enabled = String(enabledRow && enabledRow.value || 'false').trim().toLowerCase() === 'true';
+        if (!enabled) return;
+        const intervalSeconds = Math.max(30, Number.parseInt(intervalRow && intervalRow.value, 10) || 300);
+        const now = Date.now();
+        if ((now - serviceHealthSweepLastRunAtMs) < (intervalSeconds * 1000)) return;
+
+        const settingsMap = {
+            featureServiceHealthChecksEnabled: enabled ? 'true' : 'false',
+            serviceHealthCheckIntervalSeconds: String(intervalSeconds)
+        };
+        const snapshot = await runServiceHealthSnapshot(settingsMap);
+        await appendServiceHealthHistory(snapshot);
+        serviceHealthSweepLastRunAtMs = now;
+    } catch (error) {
+        console.warn('Service health sweep failed:', error.message || error);
+    } finally {
+        serviceHealthSweepInFlight = false;
+    }
+};
+
+if (!global.__cpanelServiceHealthSweepTimer) {
+    global.__cpanelServiceHealthSweepTimer = setInterval(() => {
+        maybeRunServiceHealthSweep().catch(() => {});
+    }, 30_000);
+}
+
 // Admin Redis
 app.get('/admin/redis', requireAuth, requireAdmin, async (req, res) => {
     try {
@@ -306,6 +694,132 @@ app.get('/admin/redis', requireAuth, requireAdmin, async (req, res) => {
             hasStoredRedisConfig: false,
             nowMs: Date.now()
         });
+    }
+});
+
+app.get('/admin/forecasting', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const report = await buildForecastingReport(res.locals.settings || {});
+        return res.render('admin/forecasting', {
+            user: req.session.user,
+            path: '/admin/forecasting',
+            title: 'Forecasting',
+            success: req.query.success || null,
+            error: req.query.error || null,
+            report
+        });
+    } catch (error) {
+        console.error('Error loading forecasting page:', error);
+        return res.render('admin/forecasting', {
+            user: req.session.user,
+            path: '/admin/forecasting',
+            title: 'Forecasting',
+            success: null,
+            error: 'Failed to load forecasting data.',
+            report: {
+                enabled: false,
+                generatedAtMs: Date.now(),
+                economyUnit: String((res.locals.settings && res.locals.settings.economyUnit) || 'Coins'),
+                rows: []
+            }
+        });
+    }
+});
+
+app.get('/admin/forecasting.json', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const report = await buildForecastingReport(res.locals.settings || {});
+        return res.json({ success: true, report });
+    } catch {
+        return res.status(500).json({ success: false, error: 'Failed to build forecasting report.' });
+    }
+});
+
+app.get('/admin/abuse-scores', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const report = await buildAbuseScoreReport(res.locals.settings || {});
+        return res.render('admin/abuse-scores', {
+            user: req.session.user,
+            path: '/admin/abuse-scores',
+            title: 'Abuse Scores',
+            success: req.query.success || null,
+            error: req.query.error || null,
+            report
+        });
+    } catch (error) {
+        console.error('Error loading abuse scores page:', error);
+        return res.render('admin/abuse-scores', {
+            user: req.session.user,
+            path: '/admin/abuse-scores',
+            title: 'Abuse Scores',
+            success: null,
+            error: 'Failed to build abuse score report.',
+            report: { enabled: false, generatedAtMs: Date.now(), windowHours: 72, threshold: 80, topServers: [], topUsers: [], flaggedServers: 0, flaggedUsers: 0 }
+        });
+    }
+});
+
+app.get('/admin/abuse-scores.json', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const report = await buildAbuseScoreReport(res.locals.settings || {});
+        return res.json({ success: true, report });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: 'Failed to build abuse report.' });
+    }
+});
+
+app.get('/admin/service-health-checks', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const shouldRun = String(req.query.run || '').trim() === '1';
+        let latest = null;
+        if (shouldRun) {
+            latest = await runServiceHealthSnapshot(res.locals.settings || {});
+            await appendServiceHealthHistory(latest);
+        }
+        const history = await getServiceHealthHistory(50);
+        if (!latest && history.length > 0) {
+            latest = history[0];
+        }
+        return res.render('admin/service-health-checks', {
+            user: req.session.user,
+            path: '/admin/service-health-checks',
+            title: 'Service Health Checks',
+            success: req.query.success || null,
+            error: req.query.error || null,
+            latest,
+            history
+        });
+    } catch (error) {
+        console.error('Error loading service health checks page:', error);
+        return res.render('admin/service-health-checks', {
+            user: req.session.user,
+            path: '/admin/service-health-checks',
+            title: 'Service Health Checks',
+            success: null,
+            error: 'Failed to load service health checks.',
+            latest: null,
+            history: []
+        });
+    }
+});
+
+app.post('/admin/service-health-checks/run', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const snapshot = await runServiceHealthSnapshot(res.locals.settings || {});
+        await appendServiceHealthHistory(snapshot);
+        return res.redirect('/admin/service-health-checks?success=' + encodeURIComponent(`Health check finished with status: ${String(snapshot.status || 'unknown').toUpperCase()}`));
+    } catch (error) {
+        console.error('Error running service health checks:', error);
+        return res.redirect('/admin/service-health-checks?error=' + encodeURIComponent('Failed to run health checks.'));
+    }
+});
+
+app.get('/admin/service-health-checks.json', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const history = await getServiceHealthHistory(50);
+        return res.json({ success: true, latest: history[0] || null, history });
+    } catch {
+        return res.status(500).json({ success: false, error: 'Failed to load service health history.' });
     }
 });
 

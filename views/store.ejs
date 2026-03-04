@@ -29,6 +29,7 @@ const unitCosts = inventoryUnitCosts || {
     package: 0
 };
 const billingAuditRows = Array.isArray(billingLogs) ? billingLogs : [];
+const invoiceRowsPreview = Array.isArray(invoicePreviewRows) ? invoicePreviewRows : [];
 const quota = quotaForecast || {
     enabled: false,
     modelVersion: 2,
@@ -113,6 +114,10 @@ const formatAuditSummary = (row) => {
                 </div>
                 <div class="d-flex gap-2">
                     <a href="/user/create" class="btn btn-primary btn-sm">Create Server</a>
+                    <% if (featureBillingInvoicesEnabled) { %>
+                        <a href="/store/invoices" class="btn btn-outline-info btn-sm">Invoices</a>
+                        <a href="/store/statement/pdf" class="btn btn-outline-warning btn-sm">Account Statement (PDF)</a>
+                    <% } %>
                     <a href="/" class="btn btn-outline-light btn-sm">Back to Dashboard</a>
                 </div>
             </div>
@@ -382,6 +387,44 @@ const formatAuditSummary = (row) => {
         </div>
 
         <div class="store-card mt-3">
+            <% if (featureBillingInvoicesEnabled) { %>
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                    <div>
+                        <h2 class="h6 mb-1 text-uppercase fw-bold">Invoices</h2>
+                        <div class="text-muted small">Paid billing invoices generated from wallet charges.</div>
+                    </div>
+                    <a href="/store/invoices" class="btn btn-sm btn-outline-info">Open all invoices</a>
+                </div>
+                <% if (!invoiceRowsPreview.length) { %>
+                    <div class="text-muted small mb-3">No invoices generated yet.</div>
+                <% } else { %>
+                    <div class="table-responsive mb-3">
+                        <table class="table table-dark table-sm store-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Invoice</th>
+                                    <th>Time</th>
+                                    <th>Amount</th>
+                                    <th class="text-end">Export</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% invoiceRowsPreview.forEach((invoice) => { %>
+                                    <tr>
+                                        <td><span class="fw-semibold"><%= invoice.invoiceNo %></span></td>
+                                        <td class="text-nowrap"><%= formatAuditDate(invoice.issuedAt) %></td>
+                                        <td><strong><%= compactCoins(invoice.amount || 0) %> <%= invoice.currency || economyUnit %></strong></td>
+                                        <td class="text-end">
+                                            <a href="/store/invoices/<%= invoice.invoiceId %>/pdf" class="btn btn-sm btn-outline-info">PDF</a>
+                                        </td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                <% } %>
+            <% } %>
+
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                 <div>
                     <h2 class="h6 mb-1 text-uppercase fw-bold">Billing History & Audit</h2>

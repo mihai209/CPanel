@@ -98,6 +98,20 @@
                                     </div>
                                     <div class="col-md-6">
                                         <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="featureBillingInvoicesEnabled" name="featureBillingInvoicesEnabled" value="1"
+                                                <%= String(settings.featureBillingInvoicesEnabled || 'true') === 'true' ? 'checked' : '' %>>
+                                            <label class="form-check-label text-light" for="featureBillingInvoicesEnabled">Enable billing invoices</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="featureBillingInvoiceWebhookEnabled" name="featureBillingInvoiceWebhookEnabled" value="1"
+                                                <%= String(settings.featureBillingInvoiceWebhookEnabled || 'false') === 'true' ? 'checked' : '' %>>
+                                            <label class="form-check-label text-light" for="featureBillingInvoiceWebhookEnabled">Invoice webhook dispatch</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check form-switch">
                                             <input class="form-check-input" type="checkbox" id="featureQuotaForecastingEnabled" name="featureQuotaForecastingEnabled" value="1"
                                                 <%= String(settings.featureQuotaForecastingEnabled || 'true') === 'true' ? 'checked' : '' %>>
                                             <label class="form-check-label text-light" for="featureQuotaForecastingEnabled">Enable quota forecasting on store</label>

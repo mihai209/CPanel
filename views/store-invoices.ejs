@@ -1,0 +1,96 @@
+<%- include('partials/header') %>
+<%- include('partials/navbar') %>
+<%- include('partials/error-modal') %>
+
+<%
+const compactCoins = (value) => {
+    const num = Number(value || 0);
+    if (!Number.isFinite(num)) return '0';
+    return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(num);
+};
+const rows = Array.isArray(invoices) ? invoices : [];
+const formatDate = (value) => {
+    const dt = value ? new Date(value) : null;
+    if (!dt || Number.isNaN(dt.getTime())) return '-';
+    return dt.toLocaleString();
+};
+%>
+
+<style>
+    .invoice-shell { max-width: 1100px; margin: 0 auto; }
+    .invoice-card { border: 1px solid #2e3036; background: linear-gradient(180deg, rgba(31, 32, 35, 0.95), rgba(31, 32, 35, 0.72)); border-radius: 14px; padding: 1.25rem; }
+    .invoice-table th, .invoice-table td { border-color: rgba(255,255,255,0.08) !important; vertical-align: middle; }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="invoice-shell">
+        <div class="invoice-card mb-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h1 class="h4 fw-bold mb-1">Billing Invoices</h1>
+                    <p class="text-muted mb-0 small">Paid invoice history generated from store and billing charges.</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="/store/statement/pdf" class="btn btn-outline-warning btn-sm">Account Statement (PDF)</a>
+                    <a href="/store" class="btn btn-outline-light btn-sm">Back to Store</a>
+                    <a href="/" class="btn btn-outline-secondary btn-sm">Dashboard</a>
+                </div>
+            </div>
+        </div>
+
+        <% if (success) { %>
+            <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success"><i class="bi bi-check-circle-fill me-2"></i><%= success %></div>
+        <% } %>
+        <% if (error) { %>
+            <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i><%= error %></div>
+        <% } %>
+
+        <div class="invoice-card">
+            <% if (!rows.length) { %>
+                <div class="text-muted">No invoices yet.</div>
+            <% } else { %>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm invoice-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Invoice</th>
+                                <th>Event</th>
+                                <th>Issued</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th class="text-end">Export</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% rows.forEach((row) => { %>
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold"><%= row.invoiceNo %></div>
+                                        <div class="text-muted small"><%= row.invoiceId %></div>
+                                    </td>
+                                    <td>
+                                        <div><%= row.actionLabel || row.action %></div>
+                                        <% if (row.details && row.details.serverRef) { %>
+                                            <div class="text-muted small">Server: <%= row.details.serverRef %></div>
+                                        <% } %>
+                                    </td>
+                                    <td class="text-nowrap"><%= formatDate(row.issuedAt) %></td>
+                                    <td><strong><%= compactCoins(row.amount || 0) %> <%= row.currency || economyUnit %></strong></td>
+                                    <td><span class="badge bg-success">PAID</span></td>
+                                    <td class="text-end">
+                                        <a href="/store/invoices/<%= row.invoiceId %>/pdf" class="btn btn-sm btn-outline-info">PDF</a>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<%- include('partials/footer') %>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= (settings.brandName || 'CPanel').toUpperCase() %> - Forecasting</title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<%- include('../partials/error-modal') %>
+<div class="admin-wrapper">
+    <%- include('../partials/admin-sidebar') %>
+    <div class="admin-content">
+        <div class="admin-header">
+            <div>
+                <h4 class="mb-0 text-light fw-normal">Resource Forecasting</h4>
+                <small class="text-muted">Wallet runway and projected burn by user.</small>
+            </div>
+            <div class="breadcrumb-admin">
+                <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span class="text-light">Forecasting</span>
+            </div>
+        </div>
+        <div class="container-fluid py-4 px-lg-4">
+            <% if (success) { %><div class="alert alert-success border-0 bg-success bg-opacity-10 text-success"><%= success %></div><% } %>
+            <% if (error) { %><div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger"><%= error %></div><% } %>
+
+            <div class="card border-0 shadow-sm" style="background-color:#141419;">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0 text-light"><i class="bi bi-graph-up-arrow me-2"></i>Forecast Table</h5>
+                        <div class="text-muted small">Updated: <%= new Date(report.generatedAtMs || Date.now()).toLocaleString() %></div>
+                    </div>
+                    <% if (!report.enabled) { %>
+                        <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning">Quota forecasting is disabled in admin settings.</div>
+                    <% } %>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm mb-0 align-middle">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Wallet</th>
+                                    <th>Servers</th>
+                                    <th>Observed / day</th>
+                                    <th>Recurring / day</th>
+                                    <th>Projected / day</th>
+                                    <th>Projected / 30d</th>
+                                    <th>Runway</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <% (report.rows || []).forEach((row) => { %>
+                                <tr>
+                                    <td>
+                                        <span class="fw-semibold"><%= row.username %></span>
+                                        <% if (row.suspended) { %><span class="badge bg-danger ms-1">Suspended</span><% } %>
+                                    </td>
+                                    <td><%= row.wallet %> <%= report.economyUnit %></td>
+                                    <td><%= row.serverCount %></td>
+                                    <td><%= row.observedDailyBurn %> <%= report.economyUnit %></td>
+                                    <td><%= row.recurringDailyBurn %> <%= report.economyUnit %></td>
+                                    <td><strong><%= row.projectedDailyBurn %> <%= report.economyUnit %></strong></td>
+                                    <td><%= row.projectedMonthlyBurn %> <%= report.economyUnit %></td>
+                                    <td>
+                                        <% if (Number.isFinite(row.runwayDays)) { %>
+                                            <span class="badge <%= row.runwayDays <= 3 ? 'bg-danger' : (row.runwayDays <= 7 ? 'bg-warning text-dark' : 'bg-success') %>"><%= row.runwayDays %> days</span>
+                                        <% } else { %>
+                                            <span class="text-muted">N/A</span>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                            <% if (!(report.rows || []).length) { %>
+                                <tr><td colspan="8" class="text-muted">No forecast rows available.</td></tr>
+                            <% } %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <%- include('../partials/footer') %>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 function registerServerPagesRoutes(ctx) {
     const fs = require('fs');
+    const nodePath = require('path');
     const nodeCrypto = require('crypto');
     const { getUserThemeId } = require('../../core/themes');
     const { pickSmartAllocation } = require('../../core/helpers/smart-allocation');
@@ -709,6 +710,273 @@ function sanitizeAuditMetadata(input) {
     }
 }
 
+const BILLING_INVOICEABLE_ACTIONS = new Set([
+    'billing.server.create',
+    'billing.server.renew',
+    'billing.server.edit',
+    'billing.inventory.purchase',
+    'billing.deal.purchase',
+    'billing.revenue.subscribe',
+    'billing.revenue.renew_success'
+]);
+
+function parseInvoiceIdToAuditId(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return 0;
+    const stripped = raw.toLowerCase().startsWith('inv_') ? raw.slice(4) : raw;
+    const parsed = Number.parseInt(stripped, 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function isBillingInvoiceAction(action) {
+    return BILLING_INVOICEABLE_ACTIONS.has(String(action || '').trim());
+}
+
+function parseInvoiceAmount(metadata) {
+    const amountRaw = metadata && metadata.amount !== undefined ? metadata.amount : null;
+    const amount = Number(amountRaw);
+    if (!Number.isFinite(amount)) return null;
+    if (amount <= 0) return null;
+    return Math.max(0, Math.round(amount * 100) / 100);
+}
+
+function mapBillingAuditToInvoiceEntry(entry, fallbackCurrency = 'Coins') {
+    if (!entry || !isBillingInvoiceAction(entry.action)) return null;
+    const meta = entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {};
+    const amount = parseInvoiceAmount(meta);
+    if (!Number.isFinite(amount) || amount <= 0) return null;
+    const currency = String(meta.currency || fallbackCurrency || 'Coins').trim().slice(0, 16) || 'Coins';
+    const invoiceNo = `INV-${String(entry.id).padStart(8, '0')}`;
+    const issuedAt = entry.createdAt ? new Date(entry.createdAt) : new Date();
+    const serverRef = meta.serverName || meta.serverContainerId || meta.containerId || null;
+    return {
+        id: Number(entry.id),
+        invoiceId: `inv_${entry.id}`,
+        invoiceNo,
+        action: String(entry.action || '').trim(),
+        actionLabel: formatBillingActionLabel(entry.action),
+        amount,
+        currency,
+        issuedAt,
+        dueAt: issuedAt,
+        paidAt: issuedAt,
+        status: 'paid',
+        details: {
+            serverRef: serverRef ? String(serverRef).slice(0, 120) : null,
+            walletBefore: Number.isFinite(Number(meta.walletBefore)) ? Number(meta.walletBefore) : null,
+            walletAfter: Number.isFinite(Number(meta.walletAfter)) ? Number(meta.walletAfter) : null,
+            raw: meta
+        }
+    };
+}
+
+async function dispatchBillingInvoiceWebhookIfEnabled(invoice) {
+    try {
+        if (!invoice || !invoice.invoiceNo || !Number.isFinite(Number(invoice.amount))) return;
+        const [invoiceWebhookToggle, extensionToggle, cfgRow, brandRow] = await Promise.all([
+            Settings.findByPk('featureBillingInvoiceWebhookEnabled'),
+            Settings.findByPk('featureExtensionWebhooksEnabled'),
+            Settings.findByPk('extensionWebhooksConfig'),
+            Settings.findByPk('brandName')
+        ]);
+        const invoiceWebhookEnabled = String(invoiceWebhookToggle && invoiceWebhookToggle.value || 'false').toLowerCase() === 'true';
+        const extensionEnabled = String(extensionToggle && extensionToggle.value || 'false').toLowerCase() === 'true';
+        if (!invoiceWebhookEnabled || !extensionEnabled) return;
+
+        const webhooksConfigRaw = parseExtensionDashboardJson(cfgRow && cfgRow.value ? cfgRow.value : '{}', {});
+        const webhooksConfig = webhooksConfigRaw && typeof webhooksConfigRaw === 'object' ? webhooksConfigRaw : {};
+        const webhooksEnabled = String(webhooksConfig.enabled || '').trim().toLowerCase() === 'true' || webhooksConfig.enabled === true || webhooksConfig.enabled === 1;
+        if (!webhooksEnabled) return;
+
+        const discordWebhook = String(webhooksConfig.discordWebhook || '').trim();
+        const telegramBotToken = String(webhooksConfig.telegramBotToken || '').trim();
+        const telegramChatId = String(webhooksConfig.telegramChatId || '').trim();
+        if (!discordWebhook && (!telegramBotToken || !telegramChatId)) return;
+
+        const brandName = String(brandRow && brandRow.value || 'CPanel').trim() || 'CPanel';
+        const title = `[${brandName}] Invoice Paid`;
+        const body = [
+            `Invoice: ${invoice.invoiceNo}`,
+            `Amount: ${invoice.amount} ${invoice.currency}`,
+            `Event: ${invoice.actionLabel || invoice.action}`,
+            `Issued: ${invoice.issuedAt instanceof Date ? invoice.issuedAt.toISOString() : new Date().toISOString()}`,
+            invoice.details && invoice.details.serverRef ? `Server: ${invoice.details.serverRef}` : null
+        ].filter(Boolean).join('\n');
+
+        if (discordWebhook && typeof sendDiscordSmartAlert === 'function') {
+            await sendDiscordSmartAlert(discordWebhook, title, body, '#10b981');
+        }
+        if (telegramBotToken && telegramChatId && typeof sendTelegramSmartAlert === 'function') {
+            await sendTelegramSmartAlert(telegramBotToken, telegramChatId, `${title}\n${body}`);
+        }
+    } catch {
+        // Ignore invoice webhook failures.
+    }
+}
+
+async function fetchBillingInvoicesForUser(userId, fallbackCurrency = 'Coins', limit = 250) {
+    if (!AuditLog) return [];
+    const parsedUserId = Number.parseInt(userId, 10);
+    if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) return [];
+
+    const rows = await AuditLog.findAll({
+        where: {
+            actorUserId: parsedUserId,
+            action: { [Op.like]: 'billing.%' }
+        },
+        order: [['createdAt', 'DESC']],
+        limit: Math.max(1, Math.min(1000, Number.parseInt(limit, 10) || 250))
+    });
+
+    const invoices = [];
+    for (const row of rows) {
+        const mapped = mapBillingAuditToInvoiceEntry(row, fallbackCurrency);
+        if (mapped) invoices.push(mapped);
+    }
+    return invoices;
+}
+
+function resolveBillingStatementAmount(action, metadata) {
+    const meta = metadata && typeof metadata === 'object' ? metadata : {};
+    const directAmount = Number(meta.amount);
+    if (Number.isFinite(directAmount) && directAmount > 0) {
+        return Math.round(directAmount * 100) / 100;
+    }
+    if (String(action || '').trim() === 'billing.server.delete') {
+        const refundedCoins = Number(meta.refundedCoins);
+        if (Number.isFinite(refundedCoins) && refundedCoins > 0) {
+            return Math.round(refundedCoins * 100) / 100;
+        }
+    }
+    return 0;
+}
+
+function resolveBillingStatementDirection(action, metadata) {
+    const normalized = String(action || '').trim();
+    if (!normalized) return 'info';
+
+    const debitActions = new Set([
+        'billing.server.create',
+        'billing.server.renew',
+        'billing.server.edit',
+        'billing.inventory.purchase',
+        'billing.deal.purchase',
+        'billing.revenue.subscribe',
+        'billing.revenue.renew_success'
+    ]);
+    const creditActions = new Set([
+        'billing.inventory.sell',
+        'billing.redeem_code.claim'
+    ]);
+    if (debitActions.has(normalized)) return 'debit';
+    if (creditActions.has(normalized)) return 'credit';
+
+    if (normalized === 'billing.server.delete') {
+        const meta = metadata && typeof metadata === 'object' ? metadata : {};
+        const refundedCoins = Number(meta.refundedCoins);
+        return Number.isFinite(refundedCoins) && refundedCoins > 0 ? 'credit' : 'info';
+    }
+
+    if (normalized.startsWith('billing.')) return 'debit';
+    return 'info';
+}
+
+function resolveBillingStatementWhere(entry, metadata) {
+    const meta = metadata && typeof metadata === 'object' ? metadata : {};
+    if (meta.serverName && meta.containerId) {
+        return `${String(meta.serverName).slice(0, 80)} (/${String(meta.containerId).slice(0, 120)})`;
+    }
+    if (meta.serverName) return String(meta.serverName).slice(0, 120);
+    if (meta.containerId) return `/${String(meta.containerId).slice(0, 120)}`;
+    if (meta.serverContainerId) return `/${String(meta.serverContainerId).slice(0, 120)}`;
+    if (entry && entry.path) return String(entry.path).slice(0, 140);
+    if (entry && entry.targetType && entry.targetId) return `${entry.targetType}:${entry.targetId}`;
+    return 'N/A';
+}
+
+function mapBillingAuditToStatementEntry(entry, fallbackCurrency = 'Coins') {
+    if (!entry || !String(entry.action || '').startsWith('billing.')) return null;
+    const meta = entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {};
+    const currency = String(meta.currency || fallbackCurrency || 'Coins').trim().slice(0, 16) || 'Coins';
+    const direction = resolveBillingStatementDirection(entry.action, meta);
+    const amount = resolveBillingStatementAmount(entry.action, meta);
+    const signedAmount = direction === 'credit'
+        ? amount
+        : (direction === 'debit' ? -amount : 0);
+    return {
+        id: Number(entry.id || 0),
+        timestamp: entry.createdAt ? new Date(entry.createdAt) : new Date(),
+        action: String(entry.action || '').trim(),
+        actionLabel: formatBillingActionLabel(entry.action),
+        direction,
+        amount,
+        signedAmount,
+        currency,
+        where: resolveBillingStatementWhere(entry, meta),
+        path: entry.path ? String(entry.path).slice(0, 255) : null,
+        ip: entry.ip ? String(entry.ip).slice(0, 120) : null,
+        walletBefore: Number.isFinite(Number(meta.walletBefore)) ? Number(meta.walletBefore) : null,
+        walletAfter: Number.isFinite(Number(meta.walletAfter)) ? Number(meta.walletAfter) : null,
+        meta
+    };
+}
+
+async function fetchBillingStatementEntriesForUser(userId, fallbackCurrency = 'Coins', limit = 1000) {
+    if (!AuditLog) return [];
+    const parsedUserId = Number.parseInt(userId, 10);
+    if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) return [];
+
+    const rows = await AuditLog.findAll({
+        where: {
+            actorUserId: parsedUserId,
+            action: { [Op.like]: 'billing.%' }
+        },
+        order: [['createdAt', 'DESC']],
+        limit: Math.max(1, Math.min(5000, Number.parseInt(limit, 10) || 1000))
+    });
+
+    const entries = [];
+    for (const row of rows) {
+        const mapped = mapBillingAuditToStatementEntry(row, fallbackCurrency);
+        if (mapped) entries.push(mapped);
+    }
+    return entries;
+}
+
+async function loadRockyLogoForPdf(req) {
+    const baseUrl = String(typeof resolvePanelBaseUrl === 'function' ? resolvePanelBaseUrl(req) : `${req.protocol}://${req.get('host') || ''}`).replace(/\/$/, '');
+    const logoUrl = `${baseUrl}/assets/rocky.png`;
+    const httpClient = (typeof axios !== 'undefined' && axios && typeof axios.get === 'function') ? axios : null;
+    try {
+        if (httpClient) {
+            const response = await httpClient.get(logoUrl, {
+                responseType: 'arraybuffer',
+                timeout: 8000
+            });
+            const bytes = Buffer.from(response.data || '');
+            if (bytes.length > 0) {
+                return { logoUrl, imageBuffer: bytes };
+            }
+        }
+    } catch {
+        // fallback below
+    }
+
+    try {
+        const localLogoPath = nodePath.join(process.cwd(), 'public', 'assets', 'rocky.png');
+        if (fs.existsSync(localLogoPath)) {
+            return {
+                logoUrl,
+                imageBuffer: fs.readFileSync(localLogoPath)
+            };
+        }
+    } catch {
+        // ignore
+    }
+
+    return { logoUrl, imageBuffer: null };
+}
+
 async function createBillingAuditLog({
     actorUserId = null,
     action,
@@ -721,7 +989,7 @@ async function createBillingAuditLog({
         if (!AuditLog) return;
         const cleanAction = String(action || '').trim().slice(0, 120);
         if (!cleanAction) return;
-        await AuditLog.create({
+        const createdAudit = await AuditLog.create({
             actorUserId: Number.isInteger(Number(actorUserId)) && Number(actorUserId) > 0 ? Number(actorUserId) : null,
             action: cleanAction,
             targetType: targetType ? String(targetType).slice(0, 64) : null,
@@ -732,6 +1000,18 @@ async function createBillingAuditLog({
             userAgent: req && req.headers && req.headers['user-agent'] ? String(req.headers['user-agent']).slice(0, 1000) : null,
             metadata: sanitizeAuditMetadata(metadata)
         });
+
+        const invoicesEnabledRow = await Settings.findByPk('featureBillingInvoicesEnabled').catch(() => null);
+        const invoicesEnabled = String(invoicesEnabledRow && invoicesEnabledRow.value || 'true').toLowerCase() === 'true';
+        if (invoicesEnabled && isBillingInvoiceAction(cleanAction)) {
+            const invoice = mapBillingAuditToInvoiceEntry(
+                createdAudit,
+                String((metadata && metadata.currency) || 'Coins')
+            );
+            if (invoice) {
+                await dispatchBillingInvoiceWebhookIfEnabled(invoice);
+            }
+        }
     } catch {
         // Ignore billing audit logging failures.
     }
@@ -748,7 +1028,9 @@ function formatBillingActionLabel(action) {
         'billing.server.delete': 'Server Delete',
         'billing.server.auto_suspend': 'Auto Suspend (Overdue)',
         'billing.server.auto_delete': 'Auto Delete (Overdue)',
-        'billing.server.auto_unsuspend': 'Auto Unsuspend (Billing Disabled)'
+        'billing.server.auto_unsuspend': 'Auto Unsuspend (Billing Disabled)',
+        'billing.revenue.subscribe': 'Revenue Subscribe',
+        'billing.revenue.renew_success': 'Revenue Renew Success'
     };
     const key = String(action || '').trim();
     return map[key] || key || 'Billing Event';
@@ -3245,6 +3527,7 @@ app.get('/store', requireAuth, async (req, res) => {
         }
 
         let billingLogs = [];
+        let invoicePreviewRows = [];
         if (AuditLog) {
             const whereOr = [
                 { actorUserId: account.id }
@@ -3279,6 +3562,13 @@ app.get('/store', requireAuth, async (req, res) => {
                     currency: String(meta.currency || featureFlags.economyUnit || 'Coins')
                 };
             });
+
+            if (featureFlags.billingInvoicesEnabled) {
+                invoicePreviewRows = rawLogs
+                    .map((entry) => mapBillingAuditToInvoiceEntry(entry, normalizeEconomyUnit(featureFlags.economyUnit)))
+                    .filter(Boolean)
+                    .slice(0, 8);
+            }
         }
 
         req.session.user.coins = Number.isFinite(Number(account.coins)) ? Number(account.coins) : 0;
@@ -3320,6 +3610,7 @@ app.get('/store', requireAuth, async (req, res) => {
             featureInventoryEnabled: Boolean(featureFlags.inventoryEnabled),
             featureStoreDealsEnabled: Boolean(featureFlags.storeDealsEnabled),
             featureStoreRedeemCodesEnabled: Boolean(featureFlags.storeRedeemCodesEnabled),
+            featureBillingInvoicesEnabled: Boolean(featureFlags.billingInvoicesEnabled),
             inventoryState,
             inventoryUnitCosts: {
                 ramGb: Number(featureFlags.storeRamPerGbCoins || 0),
@@ -3335,6 +3626,7 @@ app.get('/store', requireAuth, async (req, res) => {
             storeDealsCount,
             storeDealsActiveCount,
             billingLogs,
+            invoicePreviewRows,
             featureQuotaForecastingEnabled: quotaForecastingEnabled,
             quotaForecast,
             featureRevenueModeEnabled: Boolean(featureFlags.revenueModeEnabled),
@@ -3354,6 +3646,383 @@ app.get('/store', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error loading store:', error);
         return res.redirect('/?error=' + encodeURIComponent('Failed to load store page.'));
+    }
+});
+
+app.get('/store/forecast.json', requireAuth, async (req, res) => {
+    try {
+        const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
+        if (!featureFlags.userCreateEnabled) {
+            return res.status(403).json({ success: false, error: 'Store is disabled by admin.' });
+        }
+        if (!featureFlags.quotaForecastingEnabled) {
+            return res.status(403).json({ success: false, error: 'Quota forecasting is disabled by admin.' });
+        }
+
+        const account = await User.findByPk(req.session.user.id, {
+            attributes: ['id', 'coins', 'isSuspended']
+        });
+        if (!account) {
+            return res.status(401).json({ success: false, error: 'Session expired.' });
+        }
+        if (account.isSuspended) {
+            return res.status(403).json({ success: false, error: 'Account is suspended.' });
+        }
+
+        const [servers, burnLogs] = await Promise.all([
+            Server.findAll({
+                where: { ownerId: account.id },
+                attributes: ['id', 'memory', 'cpu', 'disk']
+            }),
+            AuditLog
+                ? AuditLog.findAll({
+                    where: {
+                        action: { [Op.in]: Array.from(QUOTA_FORECAST_SPEND_ACTIONS) },
+                        createdAt: { [Op.gte]: new Date(Date.now() - (QUOTA_FORECAST_V2_LOOKBACK_DAYS * DAY_MS)) }
+                    },
+                    attributes: ['actorUserId', 'action', 'createdAt', 'metadata'],
+                    order: [['createdAt', 'DESC']],
+                    limit: 2000
+                })
+                : Promise.resolve([])
+        ]);
+
+        let recurringDailyBurn = 0;
+        for (const server of servers) {
+            const recurringCoins = featureFlags.costPerServerEnabled
+                ? calculateStoreRenewCostSafe(server, res.locals.settings || {})
+                : 0;
+            const renewPeriodDays = Math.max(1, Number.parseInt(featureFlags.storeRenewDays, 10) || 30);
+            recurringDailyBurn += Number(recurringCoins || 0) / renewPeriodDays;
+        }
+
+        const quotaForecast = buildQuotaForecastV2({
+            enabled: true,
+            walletCoins: Number(account.coins || 0),
+            recurringDailyBurn,
+            revenueDailyBurn: 0,
+            burnLogs,
+            ownerUserId: account.id
+        });
+
+        return res.json({ success: true, forecast: quotaForecast });
+    } catch (error) {
+        console.error('Error generating store forecast JSON:', error);
+        return res.status(500).json({ success: false, error: 'Failed to generate forecast.' });
+    }
+});
+
+app.get('/store/invoices', requireAuth, async (req, res) => {
+    try {
+        const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
+        if (!featureFlags.userCreateEnabled) {
+            return res.redirect('/?error=' + encodeURIComponent('Store is disabled by admin.'));
+        }
+        if (!featureFlags.billingInvoicesEnabled) {
+            return res.redirect('/store?error=' + encodeURIComponent('Billing invoices are disabled by admin.'));
+        }
+
+        const account = await User.findByPk(req.session.user.id, {
+            attributes: ['id', 'username', 'coins', 'isSuspended']
+        });
+        if (!account) {
+            req.session.destroy(() => {});
+            return res.redirect('/login?error=' + encodeURIComponent('Session expired. Please login again.'));
+        }
+        if (account.isSuspended) {
+            return res.redirect('/suspend');
+        }
+
+        const invoices = await fetchBillingInvoicesForUser(
+            account.id,
+            normalizeEconomyUnit(featureFlags.economyUnit),
+            300
+        );
+
+        return res.render('store-invoices', {
+            user: req.session.user,
+            title: 'Invoices',
+            path: '/store/invoices',
+            economyUnit: normalizeEconomyUnit(featureFlags.economyUnit),
+            invoices,
+            success: req.query.success || null,
+            error: req.query.error || null
+        });
+    } catch (error) {
+        console.error('Error loading invoices page:', error);
+        return res.redirect('/store?error=' + encodeURIComponent('Failed to load invoices.'));
+    }
+});
+
+app.get('/store/invoices/:invoiceId/pdf', requireAuth, async (req, res) => {
+    try {
+        const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
+        if (!featureFlags.userCreateEnabled || !featureFlags.billingInvoicesEnabled) {
+            return res.redirect('/store?error=' + encodeURIComponent('Invoices are disabled.'));
+        }
+
+        const account = await User.findByPk(req.session.user.id, {
+            attributes: ['id', 'username', 'email', 'firstName', 'lastName', 'isSuspended']
+        });
+        if (!account) {
+            req.session.destroy(() => {});
+            return res.redirect('/login?error=' + encodeURIComponent('Session expired. Please login again.'));
+        }
+        if (account.isSuspended) {
+            return res.redirect('/suspend');
+        }
+
+        const auditId = parseInvoiceIdToAuditId(req.params.invoiceId);
+        if (!auditId) {
+            return res.redirect('/store/invoices?error=' + encodeURIComponent('Invalid invoice id.'));
+        }
+
+        const entry = await AuditLog.findOne({
+            where: {
+                id: auditId,
+                actorUserId: account.id,
+                action: { [Op.like]: 'billing.%' }
+            }
+        });
+        if (!entry) {
+            return res.redirect('/store/invoices?error=' + encodeURIComponent('Invoice not found.'));
+        }
+
+        const invoice = mapBillingAuditToInvoiceEntry(entry, normalizeEconomyUnit(featureFlags.economyUnit));
+        if (!invoice) {
+            return res.redirect('/store/invoices?error=' + encodeURIComponent('Audit event is not invoiceable.'));
+        }
+
+        const filename = `${invoice.invoiceNo}.pdf`;
+        try {
+            const PDFDocument = require('pdfkit');
+            const doc = new PDFDocument({
+                size: 'A4',
+                margins: { top: 50, left: 50, right: 50, bottom: 50 }
+            });
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            doc.pipe(res);
+
+            const brandName = String((res.locals.settings && res.locals.settings.brandName) || 'CPanel').trim() || 'CPanel';
+            const customerName = [account.firstName, account.lastName].map((v) => String(v || '').trim()).filter(Boolean).join(' ') || account.username;
+
+            doc.fontSize(22).text(`${brandName} Invoice`, { align: 'left' });
+            doc.moveDown(0.6);
+            doc.fontSize(11).fillColor('#444');
+            doc.text(`Invoice No: ${invoice.invoiceNo}`);
+            doc.text(`Invoice ID: ${invoice.invoiceId}`);
+            doc.text(`Status: ${String(invoice.status || 'paid').toUpperCase()}`);
+            doc.text(`Issued At: ${invoice.issuedAt.toISOString()}`);
+            doc.text(`Paid At: ${invoice.paidAt.toISOString()}`);
+            doc.moveDown();
+            doc.text(`Customer: ${customerName}`);
+            doc.text(`Email: ${String(account.email || '').trim() || 'n/a'}`);
+            doc.moveDown();
+            doc.fillColor('#000').fontSize(13).text('Summary');
+            doc.moveDown(0.4);
+            doc.fontSize(11);
+            doc.text(`Description: ${invoice.actionLabel}`);
+            doc.text(`Amount: ${invoice.amount} ${invoice.currency}`);
+            if (invoice.details && invoice.details.serverRef) {
+                doc.text(`Server: ${invoice.details.serverRef}`);
+            }
+            if (invoice.details && Number.isFinite(invoice.details.walletBefore) && Number.isFinite(invoice.details.walletAfter)) {
+                doc.text(`Wallet: ${invoice.details.walletBefore} -> ${invoice.details.walletAfter}`);
+            }
+            doc.moveDown();
+            doc.fillColor('#444').fontSize(9).text('Generated by CPanel billing module.');
+            doc.end();
+        } catch {
+            const fallbackName = `${invoice.invoiceNo}.txt`;
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${fallbackName}"`);
+            return res.send([
+                `${(res.locals.settings && res.locals.settings.brandName) || 'CPanel'} Invoice`,
+                `Invoice No: ${invoice.invoiceNo}`,
+                `Invoice ID: ${invoice.invoiceId}`,
+                `Status: ${invoice.status}`,
+                `Issued At: ${invoice.issuedAt.toISOString()}`,
+                `Description: ${invoice.actionLabel}`,
+                `Amount: ${invoice.amount} ${invoice.currency}`
+            ].join('\n'));
+        }
+    } catch (error) {
+        console.error('Error downloading invoice PDF:', error);
+        return res.redirect('/store/invoices?error=' + encodeURIComponent('Failed to generate invoice PDF.'));
+    }
+});
+
+app.get('/store/statement/pdf', requireAuth, async (req, res) => {
+    try {
+        const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
+        if (!featureFlags.userCreateEnabled) {
+            return res.redirect('/?error=' + encodeURIComponent('Store is disabled by admin.'));
+        }
+        if (!featureFlags.billingInvoicesEnabled) {
+            return res.redirect('/store?error=' + encodeURIComponent('Billing statement is disabled by admin.'));
+        }
+
+        const account = await User.findByPk(req.session.user.id, {
+            attributes: ['id', 'username', 'email', 'firstName', 'lastName', 'coins', 'isSuspended']
+        });
+        if (!account) {
+            req.session.destroy(() => {});
+            return res.redirect('/login?error=' + encodeURIComponent('Session expired. Please login again.'));
+        }
+        if (account.isSuspended) {
+            return res.redirect('/suspend');
+        }
+
+        const currency = normalizeEconomyUnit(featureFlags.economyUnit);
+        const entries = await fetchBillingStatementEntriesForUser(account.id, currency, 1500);
+        const totals = entries.reduce((acc, row) => {
+            if (row.direction === 'debit') acc.debit += Number(row.amount || 0);
+            if (row.direction === 'credit') acc.credit += Number(row.amount || 0);
+            return acc;
+        }, { debit: 0, credit: 0 });
+        totals.debit = Math.round(totals.debit * 100) / 100;
+        totals.credit = Math.round(totals.credit * 100) / 100;
+        totals.net = Math.round((totals.credit - totals.debit) * 100) / 100;
+
+        const statementId = `ST-${account.id}-${new Date().toISOString().slice(0, 10)}`;
+        const generatedAt = new Date();
+        const brandName = String((res.locals.settings && res.locals.settings.brandName) || 'CPanel').trim() || 'CPanel';
+        const customerName = [account.firstName, account.lastName]
+            .map((value) => String(value || '').trim())
+            .filter(Boolean)
+            .join(' ') || account.username;
+
+        const filename = `${statementId}.pdf`;
+        try {
+            const PDFDocument = require('pdfkit');
+            const doc = new PDFDocument({
+                size: 'A4',
+                margins: { top: 48, left: 42, right: 42, bottom: 42 }
+            });
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            doc.pipe(res);
+
+            const { logoUrl, imageBuffer } = await loadRockyLogoForPdf(req);
+
+            if (imageBuffer) {
+                try {
+                    doc.image(imageBuffer, 42, 42, { fit: [62, 62], align: 'left', valign: 'top' });
+                } catch {
+                    // Ignore image parse errors.
+                }
+            }
+            doc.fontSize(20).fillColor('#111').text(`${brandName} - Account Statement`, 116, 48);
+            doc.moveDown(0.4);
+            doc.fontSize(10).fillColor('#444');
+            doc.text(`Statement ID: ${statementId}`, 116);
+            doc.text(`Generated At: ${generatedAt.toISOString()}`, 116);
+            doc.text(`Logo: ${logoUrl}`, 116, undefined, { width: 430 });
+
+            doc.moveDown(1.2);
+            doc.fillColor('#111').fontSize(12).text('Account');
+            doc.fontSize(10).fillColor('#333');
+            doc.text(`User: ${customerName} (@${account.username})`);
+            doc.text(`Email: ${String(account.email || '').trim() || 'n/a'}`);
+            doc.text(`Current Wallet: ${Number(account.coins || 0)} ${currency}`);
+
+            doc.moveDown(0.8);
+            doc.fillColor('#111').fontSize(12).text('Summary');
+            doc.fontSize(10).fillColor('#333');
+            doc.text(`Total Debit: ${totals.debit} ${currency}`);
+            doc.text(`Total Credit: ${totals.credit} ${currency}`);
+            doc.text(`Net Impact: ${totals.net >= 0 ? '+' : ''}${totals.net} ${currency}`);
+            doc.text(`Rows: ${entries.length}`);
+
+            doc.moveDown(1.0);
+            doc.fillColor('#111').fontSize(12).text('Transactions');
+
+            const headerY = doc.y + 6;
+            const columns = {
+                ts: 42,
+                type: 148,
+                amount: 196,
+                where: 258,
+                event: 398
+            };
+            const drawHeader = () => {
+                doc.fontSize(8).fillColor('#666');
+                doc.text('Timestamp', columns.ts, doc.y, { width: 102 });
+                doc.text('Type', columns.type, doc.y, { width: 44 });
+                doc.text('Amount', columns.amount, doc.y, { width: 58 });
+                doc.text('Where', columns.where, doc.y, { width: 132 });
+                doc.text('Event', columns.event, doc.y, { width: 155 });
+                doc.moveDown(0.5);
+                const y = doc.y;
+                doc.moveTo(42, y).lineTo(553, y).strokeColor('#cccccc').stroke();
+                doc.moveDown(0.4);
+            };
+
+            doc.y = headerY;
+            drawHeader();
+
+            const pushRow = (row) => {
+                const ts = row.timestamp instanceof Date && !Number.isNaN(row.timestamp.getTime())
+                    ? row.timestamp.toISOString().replace('T', ' ').slice(0, 19)
+                    : '-';
+                const type = String(row.direction || 'info').toUpperCase();
+                const amountText = row.amount > 0
+                    ? `${row.direction === 'debit' ? '-' : (row.direction === 'credit' ? '+' : '')}${row.amount} ${row.currency}`
+                    : '-';
+                const whereText = String(row.where || 'N/A').replace(/\s+/g, ' ').slice(0, 56);
+                const eventText = String(row.actionLabel || row.action || '-').replace(/\s+/g, ' ').slice(0, 68);
+
+                const rowHeight = 14;
+                if ((doc.y + rowHeight) > 790) {
+                    doc.addPage();
+                    drawHeader();
+                }
+                doc.fontSize(8).fillColor('#222');
+                doc.text(ts, columns.ts, doc.y, { width: 102 });
+                doc.text(type, columns.type, doc.y, { width: 44 });
+                doc.text(amountText, columns.amount, doc.y, { width: 58 });
+                doc.text(whereText, columns.where, doc.y, { width: 132 });
+                doc.text(eventText, columns.event, doc.y, { width: 155 });
+                doc.moveDown(0.55);
+            };
+
+            entries.forEach((row) => pushRow(row));
+
+            doc.moveDown(0.8);
+            doc.fontSize(9).fillColor('#666').text('Generated by CPanel Billing Statement module.');
+            doc.end();
+        } catch {
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${statementId}.txt"`);
+            const lines = [
+                `${brandName} - Account Statement`,
+                `Statement ID: ${statementId}`,
+                `Generated At: ${generatedAt.toISOString()}`,
+                `User: ${customerName} (@${account.username})`,
+                `Email: ${String(account.email || '').trim() || 'n/a'}`,
+                `Current Wallet: ${Number(account.coins || 0)} ${currency}`,
+                `Total Debit: ${totals.debit} ${currency}`,
+                `Total Credit: ${totals.credit} ${currency}`,
+                `Net Impact: ${totals.net >= 0 ? '+' : ''}${totals.net} ${currency}`,
+                `Rows: ${entries.length}`,
+                '',
+                'Transactions:'
+            ];
+            entries.forEach((row) => {
+                const ts = row.timestamp instanceof Date && !Number.isNaN(row.timestamp.getTime())
+                    ? row.timestamp.toISOString()
+                    : '-';
+                const amountText = row.amount > 0
+                    ? `${row.direction === 'debit' ? '-' : (row.direction === 'credit' ? '+' : '')}${row.amount} ${row.currency}`
+                    : '-';
+                lines.push(`${ts} | ${String(row.direction || 'info').toUpperCase()} | ${amountText} | ${row.where} | ${row.actionLabel || row.action}`);
+            });
+            return res.send(lines.join('\n'));
+        }
+    } catch (error) {
+        console.error('Error generating account statement PDF:', error);
+        return res.redirect('/store?error=' + encodeURIComponent('Failed to generate account statement.'));
     }
 });
 
