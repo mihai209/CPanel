@@ -83,12 +83,6 @@
         let boundModalEl = null;
 
         function applyStatusPresentation(modalEl, message, type = 'success') {
-            const t = (value) => {
-                if (window.cpanelI18n && typeof window.cpanelI18n.translateText === 'function') {
-                    return window.cpanelI18n.translateText(value);
-                }
-                return value;
-            };
             const titleEl = document.getElementById('statusModalTitle');
             const messageEl = document.getElementById('statusModalMessage');
             const topBarEl = document.getElementById('modal-top-bar');
@@ -103,9 +97,9 @@
             }
 
             if (type === 'error') {
-                titleEl.textContent = t('Whoops! Something went wrong.');
+                titleEl.textContent = 'Whoops! Something went wrong.';
                 titleEl.className = 'fw-bold mb-2 text-danger';
-                messageEl.textContent = t(message);
+                messageEl.textContent = message;
                 topBarEl.style.background = 'linear-gradient(90deg, #ef4444, #b91c1c)';
                 mascotImg.src = '/assets/sad-rocky.png';
                 mascotIcon.className = 'bi bi-exclamation-octagon text-danger display-3';
@@ -114,14 +108,14 @@
                 alertEl.classList.remove('d-none');
                 buttonEl.style.background = 'linear-gradient(90deg, #ef4444, #b91c1c)';
                 buttonEl.style.boxShadow = '0 4px 15px rgba(239, 68, 68, 0.3)';
-                buttonEl.textContent = t('I Understand');
+                buttonEl.textContent = 'I Understand';
                 return;
             }
 
             if (type === 'warning') {
-                titleEl.textContent = t('Warning!');
+                titleEl.textContent = 'Warning!';
                 titleEl.className = 'fw-bold mb-2 text-warning';
-                messageEl.textContent = t(message);
+                messageEl.textContent = message;
                 topBarEl.style.background = 'linear-gradient(90deg, #f59e0b, #d97706)';
                 mascotImg.src = '/assets/what-rocky.png';
                 mascotIcon.className = 'bi bi-exclamation-triangle text-warning display-3';
@@ -130,13 +124,13 @@
                 alertEl.classList.add('d-none');
                 buttonEl.style.background = 'linear-gradient(90deg, #f59e0b, #d97706)';
                 buttonEl.style.boxShadow = '0 4px 15px rgba(245, 158, 11, 0.3)';
-                buttonEl.textContent = t('Got It');
+                buttonEl.textContent = 'Got It';
                 return;
             }
 
-            titleEl.textContent = t('Great! Operation successful.');
+            titleEl.textContent = 'Great! Operation successful.';
             titleEl.className = 'fw-bold mb-2 text-success';
-            messageEl.textContent = t(message);
+            messageEl.textContent = message;
             topBarEl.style.background = 'linear-gradient(90deg, #22c55e, #15803d)';
             mascotImg.src = '/assets/happy-rocky.png';
             mascotIcon.className = 'bi bi-stars text-success display-3';
@@ -145,7 +139,7 @@
             alertEl.classList.add('d-none');
             buttonEl.style.background = 'linear-gradient(90deg, #22c55e, #15803d)';
             buttonEl.style.boxShadow = '0 4px 15px rgba(34, 197, 94, 0.3)';
-            buttonEl.textContent = t('Perfect, thanks!');
+            buttonEl.textContent = 'Perfect, thanks!';
         }
 
         function decodeMaybe(value) {
@@ -251,7 +245,6 @@
         }
 
         document.addEventListener('cpanel:page-load', initGlobalStatusModal);
-        document.addEventListener('cpanel:i18n-ready', initGlobalStatusModal);
         document.addEventListener('turbo:load', initGlobalStatusModal);
         document.addEventListener('turbo:before-cache', cleanupGlobalStatusModal);
         if (document.readyState === 'loading') {

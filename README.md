@@ -63,12 +63,6 @@ Language sync options:
 - `npm run lang:sync -- --only=ro` - sync only Romanian
 - `npm run lang:sync -- --limit=50` - translate only first 50 pending keys (test mode)
 
-Language runtime:
-
-- `/admin/lang` manages JSON files from `public/lang`.
-- UI language is resolved from session/cookie/query (`lang`) with fallback to `english`.
-- `POST /language` changes active language (`languageCode` + optional `redirect`).
-
 ### Core Features
 
 - Multi-connector and multi-location orchestration
@@ -150,12 +144,6 @@ Optiuni pentru sincronizare limbi:
 - `npm run lang:sync -- --only=es` - sincronizeaza doar spaniola
 - `npm run lang:sync -- --only=ro` - sincronizeaza doar romana
 - `npm run lang:sync -- --limit=50` - traduce doar primele 50 chei pendinte (test)
-
-Runtime limbi:
-
-- `/admin/lang` administreaza fisierele JSON din `public/lang`.
-- Limba UI este rezolvata din session/cookie/query (`lang`), cu fallback la `english`.
-- `POST /language` schimba limba activa (`languageCode` + `redirect` optional).
 
 ### Functionalitati
 

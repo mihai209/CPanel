@@ -20,7 +20,6 @@ const REDIS_SETTING_KEYS = [
 const nodeFs = require('fs');
 const nodeFsPromises = nodeFs.promises;
 const nodePath = require('path');
-const { loadLanguageCache } = require('../../core/i18n');
 const LANG_DIRECTORY = nodePath.join(process.cwd(), 'public', 'lang');
 const MAX_LANGUAGE_JSON_SIZE_BYTES = 2 * 1024 * 1024;
 
@@ -446,7 +445,6 @@ app.post('/admin/lang/save', requireAuth, requireAdmin, async (req, res) => {
         const fileName = `${languageCode}.json`;
         const filePath = nodePath.join(LANG_DIRECTORY, fileName);
         await nodeFsPromises.writeFile(filePath, pretty, 'utf8');
-        loadLanguageCache(true);
 
         return res.redirect('/admin/lang?success=' + encodeURIComponent(`Language "${fileName}" saved.`) + '&file=' + encodeURIComponent(fileName));
     } catch (error) {
@@ -468,7 +466,6 @@ app.post('/admin/lang/delete/:fileName', requireAuth, requireAdmin, async (req, 
         }
 
         await nodeFsPromises.unlink(filePath);
-        loadLanguageCache(true);
         return res.redirect('/admin/lang?success=' + encodeURIComponent(`Language "${fileName}" deleted.`));
     } catch (error) {
         console.error('Error deleting language file:', error);
