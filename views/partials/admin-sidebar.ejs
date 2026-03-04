@@ -48,191 +48,84 @@
 
     <!-- Navigation -->
     <div class="flex-grow-1 overflow-auto sidebar-nav-container">
+        <%
+        const currentAdminPath = String(path || '');
+        const adminNavSections = [
+            {
+                title: 'Core',
+                items: [
+                    { href: '/admin/overview', icon: 'bi-house-door', label: 'Overview' },
+                    { href: '/admin/settings', icon: 'bi-gear', label: 'Settings' },
+                    { href: '/admin/platform', icon: 'bi-command', label: 'Platform Ops' },
+                    { href: '/admin/incidents', icon: 'bi-exclamation-triangle', label: 'Incident Center' },
+                    { href: '/admin/logs', icon: 'bi-file-text', label: 'Logs' }
+                ]
+            },
+            {
+                title: 'Commerce',
+                items: [
+                    { href: '/admin/let-user-create', icon: 'bi-shop', label: 'Let User Create' },
+                    { href: '/admin/revenue-plans', icon: 'bi-cash-stack', label: 'Revenue Plans' },
+                    { href: '/admin/store/deals', icon: 'bi-stars', label: 'Store Deals' },
+                    { href: '/admin/store/redeem-codes', icon: 'bi-ticket-perforated', label: 'Redeem Codes' },
+                    { href: '/admin/forecasting', icon: 'bi-graph-up-arrow', label: 'Forecasting' }
+                ]
+            },
+            {
+                title: 'Infrastructure',
+                items: [
+                    { href: '/admin/connectors', icon: 'bi-diagram-3', label: 'Connectors' },
+                    { href: '/admin/connect-info', icon: 'bi-activity', label: 'Connector(s) Health' },
+                    { href: '/admin/locations', icon: 'bi-geo-alt', label: 'Locations' },
+                    { href: '/admin/users', icon: 'bi-people', label: 'Users' },
+                    { href: '/admin/servers', icon: 'bi-hdd-stack', label: 'Servers' },
+                    { href: '/admin/databases', icon: 'bi-database', label: 'Databases' },
+                    { href: '/admin/redis', icon: 'bi-hdd-network', label: 'Redis' }
+                ]
+            },
+            {
+                title: 'Security',
+                items: [
+                    { href: '/admin/abuse-scores', icon: 'bi-shield-exclamation', label: 'Abuse Scores' },
+                    { href: '/admin/service-health-checks', icon: 'bi-heart-pulse', label: 'Health Checks' },
+                    { href: '/admin/auth-providers', icon: 'bi-shield-lock', label: 'Auth Providers' },
+                    { href: '/admin/captcha', icon: 'bi-robot', label: 'Captcha' },
+                    { href: '/admin/api', icon: 'bi-code-square', label: 'CPanel API' }
+                ]
+            },
+            {
+                title: 'Content',
+                items: [
+                    { href: '/admin/images', icon: 'bi-grid-3x3-gap', label: 'Images' },
+                    { href: '/admin/packages', icon: 'bi-box', label: 'Packages' },
+                    { href: '/admin/migrations/pterodactyl', icon: 'bi-arrow-left-right', label: 'Migrations' },
+                    { href: '/admin/extensions', icon: 'bi-puzzle', label: 'Extensions' },
+                    { href: '/admin/themes', icon: 'bi-palette', label: 'Themes' },
+                    { href: '/admin/lang', icon: 'bi-translate', label: 'Languages' }
+                ]
+            }
+        ];
+        const isAdminNavActive = (item) => {
+            const matches = Array.isArray(item && item.match) && item.match.length ? item.match : [item && item.href];
+            return matches.some((entry) => {
+                const value = String(entry || '').trim();
+                if (!value) return false;
+                return currentAdminPath === value || currentAdminPath.startsWith(`${value}/`);
+            });
+        };
+        %>
         <ul class="nav flex-column mb-auto">
-            <!-- GENERAL -->
-            <li class="sidebar-category-header">General</li>
-            <li class="nav-item">
-                <a href="/admin/overview" class="nav-link <%= path === '/admin/overview' ? 'active' : '' %>">
-                    <i class="bi bi-house-door"></i>
-                    <span class="sidebar-text">Overview</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/settings" class="nav-link <%= path === '/admin/settings' ? 'active' : '' %>">
-                    <i class="bi bi-gear"></i>
-                    <span class="sidebar-text">Settings</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/redis" class="nav-link <%= path === '/admin/redis' ? 'active' : '' %>">
-                    <i class="bi bi-hdd-network"></i>
-                    <span class="sidebar-text">Redis</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/let-user-create" class="nav-link <%= path === '/admin/let-user-create' ? 'active' : '' %>">
-                    <i class="bi bi-shop"></i>
-                    <span class="sidebar-text">Let User Create</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/store/deals" class="nav-link <%= path === '/admin/store/deals' ? 'active' : '' %>">
-                    <i class="bi bi-stars"></i>
-                    <span class="sidebar-text">Store Deals</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/store/redeem-codes" class="nav-link <%= path === '/admin/store/redeem-codes' ? 'active' : '' %>">
-                    <i class="bi bi-ticket-perforated"></i>
-                    <span class="sidebar-text">Redeem Codes</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/revenue-plans" class="nav-link <%= path === '/admin/revenue-plans' ? 'active' : '' %>">
-                    <i class="bi bi-cash-stack"></i>
-                    <span class="sidebar-text">Revenue Plans</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/forecasting" class="nav-link <%= path === '/admin/forecasting' ? 'active' : '' %>">
-                    <i class="bi bi-graph-up-arrow"></i>
-                    <span class="sidebar-text">Forecasting</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/abuse-scores" class="nav-link <%= path === '/admin/abuse-scores' ? 'active' : '' %>">
-                    <i class="bi bi-shield-exclamation"></i>
-                    <span class="sidebar-text">Abuse Scores</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/service-health-checks" class="nav-link <%= path === '/admin/service-health-checks' ? 'active' : '' %>">
-                    <i class="bi bi-heart-pulse"></i>
-                    <span class="sidebar-text">Health Checks</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/api" class="nav-link <%= path === '/admin/api' ? 'active' : '' %>">
-                    <i class="bi bi-code-square"></i>
-                    <span class="sidebar-text">CPanel API</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/captcha" class="nav-link <%= path === '/admin/captcha' ? 'active' : '' %>">
-                    <i class="bi bi-robot"></i>
-                    <span class="sidebar-text">Captcha</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/lang" class="nav-link <%= path === '/admin/lang' ? 'active' : '' %>">
-                    <i class="bi bi-translate"></i>
-                    <span class="sidebar-text">Languages</span>
-                </a>
-            </li>
-
-            <!-- INFRASTRUCTURE -->
-            <li class="sidebar-category-header">Infrastructure</li>
-            <li class="nav-item">
-                <a href="/admin/users" class="nav-link <%= path === '/admin/users' ? 'active' : '' %>">
-                    <i class="bi bi-people"></i>
-                    <span class="sidebar-text">Users</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/connectors" class="nav-link <%= path === '/admin/connectors' ? 'active' : '' %>">
-                    <i class="bi bi-diagram-3"></i>
-                    <span class="sidebar-text">Connectors</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/connect-info" class="nav-link <%= path === '/admin/connect-info' ? 'active' : '' %>">
-                    <i class="bi bi-activity"></i>
-                    <span class="sidebar-text">Connector(s) Health</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/platform" class="nav-link <%= path === '/admin/platform' ? 'active' : '' %>">
-                    <i class="bi bi-command"></i>
-                    <span class="sidebar-text">Platform Ops</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/incidents" class="nav-link <%= path === '/admin/incidents' ? 'active' : '' %>">
-                    <i class="bi bi-exclamation-triangle"></i>
-                    <span class="sidebar-text">Incident Center</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/migrations/pterodactyl" class="nav-link <%= path === '/admin/migrations/pterodactyl' ? 'active' : '' %>">
-                    <i class="bi bi-arrow-left-right"></i>
-                    <span class="sidebar-text">Migrations</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/locations" class="nav-link <%= path === '/admin/locations' ? 'active' : '' %>">
-                    <i class="bi bi-geo-alt"></i>
-                    <span class="sidebar-text">Locations</span>
-                </a>
-            </li>
-
-            <!-- RESOURCES -->
-            <li class="sidebar-category-header">Resources</li>
-
-            <li class="nav-item">
-                <a href="/admin/servers" class="nav-link <%= path === '/admin/servers' ? 'active' : '' %>">
-                    <i class="bi bi-hdd-stack"></i>
-                    <span class="sidebar-text">Servers</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/images" class="nav-link <%= path === '/admin/images' ? 'active' : '' %>">
-                    <i class="bi bi-grid-3x3-gap"></i>
-                    <span class="sidebar-text">Images</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/packages" class="nav-link <%= path === '/admin/packages' ? 'active' : '' %>">
-                    <i class="bi bi-box"></i>
-                    <span class="sidebar-text">Packages</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/databases" class="nav-link <%= path === '/admin/databases' ? 'active' : '' %>">
-                    <i class="bi bi-database"></i>
-                    <span class="sidebar-text">Databases</span>
-                </a>
-            </li>
-
-            <!-- SYSTEM -->
-            <li class="sidebar-category-header">System</li>
-
-            <li class="nav-item">
-                <a href="/admin/auth-providers"
-                    class="nav-link <%= path === '/admin/auth-providers' ? 'active' : '' %>">
-                    <i class="bi bi-shield-lock"></i>
-                    <span class="sidebar-text">Auth Providers</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/themes" class="nav-link <%= path === '/admin/themes' ? 'active' : '' %>">
-                    <i class="bi bi-palette"></i>
-                    <span class="sidebar-text">Themes</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/extensions" class="nav-link <%= path === '/admin/extensions' ? 'active' : '' %>">
-                    <i class="bi bi-box"></i>
-                    <span class="sidebar-text">Extensions</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="/admin/logs" class="nav-link <%= path === '/admin/logs' ? 'active' : '' %>">
-                    <i class="bi bi-file-text"></i>
-                    <span class="sidebar-text">Logs</span>
-                </a>
-            </li>
-
-
+            <% adminNavSections.forEach((section) => { %>
+                <li class="sidebar-category-header"><%= section.title %></li>
+                <% section.items.forEach((item) => { %>
+                    <li class="nav-item">
+                        <a href="<%= item.href %>" class="nav-link <%= isAdminNavActive(item) ? 'active' : '' %>">
+                            <i class="bi <%= item.icon %>"></i>
+                            <span class="sidebar-text"><%= item.label %></span>
+                        </a>
+                    </li>
+                <% }) %>
+            <% }) %>
         </ul>
     </div>
 

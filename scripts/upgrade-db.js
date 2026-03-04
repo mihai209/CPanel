@@ -693,6 +693,7 @@ async function upgrade() {
             { key: 'featureStoreDealsEnabled', value: 'false' },
             { key: 'featureStoreRedeemCodesEnabled', value: 'false' },
             { key: 'featureBillingInvoicesEnabled', value: 'true' },
+            { key: 'featureBillingStatementsEnabled', value: 'true' },
             { key: 'featureBillingInvoiceWebhookEnabled', value: 'false' },
             { key: 'featureAutoRemediationEnabled', value: 'false' },
             { key: 'featureAntiMinerEnabled', value: 'false' },

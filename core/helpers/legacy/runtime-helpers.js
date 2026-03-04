@@ -67,6 +67,7 @@ const FEATURE_FLAG_SETTING_KEYS = [
     'featureStoreDealsEnabled',
     'featureStoreRedeemCodesEnabled',
     'featureBillingInvoicesEnabled',
+    'featureBillingStatementsEnabled',
     'featureBillingInvoiceWebhookEnabled',
     'featureQuotaForecastingEnabled',
     'featureAbuseScoreEnabled',
@@ -259,6 +260,7 @@ function defaultPanelFeatureFlags() {
         storeDealsEnabled: false,
         storeRedeemCodesEnabled: false,
         billingInvoicesEnabled: true,
+        billingStatementsEnabled: true,
         billingInvoiceWebhookEnabled: false,
         quotaForecastingEnabled: true,
         abuseScoreEnabled: false,
@@ -330,6 +332,10 @@ function getPanelFeatureFlagsFromMap(settingsMap) {
         storeDealsEnabled: parseBooleanInput(source.featureStoreDealsEnabled, base.storeDealsEnabled),
         storeRedeemCodesEnabled: parseBooleanInput(source.featureStoreRedeemCodesEnabled, base.storeRedeemCodesEnabled),
         billingInvoicesEnabled: parseBooleanInput(source.featureBillingInvoicesEnabled, base.billingInvoicesEnabled),
+        billingStatementsEnabled: parseBooleanInput(
+            source.featureBillingStatementsEnabled,
+            parseBooleanInput(source.featureBillingInvoicesEnabled, base.billingStatementsEnabled)
+        ),
         billingInvoiceWebhookEnabled: parseBooleanInput(source.featureBillingInvoiceWebhookEnabled, base.billingInvoiceWebhookEnabled),
         quotaForecastingEnabled: parseBooleanInput(source.featureQuotaForecastingEnabled, base.quotaForecastingEnabled),
         abuseScoreEnabled: parseBooleanInput(source.featureAbuseScoreEnabled, base.abuseScoreEnabled),

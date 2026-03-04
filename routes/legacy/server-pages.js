@@ -977,6 +977,106 @@ async function loadRockyLogoForPdf(req) {
     return { logoUrl, imageBuffer: null };
 }
 
+function formatPdfTimestamp(value) {
+    const dt = value instanceof Date ? value : new Date(value);
+    if (!dt || Number.isNaN(dt.getTime())) return '-';
+    const tz = String(process.env.TIMEZONE || 'UTC').trim() || 'UTC';
+    try {
+        return new Intl.DateTimeFormat('en-GB', {
+            dateStyle: 'medium',
+            timeStyle: 'medium',
+            hour12: false,
+            timeZone: tz
+        }).format(dt);
+    } catch {
+        return dt.toISOString();
+    }
+}
+
+function formatPdfAmount(value, currency) {
+    const amount = Number(value);
+    const normalized = Number.isFinite(amount) ? amount : 0;
+    const unit = String(currency || 'Coins').trim().slice(0, 16) || 'Coins';
+    return `${normalized.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${unit}`;
+}
+
+function cleanPdfText(value, maxLen = 180, fallback = '-') {
+    const clean = String(value === undefined || value === null ? '' : value).replace(/\s+/g, ' ').trim();
+    if (!clean) return fallback;
+    return clean.slice(0, Math.max(1, Number.parseInt(maxLen, 10) || 180));
+}
+
+function renderProfessionalPdfHeader(doc, {
+    brandName,
+    title,
+    documentId,
+    generatedAt,
+    logoBuffer = null,
+    customerName = '',
+    customerEmail = '',
+    subtitle = ''
+} = {}) {
+    const left = doc.page.margins.left;
+    const right = doc.page.width - doc.page.margins.right;
+    const usableWidth = right - left;
+    const headerHeight = 88;
+
+    doc.save();
+    doc.rect(0, 0, doc.page.width, headerHeight).fill('#0f172a');
+    doc.restore();
+
+    if (logoBuffer) {
+        try {
+            doc.image(logoBuffer, left, 22, { fit: [42, 42], align: 'left', valign: 'top' });
+        } catch {
+            // Ignore image decode errors.
+        }
+    }
+
+    const textStartX = left + (logoBuffer ? 54 : 0);
+    doc.font('Helvetica-Bold').fontSize(18).fillColor('#f8fafc')
+        .text(cleanPdfText(brandName, 48, 'CPanel'), textStartX, 22, { width: usableWidth * 0.55 });
+    doc.font('Helvetica').fontSize(10).fillColor('#cbd5e1')
+        .text(cleanPdfText(title, 120, 'Document'), textStartX, 45, { width: usableWidth * 0.55 });
+    if (subtitle) {
+        doc.fontSize(9).fillColor('#94a3b8')
+            .text(cleanPdfText(subtitle, 160, ''), textStartX, 60, { width: usableWidth * 0.55 });
+    }
+
+    doc.font('Helvetica').fontSize(9).fillColor('#e2e8f0')
+        .text(`ID: ${cleanPdfText(documentId, 80, '-')}`, right - 260, 22, { width: 260, align: 'right' });
+    doc.text(`Generated: ${formatPdfTimestamp(generatedAt)}`, right - 260, 36, { width: 260, align: 'right' });
+    doc.text(`Timezone: ${cleanPdfText(process.env.TIMEZONE || 'UTC', 40, 'UTC')}`, right - 260, 50, { width: 260, align: 'right' });
+
+    const infoY = headerHeight + 14;
+    doc.roundedRect(left, infoY, usableWidth, 48, 6).fillAndStroke('#f8fafc', '#e2e8f0');
+    doc.font('Helvetica').fontSize(9).fillColor('#475569')
+        .text('Account Holder', left + 10, infoY + 7, { width: usableWidth / 2 });
+    doc.font('Helvetica-Bold').fontSize(11).fillColor('#0f172a')
+        .text(cleanPdfText(customerName, 90, 'Unknown User'), left + 10, infoY + 20, { width: usableWidth / 2 });
+    doc.font('Helvetica').fontSize(10).fillColor('#334155')
+        .text(cleanPdfText(customerEmail, 120, 'n/a'), left + usableWidth / 2, infoY + 20, { width: (usableWidth / 2) - 10, align: 'right' });
+
+    doc.y = infoY + 62;
+}
+
+function finalizeProfessionalPdf(doc, { brandName = 'CPanel', documentType = 'Document' } = {}) {
+    const left = doc.page.margins.left;
+    const right = doc.page.width - doc.page.margins.right;
+    const range = doc.bufferedPageRange();
+
+    for (let i = 0; i < range.count; i += 1) {
+        doc.switchToPage(i);
+        const y = doc.page.height - doc.page.margins.bottom + 12;
+        doc.moveTo(left, y - 8).lineTo(right, y - 8).lineWidth(0.7).strokeColor('#e2e8f0').stroke();
+        doc.font('Helvetica').fontSize(8).fillColor('#64748b')
+            .text(`${cleanPdfText(brandName, 48, 'CPanel')} | ${cleanPdfText(documentType, 48, 'Document')}`, left, y, { width: 280 });
+        doc.text(`Page ${i + 1} / ${range.count}`, right - 120, y, { width: 120, align: 'right' });
+    }
+
+    doc.end();
+}
+
 async function createBillingAuditLog({
     actorUserId = null,
     action,
@@ -3798,7 +3898,13 @@ app.get('/store/invoices/:invoiceId/pdf', requireAuth, async (req, res) => {
             const PDFDocument = require('pdfkit');
             const doc = new PDFDocument({
                 size: 'A4',
-                margins: { top: 50, left: 50, right: 50, bottom: 50 }
+                margins: { top: 44, left: 44, right: 44, bottom: 44 },
+                bufferPages: true,
+                info: {
+                    Title: `${invoice.invoiceNo} - Invoice`,
+                    Author: String((res.locals.settings && res.locals.settings.brandName) || 'CPanel').trim() || 'CPanel',
+                    Subject: 'Billing Invoice'
+                }
             });
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -3806,33 +3912,72 @@ app.get('/store/invoices/:invoiceId/pdf', requireAuth, async (req, res) => {
 
             const brandName = String((res.locals.settings && res.locals.settings.brandName) || 'CPanel').trim() || 'CPanel';
             const customerName = [account.firstName, account.lastName].map((v) => String(v || '').trim()).filter(Boolean).join(' ') || account.username;
+            const { imageBuffer } = await loadRockyLogoForPdf(req);
 
-            doc.fontSize(22).text(`${brandName} Invoice`, { align: 'left' });
-            doc.moveDown(0.6);
-            doc.fontSize(11).fillColor('#444');
-            doc.text(`Invoice No: ${invoice.invoiceNo}`);
-            doc.text(`Invoice ID: ${invoice.invoiceId}`);
-            doc.text(`Status: ${String(invoice.status || 'paid').toUpperCase()}`);
-            doc.text(`Issued At: ${invoice.issuedAt.toISOString()}`);
-            doc.text(`Paid At: ${invoice.paidAt.toISOString()}`);
-            doc.moveDown();
-            doc.text(`Customer: ${customerName}`);
-            doc.text(`Email: ${String(account.email || '').trim() || 'n/a'}`);
-            doc.moveDown();
-            doc.fillColor('#000').fontSize(13).text('Summary');
+            renderProfessionalPdfHeader(doc, {
+                brandName,
+                title: 'Billing Invoice',
+                subtitle: cleanPdfText(invoice.actionLabel || invoice.action, 140, ''),
+                documentId: `${invoice.invoiceNo} (${invoice.invoiceId})`,
+                generatedAt: new Date(),
+                logoBuffer: imageBuffer,
+                customerName,
+                customerEmail: String(account.email || '').trim() || 'n/a'
+            });
+
+            const left = doc.page.margins.left;
+            const right = doc.page.width - doc.page.margins.right;
+            const width = right - left;
+            const statusText = String(invoice.status || 'paid').toUpperCase();
+
+            doc.font('Helvetica-Bold').fontSize(12).fillColor('#0f172a').text('Invoice Summary', left, doc.y);
             doc.moveDown(0.4);
-            doc.fontSize(11);
-            doc.text(`Description: ${invoice.actionLabel}`);
-            doc.text(`Amount: ${invoice.amount} ${invoice.currency}`);
-            if (invoice.details && invoice.details.serverRef) {
-                doc.text(`Server: ${invoice.details.serverRef}`);
+            const summaryTop = doc.y;
+            doc.roundedRect(left, summaryTop, width, 74, 6).fillAndStroke('#ffffff', '#dbe2ea');
+            doc.font('Helvetica').fontSize(10).fillColor('#334155');
+            doc.text(`Issued: ${formatPdfTimestamp(invoice.issuedAt)}`, left + 12, summaryTop + 11);
+            doc.text(`Paid: ${formatPdfTimestamp(invoice.paidAt)}`, left + 12, summaryTop + 28);
+            doc.text(`Status: ${statusText}`, left + 12, summaryTop + 45);
+            doc.font('Helvetica-Bold').fontSize(16).fillColor('#0f172a')
+                .text(formatPdfAmount(invoice.amount, invoice.currency), left + width - 220, summaryTop + 22, { width: 208, align: 'right' });
+            doc.moveDown(4.6);
+
+            doc.font('Helvetica-Bold').fontSize(12).fillColor('#0f172a').text('Line Item', left, doc.y);
+            doc.moveDown(0.4);
+
+            const tableTop = doc.y;
+            const col = {
+                description: left + 10,
+                server: left + 260,
+                amount: right - 130
+            };
+            doc.roundedRect(left, tableTop, width, 96, 6).fillAndStroke('#ffffff', '#dbe2ea');
+            doc.font('Helvetica-Bold').fontSize(9).fillColor('#475569');
+            doc.text('Description', col.description, tableTop + 10, { width: 240 });
+            doc.text('Server', col.server, tableTop + 10, { width: 170 });
+            doc.text('Amount', col.amount, tableTop + 10, { width: 120, align: 'right' });
+
+            doc.moveTo(left + 10, tableTop + 26).lineTo(right - 10, tableTop + 26).lineWidth(0.6).strokeColor('#e2e8f0').stroke();
+            doc.font('Helvetica').fontSize(10).fillColor('#0f172a');
+            doc.text(cleanPdfText(invoice.actionLabel || invoice.action, 120), col.description, tableTop + 34, { width: 240 });
+            doc.text(cleanPdfText(invoice.details && invoice.details.serverRef ? invoice.details.serverRef : 'N/A', 64), col.server, tableTop + 34, { width: 170 });
+            doc.text(formatPdfAmount(invoice.amount, invoice.currency), col.amount, tableTop + 34, { width: 120, align: 'right' });
+
+            const hasWallet =
+                invoice.details
+                && Number.isFinite(invoice.details.walletBefore)
+                && Number.isFinite(invoice.details.walletAfter);
+            if (hasWallet) {
+                doc.fontSize(9).fillColor('#64748b')
+                    .text(
+                        `Wallet: ${formatPdfAmount(invoice.details.walletBefore, invoice.currency)} -> ${formatPdfAmount(invoice.details.walletAfter, invoice.currency)}`,
+                        col.description,
+                        tableTop + 64,
+                        { width: width - 24 }
+                    );
             }
-            if (invoice.details && Number.isFinite(invoice.details.walletBefore) && Number.isFinite(invoice.details.walletAfter)) {
-                doc.text(`Wallet: ${invoice.details.walletBefore} -> ${invoice.details.walletAfter}`);
-            }
-            doc.moveDown();
-            doc.fillColor('#444').fontSize(9).text('Generated by CPanel billing module.');
-            doc.end();
+
+            finalizeProfessionalPdf(doc, { brandName, documentType: 'Invoice' });
         } catch {
             const fallbackName = `${invoice.invoiceNo}.txt`;
             res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -3859,7 +4004,7 @@ app.get('/store/statement/pdf', requireAuth, async (req, res) => {
         if (!featureFlags.userCreateEnabled) {
             return res.redirect('/?error=' + encodeURIComponent('Store is disabled by admin.'));
         }
-        if (!featureFlags.billingInvoicesEnabled) {
+        if (!featureFlags.billingStatementsEnabled) {
             return res.redirect('/store?error=' + encodeURIComponent('Billing statement is disabled by admin.'));
         }
 
@@ -3898,100 +4043,103 @@ app.get('/store/statement/pdf', requireAuth, async (req, res) => {
             const PDFDocument = require('pdfkit');
             const doc = new PDFDocument({
                 size: 'A4',
-                margins: { top: 48, left: 42, right: 42, bottom: 42 }
+                margins: { top: 44, left: 44, right: 44, bottom: 44 },
+                bufferPages: true,
+                info: {
+                    Title: `${statementId} - Billing Statement`,
+                    Author: String((res.locals.settings && res.locals.settings.brandName) || 'CPanel').trim() || 'CPanel',
+                    Subject: 'Account Billing Statement'
+                }
             });
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
             doc.pipe(res);
 
-            const { logoUrl, imageBuffer } = await loadRockyLogoForPdf(req);
+            const { imageBuffer } = await loadRockyLogoForPdf(req);
+            renderProfessionalPdfHeader(doc, {
+                brandName,
+                title: 'Account Billing Statement',
+                subtitle: 'Detailed ledger of wallet operations (purchase/sell/renew/refund).',
+                documentId: statementId,
+                generatedAt,
+                logoBuffer: imageBuffer,
+                customerName: `${customerName} (@${account.username})`,
+                customerEmail: String(account.email || '').trim() || 'n/a'
+            });
 
-            if (imageBuffer) {
-                try {
-                    doc.image(imageBuffer, 42, 42, { fit: [62, 62], align: 'left', valign: 'top' });
-                } catch {
-                    // Ignore image parse errors.
+            const left = doc.page.margins.left;
+            const right = doc.page.width - doc.page.margins.right;
+            const width = right - left;
+
+            doc.font('Helvetica-Bold').fontSize(12).fillColor('#0f172a').text('Summary', left, doc.y);
+            doc.moveDown(0.35);
+            const summaryTop = doc.y;
+            const gap = 10;
+            const boxWidth = (width - (gap * 3)) / 4;
+            const summaryCards = [
+                { label: 'Total Debit', value: formatPdfAmount(totals.debit, currency), color: '#ef4444' },
+                { label: 'Total Credit', value: formatPdfAmount(totals.credit, currency), color: '#22c55e' },
+                { label: 'Net Impact', value: `${totals.net >= 0 ? '+' : ''}${formatPdfAmount(totals.net, currency)}`, color: '#0ea5e9' },
+                { label: 'Wallet', value: formatPdfAmount(account.coins, currency), color: '#64748b' }
+            ];
+            summaryCards.forEach((card, index) => {
+                const x = left + (index * (boxWidth + gap));
+                doc.roundedRect(x, summaryTop, boxWidth, 64, 6).fillAndStroke('#ffffff', '#dbe2ea');
+                doc.rect(x, summaryTop, boxWidth, 3).fill(card.color);
+                doc.font('Helvetica').fontSize(8).fillColor('#64748b').text(card.label, x + 8, summaryTop + 12, { width: boxWidth - 16 });
+                doc.font('Helvetica-Bold').fontSize(11).fillColor('#0f172a').text(card.value, x + 8, summaryTop + 30, { width: boxWidth - 16 });
+            });
+            doc.y = summaryTop + 76;
+
+            doc.font('Helvetica-Bold').fontSize(12).fillColor('#0f172a').text('Transactions', left, doc.y);
+            doc.moveDown(0.35);
+
+            const drawTableHeader = (isContinuation = false) => {
+                if (isContinuation) {
+                    doc.save();
+                    doc.rect(0, 0, doc.page.width, 46).fill('#0f172a');
+                    doc.restore();
+                    doc.font('Helvetica-Bold').fontSize(12).fillColor('#f8fafc')
+                        .text(`${cleanPdfText(brandName, 48, 'CPanel')} - Statement (continued)`, left, 16, { width });
+                    doc.y = 58;
                 }
-            }
-            doc.fontSize(20).fillColor('#111').text(`${brandName} - Account Statement`, 116, 48);
-            doc.moveDown(0.4);
-            doc.fontSize(10).fillColor('#444');
-            doc.text(`Statement ID: ${statementId}`, 116);
-            doc.text(`Generated At: ${generatedAt.toISOString()}`, 116);
-            doc.text(`Logo: ${logoUrl}`, 116, undefined, { width: 430 });
 
-            doc.moveDown(1.2);
-            doc.fillColor('#111').fontSize(12).text('Account');
-            doc.fontSize(10).fillColor('#333');
-            doc.text(`User: ${customerName} (@${account.username})`);
-            doc.text(`Email: ${String(account.email || '').trim() || 'n/a'}`);
-            doc.text(`Current Wallet: ${Number(account.coins || 0)} ${currency}`);
-
-            doc.moveDown(0.8);
-            doc.fillColor('#111').fontSize(12).text('Summary');
-            doc.fontSize(10).fillColor('#333');
-            doc.text(`Total Debit: ${totals.debit} ${currency}`);
-            doc.text(`Total Credit: ${totals.credit} ${currency}`);
-            doc.text(`Net Impact: ${totals.net >= 0 ? '+' : ''}${totals.net} ${currency}`);
-            doc.text(`Rows: ${entries.length}`);
-
-            doc.moveDown(1.0);
-            doc.fillColor('#111').fontSize(12).text('Transactions');
-
-            const headerY = doc.y + 6;
-            const columns = {
-                ts: 42,
-                type: 148,
-                amount: 196,
-                where: 258,
-                event: 398
-            };
-            const drawHeader = () => {
-                doc.fontSize(8).fillColor('#666');
-                doc.text('Timestamp', columns.ts, doc.y, { width: 102 });
-                doc.text('Type', columns.type, doc.y, { width: 44 });
-                doc.text('Amount', columns.amount, doc.y, { width: 58 });
-                doc.text('Where', columns.where, doc.y, { width: 132 });
-                doc.text('Event', columns.event, doc.y, { width: 155 });
-                doc.moveDown(0.5);
-                const y = doc.y;
-                doc.moveTo(42, y).lineTo(553, y).strokeColor('#cccccc').stroke();
-                doc.moveDown(0.4);
+                const tableHeaderTop = doc.y;
+                doc.roundedRect(left, tableHeaderTop, width, 24, 4).fill('#f1f5f9');
+                doc.font('Helvetica-Bold').fontSize(8).fillColor('#334155');
+                doc.text('Timestamp', left + 8, tableHeaderTop + 8, { width: 112 });
+                doc.text('Type', left + 124, tableHeaderTop + 8, { width: 46 });
+                doc.text('Amount', left + 174, tableHeaderTop + 8, { width: 92, align: 'right' });
+                doc.text('Where', left + 270, tableHeaderTop + 8, { width: 108 });
+                doc.text('Event', left + 382, tableHeaderTop + 8, { width: width - 390 });
+                doc.y = tableHeaderTop + 28;
             };
 
-            doc.y = headerY;
-            drawHeader();
+            drawTableHeader(false);
 
-            const pushRow = (row) => {
-                const ts = row.timestamp instanceof Date && !Number.isNaN(row.timestamp.getTime())
-                    ? row.timestamp.toISOString().replace('T', ' ').slice(0, 19)
-                    : '-';
-                const type = String(row.direction || 'info').toUpperCase();
-                const amountText = row.amount > 0
-                    ? `${row.direction === 'debit' ? '-' : (row.direction === 'credit' ? '+' : '')}${row.amount} ${row.currency}`
-                    : '-';
-                const whereText = String(row.where || 'N/A').replace(/\s+/g, ' ').slice(0, 56);
-                const eventText = String(row.actionLabel || row.action || '-').replace(/\s+/g, ' ').slice(0, 68);
-
-                const rowHeight = 14;
-                if ((doc.y + rowHeight) > 790) {
+            const rowHeight = 20;
+            entries.forEach((row, index) => {
+                const needsBreak = (doc.y + rowHeight) > (doc.page.height - doc.page.margins.bottom - 30);
+                if (needsBreak) {
                     doc.addPage();
-                    drawHeader();
+                    drawTableHeader(true);
                 }
-                doc.fontSize(8).fillColor('#222');
-                doc.text(ts, columns.ts, doc.y, { width: 102 });
-                doc.text(type, columns.type, doc.y, { width: 44 });
-                doc.text(amountText, columns.amount, doc.y, { width: 58 });
-                doc.text(whereText, columns.where, doc.y, { width: 132 });
-                doc.text(eventText, columns.event, doc.y, { width: 155 });
-                doc.moveDown(0.55);
-            };
 
-            entries.forEach((row) => pushRow(row));
+                const rowY = doc.y;
+                if (index % 2 === 0) {
+                    doc.rect(left, rowY, width, rowHeight).fill('#f8fafc');
+                }
+                doc.font('Helvetica').fontSize(8).fillColor('#0f172a');
+                doc.text(formatPdfTimestamp(row.timestamp), left + 8, rowY + 6, { width: 112 });
+                doc.text(cleanPdfText(String(row.direction || 'info').toUpperCase(), 8), left + 124, rowY + 6, { width: 46 });
+                const sign = row.direction === 'debit' ? '-' : (row.direction === 'credit' ? '+' : '');
+                doc.text(`${sign}${formatPdfAmount(row.amount, row.currency)}`, left + 174, rowY + 6, { width: 92, align: 'right' });
+                doc.text(cleanPdfText(row.where, 36), left + 270, rowY + 6, { width: 108 });
+                doc.text(cleanPdfText(row.actionLabel || row.action, 42), left + 382, rowY + 6, { width: width - 390 });
+                doc.y = rowY + rowHeight;
+            });
 
-            doc.moveDown(0.8);
-            doc.fontSize(9).fillColor('#666').text('Generated by CPanel Billing Statement module.');
-            doc.end();
+            finalizeProfessionalPdf(doc, { brandName, documentType: 'Billing Statement' });
         } catch {
             res.setHeader('Content-Type', 'text/plain; charset=utf-8');
             res.setHeader('Content-Disposition', `attachment; filename="${statementId}.txt"`);
