@@ -60,7 +60,19 @@
             <% } %>
 
             <div class="cardx p-3 mb-3">
-                <h2 class="h6 mb-3">Active Keys</h2>
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h2 class="h6 mb-0">Active Keys</h2>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#apiDocsModal">
+                            <i class="bi bi-book"></i> API Docs
+                        </button>
+                        <% if (canManageApiKeys) { %>
+                            <button class="btn btn-sm btn-primary" data-action="create" data-bs-toggle="modal" data-bs-target="#apiKeyModal">
+                                <i class="bi bi-key"></i> Create Key
+                            </button>
+                        <% } %>
+                    </div>
+                </div>
                 <div class="table-responsive">
                     <table class="table table-dark table-sm align-middle mb-0">
                         <thead>
@@ -109,9 +121,19 @@
                                 </td>
                                 <td class="text-end">
                                     <% if (canManageApiKeys && entry.active) { %>
-                                    <form method="POST" action="/server/<%= server.containerId %>/api-keys/<%= entry.id %>/revoke" class="d-inline">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">Revoke</button>
-                                    </form>
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-light"
+                                        data-action="manage"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#apiKeyModal"
+                                        data-key-id="<%= entry.id %>"
+                                        data-name="<%= entry.name %>"
+                                        data-prefix="<%= entry.keyPrefixMasked %>"
+                                        data-permissions='<%= JSON.stringify(Array.isArray(entry.permissions) ? entry.permissions : []) %>'
+                                        data-expires="<%= entry.expiresAt ? new Date(entry.expiresAt).toISOString() : '' %>">
+                                        Manage
+                                    </button>
                                     <% } else { %>
                                         <span class="text-muted-2">-</span>
                                     <% } %>
@@ -123,39 +145,108 @@
                 </div>
             </div>
 
-            <% if (canManageApiKeys) { %>
-            <div class="cardx p-3">
-                <h2 class="h6 mb-3">Create API Key</h2>
-                <form method="POST" action="/server/<%= server.containerId %>/api-keys">
-                    <div class="row g-2 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label small text-uppercase text-muted-2">Name</label>
-                            <input name="name" class="form-control" required maxlength="120" placeholder="CI deploy key" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small text-uppercase text-muted-2">Expires At (optional)</label>
-                            <input type="datetime-local" name="expiresAt" class="form-control" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
-                        </div>
-                    </div>
-
-                    <label class="form-label small text-uppercase text-muted-2">Permissions</label>
-                    <div class="permission-grid mb-3">
-                        <% (apiPermissionCatalog || []).forEach((perm) => { %>
-                        <label class="form-check" style="padding:.4rem .5rem;border:1px solid #2d2d35;border-radius:.5rem;background:#16161b;">
-                            <input class="form-check-input" type="checkbox" name="permissions" value="<%= perm %>" <%= perm === 'server.view' ? 'checked' : '' %>>
-                            <span class="form-check-label"><%= perm %></span>
-                        </label>
-                        <% }) %>
-                    </div>
-
-                    <button class="btn btn-primary" type="submit">Create API Key</button>
-                </form>
-            </div>
-            <% } %>
         </section>
     </main>
 </div>
 
+<% if (canManageApiKeys) { %>
+<div class="modal fade" id="apiKeyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content" style="background:#121216;border:1px solid #2d2d35;color:#e1e1e6;">
+            <div class="modal-header border-secondary border-opacity-25">
+                <h5 class="modal-title" id="apiKeyModalTitle">Create API Key</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="apiKeyCreateSection">
+                    <form method="POST" action="/server/<%= server.containerId %>/api-keys" id="apiKeyCreateForm" data-turbo="false">
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small text-uppercase text-muted-2">Name</label>
+                                <input name="name" class="form-control" required maxlength="120" placeholder="CI deploy key" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small text-uppercase text-muted-2">Expires At (optional)</label>
+                                <input type="datetime-local" name="expiresAt" class="form-control" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                            </div>
+                        </div>
+
+                        <label class="form-label small text-uppercase text-muted-2">Permissions</label>
+                    <div class="permission-grid mb-3">
+                            <% (apiPermissionCatalog || []).forEach((perm) => { %>
+                            <label class="form-check" style="padding:.4rem .5rem;border:1px solid #2d2d35;border-radius:.5rem;background:#16161b;">
+                                <input class="form-check-input api-permission" type="checkbox" name="permissions" value="<%= perm %>" <%= perm === 'server.view' ? 'checked' : '' %>>
+                                <span class="form-check-label">
+                                    <div class="fw-semibold"><%= perm %></div>
+                                    <div class="small text-muted-2" data-permission-desc="<%= perm %>"></div>
+                                </span>
+                            </label>
+                            <% }) %>
+                        </div>
+
+                        <button class="btn btn-primary" type="submit">Create API Key</button>
+                    </form>
+                </div>
+
+                <div id="apiKeyManageSection" class="d-none">
+                    <div class="mb-3">
+                        <div class="small text-muted-2 text-uppercase">Key</div>
+                        <div class="fw-semibold" id="apiKeyManageName">-</div>
+                        <div class="text-muted-2 small" id="apiKeyManagePrefix">-</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="small text-muted-2 text-uppercase">Permissions</div>
+                        <code id="apiKeyManagePerms">-</code>
+                    </div>
+                    <div class="mb-3">
+                        <div class="small text-muted-2 text-uppercase">Expires</div>
+                        <div id="apiKeyManageExpires">Never</div>
+                    </div>
+                    <form method="POST" id="apiKeyRotateForm" class="d-inline" data-turbo="false">
+                        <button type="submit" class="btn btn-outline-warning">Rotate Key</button>
+                    </form>
+                    <form method="POST" id="apiKeyRevokeForm" class="d-inline ms-2" data-turbo="false">
+                        <button type="submit" class="btn btn-outline-danger">Revoke Key</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<% } %>
+
+<div class="modal fade" id="apiDocsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content" style="background:#121216;border:1px solid #2d2d35;color:#e1e1e6;">
+            <div class="modal-header border-secondary border-opacity-25">
+                <h5 class="modal-title">Server API (Swagger-style)</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted-2">Use your Server API Key in <code>Authorization: Bearer &lt;token&gt;</code>.</p>
+                <h6>Endpoints</h6>
+                <ul class="small">
+                    <li><code>GET /api/client/servers/:containerId</code> (server.view)</li>
+                    <li><code>POST /api/client/servers/:containerId/power</code> (server.power)</li>
+                    <li><code>POST /api/client/servers/:containerId/command</code> (server.console)</li>
+                    <li><code>GET /api/client/servers/:containerId/files/list?directory=/</code> (server.files.read)</li>
+                    <li><code>GET /api/client/servers/:containerId/files/content?file=/server.properties</code> (server.files.read)</li>
+                </ul>
+
+                <h6 class="mt-3">Examples (curl)</h6>
+                <pre><code>curl -H \"Authorization: Bearer YOUR_TOKEN\" \\\n  https://your-panel.tld/api/client/servers/<%= server.containerId %>\n\ncurl -X POST -H \"Authorization: Bearer YOUR_TOKEN\" -H \"Content-Type: application/json\" \\\n  -d '{\"signal\":\"restart\"}' \\\n  https://your-panel.tld/api/client/servers/<%= server.containerId %>/power\n\ncurl -X POST -H \"Authorization: Bearer YOUR_TOKEN\" -H \"Content-Type: application/json\" \\\n  -d '{\"command\":\"say hello\"}' \\\n  https://your-panel.tld/api/client/servers/<%= server.containerId %>/command</code></pre>
+
+                <h6 class="mt-3">Examples (Node.js)</h6>
+                <pre><code>import fetch from \"node-fetch\";\n\nconst token = \"YOUR_TOKEN\";\nconst base = \"https://your-panel.tld\";\nconst id = \"<%= server.containerId %>\";\n\nconst resp = await fetch(`${base}/api/client/servers/${id}`, {\n  headers: { Authorization: `Bearer ${token}` }\n});\nconst data = await resp.json();\nconsole.log(data);</code></pre>
+
+                <h6 class="mt-3">Examples (Python)</h6>
+                <pre><code>import requests\n\nbase = \"https://your-panel.tld\"\nserver_id = \"<%= server.containerId %>\"\nheaders = {\"Authorization\": \"Bearer YOUR_TOKEN\"}\n\nresp = requests.get(f\"{base}/api/client/servers/{server_id}\", headers=headers)\nprint(resp.json())</code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
 <script>
     document.getElementById('sidebarToggle')?.addEventListener('click', function () {
         document.getElementById('sidebar')?.classList.toggle('collapsed');
@@ -175,6 +266,83 @@
             this.textContent = 'Copied';
             setTimeout(() => { this.textContent = 'Copy'; }, 1200);
         }
+    });
+
+    const apiPermissionDescriptions = {
+        'server.view': 'Read server metadata and status.',
+        'server.console': 'Send console commands.',
+        'server.power': 'Start, stop, restart, or kill the server.',
+        'server.files.read': 'List and read files.',
+        'server.files.write': 'Create, write, rename, delete, and edit files.',
+        'server.files.download': 'Download files/archives.',
+        'server.startup.read': 'Read startup configuration and variables.',
+        'server.startup.write': 'Update startup configuration and variables.',
+        'server.backups.view': 'View backups metadata.',
+        'server.backups.manage': 'Create/delete backups (if enabled).',
+        'server.databases.view': 'View databases linked to the server.',
+        'server.databases.manage': 'Create/update/delete databases.',
+        'server.schedules.view': 'View schedules.',
+        'server.schedules.manage': 'Create/update/delete schedules.',
+        'server.network.view': 'View allocations and ports.',
+        'server.network.manage': 'Manage allocations/ports.',
+        'server.activity.view': 'Read server activity logs.'
+    };
+
+    document.querySelectorAll('[data-permission-desc]').forEach((el) => {
+        const key = el.getAttribute('data-permission-desc');
+        if (!key) return;
+        el.textContent = apiPermissionDescriptions[key] || 'Permission access.';
+    });
+
+    const apiKeyModal = document.getElementById('apiKeyModal');
+    const apiKeyCreateSection = document.getElementById('apiKeyCreateSection');
+    const apiKeyManageSection = document.getElementById('apiKeyManageSection');
+    const apiKeyModalTitle = document.getElementById('apiKeyModalTitle');
+    const apiKeyManageName = document.getElementById('apiKeyManageName');
+    const apiKeyManagePrefix = document.getElementById('apiKeyManagePrefix');
+    const apiKeyManagePerms = document.getElementById('apiKeyManagePerms');
+    const apiKeyManageExpires = document.getElementById('apiKeyManageExpires');
+    const apiKeyRotateForm = document.getElementById('apiKeyRotateForm');
+    const apiKeyRevokeForm = document.getElementById('apiKeyRevokeForm');
+
+    function resetApiPermissionDefaults() {
+        document.querySelectorAll('.api-permission').forEach((checkbox) => {
+            checkbox.checked = checkbox.value === 'server.view';
+        });
+    }
+
+    function openCreateApiKeyModal() {
+        if (!apiKeyModalTitle) return;
+        apiKeyModalTitle.textContent = 'Create API Key';
+        if (apiKeyCreateSection) apiKeyCreateSection.classList.remove('d-none');
+        if (apiKeyManageSection) apiKeyManageSection.classList.add('d-none');
+        resetApiPermissionDefaults();
+    }
+
+    function openManageApiKeyModal(button) {
+        const keyId = button.dataset.keyId;
+        const name = button.dataset.name || '';
+        const prefix = button.dataset.prefix || '';
+        const permissions = JSON.parse(button.dataset.permissions || '[]');
+        const expires = button.dataset.expires || '';
+
+        if (apiKeyModalTitle) apiKeyModalTitle.textContent = 'Manage API Key';
+        if (apiKeyCreateSection) apiKeyCreateSection.classList.add('d-none');
+        if (apiKeyManageSection) apiKeyManageSection.classList.remove('d-none');
+        if (apiKeyManageName) apiKeyManageName.textContent = name || 'API Key';
+        if (apiKeyManagePrefix) apiKeyManagePrefix.textContent = prefix ? `Prefix: ${prefix}` : '-';
+        if (apiKeyManagePerms) apiKeyManagePerms.textContent = permissions.length ? permissions.join(', ') : '-';
+        if (apiKeyManageExpires) apiKeyManageExpires.textContent = expires ? new Date(expires).toLocaleString() : 'Never';
+
+        if (apiKeyRotateForm) apiKeyRotateForm.action = `/server/<%= server.containerId %>/api-keys/${keyId}/rotate`;
+        if (apiKeyRevokeForm) apiKeyRevokeForm.action = `/server/<%= server.containerId %>/api-keys/${keyId}/revoke`;
+    }
+
+    document.querySelectorAll('[data-action=\"create\"]').forEach((btn) => {
+        btn.addEventListener('click', openCreateApiKeyModal);
+    });
+    document.querySelectorAll('[data-action=\"manage\"]').forEach((btn) => {
+        btn.addEventListener('click', () => openManageApiKeyModal(btn));
     });
 </script>
 </body>

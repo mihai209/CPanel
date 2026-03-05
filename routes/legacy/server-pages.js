@@ -6494,6 +6494,78 @@ app.post('/server/:containerId/api-keys/:keyId/revoke', requireAuth, async (req,
     }
 });
 
+app.post('/server/:containerId/api-keys/:keyId/rotate', requireAuth, async (req, res) => {
+    try {
+        if (!ServerApiKey) {
+            return res.redirect(`/server/${req.params.containerId}/api?error=${encodeURIComponent('Server API keys are not available in this build.')}`);
+        }
+
+        const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.users.manage')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const keyId = Number.parseInt(req.params.keyId, 10);
+        if (!Number.isInteger(keyId) || keyId <= 0) {
+            return res.redirect(`/server/${server.containerId}/api?error=${encodeURIComponent('Invalid API key id.')}`);
+        }
+
+        const key = await ServerApiKey.findOne({
+            where: {
+                id: keyId,
+                serverId: server.id
+            }
+        });
+        if (!key) {
+            return res.redirect(`/server/${server.containerId}/api?error=${encodeURIComponent('API key not found.')}`);
+        }
+
+        const isActive = typeof isServerApiKeyActive === 'function'
+            ? isServerApiKeyActive(key)
+            : !key.revokedAt;
+        if (!isActive) {
+            return res.redirect(`/server/${server.containerId}/api?error=${encodeURIComponent('Cannot rotate an inactive/expired key.')}`);
+        }
+
+        const generated = typeof generateServerApiKeyToken === 'function'
+            ? generateServerApiKeyToken()
+            : null;
+        if (!generated || !generated.token) {
+            return res.redirect(`/server/${server.containerId}/api?error=${encodeURIComponent('Failed to generate API key token.')}`);
+        }
+
+        const keyHash = typeof hashServerApiKeyToken === 'function'
+            ? hashServerApiKeyToken(generated.token, SECRET_KEY)
+            : '';
+        if (!keyHash) {
+            return res.redirect(`/server/${server.containerId}/api?error=${encodeURIComponent('Failed to hash API key token.')}`);
+        }
+
+        await key.update({
+            keyPrefix: generated.keyPrefix,
+            keyHash,
+            lastUsedAt: null,
+            lastUsedIp: null,
+            revokedAt: null
+        });
+
+        req.session.newServerApiKey = {
+            serverId: server.id,
+            name: key.name,
+            token: generated.token
+        };
+        await new Promise((resolve) => req.session.save(() => resolve()));
+
+        return res.redirect(`/server/${server.containerId}/api?success=${encodeURIComponent('API key rotated. Copy the new token now; it will not be shown again.')}`);
+    } catch (error) {
+        console.error('Error rotating server API key:', error);
+        return res.redirect(`/server/${req.params.containerId}/api?error=${encodeURIComponent('Failed to rotate API key.')}`);
+    }
+});
+
 app.get('/server/:containerId/activity', requireAuth, async (req, res) => {
     try {
         const server = await Server.findOne({ where: { containerId: req.params.containerId } });
