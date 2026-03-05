@@ -8,10 +8,11 @@ function registerSecurityMiddleware(app) {
             directives: {
                 ...helmet.contentSecurityPolicy.getDefaultDirectives(),
                 "img-src": ["'self'", "data:", "https:", "http:", "blob:"],
-                "script-src": ["'self'", "'unsafe-inline'", "blob:", "https://cdn.jsdelivr.net"],
+                "script-src": ["'self'", "'unsafe-inline'", "blob:", "https://cdn.jsdelivr.net", "https://storage.ko-fi.com"],
                 "style-src": ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com"],
                 "font-src": ["'self'", "https://fonts.gstatic.com", "https://cdn.jsdelivr.net"],
-                "connect-src": ["'self'", "https://cdn.jsdelivr.net", "ws:", "wss:"],
+                "connect-src": ["'self'", "https://cdn.jsdelivr.net", "https://storage.ko-fi.com", "https://ko-fi.com", "ws:", "wss:"],
+                "frame-src": ["'self'", "https://storage.ko-fi.com", "https://ko-fi.com"],
                 "worker-src": ["'self'", "blob:"],
             },
         },

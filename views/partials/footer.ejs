@@ -30,6 +30,16 @@
     .copyright-info-btn:hover {
         color: #ffffff;
     }
+
+    .dev-support-link {
+        display: inline-flex;
+        margin-top: 0.45rem;
+    }
+
+    .dev-support-link img {
+        height: 36px;
+        border: 0;
+    }
 </style>
 
 <div class="copyright-footer">
@@ -41,6 +51,10 @@
         <button type="button" class="copyright-info-btn" data-bs-toggle="modal" data-bs-target="#copyrightInfoModal">
             Licensing & Support Information
         </button>
+        <br>
+        <a href="https://ko-fi.com/S6S11A22SE" target="_blank" rel="noopener noreferrer" class="dev-support-link" aria-label="Support the developer on Ko-fi">
+            <img src="https://storage.ko-fi.com/cdn/kofi5.png?v=6" alt="Support the developer on Ko-fi">
+        </a>
     </p>
 </div>
 
@@ -96,3 +110,16 @@
         </div>
     </div>
 </div>
+
+<script src="https://storage.ko-fi.com/cdn/scripts/overlay-widget.js"></script>
+<script>
+    if (!window.__cpanelKofiWidgetLoaded && window.kofiWidgetOverlay && typeof window.kofiWidgetOverlay.draw === 'function') {
+        window.__cpanelKofiWidgetLoaded = true;
+        window.kofiWidgetOverlay.draw('mihai14launcher', {
+            type: 'floating-chat',
+            'floating-chat.donateButton.text': 'Support Us',
+            'floating-chat.donateButton.background-color': '#00b9fe',
+            'floating-chat.donateButton.text-color': '#fff'
+        });
+    }
+</script>

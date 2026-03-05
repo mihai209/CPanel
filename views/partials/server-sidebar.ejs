@@ -48,6 +48,13 @@ if (String(settings.featurePolicyEngineEnabled || 'false') === 'true') {
         </a>
         <% }); %>
 
+            <div class="sidebar-support">
+                <a href="https://ko-fi.com/S6S11A22SE" target="_blank" rel="noopener noreferrer" class="sidebar-support-link" aria-label="Support the developer on Ko-fi">
+                    <i class="bi bi-cup-hot me-1"></i>
+                    <span class="sidebar-label">Support The Dev</span>
+                </a>
+            </div>
+
             <!-- Sidebar styles (fallback if parent page doesn't define them) -->
             <style>
                 .sidebar-item {
@@ -100,6 +107,31 @@ if (String(settings.featurePolicyEngineEnabled || 'false') === 'true') {
 
                 .sidebar-header img {
                     object-fit: contain;
+                }
+
+                .sidebar-support {
+                    margin-top: 0.6rem;
+                    padding-top: 0.75rem;
+                    border-top: 1px solid #2d2d35;
+                }
+
+                .sidebar-support-link {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #8b8b9a;
+                    text-decoration: none;
+                    font-size: 0.86rem;
+                    padding: 0.6rem 0.5rem;
+                    border: 1px dashed #2d2d35;
+                    border-radius: 0.5rem;
+                    transition: all 0.2s ease;
+                }
+
+                .sidebar-support-link:hover {
+                    color: #e1e1e6;
+                    border-color: rgba(59, 130, 246, 0.4);
+                    background: rgba(59, 130, 246, 0.08);
                 }
 
                 @media (max-width: 992px) {
