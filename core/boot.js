@@ -54,9 +54,9 @@ function buildPanelBanner() {
 
 const PANEL_BANNER = buildPanelBanner();
 
-const PANEL_COPYRIGHT = 'Copyright (c) 2026 CPanel Contributors';
+const PANEL_COPYRIGHT = 'Copyright (c) 2026 CPanel Mihai209';
 const PANEL_WEBSITE = 'https://cpanel-rocky.netlify.app';
-const PANEL_SOURCE = 'https://github.com/mihai209/cpanel-rocky';
+const PANEL_SOURCE = 'https://github.com/mihai209/CPanel';
 const PANEL_LICENSE = 'MIT';
 const DEFAULT_TIMEZONE = 'Europe/Bucharest';
 
