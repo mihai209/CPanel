@@ -41,11 +41,22 @@
             <button class="btn-icon" id="sidebarToggle"><i class="bi bi-list"></i></button>
             <h1 class="h5 mb-0">Debug Logs / <span class="text-secondary"><%= server.name %></span></h1>
             <div class="ms-auto d-flex gap-2">
+                <% if (canFixPermissions) { %>
+                    <form method="POST" action="/server/<%= server.containerId %>/fix-permissions" class="d-inline">
+                        <button type="submit" class="btn btn-sm btn-warning">Fix Permissions</button>
+                    </form>
+                <% } %>
                 <a class="btn btn-sm btn-outline-light" href="/server/<%= server.containerId %>">Console</a>
                 <a class="btn btn-sm btn-primary" href="/server/<%= server.containerId %>/debug-logs">Refresh</a>
             </div>
         </header>
         <section class="scroll">
+            <% if (success) { %>
+                <div class="alert alert-success"><%= success %></div>
+            <% } %>
+            <% if (error) { %>
+                <div class="alert alert-danger"><%= error %></div>
+            <% } %>
             <% if (!logs || logs.length === 0) { %>
                 <div class="cardx p-4">
                     <h2 class="h6 mb-2">No debug entries yet</h2>

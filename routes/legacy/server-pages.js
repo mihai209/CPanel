@@ -6663,11 +6663,86 @@ app.get('/server/:containerId/debug-logs', requireAuth, async (req, res) => {
             title: `Debug Logs ${server.name}`,
             path: '/servers',
             active: 'debuglogs',
-            logs
+            logs,
+            canFixPermissions: hasServerPermission(access, 'server.files.write') || hasServerPermission(access, 'server.startup'),
+            success: req.query.success || null,
+            error: req.query.error || null
         });
     } catch (error) {
         console.error('Error loading debug logs page:', error);
         return res.redirect('/?error=' + encodeURIComponent('Failed to load server debug logs.'));
+    }
+});
+
+app.post('/server/:containerId/fix-permissions', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{
+                model: Allocation,
+                as: 'allocation',
+                include: [{ model: Connector, as: 'connector' }]
+            }]
+        });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.files.write') && !hasServerPermission(access, 'server.startup')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        if (!server.allocation || !server.allocation.connectorId) {
+            return res.redirect(`/server/${server.containerId}/debug-logs?error=${encodeURIComponent('Server allocation is missing.')}`);
+        }
+
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return res.redirect(`/server/${server.containerId}/debug-logs?error=${encodeURIComponent('Connector is offline.')}`);
+        }
+
+        const requestId = `fix_perm_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`;
+        connectorWs.send(JSON.stringify({
+            type: 'fix_server_permissions',
+            serverId: server.id,
+            requestId
+        }));
+
+        const result = await waitForConnectorMessage(connectorWs, (message) => {
+            if (!message || String(message.type || '') !== 'fix_server_permissions_result') return false;
+            if (Number.parseInt(message.serverId, 10) !== Number.parseInt(server.id, 10)) return false;
+            if (String(message.requestId || '').trim() !== requestId) return false;
+            return message;
+        }, 20000);
+
+        const isSuccess = Boolean(result && result.success);
+        const statusAction = isSuccess ? 'server:permissions.fix.success' : 'server:permissions.fix.failed';
+        await AuditLog.create({
+            actorUserId: req.session.user.id,
+            action: statusAction,
+            targetType: 'server',
+            targetId: String(server.id),
+            method: req.method,
+            path: req.originalUrl || req.url,
+            ip: req.headers['x-forwarded-for'] || req.ip || null,
+            userAgent: req.headers['user-agent'] || null,
+            metadata: {
+                containerId: server.containerId,
+                requestId,
+                connectorId: server.allocation.connectorId,
+                success: isSuccess,
+                error: result && result.error ? String(result.error) : null
+            }
+        }).catch(() => {});
+
+        if (!isSuccess) {
+            const errorText = String((result && result.error) || 'Connector failed to repair server permissions.');
+            return res.redirect(`/server/${server.containerId}/debug-logs?error=${encodeURIComponent(errorText)}`);
+        }
+
+        return res.redirect(`/server/${server.containerId}/debug-logs?success=${encodeURIComponent('Server file permissions repaired successfully.')}`);
+    } catch (error) {
+        console.error('Error repairing server permissions:', error);
+        return res.redirect(`/server/${req.params.containerId}/debug-logs?error=${encodeURIComponent('Failed to repair server permissions.')}`);
     }
 });
 
