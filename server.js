@@ -379,6 +379,8 @@ const legacyRouteContextData = {
     AuditLog,
     ServerBackupPolicy,
     ServerBackup,
+    Mount,
+    ServerMount,
     ServerSubuser,
     ServerApiKey,
     AdminApiKey,
