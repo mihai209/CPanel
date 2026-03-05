@@ -143,6 +143,39 @@
             '--cp-panel-surface': 'rgba(18, 38, 72, 0.82)',
             '--cp-panel-surface-2': 'rgba(15, 34, 64, 0.86)',
             '--cp-panel-input': 'rgba(11, 27, 52, 0.72)'
+        },
+        'neon-circuit': {
+            '--bg-dark': '#05060d',
+            '--bg-sidebar': '#0b0d19',
+            '--border-color': 'rgba(0, 255, 163, 0.28)',
+            '--text-primary': '#e9f8ff',
+            '--text-secondary': '#8ab1c4',
+            '--accent-blue': '#2effc8',
+            '--cp-panel-surface': 'rgba(10, 12, 22, 0.86)',
+            '--cp-panel-surface-2': 'rgba(8, 10, 18, 0.88)',
+            '--cp-panel-input': 'rgba(8, 10, 18, 0.9)'
+        },
+        'forest-night': {
+            '--bg-dark': '#0c1710',
+            '--bg-sidebar': '#102016',
+            '--border-color': 'rgba(77, 164, 99, 0.32)',
+            '--text-primary': '#e6f4ec',
+            '--text-secondary': '#a2bfb0',
+            '--accent-blue': '#6ee7a5',
+            '--cp-panel-surface': 'rgba(16, 30, 21, 0.86)',
+            '--cp-panel-surface-2': 'rgba(14, 26, 19, 0.88)',
+            '--cp-panel-input': 'rgba(12, 22, 16, 0.92)'
+        },
+        'retro-synth': {
+            '--bg-dark': '#1a0f2f',
+            '--bg-sidebar': '#23133b',
+            '--border-color': 'rgba(255, 116, 233, 0.32)',
+            '--text-primary': '#ffe8ff',
+            '--text-secondary': '#d4a2df',
+            '--accent-blue': '#ff77d6',
+            '--cp-panel-surface': 'rgba(26, 15, 47, 0.86)',
+            '--cp-panel-surface-2': 'rgba(22, 13, 40, 0.88)',
+            '--cp-panel-input': 'rgba(20, 11, 36, 0.9)'
         }
     };
 

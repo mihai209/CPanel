@@ -65,6 +65,21 @@ const THEME_CATALOG = Object.freeze([
         id: 'sky-islands-fantasy',
         label: 'Sky Islands Fantasy',
         cssPath: '/themes/sky-islands-fantasy/index.css'
+    },
+    {
+        id: 'neon-circuit',
+        label: 'Neon Circuit',
+        cssPath: '/themes/neon-circuit/index.css'
+    },
+    {
+        id: 'forest-night',
+        label: 'Forest Night',
+        cssPath: '/themes/forest-night/index.css'
+    },
+    {
+        id: 'retro-synth',
+        label: 'Retro Synth',
+        cssPath: '/themes/retro-synth/index.css'
     }
 ]);
 

@@ -183,6 +183,150 @@
                                                                     value="<%= settings.featureWebUploadMaxMb || '50' %>">
                                                                 <div class="form-text text-muted">Applies to uploads from File Manager UI.</div>
                                                             </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                        id="featureRemoteDownloadEnabled"
+                                                                        name="featureRemoteDownloadEnabled" value="1"
+                                                                        <%= String(settings.featureRemoteDownloadEnabled || 'true') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="featureRemoteDownloadEnabled">Remote Downloads</label>
+                                                                </div>
+                                                                <div class="form-text text-muted">Allow downloading files from URL (Modrinth, remote fetch).</div>
+                                                            </div>
+
+                                                            <div class="col-12 mt-4">
+                                                                <h6 class="text-light mb-3"><i class="bi bi-activity me-2"></i>Crash Detection Policy</h6>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                        id="crashDetectionEnabled"
+                                                                        name="crashDetectionEnabled" value="1"
+                                                                        <%= String(settings.crashDetectionEnabled || 'true') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="crashDetectionEnabled">Crash Detection</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                        id="crashDetectCleanExitAsCrash"
+                                                                        name="crashDetectCleanExitAsCrash" value="1"
+                                                                        <%= String(settings.crashDetectCleanExitAsCrash || 'true') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="crashDetectCleanExitAsCrash">Treat Clean Exit as Crash</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Crash Cooldown (s)</label>
+                                                                <input type="number" min="0" max="3600" name="crashDetectionCooldownSeconds" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.crashDetectionCooldownSeconds || '60' %>">
+                                                                <div class="form-text text-muted">Ignore repeated crashes inside this window.</div>
+                                                            </div>
+
+                                                            <div class="col-12 mt-4">
+                                                                <h6 class="text-light mb-3"><i class="bi bi-cpu me-2"></i>Connector Runtime</h6>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                        id="connectorConsoleThrottleEnabled"
+                                                                        name="connectorConsoleThrottleEnabled" value="1"
+                                                                        <%= String(settings.connectorConsoleThrottleEnabled || 'true') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="connectorConsoleThrottleEnabled">Console Throttling</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Throttle Lines</label>
+                                                                <input type="number" min="10" max="100000" name="connectorConsoleThrottleLines" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.connectorConsoleThrottleLines || '2000' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Throttle Interval (ms)</label>
+                                                                <input type="number" min="10" max="10000" name="connectorConsoleThrottleIntervalMs" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.connectorConsoleThrottleIntervalMs || '100' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Disk Usage Cache (s)</label>
+                                                                <input type="number" min="0" max="86400" name="connectorDiskCheckTtlSeconds" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.connectorDiskCheckTtlSeconds || '10' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Transfer Download Limit (MiB/s)</label>
+                                                                <input type="number" min="0" max="100000" name="connectorTransferDownloadLimit" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.connectorTransferDownloadLimit || '0' %>">
+                                                                <div class="form-text text-muted">0 = unlimited.</div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                        id="connectorSftpReadOnly"
+                                                                        name="connectorSftpReadOnly" value="1"
+                                                                        <%= String(settings.connectorSftpReadOnly || 'false') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="connectorSftpReadOnly">SFTP Read-Only</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                        id="connectorRootlessEnabled"
+                                                                        name="connectorRootlessEnabled" value="1"
+                                                                        <%= String(settings.connectorRootlessEnabled || 'false') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="connectorRootlessEnabled">Rootless Containers</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Rootless UID</label>
+                                                                <input type="number" min="0" max="65535" name="connectorRootlessContainerUid" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.connectorRootlessContainerUid || '0' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Rootless GID</label>
+                                                                <input type="number" min="0" max="65535" name="connectorRootlessContainerGid" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.connectorRootlessContainerGid || '0' %>">
+                                                            </div>
+
+                                                            <div class="col-12 mt-4">
+                                                                <h6 class="text-light mb-3"><i class="bi bi-shield-lock me-2"></i>Connector API Security</h6>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">API Host</label>
+                                                                <input type="text" name="connectorApiHost" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.connectorApiHost || '0.0.0.0' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
+                                                                        id="connectorApiSslEnabled"
+                                                                        name="connectorApiSslEnabled" value="1"
+                                                                        <%= String(settings.connectorApiSslEnabled || 'false') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="connectorApiSslEnabled">API SSL</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">SSL Cert Path</label>
+                                                                <input type="text" name="connectorApiSslCertPath" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.connectorApiSslCertPath || '' %>">
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">SSL Key Path</label>
+                                                                <input type="text" name="connectorApiSslKeyPath" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"
+                                                                    value="<%= settings.connectorApiSslKeyPath || '' %>">
+                                                            </div>
+                                                            <div class="col-12">
+                                                                <label class="form-label text-muted small text-uppercase fw-bold">Trusted Proxies</label>
+                                                                <textarea name="connectorApiTrustedProxies" rows="3" class="form-control"
+                                                                    style="background-color: #1a1a20; border-color: #2d2d35;"><%= settings.connectorApiTrustedProxies || '' %></textarea>
+                                                                <div class="form-text text-muted">One IP/CIDR per line (e.g. 10.0.0.0/8).</div>
+                                                            </div>
 
                                                             <div class="col-12 mt-4">
                                                                 <h6 class="text-light mb-3"><i class="bi bi-currency-exchange me-2"></i>Virtual Economy (Coins)</h6>

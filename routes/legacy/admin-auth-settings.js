@@ -594,7 +594,25 @@ app.post('/admin/settings', requireAuth, requireAdmin, [
         antiMinerHighCpuPercent: toNumberString(req.body.antiMinerHighCpuPercent, 95, 70, 100),
         antiMinerHighCpuSamples: toNumberString(req.body.antiMinerHighCpuSamples, 8, 3, 120),
         antiMinerDecayMinutes: toNumberString(req.body.antiMinerDecayMinutes, 20, 1, 720),
-        antiMinerCooldownSeconds: toNumberString(req.body.antiMinerCooldownSeconds, 600, 30, 86400)
+        antiMinerCooldownSeconds: toNumberString(req.body.antiMinerCooldownSeconds, 600, 30, 86400),
+        featureRemoteDownloadEnabled: toBooleanString(req.body.featureRemoteDownloadEnabled),
+        crashDetectionEnabled: toBooleanString(req.body.crashDetectionEnabled),
+        crashDetectCleanExitAsCrash: toBooleanString(req.body.crashDetectCleanExitAsCrash),
+        crashDetectionCooldownSeconds: toNumberString(req.body.crashDetectionCooldownSeconds, 60, 0, 3600),
+        connectorConsoleThrottleEnabled: toBooleanString(req.body.connectorConsoleThrottleEnabled),
+        connectorConsoleThrottleLines: toNumberString(req.body.connectorConsoleThrottleLines, 2000, 10, 100000),
+        connectorConsoleThrottleIntervalMs: toNumberString(req.body.connectorConsoleThrottleIntervalMs, 100, 10, 10000),
+        connectorDiskCheckTtlSeconds: toNumberString(req.body.connectorDiskCheckTtlSeconds, 10, 0, 86400),
+        connectorTransferDownloadLimit: toNumberString(req.body.connectorTransferDownloadLimit, 0, 0, 100000),
+        connectorSftpReadOnly: toBooleanString(req.body.connectorSftpReadOnly),
+        connectorApiHost: String(req.body.connectorApiHost || '0.0.0.0').trim(),
+        connectorApiSslEnabled: toBooleanString(req.body.connectorApiSslEnabled),
+        connectorApiSslCertPath: String(req.body.connectorApiSslCertPath || '').trim(),
+        connectorApiSslKeyPath: String(req.body.connectorApiSslKeyPath || '').trim(),
+        connectorApiTrustedProxies: String(req.body.connectorApiTrustedProxies || '').trim(),
+        connectorRootlessEnabled: toBooleanString(req.body.connectorRootlessEnabled),
+        connectorRootlessContainerUid: toNumberString(req.body.connectorRootlessContainerUid, 0, 0, 65535),
+        connectorRootlessContainerGid: toNumberString(req.body.connectorRootlessContainerGid, 0, 0, 65535)
     };
 
     try {

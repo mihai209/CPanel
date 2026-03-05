@@ -57,6 +57,19 @@ function normalizeBooleanInput(value, fallback = false) {
     return ['1', 'true', 'yes', 'on'].includes(normalized);
 }
 
+function normalizeNumberInput(value, fallback, min, max) {
+    const parsed = Number.parseInt(String(value === undefined || value === null ? '' : value).trim(), 10);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(max, Math.max(min, parsed));
+}
+
+function parseLinesInput(value) {
+    return String(value || '')
+        .split(/\r?\n|,/g)
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+}
+
 function registerAdminConnectorsOverviewRoutes(ctx) {
     for (const [key, value] of Object.entries(ctx || {})) {
         try {
@@ -329,6 +342,21 @@ app.get('/admin/connectors/:id/configuration', requireAuth, requireAdmin, async 
         const panelUrl = resolvePanelBaseUrl(req);
         const panelOrigin = extractOriginFromUrl(panelUrl);
         const allowedOrigins = await getConnectorAllowedOrigins(connector.id, panelOrigin);
+        const settingsMap = res.locals.settings || {};
+        const apiHost = String(settingsMap.connectorApiHost || '0.0.0.0').trim() || '0.0.0.0';
+        const apiSslEnabled = normalizeBooleanInput(settingsMap.connectorApiSslEnabled, false);
+        const apiSslCertPath = String(settingsMap.connectorApiSslCertPath || '').trim();
+        const apiSslKeyPath = String(settingsMap.connectorApiSslKeyPath || '').trim();
+        const apiTrustedProxies = parseLinesInput(settingsMap.connectorApiTrustedProxies);
+        const throttleEnabled = normalizeBooleanInput(settingsMap.connectorConsoleThrottleEnabled, true);
+        const throttleLines = normalizeNumberInput(settingsMap.connectorConsoleThrottleLines, 2000, 10, 100000);
+        const throttleInterval = normalizeNumberInput(settingsMap.connectorConsoleThrottleIntervalMs, 100, 10, 10000);
+        const diskTtlSeconds = normalizeNumberInput(settingsMap.connectorDiskCheckTtlSeconds, 10, 0, 86400);
+        const transferDownloadLimit = normalizeNumberInput(settingsMap.connectorTransferDownloadLimit, 0, 0, 100000);
+        const sftpReadOnly = normalizeBooleanInput(settingsMap.connectorSftpReadOnly, false);
+        const rootlessEnabled = normalizeBooleanInput(settingsMap.connectorRootlessEnabled, false);
+        const rootlessUid = normalizeNumberInput(settingsMap.connectorRootlessContainerUid, 0, 0, 65535);
+        const rootlessGid = normalizeNumberInput(settingsMap.connectorRootlessContainerGid, 0, 0, 65535);
         const configJson = {
             panel: {
                 url: panelUrl,
@@ -336,7 +364,15 @@ app.get('/admin/connectors/:id/configuration', requireAuth, requireAdmin, async 
                 allowedUrls: allowedOrigins
             },
             api: {
-                allowedOrigins
+                host: apiHost,
+                port: connector.port,
+                allowedOrigins,
+                trustedProxies: apiTrustedProxies,
+                ssl: {
+                    enabled: apiSslEnabled,
+                    cert: apiSslCertPath,
+                    key: apiSslKeyPath
+                }
             },
             connector: {
                 id: connector.id,
@@ -345,7 +381,26 @@ app.get('/admin/connectors/:id/configuration', requireAuth, requireAdmin, async 
             },
             sftp: {
                 port: connector.sftpPort,
-                directory: connector.fileDirectory
+                directory: connector.fileDirectory,
+                readOnly: sftpReadOnly
+            },
+            docker: {
+                rootless: {
+                    enabled: rootlessEnabled,
+                    container_uid: rootlessUid,
+                    container_gid: rootlessGid
+                }
+            },
+            system: {
+                diskCheckTtlSeconds: diskTtlSeconds
+            },
+            transfers: {
+                downloadLimit: transferDownloadLimit
+            },
+            throttles: {
+                enabled: throttleEnabled,
+                lines: throttleLines,
+                lineResetInterval: throttleInterval
             }
         };
         const webServerTemplateType = resolveWebServerTemplateType(req.query.webServerTemplate);

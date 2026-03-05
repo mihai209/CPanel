@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mounts <%= server.name %> | <%= settings.brandName.toUpperCase() %></title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body { background:#0f0f12; color:#e1e1e6; margin:0; font-family:Inter,system-ui,-apple-system,sans-serif; height:100vh; overflow:hidden; }
+        .wrapper{display:flex;height:100vh}.sidebar{width:260px;background:#121216;border-right:1px solid #2d2d35;overflow-y:auto}.sidebar.collapsed{margin-left:-260px}
+        .content{flex:1;display:flex;flex-direction:column;min-width:0}.top{background:#121216;border-bottom:1px solid #2d2d35;padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem}
+        .scroll{flex:1;overflow:auto;padding:1rem}.cardx{background:#121216;border:1px solid #2d2d35;border-radius:.8rem}.btn-icon{background:transparent;border:0;color:#8b8b9a;font-size:1.2rem}
+        code { color:#93c5fd; }
+    </style>
+</head>
+<body>
+    <%- include ('../partials/error-modal') %>
+<div class="wrapper">
+    <nav class="sidebar" id="sidebar"><div class="p-3"><%- include('../partials/server-sidebar', { server, active: 'mounts' }) %></div></nav>
+    <main class="content">
+        <header class="top">
+            <button class="btn-icon" id="sidebarToggle"><i class="bi bi-list"></i></button>
+            <h1 class="h5 mb-0">Mounts / <span class="text-secondary"><%= server.name %></span></h1>
+            <div class="ms-auto">
+                <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#mountsTutorial">Tutorial</button>
+            </div>
+        </header>
+        <section class="scroll">
+            <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+            <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+
+            <div class="cardx p-3 mb-3">
+                <h2 class="h6 mb-2">Assigned Mounts</h2>
+                <div class="text-secondary small mb-3">Mounts apply on next reinstall or container rebuild.</div>
+                <% if (!assignedMounts || assignedMounts.length === 0) { %>
+                    <div class="text-secondary">No mounts assigned yet.</div>
+                <% } else { %>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Source</th>
+                                    <th>Target</th>
+                                    <th>Read-Only</th>
+                                    <th>Connector</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% assignedMounts.forEach((mount) => { %>
+                                    <tr>
+                                        <td><%= mount.name %></td>
+                                        <td><code><%= mount.sourcePath %></code></td>
+                                        <td><code><%= mount.targetPath %></code></td>
+                                        <td>
+                                            <% if (mount.readOnly) { %>
+                                                <span class="badge bg-secondary">Read-only</span>
+                                            <% } else { %>
+                                                <span class="badge bg-success">Writable</span>
+                                            <% } %>
+                                        </td>
+                                        <td><%= mount.connectorName || 'Any' %></td>
+                                        <td class="text-end">
+                                            <% if (canManageMounts) { %>
+                                                <form method="POST" action="/server/<%= server.containerId %>/mounts/detach" data-turbo="false">
+                                                    <input type="hidden" name="mountId" value="<%= mount.id %>">
+                                                    <button class="btn btn-sm btn-outline-danger" type="submit">Detach</button>
+                                                </form>
+                                            <% } %>
+                                        </td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                <% } %>
+            </div>
+
+            <div class="cardx p-3">
+                <h2 class="h6 mb-2">Available Mounts</h2>
+                <% if (!availableMounts || availableMounts.length === 0) { %>
+                    <div class="text-secondary">No available mounts for this server connector.</div>
+                <% } else { %>
+                    <form method="POST" action="/server/<%= server.containerId %>/mounts/attach" class="row g-3 align-items-end" data-turbo="false">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small text-uppercase fw-bold">Mount</label>
+                            <select name="mountId" class="form-select" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                                <% availableMounts.forEach((mount) => { %>
+                                    <option value="<%= mount.id %>">
+                                        <%= mount.name %> — <%= mount.sourcePath %> → <%= mount.targetPath %>
+                                    </option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="mountReadOnly" name="readOnly" value="1">
+                                <label class="form-check-label text-light" for="mountReadOnly">Read-only</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3 text-end">
+                            <button class="btn btn-primary" type="submit">Attach Mount</button>
+                        </div>
+                    </form>
+                <% } %>
+            </div>
+        </section>
+    </main>
+</div>
+
+<div class="modal fade" id="mountsTutorial" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content" style="background:#141419;border:1px solid #2d2d35;">
+            <div class="modal-header border-bottom border-secondary border-opacity-10">
+                <h5 class="modal-title text-light">What are Mounts?</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-muted">
+                <p>Mounts attach a host directory into your container, so multiple servers can share files or data.</p>
+                <ul>
+                    <li>Use mounts for shared configs, maps, or assets.</li>
+                    <li>Read-only mounts are safer for shared libraries.</li>
+                    <li>Mounts apply when a container is created or reinstalled.</li>
+                </ul>
+                <p class="mb-0">Tip: create mounts in the Admin panel, then attach them here.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    (function () {
+        const sidebar = document.getElementById('sidebar');
+        const toggle = document.getElementById('sidebarToggle');
+        if (!sidebar || !toggle) return;
+        toggle.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+        });
+    })();
+</script>
+</body>
+</html>

@@ -64,6 +64,55 @@ const ANTI_MINER_CONFIG_SETTING_KEYS = [
     'antiMinerDecayMinutes',
     'antiMinerCooldownSeconds'
 ];
+const CRASH_POLICY_CACHE_TTL_MS = 10 * 1000;
+const CRASH_POLICY_SETTING_KEYS = [
+    'crashDetectionEnabled',
+    'crashDetectCleanExitAsCrash',
+    'crashDetectionCooldownSeconds'
+];
+let crashPolicyCache = { ts: 0, config: null };
+const SERVER_CRASH_COOLDOWN_STATE = new Map(); // serverId -> last crash ts
+
+const parseCrashBool = (value, fallback = false) => {
+    if (value === undefined || value === null || value === '') return fallback;
+    return ['1', 'true', 'yes', 'on'].includes(String(value).trim().toLowerCase());
+};
+const parseCrashNumber = (value, fallback, min, max) => {
+    const parsed = Number.parseInt(String(value === undefined || value === null ? '' : value).trim(), 10);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(max, Math.max(min, parsed));
+};
+
+async function getCrashPolicySettings() {
+    const now = Date.now();
+    if (crashPolicyCache.config && now - crashPolicyCache.ts < CRASH_POLICY_CACHE_TTL_MS) {
+        return crashPolicyCache.config;
+    }
+    const defaults = {
+        enabled: true,
+        detectCleanExitAsCrash: true,
+        cooldownSeconds: 60
+    };
+    if (!Settings || typeof Settings.findAll !== 'function') {
+        crashPolicyCache = { ts: now, config: defaults };
+        return defaults;
+    }
+    const rows = await Settings.findAll({
+        where: { key: CRASH_POLICY_SETTING_KEYS },
+        attributes: ['key', 'value']
+    });
+    const map = {};
+    rows.forEach((row) => {
+        map[row.key] = row.value;
+    });
+    const config = {
+        enabled: parseCrashBool(map.crashDetectionEnabled, defaults.enabled),
+        detectCleanExitAsCrash: parseCrashBool(map.crashDetectCleanExitAsCrash, defaults.detectCleanExitAsCrash),
+        cooldownSeconds: parseCrashNumber(map.crashDetectionCooldownSeconds, defaults.cooldownSeconds, 0, 3600)
+    };
+    crashPolicyCache = { ts: now, config };
+    return config;
+}
 const ANTI_MINER_STRONG_PATTERNS = [
     /\b(?:xmrig|xmr-stak|cpuminer|minerd|nanominer|teamredminer|ethminer|nbminer|gminer|srbminer|wildrig)\b/i,
     /\b(?:stratum\+tcp|stratum2\+tcp)\b/i,
@@ -1590,6 +1639,7 @@ wss.on('connection', (ws, request) => {
                     const normalizedStatus = String(data.status || '').toLowerCase();
                     if (normalizedStatus === 'running' && previousStatus !== 'running') {
                         consumeServerPowerIntent(data.serverId);
+                        SERVER_CRASH_COOLDOWN_STATE.delete(data.serverId);
                         sendServerSmartAlert(server, 'started', {
                             previousStatus
                         });
@@ -1602,7 +1652,33 @@ wss.on('connection', (ws, request) => {
                         );
                     } else if (normalizedStatus === 'stopped' && previousStatus !== 'stopped') {
                         const intent = consumeServerPowerIntent(data.serverId);
-                        const expectedStop = Boolean(intent && (intent.action === 'stop' || intent.action === 'kill' || intent.action === 'restart'));
+                        const crashPolicy = await getCrashPolicySettings();
+                        const exitCode = Number.isInteger(Number.parseInt(data.exitCode, 10))
+                            ? Number.parseInt(data.exitCode, 10)
+                            : null;
+                        const oomKilled = Boolean(data.oomKilled);
+                        let expectedStop = Boolean(intent && (intent.action === 'stop' || intent.action === 'kill' || intent.action === 'restart'));
+                        let crashSuppressed = false;
+
+                        if (!crashPolicy.enabled) {
+                            expectedStop = true;
+                            crashSuppressed = true;
+                        } else if (!expectedStop) {
+                            if (!crashPolicy.detectCleanExitAsCrash && exitCode === 0 && !oomKilled) {
+                                expectedStop = true;
+                                crashSuppressed = true;
+                            }
+                            if (!expectedStop && crashPolicy.cooldownSeconds > 0) {
+                                const now = Date.now();
+                                const lastCrash = SERVER_CRASH_COOLDOWN_STATE.get(data.serverId) || 0;
+                                if (lastCrash && now - lastCrash < crashPolicy.cooldownSeconds * 1000) {
+                                    expectedStop = true;
+                                    crashSuppressed = true;
+                                } else {
+                                    SERVER_CRASH_COOLDOWN_STATE.set(data.serverId, now);
+                                }
+                            }
+                        }
                         await writeServerAuditLog({
                             serverId: data.serverId,
                             action: expectedStop ? 'server:debug.stop' : 'server:debug.crash',
@@ -1610,7 +1686,10 @@ wss.on('connection', (ws, request) => {
                                 previousStatus,
                                 currentStatus: normalizedStatus,
                                 expectedStop,
+                                crashSuppressed,
                                 powerIntent: intent && intent.action ? String(intent.action) : null,
+                                exitCode,
+                                oomKilled,
                                 capturedAt: new Date().toISOString(),
                                 logTail: getServerConsoleTailForDebug(data.serverId) || null
                             }

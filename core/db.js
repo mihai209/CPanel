@@ -318,6 +318,29 @@ const ServerBackup = sequelize.define('ServerBackup', {
     metadata: { type: DataTypes.JSON, allowNull: true }
 });
 
+const Mount = sequelize.define('Mount', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    name: { type: DataTypes.STRING(120), allowNull: false },
+    description: { type: DataTypes.STRING(255), allowNull: true },
+    sourcePath: { type: DataTypes.STRING(512), allowNull: false },
+    targetPath: { type: DataTypes.STRING(512), allowNull: false },
+    readOnly: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    connectorId: { type: DataTypes.INTEGER, allowNull: true }
+});
+
+const ServerMount = sequelize.define('ServerMount', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    serverId: { type: DataTypes.INTEGER, allowNull: false },
+    mountId: { type: DataTypes.INTEGER, allowNull: false },
+    readOnly: { type: DataTypes.BOOLEAN, allowNull: true }
+}, {
+    indexes: [
+        { fields: ['serverId'] },
+        { fields: ['mountId'] },
+        { fields: ['serverId', 'mountId'], unique: true }
+    ]
+});
+
 User.hasMany(LinkedAccount, { foreignKey: 'userId', as: 'linkedAccounts' });
 LinkedAccount.belongsTo(User, { foreignKey: 'userId' });
 
@@ -377,6 +400,16 @@ ServerBackupPolicy.belongsTo(Server, { foreignKey: 'serverId', as: 'server' });
 
 Server.hasMany(ServerBackup, { foreignKey: 'serverId', as: 'backups' });
 ServerBackup.belongsTo(Server, { foreignKey: 'serverId', as: 'server' });
+
+Connector.hasMany(Mount, { foreignKey: 'connectorId', as: 'mounts' });
+Mount.belongsTo(Connector, { foreignKey: 'connectorId', as: 'connector' });
+
+Server.belongsToMany(Mount, { through: ServerMount, foreignKey: 'serverId', otherKey: 'mountId', as: 'mounts' });
+Mount.belongsToMany(Server, { through: ServerMount, foreignKey: 'mountId', otherKey: 'serverId', as: 'servers' });
+Server.hasMany(ServerMount, { foreignKey: 'serverId', as: 'serverMounts', onDelete: 'CASCADE', hooks: true });
+ServerMount.belongsTo(Server, { foreignKey: 'serverId', as: 'server', onDelete: 'CASCADE' });
+Mount.hasMany(ServerMount, { foreignKey: 'mountId', as: 'serverMounts', onDelete: 'CASCADE', hooks: true });
+ServerMount.belongsTo(Mount, { foreignKey: 'mountId', as: 'mount', onDelete: 'CASCADE' });
 
 Server.hasMany(ServerSubuser, { foreignKey: 'serverId', as: 'subusers' });
 ServerSubuser.belongsTo(Server, { foreignKey: 'serverId', as: 'server' });
@@ -468,6 +501,8 @@ module.exports = {
     AuditLog,
     ServerBackupPolicy,
     ServerBackup,
+    Mount,
+    ServerMount,
     ServerSubuser,
     ServerApiKey,
     AdminApiKey,

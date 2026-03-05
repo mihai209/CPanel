@@ -24,6 +24,8 @@ function createLegacyRuntimeHelpers(deps) {
         Image,
         Allocation,
         AuditLog,
+        Mount,
+        ServerMount,
         Op,
         axios,
         WebSocket,
@@ -75,6 +77,7 @@ const FEATURE_FLAG_SETTING_KEYS = [
     'abuseScoreAlertThreshold',
     'featureServiceHealthChecksEnabled',
     'serviceHealthCheckIntervalSeconds',
+    'featureRemoteDownloadEnabled',
     'featureScheduledScalingEnabled',
     'featureAdminApiRatePlansEnabled',
     'featureRevenueModeEnabled',
@@ -276,6 +279,7 @@ function defaultPanelFeatureFlags() {
         policyEngineEnabled: false,
         sftpEnabled: true,
         webUploadEnabled: true,
+        remoteDownloadEnabled: true,
         webUploadMaxMb: 50,
         economyUnit: 'Coins',
         revenueDefaultTrialDays: 3,
@@ -351,6 +355,7 @@ function getPanelFeatureFlagsFromMap(settingsMap) {
         policyEngineEnabled: parseBooleanInput(source.featurePolicyEngineEnabled, base.policyEngineEnabled),
         sftpEnabled: parseBooleanInput(source.featureSftpEnabled, base.sftpEnabled),
         webUploadEnabled: parseBooleanInput(source.featureWebUploadEnabled, base.webUploadEnabled),
+        remoteDownloadEnabled: parseBooleanInput(source.featureRemoteDownloadEnabled, base.remoteDownloadEnabled),
         webUploadMaxMb: Math.max(1, Number.parseInt(parseFiniteNumberInput(source.featureWebUploadMaxMb, base.webUploadMaxMb, 1, 2048), 10) || base.webUploadMaxMb),
         economyUnit: String(source.economyUnit || source.costCurrency || base.economyUnit).trim().slice(0, 16) || base.economyUnit,
         revenueDefaultTrialDays: Math.max(0, Number.parseInt(parseFiniteNumberInput(source.revenueDefaultTrialDays, base.revenueDefaultTrialDays, 0, 365), 10) || base.revenueDefaultTrialDays),
@@ -409,6 +414,34 @@ async function getPanelFeatureFlags(forceRefresh = false) {
     featureFlagsCache = getPanelFeatureFlagsFromMap(map);
     featureFlagsCacheTs = now;
     return featureFlagsCache;
+}
+
+async function getServerMountsForInstall(serverId) {
+    const parsedServerId = Number.parseInt(serverId, 10);
+    if (!Number.isInteger(parsedServerId) || parsedServerId <= 0) return [];
+    if (!ServerMount || !Mount) return [];
+
+    const rows = await ServerMount.findAll({
+        where: { serverId: parsedServerId },
+        include: [{ model: Mount, as: 'mount' }]
+    });
+
+    const mounts = [];
+    for (const row of rows) {
+        if (!row || !row.mount) continue;
+        const mount = row.mount;
+        const source = String(mount.sourcePath || '').trim();
+        const target = String(mount.targetPath || '').trim();
+        if (!source || !target) continue;
+        mounts.push({
+            source,
+            target,
+            readOnly: row.readOnly === null || row.readOnly === undefined
+                ? Boolean(mount.readOnly)
+                : Boolean(row.readOnly)
+        });
+    }
+    return mounts;
 }
 
 function calculateServerCostEstimate(server, settingsMap = {}) {
@@ -1140,6 +1173,9 @@ async function runServerScheduledScalingSweep() {
                             primaryAllocation,
                             allocations: assignedAllocations
                         });
+                        const mountConfig = typeof getServerMountsForInstall === 'function'
+                            ? await getServerMountsForInstall(server.id)
+                            : [];
 
                         connectorWs.send(JSON.stringify({
                             type: 'install_server',
@@ -1163,7 +1199,8 @@ async function runServerScheduledScalingSweep() {
                                 installation: server.image.installation || null,
                                 configFiles: server.image.configFiles || null,
                                 brandName: 'cpanel',
-                                ports: deploymentPorts
+                                ports: deploymentPorts,
+                                mounts: mountConfig
                             }
                         }));
                         await server.update({ status: 'installing' });
@@ -2706,6 +2743,7 @@ async function getConnectorAllowedOriginsMap(connectorIds, fallbackOrigin) {
         defaultPanelFeatureFlags,
         getPanelFeatureFlagsFromMap,
         getPanelFeatureFlags,
+        getServerMountsForInstall,
         calculateServerCostEstimate,
         getServerStoreBillingSettingKey,
         normalizeServerStoreBillingState,

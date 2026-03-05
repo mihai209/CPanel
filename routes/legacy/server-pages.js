@@ -641,6 +641,7 @@ const SERVER_PERMISSIONS = Object.freeze([
     'server.schedules.manage',
     'server.network.view',
     'server.network.manage',
+    'server.mounts',
     'server.users.view',
     'server.users.manage',
     'server.activity.view',
@@ -5801,27 +5802,28 @@ app.post('/user/create', requireAuth, async (req, res) => {
                     reinstall: false,
                     clearSuspended: true,
                     resolvedVariables,
-                    config: {
-                        image: server.dockerImage,
-                        memory: server.memory,
-                        cpu: server.cpu,
-                        disk: server.disk,
-                        swapLimit: server.swapLimit,
-                        ioWeight: server.ioWeight,
-                        pidsLimit: server.pidsLimit,
-                        oomKillDisable: Boolean(server.oomKillDisable),
-                        oomScoreAdj: server.oomScoreAdj,
-                        env,
-                        startup,
-                        startupMode,
-                        eggConfig: image.eggConfig,
-                        eggScripts: image.eggScripts,
-                        installation: image.installation || null,
-                        configFiles: image.configFiles || null,
-                        brandName: String((res.locals.settings && res.locals.settings.brandName) || 'cpanel'),
-                        ports: deploymentPorts
-                    }
-                },
+                        config: {
+                            image: server.dockerImage,
+                            memory: server.memory,
+                            cpu: server.cpu,
+                            disk: server.disk,
+                            swapLimit: server.swapLimit,
+                            ioWeight: server.ioWeight,
+                            pidsLimit: server.pidsLimit,
+                            oomKillDisable: Boolean(server.oomKillDisable),
+                            oomScoreAdj: server.oomScoreAdj,
+                            env,
+                            startup,
+                            startupMode,
+                            eggConfig: image.eggConfig,
+                            eggScripts: image.eggScripts,
+                            installation: image.installation || null,
+                            configFiles: image.configFiles || null,
+                            brandName: String((res.locals.settings && res.locals.settings.brandName) || 'cpanel'),
+                            ports: deploymentPorts,
+                            mounts: []
+                        }
+                    },
                 priority: 10,
                 maxAttempts: 3,
                 createdByUserId: account.id
@@ -7002,6 +7004,144 @@ app.post('/server/:containerId/network/allocations/:allocationId/notes', require
     } catch (error) {
         console.error('Error updating allocation notes:', error);
         return res.redirect(`/server/${req.params.containerId}/network?error=${encodeURIComponent('Failed to update allocation notes.')}`);
+    }
+});
+
+app.get('/server/:containerId/mounts', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }]
+        });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.mounts')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const connectorId = server.allocation ? Number.parseInt(server.allocation.connectorId, 10) : 0;
+        const mountRows = await ServerMount.findAll({
+            where: { serverId: server.id },
+            include: [{ model: Mount, as: 'mount', include: [{ model: Connector, as: 'connector', attributes: ['id', 'name'] }] }]
+        });
+        const assignedMounts = mountRows
+            .filter((row) => row && row.mount)
+            .map((row) => {
+                const mount = row.mount;
+                return {
+                    id: mount.id,
+                    name: mount.name,
+                    description: mount.description,
+                    sourcePath: mount.sourcePath,
+                    targetPath: mount.targetPath,
+                    connectorId: mount.connectorId,
+                    connectorName: mount.connector ? mount.connector.name : null,
+                    readOnly: row.readOnly === null || row.readOnly === undefined ? Boolean(mount.readOnly) : Boolean(row.readOnly),
+                    serverMountId: row.id
+                };
+            });
+
+        const assignedIds = new Set(assignedMounts.map((item) => item.id));
+        const allMounts = await Mount.findAll({
+            include: [{ model: Connector, as: 'connector', attributes: ['id', 'name'] }],
+            order: [['name', 'ASC']]
+        });
+        const availableMounts = allMounts
+            .filter((mount) => !assignedIds.has(mount.id))
+            .filter((mount) => !mount.connectorId || !connectorId || Number(mount.connectorId) === connectorId)
+            .map((mount) => ({
+                id: mount.id,
+                name: mount.name,
+                description: mount.description,
+                sourcePath: mount.sourcePath,
+                targetPath: mount.targetPath,
+                connectorId: mount.connectorId,
+                connectorName: mount.connector ? mount.connector.name : null,
+                readOnly: Boolean(mount.readOnly)
+            }));
+
+        res.render('server/mounts', {
+            server,
+            user: req.session.user,
+            title: `Mounts ${server.name}`,
+            path: '/servers',
+            assignedMounts,
+            availableMounts,
+            canManageMounts: hasServerPermission(access, 'server.mounts'),
+            success: req.query.success || null,
+            error: req.query.error || null
+        });
+    } catch (error) {
+        console.error('Error loading mounts page:', error);
+        return res.redirect(`/server/${req.params.containerId}/overview?error=${encodeURIComponent('Failed to load mounts.')}`);
+    }
+});
+
+app.post('/server/:containerId/mounts/attach', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }]
+        });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.mounts')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const mountId = Number.parseInt(req.body.mountId, 10);
+        if (!Number.isInteger(mountId) || mountId <= 0) {
+            return res.redirect(`/server/${server.containerId}/mounts?error=${encodeURIComponent('Invalid mount selection.')}`);
+        }
+
+        const mount = await Mount.findByPk(mountId);
+        if (!mount) {
+            return res.redirect(`/server/${server.containerId}/mounts?error=${encodeURIComponent('Mount not found.')}`);
+        }
+
+        const connectorId = server.allocation ? Number.parseInt(server.allocation.connectorId, 10) : 0;
+        if (mount.connectorId && connectorId && Number(mount.connectorId) !== connectorId) {
+            return res.redirect(`/server/${server.containerId}/mounts?error=${encodeURIComponent('Mount is not available on this connector.')}`);
+        }
+
+        const readOnly = parseBooleanInput(req.body.readOnly, Boolean(mount.readOnly));
+        const [record] = await ServerMount.findOrCreate({
+            where: { serverId: server.id, mountId: mount.id },
+            defaults: { readOnly }
+        });
+        if (record && record.readOnly !== readOnly) {
+            await record.update({ readOnly });
+        }
+
+        return res.redirect(`/server/${server.containerId}/mounts?success=${encodeURIComponent('Mount attached. Apply changes on next reinstall.')}`);
+    } catch (error) {
+        console.error('Error attaching mount:', error);
+        return res.redirect(`/server/${req.params.containerId}/mounts?error=${encodeURIComponent('Failed to attach mount.')}`);
+    }
+});
+
+app.post('/server/:containerId/mounts/detach', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.mounts')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const mountId = Number.parseInt(req.body.mountId, 10);
+        if (!Number.isInteger(mountId) || mountId <= 0) {
+            return res.redirect(`/server/${server.containerId}/mounts?error=${encodeURIComponent('Invalid mount selection.')}`);
+        }
+
+        await ServerMount.destroy({ where: { serverId: server.id, mountId } });
+        return res.redirect(`/server/${server.containerId}/mounts?success=${encodeURIComponent('Mount detached. Apply changes on next reinstall.')}`);
+    } catch (error) {
+        console.error('Error detaching mount:', error);
+        return res.redirect(`/server/${req.params.containerId}/mounts?error=${encodeURIComponent('Failed to detach mount.')}`);
     }
 });
 
@@ -8420,6 +8560,10 @@ app.get('/server/:containerId/minecraft/installed', requireAuth, async (req, res
         if (server.isSuspended) {
             return res.status(423).json({ success: false, error: 'Server is suspended.' });
         }
+        const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
+        if (!featureFlags.remoteDownloadEnabled) {
+            return res.status(403).json({ success: false, error: 'Remote downloads are disabled by admin.' });
+        }
         if (!server.allocation || !server.allocation.connectorId) {
             return res.status(400).json({ success: false, error: 'Server allocation is missing.' });
         }
@@ -8507,6 +8651,10 @@ app.post('/server/:containerId/minecraft/delete', requireAuth, async (req, res) 
         }
         if (server.isSuspended) {
             return res.status(423).json({ success: false, error: 'Server is suspended.' });
+        }
+        const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
+        if (!featureFlags.remoteDownloadEnabled) {
+            return res.status(403).json({ success: false, error: 'Remote downloads are disabled by admin.' });
         }
         if (!server.allocation || !server.allocation.connectorId) {
             return res.status(400).json({ success: false, error: 'Server allocation is missing.' });
@@ -8937,6 +9085,9 @@ app.post('/server/:containerId/startup', requireAuth, async (req, res) => {
             primaryAllocation,
             allocations: assignedAllocations
         });
+        const mountConfig = typeof getServerMountsForInstall === 'function'
+            ? await getServerMountsForInstall(server.id)
+            : [];
 
         const installJob = await jobQueue.enqueue({
             type: 'server.install.dispatch',
@@ -8963,7 +9114,8 @@ app.post('/server/:containerId/startup', requireAuth, async (req, res) => {
                     installation: image.installation || null,
                     configFiles: image.configFiles || null,
                     brandName: String((res.locals.settings && res.locals.settings.brandName) || 'cpanel'),
-                    ports: deploymentPorts
+                    ports: deploymentPorts,
+                    mounts: mountConfig
                 }
             },
             priority: 10,

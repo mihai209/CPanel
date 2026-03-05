@@ -1,0 +1,37 @@
+body {
+    background:
+        radial-gradient(circle at 15% 20%, rgba(110, 231, 165, 0.18), transparent 45%),
+        radial-gradient(circle at 80% 30%, rgba(59, 130, 246, 0.12), transparent 48%),
+        linear-gradient(160deg, #0c1710 0%, #0e1f14 50%, #0a120d 100%) !important;
+    background-attachment: scroll !important;
+}
+
+.card,
+.modal-content,
+.bg-dark {
+    background: rgba(16, 30, 21, 0.86) !important;
+    border-color: rgba(77, 164, 99, 0.3) !important;
+}
+
+.navbar {
+    background: rgba(14, 26, 19, 0.95) !important;
+    border-bottom-color: rgba(77, 164, 99, 0.32) !important;
+}
+
+.form-control,
+.form-select {
+    background: rgba(12, 22, 16, 0.92) !important;
+    border-color: rgba(77, 164, 99, 0.34) !important;
+    color: #e6f4ec !important;
+}
+
+.btn-primary {
+    background: #6ee7a5 !important;
+    border-color: #6ee7a5 !important;
+    color: #0d1d14 !important;
+}
+
+a,
+.text-primary {
+    color: #6ee7a5 !important;
+}

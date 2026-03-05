@@ -1759,6 +1759,78 @@ app.post('/admin/databases/ping/:id', requireAuth, requireAdmin, async (req, res
     }
 });
 
+app.get('/admin/mounts', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const mounts = await Mount.findAll({
+            include: [{ model: Connector, as: 'connector', attributes: ['id', 'name'] }],
+            order: [['name', 'ASC']]
+        });
+        const connectors = await Connector.findAll({ attributes: ['id', 'name'], order: [['name', 'ASC']] });
+
+        res.render('admin/mounts', {
+            user: req.session.user,
+            path: '/admin/mounts',
+            mounts: mounts.map((mount) => ({
+                ...mount.toJSON(),
+                connectorName: mount.connector ? mount.connector.name : null
+            })),
+            connectors,
+            success: req.query.success || null,
+            error: req.query.error || null
+        });
+    } catch (error) {
+        console.error('Error loading mounts page:', error);
+        res.redirect('/admin/overview?error=Failed to load mounts.');
+    }
+});
+
+app.post('/admin/mounts', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const name = String(req.body.name || '').trim();
+        const description = String(req.body.description || '').trim();
+        const sourcePath = String(req.body.sourcePath || '').trim();
+        let targetPath = String(req.body.targetPath || '').trim();
+        const connectorId = Number.parseInt(req.body.connectorId, 10);
+        const readOnly = ['1', 'true', 'yes', 'on'].includes(String(req.body.readOnly || '').trim().toLowerCase());
+
+        if (!name || !sourcePath || !targetPath) {
+            return res.redirect('/admin/mounts?error=' + encodeURIComponent('Name, source path, and target path are required.'));
+        }
+        if (!targetPath.startsWith('/')) {
+            targetPath = '/' + targetPath.replace(/^\/+/, '');
+        }
+
+        await Mount.create({
+            name,
+            description: description || null,
+            sourcePath,
+            targetPath,
+            readOnly,
+            connectorId: Number.isInteger(connectorId) && connectorId > 0 ? connectorId : null
+        });
+
+        return res.redirect('/admin/mounts?success=' + encodeURIComponent('Mount created successfully.'));
+    } catch (error) {
+        console.error('Error creating mount:', error);
+        return res.redirect('/admin/mounts?error=' + encodeURIComponent('Failed to create mount.'));
+    }
+});
+
+app.post('/admin/mounts/:id/delete', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const mountId = Number.parseInt(req.params.id, 10);
+        if (!Number.isInteger(mountId) || mountId <= 0) {
+            return res.redirect('/admin/mounts?error=' + encodeURIComponent('Invalid mount id.'));
+        }
+        await ServerMount.destroy({ where: { mountId } });
+        await Mount.destroy({ where: { id: mountId } });
+        return res.redirect('/admin/mounts?success=' + encodeURIComponent('Mount deleted.'));
+    } catch (error) {
+        console.error('Error deleting mount:', error);
+        return res.redirect('/admin/mounts?error=' + encodeURIComponent('Failed to delete mount.'));
+    }
+});
+
 }
 
 module.exports = { registerAdminCoreRoutes };

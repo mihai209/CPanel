@@ -5,6 +5,8 @@ function registerDefaultJobHandlers(jobQueue, deps) {
         Connector,
         ServerBackupPolicy,
         ServerBackup,
+        Settings,
+        getPanelFeatureFlagsFromMap,
         dispatchServerLogCleanup,
         pendingMigrationFileImports,
         connectorConnections,
@@ -15,6 +17,30 @@ function registerDefaultJobHandlers(jobQueue, deps) {
         upsertServerMinecraftInstallRecord,
         bootInfo
     } = deps;
+
+    let featureFlagsCache = { ts: 0, flags: null };
+    const FEATURE_FLAGS_TTL_MS = 10 * 1000;
+
+    async function getJobFeatureFlags() {
+        if (!Settings || typeof Settings.findAll !== 'function') {
+            return getPanelFeatureFlagsFromMap ? getPanelFeatureFlagsFromMap({}) : { remoteDownloadEnabled: true };
+        }
+        const now = Date.now();
+        if (featureFlagsCache.flags && now - featureFlagsCache.ts < FEATURE_FLAGS_TTL_MS) {
+            return featureFlagsCache.flags;
+        }
+        const rows = await Settings.findAll({
+            where: { key: ['featureRemoteDownloadEnabled'] },
+            attributes: ['key', 'value']
+        });
+        const map = {};
+        rows.forEach((row) => {
+            map[row.key] = row.value;
+        });
+        const flags = getPanelFeatureFlagsFromMap ? getPanelFeatureFlagsFromMap(map) : { remoteDownloadEnabled: String(map.featureRemoteDownloadEnabled || 'true') === 'true' };
+        featureFlagsCache = { ts: now, flags };
+        return flags;
+    }
 
     function getConnectorSocket(connectorId) {
         const socket = connectorConnections && connectorConnections.get
@@ -112,6 +138,11 @@ function registerDefaultJobHandlers(jobQueue, deps) {
         const serverId = Number.parseInt(payload.serverId, 10);
         if (!Number.isInteger(serverId) || serverId <= 0) {
             throw new Error('Invalid serverId for server.minecraft.install job');
+        }
+
+        const flags = await getJobFeatureFlags();
+        if (flags && flags.remoteDownloadEnabled === false) {
+            throw new Error('Remote downloads are disabled by admin.');
         }
 
         const server = await Server.findByPk(serverId, {

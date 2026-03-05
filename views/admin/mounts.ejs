@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mounts | <%= settings.brandName.toUpperCase() %></title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <%- include('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3">
+                    <h4 class="mb-0 text-light fw-normal">Mounts</h4>
+                    <small class="text-muted">Attach shared host paths to servers.</small>
+                </div>
+                <div class="breadcrumb-admin">
+                    <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span class="text-light">Mounts</span>
+                </div>
+            </div>
+
+            <div class="container-fluid py-4 px-lg-4">
+                <% if (success) { %>
+                    <div class="alert alert-success"><%= success %></div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger"><%= error %></div>
+                <% } %>
+
+                <div class="row g-4">
+                    <div class="col-lg-5">
+                        <div class="card border-0 shadow-sm" style="background-color:#141419;">
+                            <div class="card-header border-bottom border-secondary border-opacity-10 bg-transparent">
+                                <h6 class="mb-0 text-light"><i class="bi bi-plus-circle me-2"></i>Create Mount</h6>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST" action="/admin/mounts" class="row g-3" data-turbo="false">
+                                    <div class="col-12">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Name</label>
+                                        <input type="text" name="name" class="form-control" required maxlength="120"
+                                            style="background-color:#1a1a20;border-color:#2d2d35;">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Description</label>
+                                        <input type="text" name="description" class="form-control" maxlength="255"
+                                            style="background-color:#1a1a20;border-color:#2d2d35;">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Source Path (Host)</label>
+                                        <input type="text" name="sourcePath" class="form-control" required maxlength="512"
+                                            style="background-color:#1a1a20;border-color:#2d2d35;" placeholder="/var/lib/cpanel/shared">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Target Path (Container)</label>
+                                        <input type="text" name="targetPath" class="form-control" required maxlength="512"
+                                            style="background-color:#1a1a20;border-color:#2d2d35;" placeholder="/home/container/shared">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Connector</label>
+                                        <select name="connectorId" class="form-select" style="background-color:#1a1a20;border-color:#2d2d35;">
+                                            <option value="">Any Connector</option>
+                                            <% (connectors || []).forEach((connector) => { %>
+                                                <option value="<%= connector.id %>"><%= connector.name %></option>
+                                            <% }) %>
+                                        </select>
+                                        <div class="form-text text-muted">Optional: restrict to one connector.</div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="readOnly" name="readOnly" value="1">
+                                            <label class="form-check-label text-light" for="readOnly">Read-Only</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <button class="btn btn-primary w-100" type="submit">Create Mount</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-7">
+                        <div class="card border-0 shadow-sm" style="background-color:#141419;">
+                            <div class="card-header border-bottom border-secondary border-opacity-10 bg-transparent">
+                                <h6 class="mb-0 text-light"><i class="bi bi-link-45deg me-2"></i>Existing Mounts</h6>
+                            </div>
+                            <div class="card-body">
+                                <% if (!mounts || mounts.length === 0) { %>
+                                    <div class="text-muted">No mounts created yet.</div>
+                                <% } else { %>
+                                    <div class="table-responsive">
+                                        <table class="table table-dark table-sm align-middle mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Name</th>
+                                                    <th>Source</th>
+                                                    <th>Target</th>
+                                                    <th>Read-Only</th>
+                                                    <th>Connector</th>
+                                                    <th class="text-end">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <% mounts.forEach((mount) => { %>
+                                                    <tr>
+                                                        <td><%= mount.name %></td>
+                                                        <td><code><%= mount.sourcePath %></code></td>
+                                                        <td><code><%= mount.targetPath %></code></td>
+                                                        <td>
+                                                            <% if (mount.readOnly) { %>
+                                                                <span class="badge bg-secondary">Read-only</span>
+                                                            <% } else { %>
+                                                                <span class="badge bg-success">Writable</span>
+                                                            <% } %>
+                                                        </td>
+                                                        <td><%= mount.connectorName || 'Any' %></td>
+                                                        <td class="text-end">
+                                                            <form method="POST" action="/admin/mounts/<%= mount.id %>/delete" data-turbo="false">
+                                                                <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                                                            </form>
+                                                        </td>
+                                                    </tr>
+                                                <% }) %>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -4,7 +4,8 @@ const DEFAULT_USER_PERMISSIONS = [
     'server.power',
     'server.files',
     'server.startup',
-    'server.backups.view'
+    'server.backups.view',
+    'server.mounts'
 ];
 
 const ADMIN_WILDCARD = '*';

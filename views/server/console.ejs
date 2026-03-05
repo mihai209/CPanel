@@ -257,6 +257,7 @@
                 justify-content: space-between;
                 align-items: center;
                 flex-shrink: 0;
+                gap: 0.75rem;
             }
 
             .terminal-title {
@@ -270,6 +271,8 @@
             .terminal-controls {
                 display: flex;
                 gap: 0.5rem;
+                align-items: center;
+                flex-wrap: wrap;
             }
 
             #terminal {
@@ -384,10 +387,52 @@
                     padding: 1rem;
                 }
 
+                .terminal-header {
+                    flex-direction: column;
+                    align-items: flex-start;
+                }
+
+                .terminal-controls {
+                    width: 100%;
+                    gap: 0.5rem;
+                }
+
+                #powerActions {
+                    width: 100%;
+                    display: grid;
+                    grid-template-columns: repeat(2, minmax(0, 1fr));
+                    gap: 0.5rem;
+                }
+
+                #btnPopout {
+                    grid-column: 1 / -1;
+                }
+
+                #consoleTools {
+                    width: 100%;
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.5rem;
+                }
+
+                #consoleTools .btn {
+                    flex: 1 1 calc(33.333% - 0.5rem);
+                }
+
                 .connection-toast {
                     left: 1rem;
                     right: 1rem;
                     min-width: auto;
+                }
+            }
+
+            @media (max-width: 520px) {
+                #powerActions {
+                    grid-template-columns: 1fr;
+                }
+
+                #consoleTools .btn {
+                    flex: 1 1 100%;
                 }
             }
 
@@ -462,6 +507,17 @@
                                 <span id="wsStatusBadge" class="badge bg-secondary" title="Panel status">
                                     <i class="bi bi-arrow-repeat"></i> Connecting...
                                 </span>
+                                <div id="consoleTools" class="d-flex gap-2">
+                                    <button id="btnFontMinus" class="btn btn-outline-secondary btn-sm" title="Font size -">
+                                        <i class="bi bi-dash-lg"></i>
+                                    </button>
+                                    <button id="btnFontPlus" class="btn btn-outline-secondary btn-sm" title="Font size +">
+                                        <i class="bi bi-plus-lg"></i>
+                                    </button>
+                                    <button id="btnClear" class="btn btn-outline-secondary btn-sm" title="Clear console">
+                                        <i class="bi bi-trash3"></i>
+                                    </button>
+                                </div>
                                 <div id="powerActions" class="d-flex gap-2">
                                     <button id="btnPopout" class="btn btn-outline-secondary btn-sm"
                                         data-server-id="<%= server.containerId %>">
@@ -577,6 +633,7 @@
                 scrollback: 1000,
                 convertEol: true
             });
+            let consoleFontSize = 13;
 
             const fitAddon = new FitAddon.FitAddon();
             term.loadAddon(fitAddon);
@@ -795,6 +852,29 @@
                     const srvId = this.getAttribute('data-server-id');
                     window.open(`/server/${srvId}?popout=true`, `console_popout_${srvId}`, 'width=900,height=600');
                 });
+            }
+
+            const btnFontMinus = document.getElementById('btnFontMinus');
+            const btnFontPlus = document.getElementById('btnFontPlus');
+            const btnClear = document.getElementById('btnClear');
+
+            function applyConsoleFontSize(nextSize) {
+                const size = Math.max(10, Math.min(18, nextSize));
+                consoleFontSize = size;
+                term.options.fontSize = size;
+                fitAddon.fit();
+            }
+
+            if (btnFontMinus) {
+                btnFontMinus.addEventListener('click', () => applyConsoleFontSize(consoleFontSize - 1));
+            }
+
+            if (btnFontPlus) {
+                btnFontPlus.addEventListener('click', () => applyConsoleFontSize(consoleFontSize + 1));
+            }
+
+            if (btnClear) {
+                btnClear.addEventListener('click', () => term.clear());
             }
 
             document.getElementById('btnStart').addEventListener('click', () => sendPower('start'));

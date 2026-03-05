@@ -691,7 +691,8 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
             installation: image.installation || null,
             configFiles: image.configFiles || null,
             brandName: String((res.locals.settings && res.locals.settings.brandName) || 'cpanel'),
-            ports: deploymentPorts
+            ports: deploymentPorts,
+            mounts: []
         };
 
         let installJob;
@@ -896,7 +897,8 @@ app.post('/admin/servers', requireAuth, requireAdmin, async (req, res) => {
                         installation: image.installation || null,
                         configFiles: image.configFiles || null,
                         brandName: String((res.locals.settings && res.locals.settings.brandName) || 'cpanel'),
-                        ports: deploymentPorts
+                        ports: deploymentPorts,
+                        mounts: []
                     }
                 },
                 priority: 10,
@@ -1296,6 +1298,9 @@ app.post('/admin/servers/reinstall/:containerId', requireAuth, requireAdmin, asy
             allocations: assignedAllocations
         });
         const startupMode = shouldUseCommandStartup(image) ? 'command' : 'environment';
+        const mountConfig = typeof getServerMountsForInstall === 'function'
+            ? await getServerMountsForInstall(server.id)
+            : [];
 
         const installJob = await jobQueue.enqueue({
             type: 'server.install.dispatch',
@@ -1322,7 +1327,8 @@ app.post('/admin/servers/reinstall/:containerId', requireAuth, requireAdmin, asy
                     installation: image.installation || null,
                     configFiles: image.configFiles || null,
                     brandName: String((res.locals.settings && res.locals.settings.brandName) || 'cpanel'),
-                    ports: deploymentPorts
+                    ports: deploymentPorts,
+                    mounts: mountConfig
                 }
             },
             priority: 10,
