@@ -913,12 +913,20 @@ async function fetchPterodactylApplicationServer(panelUrl, apiKey, reference) {
         'Content-Type': 'application/json'
     };
 
+    const includeParam = 'allocations,databases';
+    const withInclude = (url) => {
+        if (!url) return url;
+        return url.includes('?')
+            ? `${url}&include=${encodeURIComponent(includeParam)}`
+            : `${url}?include=${encodeURIComponent(includeParam)}`;
+    };
+
     const candidates = [];
     if (/^\d+$/.test(ref)) {
-        candidates.push(`${baseUrl}/api/application/servers/${ref}`);
+        candidates.push(withInclude(`${baseUrl}/api/application/servers/${ref}`));
     }
-    candidates.push(`${baseUrl}/api/application/servers/external/${encodeURIComponent(ref)}`);
-    candidates.push(`${baseUrl}/api/application/servers/${encodeURIComponent(ref)}`);
+    candidates.push(withInclude(`${baseUrl}/api/application/servers/external/${encodeURIComponent(ref)}`));
+    candidates.push(withInclude(`${baseUrl}/api/application/servers/${encodeURIComponent(ref)}`));
 
     let lastError = null;
     const extractPteroErrorMessage = (error) => {
@@ -935,9 +943,55 @@ async function fetchPterodactylApplicationServer(panelUrl, apiKey, reference) {
 
     const normalizeApplicationServerPayload = (input) => {
         if (!input) return null;
-        if (input.attributes && typeof input.attributes === 'object') return input.attributes;
+        if (input.attributes && typeof input.attributes === 'object') {
+            const merged = { ...input.attributes };
+            if (input.relationships && typeof input.relationships === 'object') {
+                merged.relationships = input.relationships;
+            }
+            return merged;
+        }
         if (input.object === 'server' && typeof input === 'object') return input;
         return input;
+    };
+
+    const attachRelationshipList = async (payload, relation, endpoint, extraParams = {}) => {
+        if (!payload || !relation || !endpoint) return;
+        if (payload.relationships && payload.relationships[relation] && Array.isArray(payload.relationships[relation].data)) {
+            return;
+        }
+        try {
+            const response = await axios.get(endpoint, {
+                headers,
+                timeout: 10000,
+                params: extraParams
+            });
+            const dataRows = response && response.data && Array.isArray(response.data.data)
+                ? response.data.data
+                : [];
+            if (!payload.relationships || typeof payload.relationships !== 'object') {
+                payload.relationships = {};
+            }
+            payload.relationships[relation] = { data: dataRows };
+        } catch {
+            // Best effort only.
+        }
+    };
+
+    const enrichRelationships = async (payload) => {
+        const serverId = Number.parseInt(payload && payload.id, 10);
+        if (!Number.isInteger(serverId) || serverId <= 0) return payload;
+        await attachRelationshipList(
+            payload,
+            'allocations',
+            `${baseUrl}/api/application/servers/${serverId}/allocations`
+        );
+        await attachRelationshipList(
+            payload,
+            'databases',
+            `${baseUrl}/api/application/servers/${serverId}/databases`,
+            { include: 'host' }
+        );
+        return payload;
     };
 
     for (const endpoint of candidates) {
@@ -949,6 +1003,7 @@ async function fetchPterodactylApplicationServer(panelUrl, apiKey, reference) {
             if (response && response.data) {
                 const payload = normalizeApplicationServerPayload(response.data);
                 if (payload && typeof payload === 'object') {
+                    await enrichRelationships(payload);
                     return payload;
                 }
             }
@@ -991,6 +1046,7 @@ async function fetchPterodactylApplicationServer(panelUrl, apiKey, reference) {
                         (uuid && uuid === ref) ||
                         (identifier && identifier === ref)
                     ) {
+                        await enrichRelationships(serverPayload);
                         return serverPayload;
                     }
                 }
@@ -1039,10 +1095,103 @@ function normalizePterodactylServerForMigration(rawServer) {
     const container = rawServer.container && typeof rawServer.container === 'object' ? rawServer.container : {};
     const allocation = rawServer.allocation && typeof rawServer.allocation === 'object' ? rawServer.allocation : {};
     const featureLimits = rawServer.feature_limits && typeof rawServer.feature_limits === 'object' ? rawServer.feature_limits : {};
+    const relationships = rawServer.relationships && typeof rawServer.relationships === 'object'
+        ? rawServer.relationships
+        : {};
 
     const memory = Number.parseInt(limits.memory, 10);
     const disk = Number.parseInt(limits.disk, 10);
     const cpu = Number.parseInt(limits.cpu, 10);
+
+    const extractRelationshipData = (relation) => {
+        if (!relation || typeof relation !== 'object') return [];
+        const rows = Array.isArray(relation.data) ? relation.data : [];
+        return rows.filter(Boolean);
+    };
+
+    const normalizeAllocationRow = (row) => {
+        const payload = row && row.attributes && typeof row.attributes === 'object' ? row.attributes : row;
+        if (!payload || typeof payload !== 'object') return null;
+        const ip = String(payload.ip || '').trim();
+        const port = Number.parseInt(payload.port, 10);
+        if (!ip || !Number.isInteger(port)) return null;
+        return {
+            id: Number.parseInt(payload.id, 10) || null,
+            ip,
+            port,
+            alias: String(payload.alias || '').trim(),
+            notes: String(payload.notes || '').trim(),
+            isDefault: Boolean(payload.is_default || payload.default || payload.isDefault)
+        };
+    };
+
+    const normalizeDatabaseRow = (row) => {
+        const payload = row && row.attributes && typeof row.attributes === 'object' ? row.attributes : row;
+        if (!payload || typeof payload !== 'object') return null;
+        const name = String(payload.database || payload.name || '').trim();
+        const username = String(payload.username || '').trim();
+        if (!name) return null;
+
+        let host = null;
+        const hostRel = row && row.relationships && row.relationships.host
+            ? row.relationships.host
+            : (payload.host && typeof payload.host === 'object' ? payload.host : null);
+        if (hostRel && typeof hostRel === 'object') {
+            const hostPayload = hostRel.attributes || hostRel.data && hostRel.data.attributes || hostRel.data;
+            if (hostPayload && typeof hostPayload === 'object') {
+                host = {
+                    id: Number.parseInt(hostPayload.id, 10) || null,
+                    name: String(hostPayload.name || '').trim(),
+                    type: String(hostPayload.type || '').trim(),
+                    host: String(hostPayload.host || '').trim(),
+                    port: Number.parseInt(hostPayload.port, 10) || null
+                };
+            }
+        }
+
+        return {
+            id: Number.parseInt(payload.id, 10) || null,
+            name,
+            username,
+            remote: Boolean(payload.remote),
+            host
+        };
+    };
+
+    const allocationsRaw = extractRelationshipData(relationships.allocations);
+    const allocationRows = allocationsRaw.map(normalizeAllocationRow).filter(Boolean);
+    const defaultAllocationId = Number.parseInt(allocation.id, 10) || null;
+    const allocations = [];
+    const defaultIp = String(allocation.ip || '').trim();
+    const defaultPort = Number.parseInt(allocation.port, 10);
+
+    if (defaultIp && Number.isInteger(defaultPort)) {
+        allocations.push({
+            id: defaultAllocationId,
+            ip: defaultIp,
+            port: defaultPort,
+            alias: String(allocation.alias || '').trim(),
+            notes: String(allocation.notes || '').trim(),
+            isDefault: true
+        });
+    }
+
+    allocationRows.forEach((row) => {
+        const isDefault = row.isDefault
+            || (defaultAllocationId && row.id === defaultAllocationId)
+            || (defaultIp && defaultPort && row.ip === defaultIp && row.port === defaultPort);
+        const exists = allocations.find((entry) => entry.ip === row.ip && entry.port === row.port);
+        if (exists) {
+            if (isDefault) exists.isDefault = true;
+            if (!exists.alias && row.alias) exists.alias = row.alias;
+            if (!exists.notes && row.notes) exists.notes = row.notes;
+        } else {
+            allocations.push({ ...row, isDefault });
+        }
+    });
+
+    const databasesRaw = extractRelationshipData(relationships.databases);
+    const databases = databasesRaw.map(normalizeDatabaseRow).filter(Boolean);
 
     return {
         id: Number.parseInt(rawServer.id, 10) || null,
@@ -1065,6 +1214,8 @@ function normalizePterodactylServerForMigration(rawServer) {
             ip: String(allocation.ip || '').trim(),
             port: Number.parseInt(allocation.port, 10) || null
         },
+        allocations,
+        databases,
         featureLimits: {
             databases: Number.parseInt(featureLimits.databases, 10) || 0,
             allocations: Number.parseInt(featureLimits.allocations, 10) || 0,

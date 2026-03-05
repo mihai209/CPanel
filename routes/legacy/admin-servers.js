@@ -1,5 +1,6 @@
 function registerAdminServersRoutes(ctx) {
     const nodeCrypto = require('node:crypto');
+    const { Sequelize } = require('sequelize');
     const { pickSmartAllocation } = require('../../core/helpers/smart-allocation');
     const {
         app,
@@ -10,6 +11,8 @@ function registerAdminServersRoutes(ctx) {
         User,
         Image,
         Settings,
+        DatabaseHost,
+        ServerDatabase,
         Connector,
         Allocation,
         requireAuth,
@@ -87,6 +90,132 @@ function formatSmartAllocationResponse(result) {
         projectedMemoryHeadroomMb: Number(best.cap && best.cap.memoryHeadroomMb || 0),
         projectedDiskHeadroomMb: Number(best.cap && best.cap.diskHeadroomMb || 0)
     };
+}
+
+function sanitizeDatabaseObjectName(value, fallback = 'db', maxLen = 48) {
+    const source = String(value || '').trim().toLowerCase();
+    const clean = source.replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+    const normalized = (clean || String(fallback || 'db')).slice(0, Math.max(4, maxLen));
+    return normalized || 'db';
+}
+
+function trimIdentifierLength(value, maxLen) {
+    return String(value || '').slice(0, Math.max(4, Number.parseInt(maxLen, 10) || 32));
+}
+
+function buildUniqueDatabaseObjectName(baseValue, usedNames, maxLen) {
+    const used = usedNames instanceof Set ? usedNames : new Set();
+    const normalizedBase = trimIdentifierLength(sanitizeDatabaseObjectName(baseValue, 'db', maxLen), maxLen);
+    if (!used.has(normalizedBase)) return normalizedBase;
+
+    for (let i = 0; i < 24; i += 1) {
+        const suffix = nodeCrypto.randomBytes(2).toString('hex');
+        const candidateBase = trimIdentifierLength(normalizedBase, maxLen - (suffix.length + 1));
+        const candidate = trimIdentifierLength(`${candidateBase}_${suffix}`, maxLen);
+        if (!used.has(candidate)) return candidate;
+    }
+
+    return trimIdentifierLength(`${normalizedBase}_${Date.now().toString(36)}`, maxLen);
+}
+
+function getDatabaseHostDialect(hostType) {
+    const normalized = String(hostType || '').trim().toLowerCase();
+    if (normalized === 'postgres' || normalized === 'postgresql') return 'postgres';
+    if (normalized === 'mariadb') return 'mariadb';
+    return 'mysql';
+}
+
+function getDatabaseNameMaxLen(hostType) {
+    return getDatabaseHostDialect(hostType) === 'postgres' ? 63 : 64;
+}
+
+function getDatabaseUserMaxLen(hostType) {
+    return getDatabaseHostDialect(hostType) === 'postgres' ? 63 : 32;
+}
+
+function quoteMysqlIdentifier(value) {
+    return `\`${String(value || '').replace(/`/g, '``')}\``;
+}
+
+function quotePgIdentifier(value) {
+    return `"${String(value || '').replace(/"/g, '""')}"`;
+}
+
+function escapeSqlLiteral(value) {
+    return `'${String(value === undefined || value === null ? '' : value)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "''")}'`;
+}
+
+async function withDatabaseHostConnection(host, callback) {
+    const dialect = getDatabaseHostDialect(host && host.type);
+    const hostPort = Math.max(1, Number.parseInt(host && host.port, 10) || (dialect === 'postgres' ? 5432 : 3306));
+    const rootDatabase = String(host && host.database
+        ? host.database
+        : (dialect === 'postgres' ? 'postgres' : 'mysql')).trim();
+
+    const dbClient = new Sequelize(
+        rootDatabase,
+        String(host && host.username ? host.username : ''),
+        String(host && host.password ? host.password : ''),
+        {
+            host: String(host && host.host ? host.host : ''),
+            port: hostPort,
+            dialect,
+            logging: false,
+            dialectOptions: { connectTimeout: 10000 }
+        }
+    );
+
+    try {
+        await dbClient.authenticate();
+        return await callback(dbClient, dialect);
+    } finally {
+        try {
+            await dbClient.close();
+        } catch {
+            // Best effort cleanup.
+        }
+    }
+}
+
+async function provisionServerDatabaseOnHost(host, { databaseName, databaseUser, databasePassword }) {
+    return withDatabaseHostConnection(host, async (dbClient, dialect) => {
+        if (dialect === 'postgres') {
+            const dbName = quotePgIdentifier(databaseName);
+            const roleName = quotePgIdentifier(databaseUser);
+            const roleNameLiteral = escapeSqlLiteral(databaseUser);
+            const rolePassLiteral = escapeSqlLiteral(databasePassword);
+            const dbNameLiteral = escapeSqlLiteral(databaseName);
+            const rows = await dbClient.query(
+                `SELECT 1 FROM pg_database WHERE datname = ${dbNameLiteral} LIMIT 1`,
+                { type: Sequelize.QueryTypes.SELECT }
+            );
+            if (!Array.isArray(rows) || rows.length === 0) {
+                await dbClient.query(`CREATE DATABASE ${dbName}`);
+            }
+            await dbClient.query(
+                `DO $$ BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${roleNameLiteral}) THEN
+                        CREATE ROLE ${roleName} LOGIN PASSWORD ${rolePassLiteral};
+                    ELSE
+                        ALTER ROLE ${roleName} WITH LOGIN PASSWORD ${rolePassLiteral};
+                    END IF;
+                END $$;`
+            );
+            await dbClient.query(`GRANT ALL PRIVILEGES ON DATABASE ${dbName} TO ${roleName}`);
+            return;
+        }
+
+        const dbName = quoteMysqlIdentifier(databaseName);
+        const userLiteral = escapeSqlLiteral(databaseUser);
+        const passLiteral = escapeSqlLiteral(databasePassword);
+        await dbClient.query(`CREATE DATABASE IF NOT EXISTS ${dbName}`);
+        await dbClient.query(`CREATE USER IF NOT EXISTS ${userLiteral}@'%' IDENTIFIED BY ${passLiteral}`);
+        await dbClient.query(`ALTER USER ${userLiteral}@'%' IDENTIFIED BY ${passLiteral}`);
+        await dbClient.query(`GRANT ALL PRIVILEGES ON ${dbName}.* TO ${userLiteral}@'%'`);
+        await dbClient.query('FLUSH PRIVILEGES');
+    });
 }
 
 const CONNECTOR_STATUS_STALE_MS = Math.max(
@@ -587,6 +716,12 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
         const memory = Number.parseInt(req.body.memory, 10) || Number.parseInt(snapshot.memory, 10) || 1024;
         const cpu = Number.parseInt(req.body.cpu, 10) || Number.parseInt(snapshot.cpu, 10) || 100;
         const disk = Number.parseInt(req.body.disk, 10) || Number.parseInt(snapshot.disk, 10) || 10240;
+        const remoteAllocations = Array.isArray(snapshot.allocations) ? snapshot.allocations : [];
+        const remoteDatabases = Array.isArray(snapshot.databases) ? snapshot.databases : [];
+        const remoteDatabaseLimit = Math.max(
+            remoteDatabases.length,
+            Number.parseInt(snapshot && snapshot.featureLimits && snapshot.featureLimits.databases, 10) || 0
+        );
 
         if (memory < 64 || cpu < 10 || disk < 512) {
             return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Resource limits are too low. Check memory/cpu/disk values.'));
@@ -651,6 +786,7 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
             memory,
             cpu,
             disk,
+            databaseLimit: remoteDatabaseLimit,
             swapLimit: Number.parseInt(snapshot.swap, 10) || 0,
             ioWeight: Number.parseInt(snapshot.io, 10) || 500,
             pidsLimit: 512,
@@ -661,6 +797,123 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
         });
 
         await allocation.update({ serverId: createdServer.id });
+
+        const allocationAssignmentSummary = {
+            assigned: 0,
+            skipped: 0
+        };
+        if (remoteAllocations.length > 0) {
+            const seenRemote = new Set();
+            for (const remoteAlloc of remoteAllocations) {
+                if (!remoteAlloc) continue;
+                const ip = String(remoteAlloc.ip || '').trim();
+                const port = Number.parseInt(remoteAlloc.port, 10);
+                if (!ip || !Number.isInteger(port)) continue;
+                const signature = `${ip}:${port}`;
+                if (seenRemote.has(signature)) continue;
+                seenRemote.add(signature);
+
+                const isDefault = Boolean(remoteAlloc.isDefault)
+                    || (allocation.ip === ip && Number.parseInt(allocation.port, 10) === port);
+                if (isDefault) continue;
+
+                const localAlloc = await Allocation.findOne({
+                    where: {
+                        connectorId: allocation.connectorId,
+                        ip,
+                        port
+                    }
+                });
+                if (!localAlloc || (localAlloc.serverId && Number.parseInt(localAlloc.serverId, 10) !== Number.parseInt(createdServer.id, 10))) {
+                    allocationAssignmentSummary.skipped += 1;
+                    continue;
+                }
+
+                if (Number.parseInt(localAlloc.id, 10) === Number.parseInt(createdServer.allocationId, 10)) {
+                    continue;
+                }
+
+                await localAlloc.update({ serverId: createdServer.id });
+                allocationAssignmentSummary.assigned += 1;
+            }
+        }
+
+        const databaseProvisionSummary = {
+            created: 0,
+            skipped: 0,
+            errors: []
+        };
+        if (remoteDatabases.length > 0 && DatabaseHost && ServerDatabase) {
+            const locationId = allocation.connector ? Number.parseInt(allocation.connector.locationId, 10) : 0;
+            const hosts = locationId > 0
+                ? await DatabaseHost.findAll({ where: { locationId }, order: [['name', 'ASC']] })
+                : [];
+
+            if (!hosts || hosts.length === 0) {
+                databaseProvisionSummary.skipped = remoteDatabases.length;
+                databaseProvisionSummary.errors.push('No database host configured for the selected connector location.');
+            } else {
+                const hostUsageCache = new Map();
+
+                for (const remoteDb of remoteDatabases) {
+                    const remoteName = String(remoteDb && remoteDb.name ? remoteDb.name : '').trim();
+                    if (!remoteName) continue;
+
+                    const preferredType = String(remoteDb && remoteDb.host && remoteDb.host.type ? remoteDb.host.type : '').trim().toLowerCase();
+                    const selectedHost = preferredType
+                        ? (hosts.find((host) => getDatabaseHostDialect(host.type) === getDatabaseHostDialect(preferredType)) || hosts[0])
+                        : hosts[0];
+                    if (!selectedHost) {
+                        databaseProvisionSummary.skipped += 1;
+                        continue;
+                    }
+
+                    if (!hostUsageCache.has(selectedHost.id)) {
+                        const entries = await ServerDatabase.findAll({
+                            where: { databaseHostId: selectedHost.id },
+                            attributes: ['name', 'username']
+                        });
+                        hostUsageCache.set(selectedHost.id, {
+                            usedNames: new Set(entries.map((entry) => String(entry.name || '').toLowerCase())),
+                            usedUsers: new Set(entries.map((entry) => String(entry.username || '').toLowerCase()))
+                        });
+                    }
+
+                    const cache = hostUsageCache.get(selectedHost.id);
+                    const maxDbNameLen = getDatabaseNameMaxLen(selectedHost.type);
+                    const maxDbUserLen = getDatabaseUserMaxLen(selectedHost.type);
+                    const baseName = sanitizeDatabaseObjectName(`s${createdServer.id}_${remoteName}`, `s${createdServer.id}_db`, maxDbNameLen);
+                    const baseUser = sanitizeDatabaseObjectName(`u${createdServer.id}_${remoteDb.username || remoteName}`, `u${createdServer.id}_user`, maxDbUserLen);
+                    const databaseName = buildUniqueDatabaseObjectName(baseName, cache.usedNames, maxDbNameLen);
+                    const databaseUser = buildUniqueDatabaseObjectName(baseUser, cache.usedUsers, maxDbUserLen);
+                    cache.usedNames.add(String(databaseName).toLowerCase());
+                    cache.usedUsers.add(String(databaseUser).toLowerCase());
+
+                    const databasePassword = nodeCrypto.randomBytes(12).toString('base64url').slice(0, 20);
+
+                    try {
+                        await provisionServerDatabaseOnHost(selectedHost, {
+                            databaseName,
+                            databaseUser,
+                            databasePassword
+                        });
+
+                        await ServerDatabase.create({
+                            serverId: createdServer.id,
+                            databaseHostId: selectedHost.id,
+                            name: databaseName,
+                            username: databaseUser,
+                            password: databasePassword,
+                            remoteDatabaseId: remoteDb && remoteDb.id ? `pterodactyl:${remoteDb.id}` : null
+                        });
+                        databaseProvisionSummary.created += 1;
+                    } catch (dbError) {
+                        databaseProvisionSummary.errors.push(`Database "${remoteName}" failed: ${dbError.message || dbError}`);
+                        databaseProvisionSummary.skipped += 1;
+                    }
+                }
+            }
+        }
 
         const pendingFileImport = importFiles ? {
             connectorId: allocation.connectorId,
@@ -736,8 +989,21 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
             }
         }
 
-        const warning = ignoredVariables.length > 0
-            ? `Imported with warnings. Ignored ${ignoredVariables.length} variables not supported by selected image: ${ignoredVariables.slice(0, 8).join(', ')}`
+        const warningFragments = [];
+        if (ignoredVariables.length > 0) {
+            warningFragments.push(`Ignored ${ignoredVariables.length} variables not supported by selected image: ${ignoredVariables.slice(0, 8).join(', ')}`);
+        }
+        if (allocationAssignmentSummary.assigned > 0 || allocationAssignmentSummary.skipped > 0) {
+            warningFragments.push(`Additional allocations migrated: ${allocationAssignmentSummary.assigned} assigned, ${allocationAssignmentSummary.skipped} skipped.`);
+        }
+        if (databaseProvisionSummary.created > 0 || databaseProvisionSummary.skipped > 0 || databaseProvisionSummary.errors.length > 0) {
+            warningFragments.push(`Databases migrated: ${databaseProvisionSummary.created} created, ${databaseProvisionSummary.skipped} skipped.`);
+            if (databaseProvisionSummary.errors.length > 0) {
+                warningFragments.push(databaseProvisionSummary.errors.slice(0, 2).join(' | '));
+            }
+        }
+        const warning = warningFragments.length > 0
+            ? `Imported with warnings. ${warningFragments.join(' ')}`
             : '';
         const fileImportNotice = fileImportQueued
             ? ' File import via SFTP is queued and will start automatically after install finishes.'

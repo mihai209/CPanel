@@ -116,6 +116,9 @@
                                 <div class="card-body">
                                     <div class="small text-muted mb-2">Name</div>
                                     <div class="text-light fw-semibold mb-3"><%= migrationSnapshot.name %></div>
+                                    <% const remoteAllocations = Array.isArray(migrationSnapshot.allocations) ? migrationSnapshot.allocations : []; %>
+                                    <% const remoteDatabases = Array.isArray(migrationSnapshot.databases) ? migrationSnapshot.databases : []; %>
+                                    <% const remoteDefaultAllocation = remoteAllocations.find((entry) => entry && entry.isDefault) || migrationSnapshot.defaultAllocation || {}; %>
                                     <div class="row g-3 small">
                                         <div class="col-6">
                                             <div class="text-muted">Memory</div>
@@ -141,6 +144,24 @@
                                     <code class="text-info"><%= migrationSnapshot.dockerImage || 'Not provided' %></code>
                                     <div class="small text-muted mt-3">Environment Variables</div>
                                     <div class="text-light"><%= Object.keys(migrationSnapshot.environment || {}).length %> keys detected</div>
+                                    <div class="small text-muted mt-3">Allocations</div>
+                                    <div class="text-light">
+                                        <%= remoteAllocations.length || (remoteDefaultAllocation && remoteDefaultAllocation.ip ? 1 : 0) %> allocation(s) detected
+                                    </div>
+                                    <% if (remoteAllocations.length > 0) { %>
+                                        <div class="small text-muted mt-1">
+                                            <%= remoteAllocations.slice(0, 3).map((alloc) => `${alloc.ip}:${alloc.port}${alloc.isDefault ? ' (primary)' : ''}`).join(' • ') %>
+                                        </div>
+                                    <% } %>
+                                    <div class="small text-muted mt-3">Databases</div>
+                                    <div class="text-light">
+                                        <%= remoteDatabases.length %> database(s) detected
+                                    </div>
+                                    <% if (remoteDatabases.length > 0) { %>
+                                        <div class="small text-muted mt-1">
+                                            <%= remoteDatabases.slice(0, 3).map((db) => db.name).join(' • ') %>
+                                        </div>
+                                    <% } %>
                                 </div>
                             </div>
                         <% } %>
@@ -215,6 +236,11 @@
 
                                     <form method="POST" action="/admin/migrations/pterodactyl/import">
                                         <input type="hidden" name="migrationToken" value="<%= migrationToken %>">
+                                        <% const migrationAllocations = Array.isArray(migrationSnapshot.allocations) ? migrationSnapshot.allocations : []; %>
+                                        <% const migrationDefaultAllocation = migrationAllocations.find((entry) => entry && entry.isDefault) || migrationSnapshot.defaultAllocation || {}; %>
+                                        <% const preferredAllocation = (migrationDefaultAllocation && migrationDefaultAllocation.ip && migrationDefaultAllocation.port)
+                                            ? allocations.find((alloc) => String(alloc.ip) === String(migrationDefaultAllocation.ip) && Number(alloc.port) === Number(migrationDefaultAllocation.port))
+                                            : null; %>
 
                                         <div class="row g-3">
                                             <div class="col-md-6">
@@ -252,11 +278,14 @@
                                                         const nodeState = connectorStatus && connectorStatus[alloc.connectorId];
                                                         const isOnline = nodeState && nodeState.status === 'online';
                                                     %>
-                                                        <option value="<%= alloc.id %>">
+                                                        <option value="<%= alloc.id %>" <%= preferredAllocation && Number(preferredAllocation.id) === Number(alloc.id) ? 'selected' : '' %>>
                                                             <%= alloc.ip %>:<%= alloc.port %> | <%= alloc.connector ? alloc.connector.name : ('Connector #' + alloc.connectorId) %> | <%= isOnline ? 'online' : 'offline' %>
                                                         </option>
                                                     <% }) %>
                                                 </select>
+                                                <% if (preferredAllocation) { %>
+                                                    <small class="text-muted">Auto-selected based on remote primary allocation.</small>
+                                                <% } %>
                                             </div>
 
                                             <div class="col-md-4">
