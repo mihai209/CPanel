@@ -1509,6 +1509,7 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
             installation: image.installation || null,
             configFiles: image.configFiles || null,
             brandName: String((res.locals.settings && res.locals.settings.brandName) || 'cpanel'),
+            startAfterInstall: false,
             ports: deploymentPorts,
             mounts: []
         };
@@ -1588,12 +1589,13 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
             ? ' File import via SFTP is queued and will start automatically after install finishes.'
             : '';
         const jobNotice = ` Deployment job #${installJob.id} queued.`;
+        const startNotice = ' Server was imported in stopped state (no auto-start).';
         delete req.session.pterodactylMigrationDraft;
         await cleanupMigrationExportFiles(req.session.pterodactylMigrationExports || []);
         req.session.pterodactylMigrationExports = generatedDbExports;
         await new Promise((resolve) => req.session.save(resolve));
         const query = [
-            `success=${encodeURIComponent(`Server "${createdServer.name}" imported and deployment started.${jobNotice}${fileImportNotice}`)}`,
+            `success=${encodeURIComponent(`Server "${createdServer.name}" imported and deployment prepared.${jobNotice}${startNotice}${fileImportNotice}`)}`,
             warning ? `warning=${encodeURIComponent(warning)}` : '',
             `jobId=${encodeURIComponent(String(installJob.id))}`,
             `serverId=${encodeURIComponent(String(createdServer.id))}`,

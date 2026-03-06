@@ -1559,13 +1559,15 @@ wss.on('connection', (ws, request) => {
                 const server = await Server.findByPk(data.serverId);
                 if (server) {
                     const previousStatus = String(server.status || '').toLowerCase();
+                    const started = !(data.started === false || String(data.status || '').toLowerCase() === 'offline');
+                    const nextStatus = started ? 'running' : 'offline';
                     await server.update({
-                        status: 'running'
+                        status: nextStatus
                     });
-                    server.status = 'running';
-                    console.log(`Server ${data.serverId} installed and running: ${data.containerId}`);
-                    sendToServerConsole(data.serverId, { type: 'server_status_update', status: 'running', containerId: data.containerId });
-                    if (previousStatus !== 'running') {
+                    server.status = nextStatus;
+                    console.log(`Server ${data.serverId} installed (status: ${nextStatus}): ${data.containerId}`);
+                    sendToServerConsole(data.serverId, { type: 'server_status_update', status: nextStatus, containerId: data.containerId });
+                    if (started && previousStatus !== 'running') {
                         sendServerSmartAlert(server, 'reinstallSuccess', {
                             previousStatus
                         });
