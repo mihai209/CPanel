@@ -8792,6 +8792,18 @@ app.post('/server/:containerId/databases/create', requireAuth, async (req, res) 
         return res.redirect(`/server/${state.server.containerId}/databases?success=${encodeURIComponent(`Database ${databaseName} created on host ${selectedHost.name}.`)}`);
     } catch (error) {
         console.error('Error creating server database:', error);
+        const rawMessage = String((error && error.message) || '');
+        const parentCode = String((error && error.parent && error.parent.code) || '');
+        const uniqueFields = Array.isArray(error && error.fields) ? error.fields.map((field) => String(field || '')) : [];
+        const isLegacySqliteConstraint =
+            parentCode === 'SQLITE_CONSTRAINT' &&
+            (
+                rawMessage.includes('UNIQUE constraint failed: ServerDatabases.databaseHostId') ||
+                uniqueFields.includes('databaseHostId')
+            );
+        if (isLegacySqliteConstraint) {
+            return res.redirect(`/server/${req.params.containerId}/databases?error=${encodeURIComponent('Database schema is outdated (legacy UNIQUE on databaseHostId). Run `npm run upgrade-db` and restart panel, then retry.')}`);
+        }
         return res.redirect(`/server/${req.params.containerId}/databases?error=${encodeURIComponent(error.message || 'Failed to create database.')}`);
     }
 });

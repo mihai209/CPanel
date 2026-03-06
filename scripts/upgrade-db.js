@@ -647,6 +647,68 @@ async function upgrade() {
                 throw error;
             }
         };
+        const listSqliteIndexes = async (tableName) => {
+            if (dbConnection !== 'sqlite') return [];
+            return sequelize.query(`PRAGMA index_list(\`${tableName}\`)`, { type: QueryTypes.SELECT });
+        };
+        const listSqliteIndexColumns = async (indexName) => {
+            if (dbConnection !== 'sqlite') return [];
+            return sequelize.query(`PRAGMA index_info(\`${indexName}\`)`, { type: QueryTypes.SELECT });
+        };
+        const hasLegacyServerDatabaseHostUniqueConstraint = async (tableName) => {
+            if (dbConnection !== 'sqlite') return false;
+            const indexes = await listSqliteIndexes(tableName);
+            for (const index of indexes) {
+                if (!Number(index && index.unique)) continue;
+                const indexName = String(index && index.name ? index.name : '').trim();
+                if (!indexName) continue;
+                const columns = await listSqliteIndexColumns(indexName);
+                const names = columns
+                    .map((col) => String((col && col.name) || '').trim())
+                    .filter(Boolean);
+                if (names.length === 1 && names[0] === 'databaseHostId') {
+                    return true;
+                }
+            }
+            return false;
+        };
+        const rebuildServerDatabaseTableWithoutLegacyUnique = async (tableName) => {
+            if (dbConnection !== 'sqlite') return;
+            const tempTable = `${tableName}__host_fix_tmp`;
+            await sequelize.query(`DROP TABLE IF EXISTS \`${tempTable}\``);
+            await queryInterface.createTable(tempTable, {
+                id: { type: DataTypes.INTEGER, allowNull: false, primaryKey: true, autoIncrement: true },
+                serverId: {
+                    type: DataTypes.INTEGER,
+                    allowNull: false,
+                    references: { model: resolveTableName(Server), key: 'id' },
+                    onDelete: 'CASCADE',
+                    onUpdate: 'CASCADE'
+                },
+                databaseHostId: {
+                    type: DataTypes.INTEGER,
+                    allowNull: false,
+                    references: { model: resolveTableName(DatabaseHost), key: 'id' },
+                    onDelete: 'CASCADE',
+                    onUpdate: 'CASCADE'
+                },
+                name: { type: DataTypes.STRING, allowNull: false },
+                username: { type: DataTypes.STRING, allowNull: false },
+                password: { type: DataTypes.STRING, allowNull: false },
+                remoteDatabaseId: { type: DataTypes.STRING, allowNull: true },
+                createdAt: { type: DataTypes.DATE, allowNull: false },
+                updatedAt: { type: DataTypes.DATE, allowNull: false }
+            });
+            await sequelize.query(
+                `INSERT INTO \`${tempTable}\` (` +
+                '`id`,`serverId`,`databaseHostId`,`name`,`username`,`password`,`remoteDatabaseId`,`createdAt`,`updatedAt`) ' +
+                `SELECT ` +
+                '`id`,`serverId`,`databaseHostId`,`name`,`username`,`password`,`remoteDatabaseId`,`createdAt`,`updatedAt` ' +
+                `FROM \`${tableName}\``
+            );
+            await sequelize.query(`DROP TABLE \`${tableName}\``);
+            await sequelize.query(`ALTER TABLE \`${tempTable}\` RENAME TO \`${tableName}\``);
+        };
         const userTable = resolveTableName(User);
         const serverTable = resolveTableName(Server);
         const allocationTable = resolveTableName(Allocation);
@@ -659,6 +721,12 @@ async function upgrade() {
         const backupPolicyTable = resolveTableName(ServerBackupPolicy);
         const backupTable = resolveTableName(ServerBackup);
         const serverDatabaseTable = resolveTableName(ServerDatabase);
+
+        if (await hasLegacyServerDatabaseHostUniqueConstraint(serverDatabaseTable)) {
+            console.log('Detected legacy UNIQUE(databaseHostId) on ServerDatabases. Rebuilding table to repair schema...');
+            await rebuildServerDatabaseTableWithoutLegacyUnique(serverDatabaseTable);
+            console.log('ServerDatabases schema repaired.');
+        }
 
         await addIndexIfMissing(serverApiKeyTable, ['serverId'], { name: 'server_api_keys_server_id_idx' });
         await addIndexIfMissing(serverApiKeyTable, ['ownerUserId'], { name: 'server_api_keys_owner_user_id_idx' });
