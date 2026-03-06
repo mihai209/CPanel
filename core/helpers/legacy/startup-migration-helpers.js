@@ -410,7 +410,30 @@ function buildStartupCommand(startupTemplate, env) {
         ciEnv.set('STARTUP', ciEnv.get('STARTUPSCRIPT'));
     }
 
-    const replaceValue = (fullMatch, key) => {
+    const escapeRegexLiteral = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    let normalizedTemplate = String(startupTemplate || '');
+    const repairCandidates = [];
+    Object.entries(sourceEnv).forEach(([rawKey, rawValue]) => {
+        const key = String(rawKey || '').trim().toUpperCase();
+        const value = rawValue === null || rawValue === undefined ? '' : String(rawValue).trim();
+        if (!key || !value) return;
+        if (!/^[A-Z0-9_]+$/.test(key)) return;
+        if (!/^[A-Za-z0-9._:-]+$/.test(value)) return;
+        if (normalizedTemplate.includes(`\${${key}}`) || normalizedTemplate.includes(`$${key}`)) return;
+        if (!normalizedTemplate.includes(`$${value}`)) return;
+        repairCandidates.push({ key, value });
+    });
+    repairCandidates.sort((a, b) => b.value.length - a.value.length);
+    repairCandidates.forEach(({ key, value }) => {
+        const pattern = new RegExp(`\\$${escapeRegexLiteral(value)}(?![A-Za-z0-9_])`, 'g');
+        normalizedTemplate = normalizedTemplate.replace(pattern, `\${${key}}`);
+    });
+
+    const replaceValue = (fullMatch, key, offset, source) => {
+        const previousChar = offset > 0 ? String(source || '').charAt(offset - 1) : '';
+        if (previousChar === '$') {
+            return fullMatch;
+        }
         if (Object.prototype.hasOwnProperty.call(sourceEnv, key)) {
             const rawValue = sourceEnv[key];
             return rawValue === null || rawValue === undefined ? '' : String(rawValue);
@@ -425,26 +448,39 @@ function buildStartupCommand(startupTemplate, env) {
         return fullMatch;
     };
 
-    let startup = startupTemplate
+    let startup = normalizedTemplate
         .replace(STARTUP_DOUBLE_PLACEHOLDER_REGEX, replaceValue)
         .replace(STARTUP_SINGLE_PLACEHOLDER_REGEX, replaceValue);
 
     const unresolved = [
-        ...Array.from(startup.matchAll(STARTUP_DOUBLE_PLACEHOLDER_REGEX)).map((match) => match[1]),
-        ...Array.from(startup.matchAll(STARTUP_SINGLE_PLACEHOLDER_REGEX)).map((match) => match[1])
+        ...Array.from(startup.matchAll(STARTUP_DOUBLE_PLACEHOLDER_REGEX)).map((match) => ({
+            key: match[1],
+            skip: false
+        })),
+        ...Array.from(startup.matchAll(STARTUP_SINGLE_PLACEHOLDER_REGEX)).map((match) => {
+            const index = Number.isInteger(match.index) ? match.index : -1;
+            const prev = index > 0 ? startup.charAt(index - 1) : '';
+            return {
+                key: match[1],
+                skip: prev === '$'
+            };
+        })
     ];
     if (unresolved.length > 0) {
         const uniqueUnresolved = [...new Set(unresolved.filter((entry) => {
-            const normalizedKey = String(entry || '').trim().toUpperCase();
+            if (!entry || entry.skip) return false;
+            const normalizedKey = String(entry.key || '').trim().toUpperCase();
             return !OPTIONAL_PLACEHOLDERS.has(normalizedKey);
-        }))];
+        }).map((entry) => entry.key))];
         if (uniqueUnresolved.length === 0) {
             startup = startup
                 .replace(STARTUP_DOUBLE_PLACEHOLDER_REGEX, (fullMatch, key) => {
                     const normalizedKey = String(key || '').trim().toUpperCase();
                     return OPTIONAL_PLACEHOLDERS.has(normalizedKey) ? '' : fullMatch;
                 })
-                .replace(STARTUP_SINGLE_PLACEHOLDER_REGEX, (fullMatch, key) => {
+                .replace(STARTUP_SINGLE_PLACEHOLDER_REGEX, (fullMatch, key, offset, source) => {
+                    const previousChar = offset > 0 ? String(source || '').charAt(offset - 1) : '';
+                    if (previousChar === '$') return fullMatch;
                     const normalizedKey = String(key || '').trim().toUpperCase();
                     return OPTIONAL_PLACEHOLDERS.has(normalizedKey) ? '' : fullMatch;
                 });
