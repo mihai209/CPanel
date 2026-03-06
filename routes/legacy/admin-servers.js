@@ -1507,6 +1507,7 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
             eggConfig: image.eggConfig,
             eggScripts: image.eggScripts,
             installation: image.installation || null,
+            skipInstallationScript: fileImportQueued,
             configFiles: image.configFiles || null,
             brandName: String((res.locals.settings && res.locals.settings.brandName) || 'cpanel'),
             startAfterInstall: false,

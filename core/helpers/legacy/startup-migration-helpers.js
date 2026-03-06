@@ -184,9 +184,10 @@ function resolveImageVariableDefinitions(image) {
     return definitions;
 }
 
-function buildServerEnvironment(image, rawVariables, runtimeValues) {
+function buildServerEnvironment(image, rawVariables, runtimeValues, options) {
     const userVariables = normalizeClientVariables(rawVariables);
     const isLegacy = !image.eggVariables || image.eggVariables.length === 0;
+    const strictInvalidVariables = Boolean(options && options.strictInvalidVariables);
 
     let variablesArray = isLegacy ? [] : image.eggVariables;
     if (isLegacy && image.environment) {
@@ -201,18 +202,22 @@ function buildServerEnvironment(image, rawVariables, runtimeValues) {
     }
 
     const allowedKeys = new Set(variablesArray.map(v => v.env_variable));
-    const invalidKeys = Object.keys(userVariables).filter(key => !allowedKeys.has(key));
+    const sanitizedVariables = { ...userVariables };
+    const invalidKeys = Object.keys(sanitizedVariables).filter(key => !allowedKeys.has(key));
 
-    if (invalidKeys.length > 0) {
+    if (invalidKeys.length > 0 && strictInvalidVariables) {
         throw new Error(`Invalid environment variables: ${invalidKeys.join(', ')}`);
     }
+    invalidKeys.forEach((key) => {
+        delete sanitizedVariables[key];
+    });
 
     const resolvedVariables = {};
     for (const v of variablesArray) {
         const key = v.env_variable;
         const defaultValue = v.default_value;
-        const hasOverride = Object.prototype.hasOwnProperty.call(userVariables, key);
-        const resolvedValue = hasOverride ? userVariables[key] : defaultValue;
+        const hasOverride = Object.prototype.hasOwnProperty.call(sanitizedVariables, key);
+        const resolvedValue = hasOverride ? sanitizedVariables[key] : defaultValue;
         const asString = resolvedValue === null || resolvedValue === undefined ? '' : String(resolvedValue);
         const defaultString = defaultValue === null || defaultValue === undefined ? '' : String(defaultValue);
 
@@ -236,7 +241,7 @@ function buildServerEnvironment(image, rawVariables, runtimeValues) {
         env[key] = asString;
     });
 
-    return { resolvedVariables, env };
+    return { resolvedVariables, env, droppedVariables: invalidKeys };
 }
 
 function parseRuleTokens(rulesString) {
