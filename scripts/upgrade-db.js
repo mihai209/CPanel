@@ -493,6 +493,95 @@ async function upgrade() {
             }
         }
 
+        // Pre-sync repair for legacy SQLite installs where ServerDatabases has
+        // an invalid UNIQUE(databaseHostId) constraint.
+        const preSyncResolveTableName = (model) => {
+            const table = model.getTableName();
+            if (typeof table === 'string') return table;
+            if (table && typeof table.tableName === 'string') return table.tableName;
+            return String(table);
+        };
+        const preSyncTableExists = async (tableName) => {
+            if (dbConnection !== 'sqlite') return false;
+            const rows = await sequelize.query(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = :tableName",
+                { type: QueryTypes.SELECT, replacements: { tableName } }
+            );
+            return Array.isArray(rows) && rows.length > 0;
+        };
+        const preSyncListSqliteIndexes = async (tableName) => {
+            if (dbConnection !== 'sqlite') return [];
+            if (!await preSyncTableExists(tableName)) return [];
+            return sequelize.query(`PRAGMA index_list(\`${tableName}\`)`, { type: QueryTypes.SELECT });
+        };
+        const preSyncListSqliteIndexColumns = async (indexName) => {
+            if (dbConnection !== 'sqlite') return [];
+            return sequelize.query(`PRAGMA index_info(\`${indexName}\`)`, { type: QueryTypes.SELECT });
+        };
+        const preSyncHasLegacyServerDatabaseHostUniqueConstraint = async (tableName) => {
+            if (dbConnection !== 'sqlite') return false;
+            const indexes = await preSyncListSqliteIndexes(tableName);
+            for (const index of indexes) {
+                if (!Number(index && index.unique)) continue;
+                const indexName = String(index && index.name ? index.name : '').trim();
+                if (!indexName) continue;
+                const columns = await preSyncListSqliteIndexColumns(indexName);
+                const names = columns
+                    .map((col) => String((col && col.name) || '').trim())
+                    .filter(Boolean);
+                if (names.length === 1 && names[0] === 'databaseHostId') {
+                    return true;
+                }
+            }
+            return false;
+        };
+        const preSyncRebuildServerDatabaseTableWithoutLegacyUnique = async (tableName) => {
+            if (dbConnection !== 'sqlite') return;
+            if (!await preSyncTableExists(tableName)) return;
+            const queryInterface = sequelize.getQueryInterface();
+            const tempTable = `${tableName}__host_fix_tmp`;
+            await sequelize.query(`DROP TABLE IF EXISTS \`${tempTable}\``);
+            await queryInterface.createTable(tempTable, {
+                id: { type: DataTypes.INTEGER, allowNull: false, primaryKey: true, autoIncrement: true },
+                serverId: {
+                    type: DataTypes.INTEGER,
+                    allowNull: false,
+                    references: { model: preSyncResolveTableName(Server), key: 'id' },
+                    onDelete: 'CASCADE',
+                    onUpdate: 'CASCADE'
+                },
+                databaseHostId: {
+                    type: DataTypes.INTEGER,
+                    allowNull: false,
+                    references: { model: preSyncResolveTableName(DatabaseHost), key: 'id' },
+                    onDelete: 'CASCADE',
+                    onUpdate: 'CASCADE'
+                },
+                name: { type: DataTypes.STRING, allowNull: false },
+                username: { type: DataTypes.STRING, allowNull: false },
+                password: { type: DataTypes.STRING, allowNull: false },
+                remoteDatabaseId: { type: DataTypes.STRING, allowNull: true },
+                createdAt: { type: DataTypes.DATE, allowNull: false },
+                updatedAt: { type: DataTypes.DATE, allowNull: false }
+            });
+            await sequelize.query(
+                `INSERT INTO \`${tempTable}\` (` +
+                '`id`,`serverId`,`databaseHostId`,`name`,`username`,`password`,`remoteDatabaseId`,`createdAt`,`updatedAt`) ' +
+                `SELECT ` +
+                '`id`,`serverId`,`databaseHostId`,`name`,`username`,`password`,`remoteDatabaseId`,`createdAt`,`updatedAt` ' +
+                `FROM \`${tableName}\``
+            );
+            await sequelize.query(`DROP TABLE \`${tableName}\``);
+            await sequelize.query(`ALTER TABLE \`${tempTable}\` RENAME TO \`${tableName}\``);
+        };
+
+        const preSyncServerDatabaseTable = preSyncResolveTableName(ServerDatabase);
+        if (await preSyncHasLegacyServerDatabaseHostUniqueConstraint(preSyncServerDatabaseTable)) {
+            console.log('Pre-sync: detected legacy UNIQUE(databaseHostId) on ServerDatabases. Repairing before ALTER sync...');
+            await preSyncRebuildServerDatabaseTableWithoutLegacyUnique(preSyncServerDatabaseTable);
+            console.log('Pre-sync: ServerDatabases legacy unique constraint repaired.');
+        }
+
         await User.sync({ alter: true });
         console.log('User table synced.');
 
