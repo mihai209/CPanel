@@ -395,11 +395,34 @@ function buildStartupCommand(startupTemplate, env) {
         throw new Error('Image startup command is missing.');
     }
 
+    const OPTIONAL_PLACEHOLDERS = new Set(['STARTUP', 'STARTUPSCRIPT']);
+    const sourceEnv = env && typeof env === 'object' ? env : {};
+    const ciEnv = new Map();
+    Object.entries(sourceEnv).forEach(([key, value]) => {
+        const normalizedKey = String(key || '').trim().toUpperCase();
+        if (!normalizedKey) return;
+        ciEnv.set(normalizedKey, value === null || value === undefined ? '' : String(value));
+    });
+    if (ciEnv.has('STARTUP') && !ciEnv.has('STARTUPSCRIPT')) {
+        ciEnv.set('STARTUPSCRIPT', ciEnv.get('STARTUP'));
+    }
+    if (ciEnv.has('STARTUPSCRIPT') && !ciEnv.has('STARTUP')) {
+        ciEnv.set('STARTUP', ciEnv.get('STARTUPSCRIPT'));
+    }
+
     const replaceValue = (fullMatch, key) => {
-        if (!Object.prototype.hasOwnProperty.call(env, key)) {
-            return fullMatch;
+        if (Object.prototype.hasOwnProperty.call(sourceEnv, key)) {
+            const rawValue = sourceEnv[key];
+            return rawValue === null || rawValue === undefined ? '' : String(rawValue);
         }
-        return env[key];
+        const normalizedKey = String(key || '').trim().toUpperCase();
+        if (normalizedKey && ciEnv.has(normalizedKey)) {
+            return ciEnv.get(normalizedKey);
+        }
+        if (OPTIONAL_PLACEHOLDERS.has(normalizedKey)) {
+            return '';
+        }
+        return fullMatch;
     };
 
     let startup = startupTemplate
@@ -411,7 +434,22 @@ function buildStartupCommand(startupTemplate, env) {
         ...Array.from(startup.matchAll(STARTUP_SINGLE_PLACEHOLDER_REGEX)).map((match) => match[1])
     ];
     if (unresolved.length > 0) {
-        const uniqueUnresolved = [...new Set(unresolved)];
+        const uniqueUnresolved = [...new Set(unresolved.filter((entry) => {
+            const normalizedKey = String(entry || '').trim().toUpperCase();
+            return !OPTIONAL_PLACEHOLDERS.has(normalizedKey);
+        }))];
+        if (uniqueUnresolved.length === 0) {
+            startup = startup
+                .replace(STARTUP_DOUBLE_PLACEHOLDER_REGEX, (fullMatch, key) => {
+                    const normalizedKey = String(key || '').trim().toUpperCase();
+                    return OPTIONAL_PLACEHOLDERS.has(normalizedKey) ? '' : fullMatch;
+                })
+                .replace(STARTUP_SINGLE_PLACEHOLDER_REGEX, (fullMatch, key) => {
+                    const normalizedKey = String(key || '').trim().toUpperCase();
+                    return OPTIONAL_PLACEHOLDERS.has(normalizedKey) ? '' : fullMatch;
+                });
+            return startup;
+        }
         throw new Error(`Startup contains unresolved placeholders: ${uniqueUnresolved.join(', ')}`);
     }
 
@@ -1098,6 +1136,22 @@ function normalizePterodactylServerForMigration(rawServer) {
     const relationships = rawServer.relationships && typeof rawServer.relationships === 'object'
         ? rawServer.relationships
         : {};
+    const startupRaw = String(
+        container.startup_command
+        || container.startup
+        || rawServer.startup_command
+        || rawServer.startup
+        || ''
+    ).trim();
+    const dockerImageRaw = String(
+        container.image
+        || rawServer.image
+        || rawServer.docker_image
+        || ''
+    ).trim();
+    const rawEnvironment = container.environment && typeof container.environment === 'object'
+        ? container.environment
+        : (rawServer.environment && typeof rawServer.environment === 'object' ? rawServer.environment : {});
 
     const memory = Number.parseInt(limits.memory, 10);
     const disk = Number.parseInt(limits.disk, 10);
@@ -1194,6 +1248,11 @@ function normalizePterodactylServerForMigration(rawServer) {
 
     const databasesRaw = extractRelationshipData(relationships.databases);
     const databases = databasesRaw.map(normalizeDatabaseRow).filter(Boolean);
+    const defaultAllocationCandidate = allocations.find((entry) => Boolean(entry && entry.isDefault)) || allocations[0] || null;
+    const defaultAllocationIp = String(allocation.ip || '').trim() || String(defaultAllocationCandidate && defaultAllocationCandidate.ip ? defaultAllocationCandidate.ip : '').trim();
+    const defaultAllocationPort = Number.parseInt(allocation.port, 10)
+        || Number.parseInt(defaultAllocationCandidate && defaultAllocationCandidate.port, 10)
+        || null;
 
     return {
         id: Number.parseInt(rawServer.id, 10) || null,
@@ -1209,12 +1268,12 @@ function normalizePterodactylServerForMigration(rawServer) {
         cpu: Number.isInteger(cpu) && cpu > 0 ? cpu : 100,
         swap: Number.parseInt(limits.swap, 10) || 0,
         io: Number.parseInt(limits.io, 10) || 500,
-        startup: String(container.startup_command || '').trim(),
-        dockerImage: String(container.image || '').trim(),
-        environment: normalizeClientVariables(container.environment || {}),
+        startup: startupRaw,
+        dockerImage: dockerImageRaw,
+        environment: normalizeClientVariables(rawEnvironment || {}),
         defaultAllocation: {
-            ip: String(allocation.ip || '').trim(),
-            port: Number.parseInt(allocation.port, 10) || null
+            ip: defaultAllocationIp,
+            port: defaultAllocationPort
         },
         allocations,
         databases,

@@ -34,6 +34,9 @@
 const tableList = Array.isArray(tables) ? tables : [];
 const previewColumns = Array.isArray(tableColumns) ? tableColumns : [];
 const previewRows = Array.isArray(tableRows) ? tableRows : [];
+const previewColumnMeta = Array.isArray(tableColumnMeta) ? tableColumnMeta : [];
+const previewPrimaryKeys = Array.isArray(primaryKeyColumns) ? primaryKeyColumns : [];
+const previewRowCriteria = Array.isArray(tableRowCriteria) ? tableRowCriteria : [];
 const preview = queryPreview && typeof queryPreview === 'object' ? queryPreview : null;
 const pageNum = Math.max(1, Number.parseInt(currentPage, 10) || 1);
 const pages = Math.max(0, Number.parseInt(totalPages, 10) || 0);
@@ -45,6 +48,12 @@ const baseManagerPath = `/server/${server.containerId}/database/${encodedDatabas
 const exportPath = `${baseManagerPath}/export.sql`;
 const queryPath = `${baseManagerPath}/query`;
 const importPath = `${baseManagerPath}/import`;
+const rowInsertPath = `${baseManagerPath}/row/insert`;
+const rowUpdatePath = `${baseManagerPath}/row/update`;
+const rowDeletePath = `${baseManagerPath}/row/delete`;
+const canUseRowActions = Boolean(canManageDatabases && selectedTableSafe);
+const hasPrimaryKey = previewPrimaryKeys.length > 0;
+const editableUpdateColumns = previewColumnMeta.filter((columnMeta) => !columnMeta.isPrimary);
 %>
 <div class="wrapper">
     <nav class="sidebar" id="sidebar"><div class="p-3"><%- include('../partials/server-sidebar', { server, active: 'dbs' }) %></div></nav>
@@ -99,14 +108,27 @@ const importPath = `${baseManagerPath}/import`;
                     <div class="cardx p-3 mb-3">
                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
                             <h2 class="h6 mb-0">Table Preview<% if (selectedTableSafe) { %> / <span class="text-info"><%= selectedTableSafe %></span><% } %></h2>
-                            <% if (selectedTableSafe) { %>
-                                <span class="small muted-2">Rows: <%= Number(totalRows || 0) %> | Page <%= pageNum %><% if (pages > 0) { %> / <%= pages %><% } %></span>
-                            <% } %>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <% if (selectedTableSafe) { %>
+                                    <span class="small muted-2">Rows: <%= Number(totalRows || 0) %> | Page <%= pageNum %><% if (pages > 0) { %> / <%= pages %><% } %></span>
+                                <% } %>
+                                <% if (canUseRowActions) { %>
+                                    <button type="button" class="btn btn-sm btn-success desktop-only-control" data-bs-toggle="modal" data-bs-target="#insertRowModal">
+                                        <i class="bi bi-plus-circle me-1"></i>Insert Row
+                                    </button>
+                                <% } %>
+                            </div>
                         </div>
 
                         <% if (!selectedTableSafe) { %>
                             <div class="small muted-2">Pick a table from the left side to preview content.</div>
                         <% } else { %>
+                            <% if (!hasPrimaryKey) { %>
+                                <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning small mb-3">
+                                    <i class="bi bi-shield-exclamation me-1"></i>
+                                    This table has no primary key. Row-level <strong>update/delete</strong> is disabled for safety. Use SQL Console if needed.
+                                </div>
+                            <% } %>
                             <div class="table-responsive">
                                 <table class="table table-dark table-sm table-hover align-middle mb-2">
                                     <thead>
@@ -117,17 +139,47 @@ const importPath = `${baseManagerPath}/import`;
                                             <% previewColumns.forEach((columnName) => { %>
                                                 <th><%= columnName %></th>
                                             <% }) %>
+                                            <% if (canUseRowActions) { %>
+                                                <th style="min-width: 140px;">Actions</th>
+                                            <% } %>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <% if (!previewRows.length) { %>
-                                            <tr><td colspan="<%= Math.max(previewColumns.length, 1) %>" class="text-center muted-2 py-3">No rows on this page.</td></tr>
+                                            <tr><td colspan="<%= Math.max(previewColumns.length + (canUseRowActions ? 1 : 0), 1) %>" class="text-center muted-2 py-3">No rows on this page.</td></tr>
                                         <% } %>
-                                        <% previewRows.forEach((row) => { %>
+                                        <% previewRows.forEach((row, rowIndex) => { %>
+                                            <% const rowCriteria = previewRowCriteria[rowIndex] || null; %>
+                                            <% const canMutateRow = canUseRowActions && hasPrimaryKey && rowCriteria; %>
                                             <tr>
                                                 <% previewColumns.forEach((columnName) => { %>
                                                     <td><%= row[columnName] === null || row[columnName] === undefined ? 'NULL' : String(row[columnName]) %></td>
                                                 <% }) %>
+                                                <% if (canUseRowActions) { %>
+                                                    <td class="text-nowrap">
+                                                        <% if (canMutateRow) { %>
+                                                            <button
+                                                                type="button"
+                                                                class="btn btn-sm btn-outline-primary open-row-update desktop-only-control"
+                                                                data-bs-toggle="modal"
+                                                                data-bs-target="#updateRowModal"
+                                                                data-row-json="<%= encodeURIComponent(JSON.stringify(row)) %>"
+                                                                data-row-criteria="<%= encodeURIComponent(JSON.stringify(rowCriteria)) %>">
+                                                                <i class="bi bi-pencil-square"></i>
+                                                            </button>
+                                                            <form method="POST" action="<%= rowDeletePath %>" class="d-inline row-delete-form" data-turbo="false">
+                                                                <input type="hidden" name="tableName" value="<%= selectedTableSafe %>">
+                                                                <input type="hidden" name="page" value="<%= pageNum %>">
+                                                                <input type="hidden" name="rowCriteria" value="<%= JSON.stringify(rowCriteria) %>">
+                                                                <button type="submit" class="btn btn-sm btn-outline-danger desktop-only-control">
+                                                                    <i class="bi bi-trash"></i>
+                                                                </button>
+                                                            </form>
+                                                        <% } else { %>
+                                                            <span class="small muted-2">N/A</span>
+                                                        <% } %>
+                                                    </td>
+                                                <% } %>
                                             </tr>
                                         <% }) %>
                                     </tbody>
@@ -214,6 +266,130 @@ const importPath = `${baseManagerPath}/import`;
     </main>
 </div>
 
+<% if (canUseRowActions) { %>
+<div class="modal fade" id="insertRowModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content bg-dark text-light border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Insert Row into <code><%= selectedTableSafe %></code></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="<%= rowInsertPath %>" id="insertRowForm" data-turbo="false">
+                <div class="modal-body">
+                    <input type="hidden" name="tableName" value="<%= selectedTableSafe %>">
+                    <input type="hidden" name="page" value="<%= pageNum %>">
+                    <input type="hidden" name="rowValues" id="insertRowValues">
+                    <% if (!previewColumnMeta.length) { %>
+                        <div class="small muted-2">No columns available for insert in this table.</div>
+                    <% } %>
+                    <% previewColumnMeta.forEach((columnMeta, index) => { %>
+                        <div class="row g-2 align-items-center mb-2" data-row-field>
+                            <div class="col-lg-4">
+                                <div class="small">
+                                    <code><%= columnMeta.name %></code>
+                                    <% if (columnMeta.isPrimary) { %><span class="badge bg-primary ms-1">PK</span><% } %>
+                                    <% if (columnMeta.isAutoIncrement) { %><span class="badge bg-secondary ms-1">AUTO</span><% } %>
+                                </div>
+                                <div class="small muted-2"><%= columnMeta.dataType || columnMeta.columnType || 'type' %></div>
+                            </div>
+                            <div class="col-lg-6">
+                                <input
+                                    type="text"
+                                    class="form-control form-control-sm desktop-only-control"
+                                    data-row-mode="insert"
+                                    data-row-input="1"
+                                    data-column="<%= columnMeta.name %>"
+                                    data-auto-increment="<%= columnMeta.isAutoIncrement ? '1' : '0' %>"
+                                    placeholder="<%= columnMeta.defaultValue === null || columnMeta.defaultValue === undefined || String(columnMeta.defaultValue).trim() === '' ? '' : String(columnMeta.defaultValue) %>">
+                            </div>
+                            <div class="col-lg-2 d-flex align-items-center">
+                                <div class="form-check">
+                                    <input
+                                        class="form-check-input desktop-only-control"
+                                        type="checkbox"
+                                        data-row-null="1"
+                                        data-row-null-mode="insert"
+                                        data-column="<%= columnMeta.name %>"
+                                        id="insert-null-<%= index %>">
+                                    <label class="form-check-label small" for="insert-null-<%= index %>">NULL</label>
+                                </div>
+                            </div>
+                        </div>
+                    <% }) %>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success desktop-only-control">
+                        <i class="bi bi-plus-circle me-1"></i>Insert Row
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="updateRowModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content bg-dark text-light border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Update Row in <code><%= selectedTableSafe %></code></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="<%= rowUpdatePath %>" id="updateRowForm" data-turbo="false">
+                <div class="modal-body">
+                    <input type="hidden" name="tableName" value="<%= selectedTableSafe %>">
+                    <input type="hidden" name="page" value="<%= pageNum %>">
+                    <input type="hidden" name="rowCriteria" id="updateRowCriteria">
+                    <input type="hidden" name="rowValues" id="updateRowValues">
+                    <div class="small muted-2 mb-3" id="updatePkSummary">Select a row first.</div>
+
+                    <% if (!editableUpdateColumns.length) { %>
+                        <div class="alert alert-warning border-0 bg-warning bg-opacity-10 text-warning">
+                            No editable non-primary columns found in this table.
+                        </div>
+                    <% } %>
+                    <% editableUpdateColumns.forEach((columnMeta, index) => { %>
+                        <div class="row g-2 align-items-center mb-2" data-row-field>
+                            <div class="col-lg-4">
+                                <div class="small"><code><%= columnMeta.name %></code></div>
+                                <div class="small muted-2"><%= columnMeta.dataType || columnMeta.columnType || 'type' %></div>
+                            </div>
+                            <div class="col-lg-6">
+                                <input
+                                    type="text"
+                                    class="form-control form-control-sm desktop-only-control"
+                                    data-row-mode="update"
+                                    data-row-input="1"
+                                    data-column="<%= columnMeta.name %>"
+                                    placeholder="<%= columnMeta.defaultValue === null || columnMeta.defaultValue === undefined || String(columnMeta.defaultValue).trim() === '' ? '' : String(columnMeta.defaultValue) %>">
+                            </div>
+                            <div class="col-lg-2 d-flex align-items-center">
+                                <div class="form-check">
+                                    <input
+                                        class="form-check-input desktop-only-control"
+                                        type="checkbox"
+                                        data-row-null="1"
+                                        data-row-null-mode="update"
+                                        data-column="<%= columnMeta.name %>"
+                                        id="update-null-<%= index %>">
+                                    <label class="form-check-label small" for="update-null-<%= index %>">NULL</label>
+                                </div>
+                            </div>
+                        </div>
+                    <% }) %>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary desktop-only-control">
+                        <i class="bi bi-save me-1"></i>Update Row
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<% } %>
+
 <script>
 (() => {
     const sidebarToggle = document.getElementById('sidebarToggle');
@@ -224,6 +400,15 @@ const importPath = `${baseManagerPath}/import`;
     const desktopNotice = document.getElementById('desktopNotice');
     const desktopControls = Array.from(document.querySelectorAll('.desktop-only-control'));
     const mobileQuery = window.matchMedia('(max-width: 991.98px)');
+    const insertRowForm = document.getElementById('insertRowForm');
+    const insertRowValues = document.getElementById('insertRowValues');
+    const updateRowForm = document.getElementById('updateRowForm');
+    const updateRowCriteria = document.getElementById('updateRowCriteria');
+    const updateRowValues = document.getElementById('updateRowValues');
+    const updatePkSummary = document.getElementById('updatePkSummary');
+    const updateRowTriggers = Array.from(document.querySelectorAll('.open-row-update'));
+    const rowDeleteForms = Array.from(document.querySelectorAll('.row-delete-form'));
+    const rowNullToggles = Array.from(document.querySelectorAll('[data-row-null="1"]'));
 
     sidebarToggle?.addEventListener('click', () => {
         sidebar?.classList.toggle('collapsed');
@@ -252,6 +437,149 @@ const importPath = `${baseManagerPath}/import`;
     } else if (typeof mobileQuery.addListener === 'function') {
         mobileQuery.addListener(setDesktopGuard);
     }
+
+    function collectRowPayload(mode, options = {}) {
+        const includeAutoIncrementIfEmpty = options.includeAutoIncrementIfEmpty === true;
+        const payload = {};
+        const fields = Array.from(document.querySelectorAll(`[data-row-mode="${mode}"][data-row-input="1"]`));
+
+        fields.forEach((input) => {
+            const columnName = String(input.dataset.column || '').trim();
+            if (!columnName) return;
+            const fieldWrap = input.closest('[data-row-field]');
+            const nullToggle = fieldWrap ? fieldWrap.querySelector(`[data-row-null-mode="${mode}"][data-row-null="1"]`) : null;
+            const wantsNull = Boolean(nullToggle && nullToggle.checked);
+            const isAutoIncrement = String(input.dataset.autoIncrement || '') === '1';
+            const rawValue = String(input.value || '');
+
+            if (wantsNull) {
+                payload[columnName] = null;
+                return;
+            }
+            if (!includeAutoIncrementIfEmpty && isAutoIncrement && !rawValue.trim()) {
+                return;
+            }
+            payload[columnName] = rawValue;
+        });
+
+        return payload;
+    }
+
+    rowNullToggles.forEach((toggle) => {
+        toggle.addEventListener('change', () => {
+            const mode = String(toggle.dataset.rowNullMode || '').trim();
+            const fieldWrap = toggle.closest('[data-row-field]');
+            const input = fieldWrap ? fieldWrap.querySelector(`[data-row-mode="${mode}"][data-row-input="1"]`) : null;
+            if (!input) return;
+            input.disabled = toggle.checked;
+            if (toggle.checked) {
+                input.value = '';
+            }
+        });
+    });
+
+    insertRowForm?.addEventListener('submit', (event) => {
+        if (mobileQuery.matches) {
+            event.preventDefault();
+            return;
+        }
+        const payload = collectRowPayload('insert', { includeAutoIncrementIfEmpty: false });
+        if (Object.keys(payload).length === 0) {
+            event.preventDefault();
+            if (importSqlStatus) {
+                importSqlStatus.textContent = 'Insert blocked: provide at least one value.';
+            }
+            return;
+        }
+        if (insertRowValues) {
+            insertRowValues.value = JSON.stringify(payload);
+        }
+    });
+
+    updateRowTriggers.forEach((button) => {
+        button.addEventListener('click', () => {
+            const encodedRow = String(button.dataset.rowJson || '');
+            const encodedCriteria = String(button.dataset.rowCriteria || '');
+            if (!encodedRow || !encodedCriteria) return;
+
+            let rowData = {};
+            let criteria = {};
+            try {
+                rowData = JSON.parse(decodeURIComponent(encodedRow));
+            } catch {
+                rowData = {};
+            }
+            try {
+                criteria = JSON.parse(decodeURIComponent(encodedCriteria));
+            } catch {
+                criteria = {};
+            }
+
+            if (updateRowCriteria) {
+                updateRowCriteria.value = JSON.stringify(criteria);
+            }
+
+            const criteriaSummary = Object.entries(criteria).map(([key, value]) => {
+                if (value === null || value === undefined) return `${key}=NULL`;
+                return `${key}=${String(value)}`;
+            });
+            if (updatePkSummary) {
+                updatePkSummary.textContent = criteriaSummary.length > 0
+                    ? `Target row: ${criteriaSummary.join(', ')}`
+                    : 'Target row not available.';
+            }
+
+            const updateInputs = Array.from(document.querySelectorAll('[data-row-mode="update"][data-row-input="1"]'));
+            updateInputs.forEach((input) => {
+                const fieldWrap = input.closest('[data-row-field]');
+                const nullToggle = fieldWrap ? fieldWrap.querySelector('[data-row-null-mode="update"][data-row-null="1"]') : null;
+                const columnName = String(input.dataset.column || '').trim();
+                if (!columnName) return;
+                const value = Object.prototype.hasOwnProperty.call(rowData, columnName) ? rowData[columnName] : '';
+                if (value === null || value === undefined) {
+                    input.value = '';
+                    if (nullToggle) nullToggle.checked = true;
+                    input.disabled = true;
+                } else {
+                    input.value = String(value);
+                    if (nullToggle) nullToggle.checked = false;
+                    input.disabled = false;
+                }
+            });
+        });
+    });
+
+    updateRowForm?.addEventListener('submit', (event) => {
+        if (mobileQuery.matches) {
+            event.preventDefault();
+            return;
+        }
+        if (!updateRowCriteria || !String(updateRowCriteria.value || '').trim()) {
+            event.preventDefault();
+            return;
+        }
+        const payload = collectRowPayload('update', { includeAutoIncrementIfEmpty: true });
+        if (Object.keys(payload).length === 0) {
+            event.preventDefault();
+            return;
+        }
+        if (updateRowValues) {
+            updateRowValues.value = JSON.stringify(payload);
+        }
+    });
+
+    rowDeleteForms.forEach((form) => {
+        form.addEventListener('submit', (event) => {
+            if (mobileQuery.matches) {
+                event.preventDefault();
+                return;
+            }
+            const confirmed = window.confirm('Delete this row? This cannot be undone.');
+            if (!confirmed) {
+                event.preventDefault();
+            }
+        });
+    });
 
     importSqlBtn?.addEventListener('click', async () => {
         const file = sqlFileInput && sqlFileInput.files && sqlFileInput.files[0] ? sqlFileInput.files[0] : null;

@@ -583,26 +583,42 @@ function buildMigrationStartupEnv({ startupTemplate, baseEnv, remoteVariables, r
     const remoteEnv = remoteVariables && typeof remoteVariables === 'object'
         ? remoteVariables
         : {};
+    const remoteEnvCi = new Map();
+    Object.entries(remoteEnv).forEach(([rawKey, rawValue]) => {
+        const normalizedKey = String(rawKey || '').trim().toUpperCase();
+        if (!normalizedKey) return;
+        remoteEnvCi.set(normalizedKey, rawValue === null || rawValue === undefined ? '' : String(rawValue));
+    });
     const startupFromRemote = String(remoteStartupCommand || '').trim();
     const injectedKeys = [];
     const placeholders = extractStartupPlaceholders(startupTemplate);
 
     placeholders.forEach((key) => {
-        const currentValue = Object.prototype.hasOwnProperty.call(env, key)
+        const normalizedKey = String(key || '').trim().toUpperCase();
+        const directCurrentValue = Object.prototype.hasOwnProperty.call(env, key)
             ? String(env[key] || '').trim()
             : '';
+        const ciCurrentValue = directCurrentValue
+            || (() => {
+                const matchingKey = Object.keys(env).find((candidateKey) => {
+                    return String(candidateKey || '').trim().toUpperCase() === normalizedKey;
+                });
+                if (!matchingKey) return '';
+                return String(env[matchingKey] || '').trim();
+            })();
+        const currentValue = ciCurrentValue;
         if (currentValue) return;
 
         const remoteValue = Object.prototype.hasOwnProperty.call(remoteEnv, key)
             ? String(remoteEnv[key] || '').trim()
-            : '';
+            : (remoteEnvCi.get(normalizedKey) || '').trim();
         if (remoteValue) {
             env[key] = remoteValue;
             injectedKeys.push(key);
             return;
         }
 
-        if ((key === 'STARTUPSCRIPT' || key === 'STARTUP') && startupFromRemote) {
+        if ((normalizedKey === 'STARTUPSCRIPT' || normalizedKey === 'STARTUP') && startupFromRemote) {
             env[key] = startupFromRemote;
             injectedKeys.push(key);
         }
@@ -650,7 +666,9 @@ function computeDockerSimilarity(remoteDocker, localDocker) {
 function buildMigrationPrecheckMatrix(snapshot, images) {
     const remoteVariables = normalizeClientVariables(snapshot && snapshot.environment ? snapshot.environment : {});
     const remoteVariableKeys = Object.keys(remoteVariables);
-    const remoteVariableSet = new Set(remoteVariableKeys);
+    const remoteVariableSetCi = new Set(
+        remoteVariableKeys.map((key) => String(key || '').trim().toUpperCase()).filter(Boolean)
+    );
     const remoteDocker = normalizeDockerCandidate(snapshot && snapshot.dockerImage ? snapshot.dockerImage : '');
     const remoteStartup = String(snapshot && snapshot.startup ? snapshot.startup : '').trim();
 
@@ -659,15 +677,32 @@ function buildMigrationPrecheckMatrix(snapshot, images) {
         const imageVariableKeys = imageVariableDefs
             .map((entry) => String(entry && entry.env_variable ? entry.env_variable : '').trim())
             .filter(Boolean);
-        const imageVariableSet = new Set(imageVariableKeys);
+        const imageVariableMapCi = new Map();
+        imageVariableKeys.forEach((key) => {
+            const normalizedKey = String(key || '').trim().toUpperCase();
+            if (!normalizedKey || imageVariableMapCi.has(normalizedKey)) return;
+            imageVariableMapCi.set(normalizedKey, key);
+        });
 
-        const supportedVariables = remoteVariableKeys.filter((key) => imageVariableSet.has(key));
-        const unsupportedVariables = remoteVariableKeys.filter((key) => !imageVariableSet.has(key));
+        const supportedVariables = [];
+        const unsupportedVariables = [];
+        const previewVariables = {};
+        remoteVariableKeys.forEach((remoteKey) => {
+            const normalizedRemoteKey = String(remoteKey || '').trim().toUpperCase();
+            const mappedImageKey = imageVariableMapCi.get(normalizedRemoteKey);
+            if (!mappedImageKey) {
+                unsupportedVariables.push(remoteKey);
+                return;
+            }
+            supportedVariables.push(remoteKey);
+            previewVariables[mappedImageKey] = remoteVariables[remoteKey];
+        });
         const placeholderKeys = extractStartupPlaceholders(image && image.startup ? image.startup : '');
         const unresolvedPlaceholders = placeholderKeys.filter((key) => {
-            if (remoteVariableSet.has(key)) return false;
-            if (key === 'SERVER_MEMORY' || key === 'SERVER_PORT' || key === 'SERVER_IP') return false;
-            if ((key === 'STARTUPSCRIPT' || key === 'STARTUP') && remoteStartup) return false;
+            const normalizedKey = String(key || '').trim().toUpperCase();
+            if (remoteVariableSetCi.has(normalizedKey)) return false;
+            if (normalizedKey === 'SERVER_MEMORY' || normalizedKey === 'SERVER_PORT' || normalizedKey === 'SERVER_IP') return false;
+            if ((normalizedKey === 'STARTUPSCRIPT' || normalizedKey === 'STARTUP') && remoteStartup) return false;
             return true;
         });
 
@@ -675,7 +710,7 @@ function buildMigrationPrecheckMatrix(snapshot, images) {
         try {
             const defaultPort = Number.parseInt(snapshot && snapshot.defaultAllocation ? snapshot.defaultAllocation.port : '', 10) || 25565;
             const defaultMemory = Number.parseInt(snapshot && snapshot.memory ? snapshot.memory : '', 10) || 1024;
-            const { env: previewEnv } = buildServerEnvironment(image, remoteVariables, {
+            const { env: previewEnv } = buildServerEnvironment(image, previewVariables, {
                 SERVER_MEMORY: String(defaultMemory),
                 SERVER_IP: '0.0.0.0',
                 SERVER_PORT: String(defaultPort)
@@ -1017,8 +1052,28 @@ app.post('/admin/migrations/pterodactyl/fetch', requireAuth, requireAdmin, async
 });
 
 app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, async (req, res) => {
+    let createdServer = null;
+    let installJobQueued = false;
+    const claimedAllocationIds = new Set();
     try {
-        const snapshot = decodeMigrationSnapshot(req.body.migrationToken);
+        const requestedMigrationToken = String(req.body.migrationToken || '').trim();
+        const sessionDraft = req.session && req.session.pterodactylMigrationDraft && typeof req.session.pterodactylMigrationDraft === 'object'
+            ? req.session.pterodactylMigrationDraft
+            : null;
+        const sessionMigrationToken = sessionDraft ? String(sessionDraft.migrationToken || '').trim() : '';
+
+        if (sessionMigrationToken) {
+            if (!requestedMigrationToken) {
+                return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Migration token is missing. Please re-run fetch step.'));
+            }
+            if (requestedMigrationToken !== sessionMigrationToken) {
+                return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Migration token mismatch. Please fetch remote server again.'));
+            }
+        }
+
+        const snapshot = sessionDraft && sessionDraft.migrationSnapshot && typeof sessionDraft.migrationSnapshot === 'object'
+            ? sessionDraft.migrationSnapshot
+            : decodeMigrationSnapshot(requestedMigrationToken);
         const ownerId = Number.parseInt(req.body.ownerId, 10);
         const imageId = req.body.imageId;
         const connectorId = Number.parseInt(req.body.connectorId, 10);
@@ -1033,10 +1088,17 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
         const sourceCleanTarget = parseBooleanInput(req.body.sourceCleanTarget, false);
         const copyDatabaseData = parseBooleanInput(req.body.copyDatabaseData, false);
         const sourceDbHostFallback = String(req.body.sourceDbHost || '').trim();
-        const sourceDbPortFallback = Number.parseInt(req.body.sourceDbPort, 10) || 3306;
+        const parsedSourceDbPortFallback = Number.parseInt(req.body.sourceDbPort, 10);
+        const sourceDbPortFallback = Number.isInteger(parsedSourceDbPortFallback) && parsedSourceDbPortFallback > 0
+            ? parsedSourceDbPortFallback
+            : null;
         const sourceDbAdminUser = String(req.body.sourceDbAdminUser || '').trim();
         const sourceDbAdminPassword = String(req.body.sourceDbAdminPassword || '').trim();
         const exportDatabaseOnFailure = parseBooleanInput(req.body.exportDatabaseOnFailure, true);
+
+        if (!snapshot || typeof snapshot !== 'object') {
+            return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Migration snapshot is invalid. Please re-fetch the remote server first.'));
+        }
 
         if (!Number.isInteger(ownerId) || ownerId <= 0) {
             return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Select a valid local owner.'));
@@ -1059,9 +1121,14 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
             if (!sourceDbAdminUser || !sourceDbAdminPassword) {
                 return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Database copy is enabled, but source DB admin username/password is missing.'));
             }
-            if (!Number.isInteger(sourceDbPortFallback) || sourceDbPortFallback < 1 || sourceDbPortFallback > 65535) {
+            if (sourceDbPortFallback !== null && (sourceDbPortFallback < 1 || sourceDbPortFallback > 65535)) {
                 return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Source DB port must be between 1 and 65535.'));
             }
+        }
+
+        const owner = await User.findByPk(ownerId, { attributes: ['id'] });
+        if (!owner) {
+            return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Selected owner user does not exist.'));
         }
 
         const image = await Image.findByPk(imageId);
@@ -1114,29 +1181,66 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
         const imagePorts = resolveImagePorts(image.ports);
         const variableDefinitions = resolveImageVariableDefinitions(image);
         const remoteVariables = normalizeClientVariables(snapshot.environment || {});
-        const allowedVariableKeys = new Set(variableDefinitions.map((entry) => String(entry.env_variable || '').trim()).filter(Boolean));
+        const allowedVariableKeyMapCi = new Map();
+        variableDefinitions.forEach((entry) => {
+            const key = String(entry && entry.env_variable ? entry.env_variable : '').trim();
+            if (!key) return;
+            const normalizedKey = key.toUpperCase();
+            if (!allowedVariableKeyMapCi.has(normalizedKey)) {
+                allowedVariableKeyMapCi.set(normalizedKey, key);
+            }
+        });
         const migratedVariables = {};
         const ignoredVariables = [];
         Object.entries(remoteVariables).forEach(([key, value]) => {
-            if (allowedVariableKeys.has(key)) {
-                migratedVariables[key] = value;
+            const normalizedKey = String(key || '').trim().toUpperCase();
+            const mappedKey = allowedVariableKeyMapCi.get(normalizedKey);
+            if (mappedKey) {
+                migratedVariables[mappedKey] = value;
             } else {
                 ignoredVariables.push(key);
             }
         });
+
+        const remoteStartup = String(snapshot.startup || '').trim();
+        const startupVariableFallbackKeys = [];
+        if (remoteStartup) {
+            variableDefinitions.forEach((entry) => {
+                const key = String(entry && entry.env_variable ? entry.env_variable : '').trim();
+                if (!key) return;
+                const normalizedKey = key.toUpperCase();
+                if (normalizedKey !== 'STARTUP' && normalizedKey !== 'STARTUPSCRIPT') return;
+
+                const currentValue = Object.prototype.hasOwnProperty.call(migratedVariables, key)
+                    ? String(migratedVariables[key] || '').trim()
+                    : '';
+                if (currentValue) return;
+
+                migratedVariables[key] = remoteStartup;
+                startupVariableFallbackKeys.push(key);
+            });
+        }
 
         const { resolvedVariables, env } = buildServerEnvironment(image, migratedVariables, {
             SERVER_MEMORY: String(memory),
             SERVER_IP: '0.0.0.0',
             SERVER_PORT: String(allocation.port)
         });
-        const { env: startupEnv, injectedKeys: injectedStartupFallbackKeys } = buildMigrationStartupEnv({
-            startupTemplate: image.startup,
+        const startupTemplate = String(image.startup || '').trim() || String(snapshot.startup || '').trim();
+        if (!startupTemplate) {
+            return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Selected image has no startup template and remote startup is empty.'));
+        }
+        const { env: startupEnv, injectedKeys: startupTemplateFallbackKeys } = buildMigrationStartupEnv({
+            startupTemplate,
             baseEnv: env,
             remoteVariables,
             remoteStartupCommand: snapshot.startup
         });
-        const startup = buildStartupCommand(image.startup, startupEnv);
+        const injectedStartupFallbackKeys = Array.from(new Set([
+            ...startupVariableFallbackKeys,
+            ...startupTemplateFallbackKeys
+        ]));
+        const startup = buildStartupCommand(startupTemplate, startupEnv);
         const deploymentPorts = buildDeploymentPorts({
             imagePorts,
             env,
@@ -1154,7 +1258,7 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
             : (image.dockerImage || dockerOverride);
 
         const containerId = nodeCrypto.randomBytes(4).toString('hex');
-        const createdServer = await Server.create({
+        createdServer = await Server.create({
             name: String(req.body.name || snapshot.name || 'Imported Server').trim() || 'Imported Server',
             containerId,
             ownerId,
@@ -1174,6 +1278,7 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
         });
 
         await allocation.update({ serverId: createdServer.id });
+        claimedAllocationIds.add(Number.parseInt(allocation.id, 10));
 
         const allocationAssignmentSummary = {
             assigned: 0,
@@ -1211,6 +1316,7 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
                 }
 
                 await localAlloc.update({ serverId: createdServer.id });
+                claimedAllocationIds.add(Number.parseInt(localAlloc.id, 10));
                 allocationAssignmentSummary.assigned += 1;
             }
         }
@@ -1437,9 +1543,8 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
                 maxAttempts: 3,
                 createdByUserId: req.session.user.id
             });
+            installJobQueued = true;
         } catch (queueError) {
-            await allocation.update({ serverId: null }).catch(() => {});
-            await createdServer.destroy().catch(() => {});
             throw new Error(`Failed to queue deployment job: ${queueError.message}`);
         }
 
@@ -1510,6 +1615,41 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
         ].filter(Boolean).join('&');
         return res.redirect(`/admin/migrations/pterodactyl?${query}`);
     } catch (error) {
+        if (createdServer && !installJobQueued) {
+            const serverId = Number.parseInt(createdServer.id, 10);
+            if (Number.isInteger(serverId) && serverId > 0) {
+                if (ServerDatabase && typeof ServerDatabase.destroy === 'function') {
+                    await ServerDatabase.destroy({
+                        where: { serverId }
+                    }).catch(() => {});
+                }
+
+                if (Allocation && typeof Allocation.update === 'function') {
+                    for (const allocationId of claimedAllocationIds) {
+                        const parsedAllocationId = Number.parseInt(allocationId, 10);
+                        if (!Number.isInteger(parsedAllocationId) || parsedAllocationId <= 0) continue;
+                        await Allocation.update(
+                            { serverId: null },
+                            {
+                                where: {
+                                    id: parsedAllocationId,
+                                    serverId
+                                }
+                            }
+                        ).catch(() => {});
+                    }
+                }
+
+                if (typeof removeServerMigrationTransferState === 'function') {
+                    await removeServerMigrationTransferState(serverId).catch(() => {});
+                }
+            }
+
+            if (createdServer && typeof createdServer.destroy === 'function') {
+                await createdServer.destroy().catch(() => {});
+            }
+        }
+
         console.error('Failed to import migrated server:', error);
         return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent(error.message || 'Failed to import migrated server.'));
     }

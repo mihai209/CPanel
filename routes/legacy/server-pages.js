@@ -7605,6 +7605,236 @@ function quoteDatabaseTableIdentifier(dialect, tableName) {
     return quoteMysqlIdentifier(tableName);
 }
 
+function extractAffectedRowsCount(metadata) {
+    if (typeof metadata === 'number' && Number.isFinite(metadata)) {
+        return Math.max(0, Number.parseInt(metadata, 10) || 0);
+    }
+    return Math.max(0, Number.parseInt(
+        metadata && (metadata.affectedRows ?? metadata.rowCount ?? metadata.changes ?? metadata.count),
+        10
+    ) || 0);
+}
+
+function normalizeDatabaseColumnTypeName(columnMeta) {
+    const direct = String((columnMeta && (columnMeta.dataType || columnMeta.columnType || columnMeta.data_type || columnMeta.udtName || columnMeta.udt_name)) || '').trim();
+    return direct.toLowerCase();
+}
+
+function isDatabaseNumericType(columnMeta) {
+    const typeName = normalizeDatabaseColumnTypeName(columnMeta);
+    return /(^|[^a-z])(int|integer|bigint|smallint|tinyint|decimal|numeric|real|double|float|serial|bigserial)([^a-z]|$)/i.test(typeName);
+}
+
+function isDatabaseBooleanType(columnMeta) {
+    const typeName = normalizeDatabaseColumnTypeName(columnMeta);
+    return /(^|[^a-z])(bool|boolean)([^a-z]|$)/i.test(typeName);
+}
+
+function coerceDatabaseManagerInputValue(rawValue, columnMeta) {
+    if (rawValue === null) return null;
+    if (typeof rawValue === 'number' || typeof rawValue === 'boolean') return rawValue;
+    const value = String(rawValue === undefined ? '' : rawValue);
+    const trimmed = value.trim();
+
+    if (isDatabaseBooleanType(columnMeta)) {
+        if (/^(true|1|yes|on)$/i.test(trimmed)) return true;
+        if (/^(false|0|no|off)$/i.test(trimmed)) return false;
+    }
+
+    if (isDatabaseNumericType(columnMeta) && trimmed) {
+        const asNumber = Number(trimmed);
+        if (Number.isFinite(asNumber)) return asNumber;
+    }
+
+    return value;
+}
+
+function parseDatabaseManagerObjectPayload(rawValue, label) {
+    let payload = rawValue;
+    if (typeof payload === 'string') {
+        const trimmed = payload.trim();
+        if (!trimmed) return {};
+        try {
+            payload = JSON.parse(trimmed);
+        } catch {
+            throw new Error(`${label} payload is not valid JSON.`);
+        }
+    }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        throw new Error(`${label} payload must be a JSON object.`);
+    }
+    return payload;
+}
+
+function buildDatabaseWhereClause(dialect, criteria, paramPrefix = 'w') {
+    const source = criteria && typeof criteria === 'object' && !Array.isArray(criteria) ? criteria : {};
+    const keys = Object.keys(source);
+    if (keys.length === 0) {
+        throw new Error('Row criteria is required.');
+    }
+
+    const replacements = {};
+    const clauses = [];
+    let index = 0;
+
+    keys.forEach((columnName) => {
+        const safeColumn = quoteDatabaseTableIdentifier(dialect, columnName);
+        const value = source[columnName];
+        if (value === null) {
+            clauses.push(`${safeColumn} IS NULL`);
+            return;
+        }
+        const key = `${paramPrefix}${index}`;
+        index += 1;
+        replacements[key] = value;
+        clauses.push(`${safeColumn} = :${key}`);
+    });
+
+    if (clauses.length === 0) {
+        throw new Error('Row criteria produced an empty WHERE clause.');
+    }
+
+    return {
+        clause: clauses.join(' AND '),
+        replacements
+    };
+}
+
+async function listDatabaseTablesForManager(dbClient, dialect, databaseName) {
+    const tableQuery = dialect === 'postgres'
+        ? `SELECT table_name AS name
+           FROM information_schema.tables
+           WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+           ORDER BY table_name ASC`
+        : `SELECT table_name AS name
+           FROM information_schema.tables
+           WHERE table_schema = ${escapeSqlLiteral(databaseName)}
+           ORDER BY table_name ASC`;
+
+    const rawTables = await dbClient.query(tableQuery, { type: Sequelize.QueryTypes.SELECT });
+    return Array.isArray(rawTables)
+        ? rawTables
+            .map((row) => String((row && (row.name || row.table_name)) || '').trim())
+            .filter(Boolean)
+        : [];
+}
+
+async function loadDatabaseTableMetadata(dbClient, dialect, databaseName, tableName) {
+    const selectedTable = String(tableName || '').trim();
+    if (!selectedTable) {
+        return {
+            columns: [],
+            primaryKeyColumns: []
+        };
+    }
+
+    let rawColumns = [];
+    let primaryKeySet = new Set();
+
+    if (dialect === 'postgres') {
+        rawColumns = await dbClient.query(
+            `SELECT
+                c.column_name,
+                c.data_type,
+                c.udt_name,
+                c.is_nullable,
+                c.column_default
+             FROM information_schema.columns c
+             WHERE c.table_schema = 'public'
+               AND c.table_name = ${escapeSqlLiteral(selectedTable)}
+             ORDER BY c.ordinal_position`,
+            { type: Sequelize.QueryTypes.SELECT }
+        );
+
+        const rawPkRows = await dbClient.query(
+            `SELECT kcu.column_name
+             FROM information_schema.table_constraints tc
+             JOIN information_schema.key_column_usage kcu
+               ON tc.constraint_name = kcu.constraint_name
+              AND tc.table_schema = kcu.table_schema
+              AND tc.table_name = kcu.table_name
+             WHERE tc.constraint_type = 'PRIMARY KEY'
+               AND tc.table_schema = 'public'
+               AND tc.table_name = ${escapeSqlLiteral(selectedTable)}
+             ORDER BY kcu.ordinal_position`,
+            { type: Sequelize.QueryTypes.SELECT }
+        );
+        primaryKeySet = new Set(
+            (Array.isArray(rawPkRows) ? rawPkRows : [])
+                .map((row) => String((row && row.column_name) || '').trim())
+                .filter(Boolean)
+        );
+    } else {
+        rawColumns = await dbClient.query(
+            `SELECT
+                column_name,
+                data_type,
+                column_type,
+                is_nullable,
+                column_default,
+                extra,
+                column_key
+             FROM information_schema.columns
+             WHERE table_schema = ${escapeSqlLiteral(databaseName)}
+               AND table_name = ${escapeSqlLiteral(selectedTable)}
+             ORDER BY ordinal_position`,
+            { type: Sequelize.QueryTypes.SELECT }
+        );
+
+        primaryKeySet = new Set(
+            (Array.isArray(rawColumns) ? rawColumns : [])
+                .filter((row) => String((row && row.column_key) || '').toUpperCase() === 'PRI')
+                .map((row) => String((row && row.column_name) || '').trim())
+                .filter(Boolean)
+        );
+    }
+
+    const columns = (Array.isArray(rawColumns) ? rawColumns : [])
+        .map((row) => {
+            const name = String((row && row.column_name) || '').trim();
+            if (!name) return null;
+            const defaultValue = row && Object.prototype.hasOwnProperty.call(row, 'column_default')
+                ? row.column_default
+                : null;
+            const autoIncrement = dialect === 'postgres'
+                ? /nextval\(/i.test(String(defaultValue || ''))
+                : /auto_increment/i.test(String((row && row.extra) || ''));
+            return {
+                name,
+                dataType: String((row && row.data_type) || '').trim(),
+                columnType: String((row && row.column_type) || '').trim(),
+                udtName: String((row && row.udt_name) || '').trim(),
+                isNullable: String((row && row.is_nullable) || '').toUpperCase() === 'YES',
+                defaultValue,
+                isPrimary: primaryKeySet.has(name),
+                isAutoIncrement: autoIncrement
+            };
+        })
+        .filter(Boolean);
+
+    return {
+        columns,
+        primaryKeyColumns: columns.filter((column) => column.isPrimary).map((column) => column.name)
+    };
+}
+
+function buildDatabaseManagerReturnUrl(serverContainerId, databaseName, options = {}) {
+    const basePath = `/server/${encodeURIComponent(serverContainerId)}/database/${encodeURIComponent(databaseName)}`;
+    const params = [];
+    const tableName = String(options.tableName || '').trim();
+    const page = Math.max(1, Number.parseInt(options.page, 10) || 1);
+    const success = String(options.success || '').trim();
+    const error = String(options.error || '').trim();
+
+    if (tableName) params.push(`table=${encodeURIComponent(tableName)}`);
+    if (page > 1) params.push(`page=${encodeURIComponent(String(page))}`);
+    if (success) params.push(`success=${encodeURIComponent(success)}`);
+    if (error) params.push(`error=${encodeURIComponent(error)}`);
+
+    if (params.length === 0) return basePath;
+    return `${basePath}?${params.join('&')}`;
+}
+
 async function runCommandToFile(command, args, outputPath, extraEnv = {}) {
     await fs.promises.mkdir(nodePath.dirname(outputPath), { recursive: true });
     return new Promise((resolve, reject) => {
@@ -7840,6 +8070,9 @@ app.get('/server/:containerId/database/:databaseName', requireAuth, async (req, 
         let selectedTable = String(req.query.table || '').trim();
         let tables = [];
         let tableColumns = [];
+        let tableColumnMeta = [];
+        let primaryKeyColumns = [];
+        let tableRowCriteria = [];
         let tableRows = [];
         let totalRows = 0;
         let totalPages = 0;
@@ -7847,21 +8080,7 @@ app.get('/server/:containerId/database/:databaseName', requireAuth, async (req, 
 
         try {
             await withServerDatabaseConnection(entry, async (dbClient, dialect) => {
-                const tableQuery = dialect === 'postgres'
-                    ? `SELECT table_name AS name
-                       FROM information_schema.tables
-                       WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
-                       ORDER BY table_name ASC`
-                    : `SELECT table_name AS name
-                       FROM information_schema.tables
-                       WHERE table_schema = ${escapeSqlLiteral(entry.name)}
-                       ORDER BY table_name ASC`;
-                const rawTables = await dbClient.query(tableQuery, { type: Sequelize.QueryTypes.SELECT });
-                tables = Array.isArray(rawTables)
-                    ? rawTables
-                        .map((row) => String((row && (row.name || row.table_name)) || '').trim())
-                        .filter(Boolean)
-                    : [];
+                tables = await listDatabaseTablesForManager(dbClient, dialect, entry.name);
 
                 if (selectedTable && !tables.includes(selectedTable)) {
                     selectedTable = '';
@@ -7870,6 +8089,11 @@ app.get('/server/:containerId/database/:databaseName', requireAuth, async (req, 
                     selectedTable = tables[0];
                 }
                 if (!selectedTable) return;
+
+                const metadata = await loadDatabaseTableMetadata(dbClient, dialect, entry.name, selectedTable);
+                tableColumnMeta = Array.isArray(metadata.columns) ? metadata.columns : [];
+                primaryKeyColumns = Array.isArray(metadata.primaryKeyColumns) ? metadata.primaryKeyColumns : [];
+                tableColumns = tableColumnMeta.map((column) => String(column.name || '').trim()).filter(Boolean);
 
                 const safeTableIdentifier = quoteDatabaseTableIdentifier(dialect, selectedTable);
                 const countQuery = dialect === 'postgres'
@@ -7888,7 +8112,22 @@ app.get('/server/:containerId/database/:databaseName', requireAuth, async (req, 
                 const dataQuery = `SELECT * FROM ${safeTableIdentifier} LIMIT ${pageSize} OFFSET ${offset}`;
                 const previewRows = await dbClient.query(dataQuery, { type: Sequelize.QueryTypes.SELECT });
                 tableRows = Array.isArray(previewRows) ? previewRows.map((row) => sanitizeDatabasePreviewRow(row)) : [];
-                tableColumns = tableRows[0] ? Object.keys(tableRows[0]) : [];
+                if (tableColumns.length === 0) {
+                    tableColumns = tableRows[0] ? Object.keys(tableRows[0]) : [];
+                }
+
+                if (primaryKeyColumns.length > 0 && tableRows.length > 0) {
+                    tableRowCriteria = tableRows.map((row) => {
+                        const criteria = {};
+                        for (const pkColumn of primaryKeyColumns) {
+                            if (!Object.prototype.hasOwnProperty.call(row, pkColumn)) {
+                                return null;
+                            }
+                            criteria[pkColumn] = row[pkColumn];
+                        }
+                        return criteria;
+                    });
+                }
 
                 if (tableColumns.length === 0) {
                     const columnsQuery = dialect === 'postgres'
@@ -7925,6 +8164,9 @@ app.get('/server/:containerId/database/:databaseName', requireAuth, async (req, 
             tables,
             selectedTable,
             tableColumns,
+            tableColumnMeta,
+            primaryKeyColumns,
+            tableRowCriteria,
             tableRows,
             totalRows,
             totalPages,
@@ -8019,6 +8261,317 @@ app.post('/server/:containerId/database/:databaseName/query', requireAuth, async
     } catch (error) {
         console.error('Error executing database query:', error);
         return res.redirect(`/server/${req.params.containerId}/database/${encodeURIComponent(req.params.databaseName)}?error=${encodeURIComponent(error.message || 'Failed to execute SQL query.')}`);
+    }
+});
+
+app.post('/server/:containerId/database/:databaseName/row/insert', requireAuth, async (req, res) => {
+    try {
+        const state = await resolveServerDatabasesState(req.params.containerId);
+        if (!state || !state.server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(state.server, req.session.user);
+        if (!hasServerPermission(access, 'server.databases.manage')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const entry = findServerDatabaseEntry(state.databases, req.params.databaseName);
+        if (!entry || !entry.host) {
+            return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('Database entry not found.')}`);
+        }
+
+        const tableName = String(req.body.tableName || '').trim();
+        const page = Math.max(1, Number.parseInt(req.body.page, 10) || 1);
+        if (!tableName) {
+            return res.redirect(buildDatabaseManagerReturnUrl(state.server.containerId, entry.name, {
+                page,
+                error: 'Table name is required for row insert.'
+            }));
+        }
+
+        await withServerDatabaseConnection(entry, async (dbClient, dialect) => {
+            const tables = await listDatabaseTablesForManager(dbClient, dialect, entry.name);
+            if (!tables.includes(tableName)) {
+                throw new Error('Selected table does not exist in this database.');
+            }
+
+            const metadata = await loadDatabaseTableMetadata(dbClient, dialect, entry.name, tableName);
+            const columns = Array.isArray(metadata.columns) ? metadata.columns : [];
+            if (columns.length === 0) {
+                throw new Error('Failed to load table metadata.');
+            }
+            const columnsMap = new Map(columns.map((column) => [column.name, column]));
+            const payload = parseDatabaseManagerObjectPayload(req.body.rowValues, 'Row values');
+
+            const values = {};
+            Object.entries(payload).forEach(([columnName, rawValue]) => {
+                const key = String(columnName || '').trim();
+                if (!key) return;
+                const columnMeta = columnsMap.get(key);
+                if (!columnMeta) return;
+                if (rawValue === '' && columnMeta.isAutoIncrement) return;
+                if (rawValue === null && columnMeta.isAutoIncrement) return;
+                values[key] = coerceDatabaseManagerInputValue(rawValue, columnMeta);
+            });
+
+            if (Object.keys(values).length === 0) {
+                throw new Error('No insertable values were provided.');
+            }
+
+            columns.forEach((columnMeta) => {
+                if (columnMeta.isNullable || columnMeta.isAutoIncrement) return;
+                const hasDefault = columnMeta.defaultValue !== null && columnMeta.defaultValue !== undefined && String(columnMeta.defaultValue).trim() !== '';
+                if (hasDefault) return;
+                if (!Object.prototype.hasOwnProperty.call(values, columnMeta.name)) {
+                    throw new Error(`Column "${columnMeta.name}" is required.`);
+                }
+                if (values[columnMeta.name] === null) {
+                    throw new Error(`Column "${columnMeta.name}" cannot be NULL.`);
+                }
+            });
+
+            const orderedColumns = Object.keys(values);
+            const replacements = {};
+            const valuesSql = orderedColumns.map((columnName, index) => {
+                const value = values[columnName];
+                if (value === null) return 'NULL';
+                const paramName = `v${index}`;
+                replacements[paramName] = value;
+                return `:${paramName}`;
+            });
+
+            const sql = `INSERT INTO ${quoteDatabaseTableIdentifier(dialect, tableName)} (${orderedColumns.map((columnName) => quoteDatabaseTableIdentifier(dialect, columnName)).join(', ')}) VALUES (${valuesSql.join(', ')})`;
+            await dbClient.query(sql, { replacements });
+        });
+
+        await createBillingAuditLog({
+            actorUserId: req.session.user.id,
+            action: 'server.database.row_insert',
+            targetType: 'server',
+            targetId: state.server.id,
+            req,
+            metadata: {
+                serverId: state.server.id,
+                serverContainerId: state.server.containerId,
+                databaseId: entry.id,
+                databaseName: entry.name,
+                tableName
+            }
+        });
+
+        return res.redirect(buildDatabaseManagerReturnUrl(state.server.containerId, entry.name, {
+            tableName,
+            page,
+            success: `Row inserted into ${tableName}.`
+        }));
+    } catch (error) {
+        console.error('Error inserting database row:', error);
+        const safeTable = String(req.body && req.body.tableName || '').trim();
+        const safePage = Math.max(1, Number.parseInt(req.body && req.body.page, 10) || 1);
+        return res.redirect(`/server/${req.params.containerId}/database/${encodeURIComponent(req.params.databaseName)}?${[
+            safeTable ? `table=${encodeURIComponent(safeTable)}` : '',
+            safePage > 1 ? `page=${encodeURIComponent(String(safePage))}` : '',
+            `error=${encodeURIComponent(error.message || 'Failed to insert row.')}`
+        ].filter(Boolean).join('&')}`);
+    }
+});
+
+app.post('/server/:containerId/database/:databaseName/row/update', requireAuth, async (req, res) => {
+    try {
+        const state = await resolveServerDatabasesState(req.params.containerId);
+        if (!state || !state.server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(state.server, req.session.user);
+        if (!hasServerPermission(access, 'server.databases.manage')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const entry = findServerDatabaseEntry(state.databases, req.params.databaseName);
+        if (!entry || !entry.host) {
+            return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('Database entry not found.')}`);
+        }
+
+        const tableName = String(req.body.tableName || '').trim();
+        const page = Math.max(1, Number.parseInt(req.body.page, 10) || 1);
+        if (!tableName) {
+            return res.redirect(buildDatabaseManagerReturnUrl(state.server.containerId, entry.name, {
+                page,
+                error: 'Table name is required for row update.'
+            }));
+        }
+
+        await withServerDatabaseConnection(entry, async (dbClient, dialect) => {
+            const tables = await listDatabaseTablesForManager(dbClient, dialect, entry.name);
+            if (!tables.includes(tableName)) {
+                throw new Error('Selected table does not exist in this database.');
+            }
+
+            const metadata = await loadDatabaseTableMetadata(dbClient, dialect, entry.name, tableName);
+            const columns = Array.isArray(metadata.columns) ? metadata.columns : [];
+            const columnsMap = new Map(columns.map((column) => [column.name, column]));
+            const primaryKeyColumns = Array.isArray(metadata.primaryKeyColumns) ? metadata.primaryKeyColumns : [];
+            if (primaryKeyColumns.length === 0) {
+                throw new Error('This table has no primary key. Row update is disabled for safety.');
+            }
+
+            const rawCriteria = parseDatabaseManagerObjectPayload(req.body.rowCriteria, 'Row criteria');
+            const criteria = {};
+            primaryKeyColumns.forEach((pkColumn) => {
+                if (!Object.prototype.hasOwnProperty.call(rawCriteria, pkColumn)) {
+                    throw new Error(`Missing primary key value "${pkColumn}".`);
+                }
+                criteria[pkColumn] = coerceDatabaseManagerInputValue(rawCriteria[pkColumn], columnsMap.get(pkColumn));
+            });
+
+            const rawValues = parseDatabaseManagerObjectPayload(req.body.rowValues, 'Row values');
+            const updateValues = {};
+            Object.entries(rawValues).forEach(([columnName, rawValue]) => {
+                const key = String(columnName || '').trim();
+                if (!key) return;
+                if (primaryKeyColumns.includes(key)) return;
+                const columnMeta = columnsMap.get(key);
+                if (!columnMeta) return;
+                updateValues[key] = coerceDatabaseManagerInputValue(rawValue, columnMeta);
+            });
+
+            const updateKeys = Object.keys(updateValues);
+            if (updateKeys.length === 0) {
+                throw new Error('No editable values were provided for update.');
+            }
+
+            const replacements = {};
+            const setClauses = updateKeys.map((columnName, index) => {
+                const value = updateValues[columnName];
+                const safeColumn = quoteDatabaseTableIdentifier(dialect, columnName);
+                if (value === null) return `${safeColumn} = NULL`;
+                const paramName = `s${index}`;
+                replacements[paramName] = value;
+                return `${safeColumn} = :${paramName}`;
+            });
+
+            const where = buildDatabaseWhereClause(dialect, criteria, 'w');
+            Object.assign(replacements, where.replacements);
+
+            const sql = `UPDATE ${quoteDatabaseTableIdentifier(dialect, tableName)} SET ${setClauses.join(', ')} WHERE ${where.clause}`;
+            const result = await dbClient.query(sql, { replacements });
+            const affectedRows = extractAffectedRowsCount(Array.isArray(result) ? result[1] : result);
+            if (affectedRows <= 0) {
+                throw new Error('No rows were updated. The row may have changed since preview.');
+            }
+        });
+
+        await createBillingAuditLog({
+            actorUserId: req.session.user.id,
+            action: 'server.database.row_update',
+            targetType: 'server',
+            targetId: state.server.id,
+            req,
+            metadata: {
+                serverId: state.server.id,
+                serverContainerId: state.server.containerId,
+                databaseId: entry.id,
+                databaseName: entry.name,
+                tableName
+            }
+        });
+
+        return res.redirect(buildDatabaseManagerReturnUrl(state.server.containerId, entry.name, {
+            tableName,
+            page,
+            success: `Row updated in ${tableName}.`
+        }));
+    } catch (error) {
+        console.error('Error updating database row:', error);
+        const safeTable = String(req.body && req.body.tableName || '').trim();
+        const safePage = Math.max(1, Number.parseInt(req.body && req.body.page, 10) || 1);
+        return res.redirect(`/server/${req.params.containerId}/database/${encodeURIComponent(req.params.databaseName)}?${[
+            safeTable ? `table=${encodeURIComponent(safeTable)}` : '',
+            safePage > 1 ? `page=${encodeURIComponent(String(safePage))}` : '',
+            `error=${encodeURIComponent(error.message || 'Failed to update row.')}`
+        ].filter(Boolean).join('&')}`);
+    }
+});
+
+app.post('/server/:containerId/database/:databaseName/row/delete', requireAuth, async (req, res) => {
+    try {
+        const state = await resolveServerDatabasesState(req.params.containerId);
+        if (!state || !state.server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(state.server, req.session.user);
+        if (!hasServerPermission(access, 'server.databases.manage')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const entry = findServerDatabaseEntry(state.databases, req.params.databaseName);
+        if (!entry || !entry.host) {
+            return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('Database entry not found.')}`);
+        }
+
+        const tableName = String(req.body.tableName || '').trim();
+        const page = Math.max(1, Number.parseInt(req.body.page, 10) || 1);
+        if (!tableName) {
+            return res.redirect(buildDatabaseManagerReturnUrl(state.server.containerId, entry.name, {
+                page,
+                error: 'Table name is required for row delete.'
+            }));
+        }
+
+        await withServerDatabaseConnection(entry, async (dbClient, dialect) => {
+            const tables = await listDatabaseTablesForManager(dbClient, dialect, entry.name);
+            if (!tables.includes(tableName)) {
+                throw new Error('Selected table does not exist in this database.');
+            }
+
+            const metadata = await loadDatabaseTableMetadata(dbClient, dialect, entry.name, tableName);
+            const columnsMap = new Map((Array.isArray(metadata.columns) ? metadata.columns : []).map((column) => [column.name, column]));
+            const primaryKeyColumns = Array.isArray(metadata.primaryKeyColumns) ? metadata.primaryKeyColumns : [];
+            if (primaryKeyColumns.length === 0) {
+                throw new Error('This table has no primary key. Row delete is disabled for safety.');
+            }
+
+            const rawCriteria = parseDatabaseManagerObjectPayload(req.body.rowCriteria, 'Row criteria');
+            const criteria = {};
+            primaryKeyColumns.forEach((pkColumn) => {
+                if (!Object.prototype.hasOwnProperty.call(rawCriteria, pkColumn)) {
+                    throw new Error(`Missing primary key value "${pkColumn}".`);
+                }
+                criteria[pkColumn] = coerceDatabaseManagerInputValue(rawCriteria[pkColumn], columnsMap.get(pkColumn));
+            });
+
+            const where = buildDatabaseWhereClause(dialect, criteria, 'w');
+            const sql = `DELETE FROM ${quoteDatabaseTableIdentifier(dialect, tableName)} WHERE ${where.clause}`;
+            const result = await dbClient.query(sql, { replacements: where.replacements });
+            const affectedRows = extractAffectedRowsCount(Array.isArray(result) ? result[1] : result);
+            if (affectedRows <= 0) {
+                throw new Error('No rows were deleted. The row may have changed since preview.');
+            }
+        });
+
+        await createBillingAuditLog({
+            actorUserId: req.session.user.id,
+            action: 'server.database.row_delete',
+            targetType: 'server',
+            targetId: state.server.id,
+            req,
+            metadata: {
+                serverId: state.server.id,
+                serverContainerId: state.server.containerId,
+                databaseId: entry.id,
+                databaseName: entry.name,
+                tableName
+            }
+        });
+
+        return res.redirect(buildDatabaseManagerReturnUrl(state.server.containerId, entry.name, {
+            tableName,
+            page,
+            success: `Row deleted from ${tableName}.`
+        }));
+    } catch (error) {
+        console.error('Error deleting database row:', error);
+        const safeTable = String(req.body && req.body.tableName || '').trim();
+        const safePage = Math.max(1, Number.parseInt(req.body && req.body.page, 10) || 1);
+        return res.redirect(`/server/${req.params.containerId}/database/${encodeURIComponent(req.params.databaseName)}?${[
+            safeTable ? `table=${encodeURIComponent(safeTable)}` : '',
+            safePage > 1 ? `page=${encodeURIComponent(String(safePage))}` : '',
+            `error=${encodeURIComponent(error.message || 'Failed to delete row.')}`
+        ].filter(Boolean).join('&')}`);
     }
 });
 
