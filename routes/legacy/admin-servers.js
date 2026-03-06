@@ -970,6 +970,7 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
         const snapshot = decodeMigrationSnapshot(req.body.migrationToken);
         const ownerId = Number.parseInt(req.body.ownerId, 10);
         const imageId = req.body.imageId;
+        const connectorId = Number.parseInt(req.body.connectorId, 10);
         const allocationId = Number.parseInt(req.body.allocationId, 10);
         const importFiles = parseBooleanInput(req.body.importFiles, false);
         const sourceSftpHost = String(req.body.sourceSftpHost || '').trim();
@@ -1022,6 +1023,9 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
         });
         if (!allocation || allocation.serverId) {
             return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Selected allocation is no longer free.'));
+        }
+        if (Number.isInteger(connectorId) && connectorId > 0 && Number.parseInt(allocation.connectorId, 10) !== connectorId) {
+            return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Selected allocation does not belong to selected connector.'));
         }
 
         const effectiveConnectorStatus = buildEffectiveConnectorStatus(allocation.connectorId);

@@ -260,6 +260,27 @@
                                         <% const preferredAllocation = (migrationDefaultAllocation && migrationDefaultAllocation.ip && migrationDefaultAllocation.port)
                                             ? allocations.find((alloc) => String(alloc.ip) === String(migrationDefaultAllocation.ip) && Number(alloc.port) === Number(migrationDefaultAllocation.port))
                                             : null; %>
+                                        <% const connectorChoices = []; %>
+                                        <% const seenConnectorIds = new Set(); %>
+                                        <% allocations.forEach((alloc) => {
+                                            const parsedConnectorId = Number.parseInt(alloc.connectorId, 10);
+                                            if (!Number.isInteger(parsedConnectorId) || seenConnectorIds.has(parsedConnectorId)) return;
+                                            seenConnectorIds.add(parsedConnectorId);
+                                            const nodeState = connectorStatus && connectorStatus[alloc.connectorId];
+                                            const isOnline = nodeState && nodeState.status === 'online';
+                                            connectorChoices.push({
+                                                id: parsedConnectorId,
+                                                name: alloc.connector ? alloc.connector.name : ('Connector #' + parsedConnectorId),
+                                                isOnline
+                                            });
+                                        }); %>
+                                        <% const preferredConnectorId = preferredAllocation && Number.isInteger(Number.parseInt(preferredAllocation.connectorId, 10))
+                                            ? String(Number.parseInt(preferredAllocation.connectorId, 10))
+                                            : ''; %>
+                                        <% const firstOnlineConnector = connectorChoices.find((entry) => entry && entry.isOnline); %>
+                                        <% const defaultConnectorChoice = preferredConnectorId && connectorChoices.some((entry) => String(entry.id) === preferredConnectorId)
+                                            ? preferredConnectorId
+                                            : (firstOnlineConnector ? String(firstOnlineConnector.id) : (connectorChoices.length > 0 ? String(connectorChoices[0].id) : '')); %>
 
                                         <div class="row g-3">
                                             <div class="col-md-6">
@@ -289,22 +310,45 @@
                                                 </select>
                                             </div>
                                             <div class="col-md-6">
+                                                <label class="form-label text-muted small text-uppercase fw-bold">Connector</label>
+                                                <select class="form-select" name="connectorId" required
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                                    <option value="" disabled <%= defaultConnectorChoice ? '' : 'selected' %>>Select connector...</option>
+                                                    <% connectorChoices.forEach((connectorEntry) => { %>
+                                                        <option value="<%= connectorEntry.id %>" <%= String(connectorEntry.id) === defaultConnectorChoice ? 'selected' : '' %>>
+                                                            <%= connectorEntry.name %> | <%= connectorEntry.isOnline ? 'online' : 'offline' %>
+                                                        </option>
+                                                    <% }) %>
+                                                </select>
+                                                <small class="text-muted">Allocation list is filtered by selected connector.</small>
+                                            </div>
+                                            <div class="col-md-6">
                                                 <label class="form-label text-muted small text-uppercase fw-bold">Allocation</label>
                                                 <select class="form-select" name="allocationId" required
                                                         style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
-                                                    <option value="" disabled selected>Select allocation...</option>
+                                                    <option value="" disabled <%= preferredAllocation ? '' : 'selected' %>>Select allocation...</option>
                                                     <% allocations.forEach(alloc => {
                                                         const nodeState = connectorStatus && connectorStatus[alloc.connectorId];
                                                         const isOnline = nodeState && nodeState.status === 'online';
+                                                        const isRemoteMatch = migrationDefaultAllocation
+                                                            && String(alloc.ip) === String(migrationDefaultAllocation.ip || '')
+                                                            && Number(alloc.port) === Number(migrationDefaultAllocation.port);
                                                     %>
-                                                        <option value="<%= alloc.id %>" <%= preferredAllocation && Number(preferredAllocation.id) === Number(alloc.id) ? 'selected' : '' %>>
+                                                        <option value="<%= alloc.id %>"
+                                                                data-connector-id="<%= alloc.connectorId %>"
+                                                                data-remote-match="<%= isRemoteMatch ? '1' : '0' %>"
+                                                                <%= preferredAllocation && Number(preferredAllocation.id) === Number(alloc.id) ? 'selected' : '' %>>
                                                             <%= alloc.ip %>:<%= alloc.port %> | <%= alloc.connector ? alloc.connector.name : ('Connector #' + alloc.connectorId) %> | <%= isOnline ? 'online' : 'offline' %>
                                                         </option>
                                                     <% }) %>
                                                 </select>
-                                                <% if (preferredAllocation) { %>
-                                                    <small class="text-muted">Auto-selected based on remote primary allocation.</small>
-                                                <% } %>
+                                                <small class="text-muted" id="allocationAutoSelectHint">
+                                                    <% if (preferredAllocation) { %>
+                                                        Auto-selected based on remote primary allocation.
+                                                    <% } else { %>
+                                                        Select a connector and an allocation to continue.
+                                                    <% } %>
+                                                </small>
                                             </div>
 
                                             <div class="col-md-4">
@@ -516,6 +560,8 @@
                     importFilesToggleHandler: null,
                     copyDatabaseToggle: null,
                     copyDatabaseToggleHandler: null,
+                    connectorSelect: null,
+                    connectorSelectHandler: null,
                     pageRoot
                 };
 
@@ -523,6 +569,9 @@
                 const fields = Array.from(document.querySelectorAll('.sftp-import-field'));
                 const copyDatabaseToggle = document.getElementById('copyDatabaseData');
                 const dbFields = Array.from(document.querySelectorAll('.db-copy-field'));
+                const connectorSelect = document.querySelector('select[name="connectorId"]');
+                const allocationSelect = document.querySelector('select[name="allocationId"]');
+                const allocationAutoSelectHint = document.getElementById('allocationAutoSelectHint');
 
                 function renderSftpImportFields() {
                     const enabled = importFilesToggle && importFilesToggle.checked;
@@ -561,6 +610,54 @@
                     renderDatabaseCopyFields();
                     state.copyDatabaseToggle = copyDatabaseToggle;
                     state.copyDatabaseToggleHandler = copyDatabaseToggleHandler;
+                }
+
+                function syncAllocationForConnector() {
+                    if (!connectorSelect || !allocationSelect) return;
+                    const selectedConnectorId = String(connectorSelect.value || '').trim();
+                    const allocationOptions = Array.from(allocationSelect.options).filter((option) => option.value);
+                    let visibleCount = 0;
+
+                    allocationOptions.forEach((option) => {
+                        const optionConnectorId = String(option.dataset.connectorId || '').trim();
+                        const matchesConnector = !selectedConnectorId || optionConnectorId === selectedConnectorId;
+                        option.hidden = !matchesConnector;
+                        option.disabled = !matchesConnector;
+                        if (matchesConnector) visibleCount += 1;
+                    });
+
+                    const currentOption = allocationSelect.options[allocationSelect.selectedIndex];
+                    const currentValid = Boolean(currentOption && currentOption.value && !currentOption.disabled);
+                    if (!currentValid) {
+                        const preferredOption = allocationOptions.find((option) => !option.disabled && String(option.dataset.remoteMatch || '') === '1');
+                        const fallbackOption = allocationOptions.find((option) => !option.disabled);
+                        if (preferredOption) {
+                            allocationSelect.value = preferredOption.value;
+                        } else if (fallbackOption) {
+                            allocationSelect.value = fallbackOption.value;
+                        } else {
+                            allocationSelect.value = '';
+                        }
+                    }
+
+                    if (allocationAutoSelectHint) {
+                        const selectedOption = allocationSelect.options[allocationSelect.selectedIndex];
+                        if (visibleCount === 0) {
+                            allocationAutoSelectHint.textContent = 'No free allocations available on selected connector.';
+                        } else if (selectedOption && selectedOption.value && String(selectedOption.dataset.remoteMatch || '') === '1') {
+                            allocationAutoSelectHint.textContent = 'Auto-selected remote primary allocation on selected connector.';
+                        } else {
+                            allocationAutoSelectHint.textContent = 'Remote primary allocation was not found on selected connector. Selected first available allocation.';
+                        }
+                    }
+                }
+
+                if (connectorSelect && allocationSelect) {
+                    const connectorSelectHandler = () => syncAllocationForConnector();
+                    connectorSelect.addEventListener('change', connectorSelectHandler);
+                    syncAllocationForConnector();
+                    state.connectorSelect = connectorSelect;
+                    state.connectorSelectHandler = connectorSelectHandler;
                 }
 
                 const trackedJobId = <%- JSON.stringify(jobId || null) %>;
@@ -682,6 +779,9 @@
                 }
                 if (migrationPageState.copyDatabaseToggle && migrationPageState.copyDatabaseToggleHandler) {
                     migrationPageState.copyDatabaseToggle.removeEventListener('change', migrationPageState.copyDatabaseToggleHandler);
+                }
+                if (migrationPageState.connectorSelect && migrationPageState.connectorSelectHandler) {
+                    migrationPageState.connectorSelect.removeEventListener('change', migrationPageState.connectorSelectHandler);
                 }
                 if (migrationPageState.pageRoot) {
                     migrationPageState.pageRoot.dataset.cpanelMigrationInit = '0';
