@@ -260,6 +260,12 @@ h6 {
     flex-direction: column;
 }
 
+/* Keep admin footer pinned to the bottom of the content column.
+   Without this, short admin pages leave a large empty area below footer. */
+.admin-content>.copyright-footer {
+    margin-top: auto;
+}
+
 /* Fade in animation for texts */
 .sidebar-text {
     opacity: 1;
