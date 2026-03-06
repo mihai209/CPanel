@@ -62,6 +62,23 @@
                         <span class="badge bg-secondary bg-opacity-10 text-light border border-secondary border-opacity-25" id="migrationImportBadge">queued</span>
                     </div>
                 <% } %>
+                <% if (Array.isArray(migrationExports) && migrationExports.length > 0) { %>
+                    <div class="alert border-0 bg-warning bg-opacity-10 text-warning">
+                        <div class="fw-semibold mb-2">
+                            <i class="bi bi-download me-2"></i>Database SQL fallback exports are available
+                        </div>
+                        <div class="small mb-2">Use these files only if automatic DB copy failed.</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <% migrationExports.forEach((exportEntry) => { %>
+                                <a class="btn btn-sm btn-outline-warning"
+                                   href="/admin/migrations/pterodactyl/exports/<%= exportEntry.id %>">
+                                    <i class="bi bi-file-earmark-arrow-down me-1"></i>
+                                    <%= exportEntry.databaseName || exportEntry.fileName %>
+                                </a>
+                            <% }) %>
+                        </div>
+                    </div>
+                <% } %>
 
                 <div class="row g-4">
                     <div class="col-lg-5">
@@ -238,6 +255,8 @@
                                         <input type="hidden" name="migrationToken" value="<%= migrationToken %>">
                                         <% const migrationAllocations = Array.isArray(migrationSnapshot.allocations) ? migrationSnapshot.allocations : []; %>
                                         <% const migrationDefaultAllocation = migrationAllocations.find((entry) => entry && entry.isDefault) || migrationSnapshot.defaultAllocation || {}; %>
+                                        <% const migrationRemoteDatabases = Array.isArray(migrationSnapshot.databases) ? migrationSnapshot.databases : []; %>
+                                        <% const migrationRemoteDbHost = migrationRemoteDatabases.find((entry) => entry && entry.host && entry.host.host) || null; %>
                                         <% const preferredAllocation = (migrationDefaultAllocation && migrationDefaultAllocation.ip && migrationDefaultAllocation.port)
                                             ? allocations.find((alloc) => String(alloc.ip) === String(migrationDefaultAllocation.ip) && Number(alloc.port) === Number(migrationDefaultAllocation.port))
                                             : null; %>
@@ -364,6 +383,58 @@
                                                 </div>
                                                 <small class="text-muted">If enabled, existing files on destination server are removed before pulling from source.</small>
                                             </div>
+
+                                            <% if (migrationRemoteDatabases.length > 0) { %>
+                                                <div class="col-12">
+                                                    <div class="alert border-0 bg-success bg-opacity-10 text-success mb-0">
+                                                        <div class="form-check form-switch mb-2">
+                                                            <input class="form-check-input" type="checkbox" id="copyDatabaseData" name="copyDatabaseData" value="1">
+                                                            <label class="form-check-label fw-semibold" for="copyDatabaseData">
+                                                                Copy assigned database data from source panel
+                                                            </label>
+                                                        </div>
+                                                        <small class="d-block">
+                                                            Attempts full SQL copy for <%= migrationRemoteDatabases.length %> database(s).
+                                                            If import fails, a fallback SQL export can be generated.
+                                                        </small>
+                                                    </div>
+                                                </div>
+
+                                                <div class="col-md-4 db-copy-field d-none">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Source DB Host (fallback)</label>
+                                                    <input type="text" class="form-control" name="sourceDbHost"
+                                                           value="<%= migrationRemoteDbHost && migrationRemoteDbHost.host && migrationRemoteDbHost.host.host ? migrationRemoteDbHost.host.host : '' %>"
+                                                           placeholder="Leave empty to use host from Pterodactyl relationship"
+                                                           style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                                </div>
+                                                <div class="col-md-2 db-copy-field d-none">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Source DB Port</label>
+                                                    <input type="number" class="form-control" name="sourceDbPort" min="1" max="65535"
+                                                           value="<%= migrationRemoteDbHost && migrationRemoteDbHost.host && migrationRemoteDbHost.host.port ? migrationRemoteDbHost.host.port : 3306 %>"
+                                                           style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                                </div>
+                                                <div class="col-md-3 db-copy-field d-none">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Source DB Admin User</label>
+                                                    <input type="text" class="form-control" name="sourceDbAdminUser"
+                                                           value="<%= migrationRemoteDbHost && migrationRemoteDbHost.host && migrationRemoteDbHost.host.username ? migrationRemoteDbHost.host.username : '' %>"
+                                                           placeholder="root / postgres / admin user"
+                                                           style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                                </div>
+                                                <div class="col-md-3 db-copy-field d-none">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Source DB Admin Password</label>
+                                                    <input type="password" class="form-control" name="sourceDbAdminPassword"
+                                                           placeholder="Source DB admin password"
+                                                           style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
+                                                </div>
+                                                <div class="col-12 db-copy-field d-none">
+                                                    <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" id="exportDatabaseOnFailure" name="exportDatabaseOnFailure" value="1" checked>
+                                                        <label class="form-check-label" for="exportDatabaseOnFailure">
+                                                            If DB copy fails, generate downloadable SQL export fallback
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            <% } %>
                                         </div>
 
                                         <div class="alert alert-info border-0 bg-info bg-opacity-10 text-info mt-4 mb-3">
@@ -402,8 +473,10 @@
                             ID, <code>external_id</code>, UUID, or identifier.</li>
                         <li class="mb-2">Click <strong>Fetch & Validate</strong>. The wizard pulls remote limits and environment variables.</li>
                         <li class="mb-2">Map local fields: owner, image, allocation, and adjust memory/cpu/disk if needed.</li>
+                        <li class="mb-2">Optional: enable <strong>copy database data</strong> and provide source DB admin credentials.</li>
                         <li class="mb-2">Optional: enable <strong>import files/content</strong> and fill source SFTP host/user/password/path.</li>
                         <li class="mb-2">Click <strong>Import Server</strong>. CPanel creates the server and starts deployment on the selected connector.</li>
+                        <li class="mb-2">If DB copy fails and fallback is enabled, wizard generates downloadable <code>.sql</code> export file(s).</li>
                         <li class="mb-2">If file import is enabled, content sync starts automatically right after install success.</li>
                     </ol>
 
@@ -416,6 +489,7 @@
                         <li class="mb-2"><strong>Ignored variables warning</strong>: selected local image does not define those remote variables; import still continues safely.</li>
                         <li class="mb-2"><strong>Startup unresolved placeholders</strong>: open Startup page and set missing variables, then reinstall.</li>
                         <li class="mb-2"><strong>SFTP import failed</strong>: verify source SFTP credentials and path (usually <code>/</code> in Pterodactyl SFTP chroot).</li>
+                        <li class="mb-2"><strong>DB copy failed</strong>: verify source DB admin credentials and that <code>mysqldump/mysql</code> (or <code>pg_dump/psql</code>) exist on panel host.</li>
                     </ul>
                 </div>
                 <div class="modal-footer border-secondary border-opacity-25">
@@ -440,11 +514,15 @@
                     pollTimers: [],
                     importFilesToggle: null,
                     importFilesToggleHandler: null,
+                    copyDatabaseToggle: null,
+                    copyDatabaseToggleHandler: null,
                     pageRoot
                 };
 
                 const importFilesToggle = document.getElementById('importFiles');
                 const fields = Array.from(document.querySelectorAll('.sftp-import-field'));
+                const copyDatabaseToggle = document.getElementById('copyDatabaseData');
+                const dbFields = Array.from(document.querySelectorAll('.db-copy-field'));
 
                 function renderSftpImportFields() {
                     const enabled = importFilesToggle && importFilesToggle.checked;
@@ -464,6 +542,25 @@
                     renderSftpImportFields();
                     state.importFilesToggle = importFilesToggle;
                     state.importFilesToggleHandler = importFilesToggleHandler;
+                }
+
+                function renderDatabaseCopyFields() {
+                    const enabled = copyDatabaseToggle && copyDatabaseToggle.checked;
+                    dbFields.forEach((field) => {
+                        field.classList.toggle('d-none', !enabled);
+                    });
+                    const adminUser = document.querySelector('input[name="sourceDbAdminUser"]');
+                    const adminPass = document.querySelector('input[name="sourceDbAdminPassword"]');
+                    if (adminUser) adminUser.required = Boolean(enabled);
+                    if (adminPass) adminPass.required = Boolean(enabled);
+                }
+
+                if (copyDatabaseToggle) {
+                    const copyDatabaseToggleHandler = () => renderDatabaseCopyFields();
+                    copyDatabaseToggle.addEventListener('change', copyDatabaseToggleHandler);
+                    renderDatabaseCopyFields();
+                    state.copyDatabaseToggle = copyDatabaseToggle;
+                    state.copyDatabaseToggleHandler = copyDatabaseToggleHandler;
                 }
 
                 const trackedJobId = <%- JSON.stringify(jobId || null) %>;
@@ -582,6 +679,9 @@
                 migrationPageState.pollTimers = [];
                 if (migrationPageState.importFilesToggle && migrationPageState.importFilesToggleHandler) {
                     migrationPageState.importFilesToggle.removeEventListener('change', migrationPageState.importFilesToggleHandler);
+                }
+                if (migrationPageState.copyDatabaseToggle && migrationPageState.copyDatabaseToggleHandler) {
+                    migrationPageState.copyDatabaseToggle.removeEventListener('change', migrationPageState.copyDatabaseToggleHandler);
                 }
                 if (migrationPageState.pageRoot) {
                     migrationPageState.pageRoot.dataset.cpanelMigrationInit = '0';

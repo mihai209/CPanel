@@ -1130,6 +1130,7 @@ function normalizePterodactylServerForMigration(rawServer) {
         if (!payload || typeof payload !== 'object') return null;
         const name = String(payload.database || payload.name || '').trim();
         const username = String(payload.username || '').trim();
+        const password = String(payload.password || payload.user_password || payload.database_password || '').trim();
         if (!name) return null;
 
         let host = null;
@@ -1153,6 +1154,7 @@ function normalizePterodactylServerForMigration(rawServer) {
             id: Number.parseInt(payload.id, 10) || null,
             name,
             username,
+            password,
             remote: Boolean(payload.remote),
             host
         };

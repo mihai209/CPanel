@@ -1,5 +1,8 @@
 function registerAdminServersRoutes(ctx) {
     const nodeCrypto = require('node:crypto');
+    const nodeFs = require('node:fs');
+    const nodePath = require('node:path');
+    const { spawn } = require('node:child_process');
     const { Sequelize } = require('sequelize');
     const { pickSmartAllocation } = require('../../core/helpers/smart-allocation');
     const {
@@ -216,6 +219,264 @@ async function provisionServerDatabaseOnHost(host, { databaseName, databaseUser,
         await dbClient.query(`GRANT ALL PRIVILEGES ON ${dbName}.* TO ${userLiteral}@'%'`);
         await dbClient.query('FLUSH PRIVILEGES');
     });
+}
+
+function sanitizeMigrationExportName(value, fallback = 'database-export') {
+    const clean = String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    return clean || fallback;
+}
+
+function getMigrationExportDirectory() {
+    return nodePath.join(process.cwd(), 'storage', 'migration-db-exports');
+}
+
+function resolveMigrationExportPath(filePath) {
+    const rawPath = String(filePath || '').trim();
+    if (!rawPath) return null;
+    const resolvedPath = nodePath.resolve(rawPath);
+    const exportRoot = nodePath.resolve(getMigrationExportDirectory());
+    if (resolvedPath !== exportRoot && !resolvedPath.startsWith(`${exportRoot}${nodePath.sep}`)) {
+        return null;
+    }
+    return resolvedPath;
+}
+
+async function cleanupMigrationExportFiles(entries) {
+    if (!Array.isArray(entries) || entries.length === 0) return;
+    const seenPaths = new Set();
+    for (const entry of entries) {
+        const resolvedPath = resolveMigrationExportPath(entry && entry.filePath);
+        if (!resolvedPath || seenPaths.has(resolvedPath)) continue;
+        seenPaths.add(resolvedPath);
+        await nodeFs.promises.unlink(resolvedPath).catch(() => {});
+    }
+}
+
+async function runSpawnToFile(command, args, outputPath, extraEnv = {}) {
+    await nodeFs.promises.mkdir(nodePath.dirname(outputPath), { recursive: true });
+
+    return new Promise((resolve, reject) => {
+        const env = { ...process.env, ...extraEnv };
+        const child = spawn(command, args, {
+            env,
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+
+        let stderr = '';
+        const output = nodeFs.createWriteStream(outputPath);
+        child.stdout.pipe(output);
+        child.stderr.on('data', (chunk) => {
+            stderr += String(chunk || '');
+        });
+
+        const rejectWith = (prefix, error) => {
+            output.end(() => {
+                reject(new Error(`${prefix}: ${error && error.message ? error.message : error}`));
+            });
+        };
+
+        child.on('error', (error) => {
+            rejectWith(`Failed to run "${command}"`, error);
+        });
+
+        child.on('close', (code) => {
+            output.end(() => {
+                if (code === 0) {
+                    resolve();
+                    return;
+                }
+                reject(new Error(`${command} exited with code ${code}. ${stderr.trim()}`.trim()));
+            });
+        });
+    });
+}
+
+async function runSpawnFromFile(command, args, inputPath, extraEnv = {}) {
+    return new Promise((resolve, reject) => {
+        const env = { ...process.env, ...extraEnv };
+        const child = spawn(command, args, {
+            env,
+            stdio: ['pipe', 'ignore', 'pipe']
+        });
+
+        let stderr = '';
+        child.stderr.on('data', (chunk) => {
+            stderr += String(chunk || '');
+        });
+
+        const input = nodeFs.createReadStream(inputPath);
+        input.on('error', (error) => {
+            try {
+                child.kill('SIGKILL');
+            } catch {
+                // ignore
+            }
+            reject(new Error(`Failed to read SQL file: ${error.message || error}`));
+        });
+        input.pipe(child.stdin);
+
+        child.on('error', (error) => {
+            reject(new Error(`Failed to run "${command}": ${error.message || error}`));
+        });
+
+        child.on('close', (code) => {
+            if (code === 0) {
+                resolve();
+                return;
+            }
+            reject(new Error(`${command} exited with code ${code}. ${stderr.trim()}`.trim()));
+        });
+    });
+}
+
+async function dumpDatabaseToSqlFile(sourceConfig, outputPath) {
+    const dialect = getDatabaseHostDialect(sourceConfig && sourceConfig.type);
+    const host = String(sourceConfig && sourceConfig.host ? sourceConfig.host : '').trim();
+    const username = String(sourceConfig && sourceConfig.username ? sourceConfig.username : '').trim();
+    const password = String(sourceConfig && sourceConfig.password ? sourceConfig.password : '');
+    const database = String(sourceConfig && sourceConfig.database ? sourceConfig.database : '').trim();
+    const port = Math.max(1, Number.parseInt(sourceConfig && sourceConfig.port, 10) || (dialect === 'postgres' ? 5432 : 3306));
+
+    if (!host || !username || !database) {
+        throw new Error('Missing source database connection details for SQL export.');
+    }
+
+    if (dialect === 'postgres') {
+        const args = [
+            '--host', host,
+            '--port', String(port),
+            '--username', username,
+            '--format', 'plain',
+            '--no-owner',
+            '--no-privileges',
+            database
+        ];
+        await runSpawnToFile('pg_dump', args, outputPath, { PGPASSWORD: password });
+        return;
+    }
+
+    const args = [
+        '--host', host,
+        '--port', String(port),
+        '--user', username,
+        '--single-transaction',
+        '--quick',
+        '--routines',
+        '--events',
+        '--triggers',
+        '--set-gtid-purged=OFF',
+        database
+    ];
+    await runSpawnToFile('mysqldump', args, outputPath, { MYSQL_PWD: password });
+}
+
+async function importSqlFileToDatabase(destinationConfig, inputPath) {
+    const dialect = getDatabaseHostDialect(destinationConfig && destinationConfig.type);
+    const host = String(destinationConfig && destinationConfig.host ? destinationConfig.host : '').trim();
+    const username = String(destinationConfig && destinationConfig.username ? destinationConfig.username : '').trim();
+    const password = String(destinationConfig && destinationConfig.password ? destinationConfig.password : '');
+    const database = String(destinationConfig && destinationConfig.database ? destinationConfig.database : '').trim();
+    const port = Math.max(1, Number.parseInt(destinationConfig && destinationConfig.port, 10) || (dialect === 'postgres' ? 5432 : 3306));
+
+    if (!host || !username || !database) {
+        throw new Error('Missing destination database connection details for SQL import.');
+    }
+
+    if (dialect === 'postgres') {
+        const args = [
+            '--host', host,
+            '--port', String(port),
+            '--username', username,
+            '--dbname', database,
+            '--set', 'ON_ERROR_STOP=1'
+        ];
+        await runSpawnFromFile('psql', args, inputPath, { PGPASSWORD: password });
+        return;
+    }
+
+    const args = [
+        '--host', host,
+        '--port', String(port),
+        '--user', username,
+        database
+    ];
+    await runSpawnFromFile('mysql', args, inputPath, { MYSQL_PWD: password });
+}
+
+async function copyDatabaseDataWithFallback({
+    sourceConfig,
+    destinationConfig,
+    exportOnFailure,
+    exportLabel
+}) {
+    const exportId = `${Date.now().toString(36)}_${nodeCrypto.randomBytes(4).toString('hex')}`;
+    const safeLabel = sanitizeMigrationExportName(exportLabel, 'database');
+    const exportFileName = `${safeLabel}-${exportId}.sql`;
+    const exportPath = nodePath.join(getMigrationExportDirectory(), exportFileName);
+    const sourceDialect = getDatabaseHostDialect(sourceConfig && sourceConfig.type);
+    const destinationDialect = getDatabaseHostDialect(destinationConfig && destinationConfig.type);
+
+    await dumpDatabaseToSqlFile(sourceConfig, exportPath);
+
+    if (sourceDialect !== destinationDialect) {
+        if (!exportOnFailure) {
+            await nodeFs.promises.unlink(exportPath).catch(() => {});
+            return {
+                copied: false,
+                exportGenerated: false,
+                exportId: null,
+                exportPath: null,
+                exportFileName: null,
+                error: `Dialect mismatch (${sourceDialect} -> ${destinationDialect}).`
+            };
+        }
+        return {
+            copied: false,
+            exportGenerated: true,
+            exportId,
+            exportPath,
+            exportFileName,
+            error: `Dialect mismatch (${sourceDialect} -> ${destinationDialect}).`
+        };
+    }
+
+    try {
+        await importSqlFileToDatabase(destinationConfig, exportPath);
+        await nodeFs.promises.unlink(exportPath).catch(() => {});
+        return {
+            copied: true,
+            exportGenerated: false,
+            exportId: null,
+            exportPath: null,
+            exportFileName: null,
+            error: null
+        };
+    } catch (error) {
+        if (!exportOnFailure) {
+            await nodeFs.promises.unlink(exportPath).catch(() => {});
+            return {
+                copied: false,
+                exportGenerated: false,
+                exportId: null,
+                exportPath: null,
+                exportFileName: null,
+                error: error && error.message ? error.message : String(error)
+            };
+        }
+        return {
+            copied: false,
+            exportGenerated: true,
+            exportId,
+            exportPath,
+            exportFileName,
+            error: error && error.message ? error.message : String(error)
+        };
+    }
 }
 
 const CONNECTOR_STATUS_STALE_MS = Math.max(
@@ -548,6 +809,17 @@ app.get('/admin/migrations/pterodactyl', requireAuth, requireAdmin, async (req, 
         const migrationDraft = req.session && req.session.pterodactylMigrationDraft && typeof req.session.pterodactylMigrationDraft === 'object'
             ? req.session.pterodactylMigrationDraft
             : null;
+        const migrationExports = req.session && Array.isArray(req.session.pterodactylMigrationExports)
+            ? req.session.pterodactylMigrationExports
+                .filter((entry) => entry && typeof entry === 'object')
+                .map((entry) => ({
+                    id: String(entry.id || '').trim(),
+                    fileName: String(entry.fileName || '').trim(),
+                    databaseName: String(entry.databaseName || '').trim(),
+                    createdAt: entry.createdAt || null
+                }))
+                .filter((entry) => entry.id && entry.fileName)
+            : [];
         const [users, images, allocations] = await Promise.all([
             User.findAll({ attributes: ['id', 'username', 'email'], order: [['username', 'ASC']] }),
             Image.findAll({ order: [['name', 'ASC']] }),
@@ -579,6 +851,7 @@ app.get('/admin/migrations/pterodactyl', requireAuth, requireAdmin, async (req, 
             jobId: req.query.jobId || null,
             serverId: req.query.serverId || null,
             fileImport: req.query.fileImport || '0',
+            migrationExports,
             success: req.query.success || null,
             error: req.query.error || null,
             warning: req.query.warning || null
@@ -623,6 +896,33 @@ app.get('/api/admin/migrations/pterodactyl/status', requireAuth, requireAdmin, a
     }
 });
 
+app.get('/admin/migrations/pterodactyl/exports/:exportId', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const exportId = String(req.params.exportId || '').trim();
+        if (!exportId) {
+            return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Invalid export id.'));
+        }
+
+        const exportsList = req.session && Array.isArray(req.session.pterodactylMigrationExports)
+            ? req.session.pterodactylMigrationExports
+            : [];
+        const entry = exportsList.find((item) => String(item && item.id || '').trim() === exportId);
+        if (!entry) {
+            return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Export file is no longer available in this session.'));
+        }
+
+        const filePath = resolveMigrationExportPath(entry.filePath);
+        const fileName = String(entry.fileName || '').trim() || `database-export-${exportId}.sql`;
+        if (!filePath) {
+            return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Export file path is invalid or outside export directory.'));
+        }
+        await nodeFs.promises.access(filePath, nodeFs.constants.R_OK);
+        return res.download(filePath, fileName);
+    } catch (error) {
+        return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent(error.message || 'Failed to download SQL export.'));
+    }
+});
+
 app.post('/admin/migrations/pterodactyl/fetch', requireAuth, requireAdmin, async (req, res) => {
     const remotePanelUrl = String(req.body.remotePanelUrl || '').trim();
     const remoteApiKey = String(req.body.remoteApiKey || '').trim();
@@ -655,6 +955,8 @@ app.post('/admin/migrations/pterodactyl/fetch', requireAuth, requireAdmin, async
             migrationPrecheck,
             migrationToken
         };
+        await cleanupMigrationExportFiles(req.session.pterodactylMigrationExports || []);
+        req.session.pterodactylMigrationExports = [];
         await new Promise((resolve) => req.session.save(resolve));
         return res.redirect('/admin/migrations/pterodactyl?success=' + encodeURIComponent('Remote server fetched successfully. Continue with import step.'));
     } catch (error) {
@@ -677,6 +979,12 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
         const sourceSftpPathRaw = String(req.body.sourceSftpPath || '').trim();
         const sourceSftpPath = sourceSftpPathRaw ? sourceSftpPathRaw : '/';
         const sourceCleanTarget = parseBooleanInput(req.body.sourceCleanTarget, false);
+        const copyDatabaseData = parseBooleanInput(req.body.copyDatabaseData, false);
+        const sourceDbHostFallback = String(req.body.sourceDbHost || '').trim();
+        const sourceDbPortFallback = Number.parseInt(req.body.sourceDbPort, 10) || 3306;
+        const sourceDbAdminUser = String(req.body.sourceDbAdminUser || '').trim();
+        const sourceDbAdminPassword = String(req.body.sourceDbAdminPassword || '').trim();
+        const exportDatabaseOnFailure = parseBooleanInput(req.body.exportDatabaseOnFailure, true);
 
         if (!Number.isInteger(ownerId) || ownerId <= 0) {
             return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Select a valid local owner.'));
@@ -693,6 +1001,14 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
             }
             if (!Number.isInteger(sourceSftpPort) || sourceSftpPort < 1 || sourceSftpPort > 65535) {
                 return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('SFTP port must be between 1 and 65535.'));
+            }
+        }
+        if (copyDatabaseData) {
+            if (!sourceDbAdminUser || !sourceDbAdminPassword) {
+                return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Database copy is enabled, but source DB admin username/password is missing.'));
+            }
+            if (!Number.isInteger(sourceDbPortFallback) || sourceDbPortFallback < 1 || sourceDbPortFallback > 65535) {
+                return res.redirect('/admin/migrations/pterodactyl?error=' + encodeURIComponent('Source DB port must be between 1 and 65535.'));
             }
         }
 
@@ -838,10 +1154,16 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
             }
         }
 
+        const generatedDbExports = [];
         const databaseProvisionSummary = {
             created: 0,
             skipped: 0,
-            errors: []
+            errors: [],
+            renamed: 0,
+            passwordGenerated: 0,
+            dataCopied: 0,
+            dataCopyFailed: 0,
+            dataExported: 0
         };
         if (remoteDatabases.length > 0 && DatabaseHost && ServerDatabase) {
             const locationId = allocation.connector ? Number.parseInt(allocation.connector.locationId, 10) : 0;
@@ -882,14 +1204,24 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
                     const cache = hostUsageCache.get(selectedHost.id);
                     const maxDbNameLen = getDatabaseNameMaxLen(selectedHost.type);
                     const maxDbUserLen = getDatabaseUserMaxLen(selectedHost.type);
-                    const baseName = sanitizeDatabaseObjectName(`s${createdServer.id}_${remoteName}`, `s${createdServer.id}_db`, maxDbNameLen);
-                    const baseUser = sanitizeDatabaseObjectName(`u${createdServer.id}_${remoteDb.username || remoteName}`, `u${createdServer.id}_user`, maxDbUserLen);
-                    const databaseName = buildUniqueDatabaseObjectName(baseName, cache.usedNames, maxDbNameLen);
-                    const databaseUser = buildUniqueDatabaseObjectName(baseUser, cache.usedUsers, maxDbUserLen);
+
+                    const remotePreferredName = sanitizeDatabaseObjectName(remoteName, `s${createdServer.id}_db`, maxDbNameLen);
+                    const remotePreferredUser = sanitizeDatabaseObjectName(remoteDb.username || remoteName, `u${createdServer.id}_user`, maxDbUserLen);
+
+                    const databaseName = buildUniqueDatabaseObjectName(remotePreferredName, cache.usedNames, maxDbNameLen);
+                    const databaseUser = buildUniqueDatabaseObjectName(remotePreferredUser, cache.usedUsers, maxDbUserLen);
+                    if (String(databaseName).toLowerCase() !== String(remotePreferredName).toLowerCase()
+                        || String(databaseUser).toLowerCase() !== String(remotePreferredUser).toLowerCase()) {
+                        databaseProvisionSummary.renamed += 1;
+                    }
                     cache.usedNames.add(String(databaseName).toLowerCase());
                     cache.usedUsers.add(String(databaseUser).toLowerCase());
 
-                    const databasePassword = nodeCrypto.randomBytes(12).toString('base64url').slice(0, 20);
+                    const remotePassword = String(remoteDb && remoteDb.password ? remoteDb.password : '').trim();
+                    const databasePassword = remotePassword || nodeCrypto.randomBytes(12).toString('base64url').slice(0, 20);
+                    if (!remotePassword) {
+                        databaseProvisionSummary.passwordGenerated += 1;
+                    }
 
                     try {
                         await provisionServerDatabaseOnHost(selectedHost, {
@@ -907,6 +1239,86 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
                             remoteDatabaseId: remoteDb && remoteDb.id ? `pterodactyl:${remoteDb.id}` : null
                         });
                         databaseProvisionSummary.created += 1;
+
+                        if (copyDatabaseData) {
+                            const sourceHost = String(
+                                (remoteDb && remoteDb.host && remoteDb.host.host)
+                                || sourceDbHostFallback
+                                || ''
+                            ).trim();
+                            const sourcePort = Math.max(
+                                1,
+                                Number.parseInt(
+                                    (remoteDb && remoteDb.host && remoteDb.host.port)
+                                    || sourceDbPortFallback
+                                    || (getDatabaseHostDialect(remoteDb && remoteDb.host && remoteDb.host.type) === 'postgres' ? 5432 : 3306),
+                                    10
+                                ) || (getDatabaseHostDialect(remoteDb && remoteDb.host && remoteDb.host.type) === 'postgres' ? 5432 : 3306)
+                            );
+                            const sourceType = getDatabaseHostDialect(
+                                remoteDb && remoteDb.host && remoteDb.host.type
+                                    ? remoteDb.host.type
+                                    : selectedHost.type
+                            );
+
+                            if (!sourceHost) {
+                                databaseProvisionSummary.dataCopyFailed += 1;
+                                databaseProvisionSummary.errors.push(`Database "${remoteName}" data copy failed: source DB host is missing.`);
+                            } else {
+                                const sourceConfig = {
+                                    type: sourceType,
+                                    host: sourceHost,
+                                    port: sourcePort,
+                                    username: sourceDbAdminUser,
+                                    password: sourceDbAdminPassword,
+                                    database: remoteName
+                                };
+                                const destinationConfig = {
+                                    type: selectedHost.type,
+                                    host: selectedHost.host,
+                                    port: selectedHost.port,
+                                    username: selectedHost.username,
+                                    password: selectedHost.password,
+                                    database: databaseName
+                                };
+
+                                const result = await copyDatabaseDataWithFallback({
+                                    sourceConfig,
+                                    destinationConfig,
+                                    exportOnFailure: exportDatabaseOnFailure,
+                                    exportLabel: `${createdServer.id}-${remoteName}`
+                                }).catch((copyError) => ({
+                                    copied: false,
+                                    exportGenerated: false,
+                                    exportId: null,
+                                    exportPath: null,
+                                    exportFileName: null,
+                                    error: copyError && copyError.message ? copyError.message : String(copyError)
+                                }));
+
+                                if (result.copied) {
+                                    databaseProvisionSummary.dataCopied += 1;
+                                } else {
+                                    databaseProvisionSummary.dataCopyFailed += 1;
+                                    const baseMessage = `Database "${remoteName}" data copy failed`;
+                                    if (result.exportGenerated && result.exportId && result.exportPath && result.exportFileName) {
+                                        const stat = await nodeFs.promises.stat(result.exportPath).catch(() => null);
+                                        generatedDbExports.push({
+                                            id: result.exportId,
+                                            filePath: result.exportPath,
+                                            fileName: result.exportFileName,
+                                            databaseName: remoteName,
+                                            sizeBytes: stat ? Number(stat.size || 0) : 0,
+                                            createdAt: new Date().toISOString()
+                                        });
+                                        databaseProvisionSummary.dataExported += 1;
+                                        databaseProvisionSummary.errors.push(`${baseMessage}; SQL export generated.`);
+                                    } else {
+                                        databaseProvisionSummary.errors.push(`${baseMessage}: ${result.error || 'unknown error'}`);
+                                    }
+                                }
+                            }
+                        }
                     } catch (dbError) {
                         databaseProvisionSummary.errors.push(`Database "${remoteName}" failed: ${dbError.message || dbError}`);
                         databaseProvisionSummary.skipped += 1;
@@ -998,6 +1410,18 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
         }
         if (databaseProvisionSummary.created > 0 || databaseProvisionSummary.skipped > 0 || databaseProvisionSummary.errors.length > 0) {
             warningFragments.push(`Databases migrated: ${databaseProvisionSummary.created} created, ${databaseProvisionSummary.skipped} skipped.`);
+            if (databaseProvisionSummary.renamed > 0) {
+                warningFragments.push(`Database credentials renamed for ${databaseProvisionSummary.renamed} entry/entries (name or username conflict on destination host).`);
+            }
+            if (databaseProvisionSummary.passwordGenerated > 0) {
+                warningFragments.push(`Generated new password for ${databaseProvisionSummary.passwordGenerated} database user(s) because source password was not available via API.`);
+            }
+            if (copyDatabaseData) {
+                warningFragments.push(`Database data copy: ${databaseProvisionSummary.dataCopied} copied, ${databaseProvisionSummary.dataCopyFailed} failed.`);
+                if (databaseProvisionSummary.dataExported > 0) {
+                    warningFragments.push(`Fallback SQL exports generated: ${databaseProvisionSummary.dataExported}.`);
+                }
+            }
             if (databaseProvisionSummary.errors.length > 0) {
                 warningFragments.push(databaseProvisionSummary.errors.slice(0, 2).join(' | '));
             }
@@ -1010,6 +1434,8 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
             : '';
         const jobNotice = ` Deployment job #${installJob.id} queued.`;
         delete req.session.pterodactylMigrationDraft;
+        await cleanupMigrationExportFiles(req.session.pterodactylMigrationExports || []);
+        req.session.pterodactylMigrationExports = generatedDbExports;
         await new Promise((resolve) => req.session.save(resolve));
         const query = [
             `success=${encodeURIComponent(`Server "${createdServer.name}" imported and deployment started.${jobNotice}${fileImportNotice}`)}`,
