@@ -65,9 +65,9 @@
                 <% if (Array.isArray(migrationExports) && migrationExports.length > 0) { %>
                     <div class="alert border-0 bg-warning bg-opacity-10 text-warning">
                         <div class="fw-semibold mb-2">
-                            <i class="bi bi-download me-2"></i>Database SQL fallback exports are available
+                            <i class="bi bi-download me-2"></i>Database SQL exports are available
                         </div>
-                        <div class="small mb-2">Use these files only if automatic DB copy failed.</div>
+                        <div class="small mb-2">Import these files manually in your destination database.</div>
                         <div class="d-flex flex-wrap gap-2">
                             <% migrationExports.forEach((exportEntry) => { %>
                                 <a class="btn btn-sm btn-outline-warning"
@@ -434,18 +434,18 @@
                                                         <div class="form-check form-switch mb-2">
                                                             <input class="form-check-input" type="checkbox" id="copyDatabaseData" name="copyDatabaseData" value="1">
                                                             <label class="form-check-label fw-semibold" for="copyDatabaseData">
-                                                                Copy assigned database data from source panel
+                                                                Export assigned database data as SQL
                                                             </label>
                                                         </div>
                                                         <small class="d-block">
-                                                            Attempts full SQL copy for <%= migrationRemoteDatabases.length %> database(s).
-                                                            If import fails, a fallback SQL export can be generated.
+                                                            Generates downloadable `.sql` files for <%= migrationRemoteDatabases.length %> database(s),
+                                                            so you can import data manually after migration.
                                                         </small>
                                                     </div>
                                                 </div>
 
                                                 <div class="col-md-4 db-copy-field d-none">
-                                                    <label class="form-label text-muted small text-uppercase fw-bold">Source DB Host (fallback)</label>
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Source DB Host (optional override)</label>
                                                     <input type="text" class="form-control" name="sourceDbHost"
                                                            value="<%= migrationRemoteDbHost && migrationRemoteDbHost.host && migrationRemoteDbHost.host.host ? migrationRemoteDbHost.host.host : '' %>"
                                                            placeholder="Leave empty to use host from Pterodactyl relationship"
@@ -469,14 +469,6 @@
                                                     <input type="password" class="form-control" name="sourceDbAdminPassword"
                                                            placeholder="Source DB admin password"
                                                            style="background-color: #1a1a20; border-color: #2d2d35; color: white;">
-                                                </div>
-                                                <div class="col-12 db-copy-field d-none">
-                                                    <div class="form-check form-switch">
-                                                        <input class="form-check-input" type="checkbox" id="exportDatabaseOnFailure" name="exportDatabaseOnFailure" value="1" checked>
-                                                        <label class="form-check-label" for="exportDatabaseOnFailure">
-                                                            If DB copy fails, generate downloadable SQL export fallback
-                                                        </label>
-                                                    </div>
                                                 </div>
                                             <% } %>
                                         </div>
@@ -517,10 +509,10 @@
                             ID, <code>external_id</code>, UUID, or identifier.</li>
                         <li class="mb-2">Click <strong>Fetch & Validate</strong>. The wizard pulls remote limits and environment variables.</li>
                         <li class="mb-2">Map local fields: owner, image, allocation, and adjust memory/cpu/disk if needed.</li>
-                        <li class="mb-2">Optional: enable <strong>copy database data</strong> and provide source DB admin credentials.</li>
+                        <li class="mb-2">Optional: enable <strong>database SQL export</strong> and provide source DB admin credentials.</li>
                         <li class="mb-2">Optional: enable <strong>import files/content</strong> and fill source SFTP host/user/password/path.</li>
                         <li class="mb-2">Click <strong>Import Server</strong>. CPanel creates the server and starts deployment on the selected connector.</li>
-                        <li class="mb-2">If DB copy fails and fallback is enabled, wizard generates downloadable <code>.sql</code> export file(s).</li>
+                        <li class="mb-2">When DB SQL export is enabled, wizard generates downloadable <code>.sql</code> files for manual import.</li>
                         <li class="mb-2">If file import is enabled, content sync starts automatically right after install success.</li>
                     </ol>
 
