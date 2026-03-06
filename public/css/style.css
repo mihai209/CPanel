@@ -130,7 +130,9 @@ h6 {
 .admin-wrapper {
     display: flex;
     min-height: 100vh;
+    height: 100vh;
     width: 100%;
+    overflow: hidden;
 }
 
 #adminSidebar {
@@ -251,11 +253,12 @@ h6 {
 }
 
 .admin-content {
-    flex-grow: 1;
+    flex: 1 1 auto;
     overflow-y: auto;
     background-color: #121216;
     /* Main content bg */
-    min-height: 100vh;
+    min-height: 0;
+    height: 100%;
     display: flex;
     flex-direction: column;
 }
@@ -382,6 +385,8 @@ h6 {
     .admin-wrapper {
         display: block;
         min-height: 100dvh;
+        height: auto;
+        overflow: visible;
     }
 
     #adminSidebar {
@@ -406,6 +411,7 @@ h6 {
     .admin-content {
         width: 100%;
         min-height: 100dvh;
+        height: auto;
     }
 
     .admin-mobile-toggle {

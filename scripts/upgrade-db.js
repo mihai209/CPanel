@@ -606,7 +606,13 @@ async function upgrade() {
         console.log('Server table synced.');
 
         // Sync the ServerDatabase model
-        await ServerDatabase.sync({ alter: true });
+        // SQLite `alter` path rebuilds via *_backup and may fail on legacy unique constraints.
+        // We already do a targeted pre-sync repair + defensive index repair below, so use safe sync.
+        if (dbConnection === 'sqlite') {
+            await ServerDatabase.sync();
+        } else {
+            await ServerDatabase.sync({ alter: true });
+        }
         console.log('ServerDatabase table synced.');
 
         // Sync the ServerSubuser model
