@@ -1,7 +1,9 @@
 function registerServerPagesRoutes(ctx) {
+    const expressLib = require('express');
     const fs = require('fs');
     const nodePath = require('path');
     const nodeCrypto = require('crypto');
+    const { spawn } = require('child_process');
     const { getUserThemeId } = require('../../core/themes');
     const { pickSmartAllocation } = require('../../core/helpers/smart-allocation');
     const {
@@ -7454,6 +7456,297 @@ async function dropServerDatabaseFromHost(host, { databaseName, databaseUser }) 
     });
 }
 
+function resolveDatabaseManagerStateKey(serverId, databaseId) {
+    return `${Number.parseInt(serverId, 10) || 0}:${Number.parseInt(databaseId, 10) || 0}`;
+}
+
+function getDatabaseManagerStateStore(req) {
+    if (!req || !req.session) return null;
+    if (!req.session.databaseManagerState || typeof req.session.databaseManagerState !== 'object') {
+        req.session.databaseManagerState = {};
+    }
+    return req.session.databaseManagerState;
+}
+
+function sanitizeDatabasePreviewValue(value) {
+    if (value === null || value === undefined) return value;
+    if (Buffer.isBuffer(value)) return value.toString('base64');
+    if (value instanceof Date) return value.toISOString();
+    if (typeof value === 'object') {
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return String(value);
+        }
+    }
+    if (typeof value === 'string' && value.length > 4096) {
+        return `${value.slice(0, 4096)}…`;
+    }
+    return value;
+}
+
+function sanitizeDatabasePreviewRow(row) {
+    if (!row || typeof row !== 'object') return {};
+    const next = {};
+    Object.entries(row).forEach(([key, value]) => {
+        next[key] = sanitizeDatabasePreviewValue(value);
+    });
+    return next;
+}
+
+function normalizeDatabaseManagerPreview(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const rows = Array.isArray(raw.rows) ? raw.rows : [];
+    const normalizedRows = rows.slice(0, 200).map((entry) => sanitizeDatabasePreviewRow(entry));
+    const columns = Array.isArray(raw.columns)
+        ? raw.columns.slice(0, 256).map((entry) => String(entry || '').trim()).filter(Boolean)
+        : (normalizedRows[0] ? Object.keys(normalizedRows[0]) : []);
+    return {
+        executedAt: raw.executedAt || null,
+        query: String(raw.query || '').slice(0, 20000),
+        message: String(raw.message || '').slice(0, 500),
+        columns,
+        rows: normalizedRows
+    };
+}
+
+function persistDatabaseManagerPreview(req, key, payload) {
+    const store = getDatabaseManagerStateStore(req);
+    if (!store || !key) return;
+    store[key] = normalizeDatabaseManagerPreview(payload);
+
+    const keys = Object.keys(store);
+    if (keys.length > 40) {
+        keys.sort((a, b) => {
+            const left = store[a] && store[a].executedAt ? new Date(store[a].executedAt).getTime() : 0;
+            const right = store[b] && store[b].executedAt ? new Date(store[b].executedAt).getTime() : 0;
+            return right - left;
+        });
+        keys.slice(40).forEach((entryKey) => {
+            delete store[entryKey];
+        });
+    }
+}
+
+function getDatabaseManagerPreview(req, key) {
+    const store = getDatabaseManagerStateStore(req);
+    if (!store || !key) return null;
+    return normalizeDatabaseManagerPreview(store[key]);
+}
+
+function resolveDatabaseManagerExportDirectory() {
+    return nodePath.join(process.cwd(), 'storage', 'database-manager-exports');
+}
+
+function buildDatabaseIdentifierMatcher(value) {
+    const raw = String(value || '').trim();
+    const lowered = raw.toLowerCase();
+    const parsedId = Number.parseInt(raw, 10);
+    return {
+        raw,
+        lowered,
+        parsedId: Number.isInteger(parsedId) && parsedId > 0 ? parsedId : null
+    };
+}
+
+function findServerDatabaseEntry(databases, identifier) {
+    const list = Array.isArray(databases) ? databases : [];
+    const match = buildDatabaseIdentifierMatcher(identifier);
+    if (!match.raw) return null;
+    return list.find((entry) => {
+        if (!entry) return false;
+        const entryId = Number.parseInt(entry.id, 10);
+        if (match.parsedId && Number.isInteger(entryId) && entryId === match.parsedId) return true;
+        return String(entry.name || '').trim().toLowerCase() === match.lowered;
+    }) || null;
+}
+
+async function withServerDatabaseConnection(entry, callback) {
+    if (!entry || !entry.host) {
+        throw new Error('Database host is not available for this entry.');
+    }
+    const host = entry.host;
+    const dialect = getDatabaseHostDialect(host.type);
+    const hostPort = Math.max(1, Number.parseInt(host.port, 10) || (dialect === 'postgres' ? 5432 : 3306));
+    const targetDatabase = String(entry.name || '').trim();
+    if (!targetDatabase) {
+        throw new Error('Database name is missing for this entry.');
+    }
+
+    const dbClient = new Sequelize(
+        targetDatabase,
+        String(host.username || ''),
+        String(host.password || ''),
+        {
+            host: String(host.host || ''),
+            port: hostPort,
+            dialect,
+            logging: false,
+            dialectOptions: { connectTimeout: 10000 }
+        }
+    );
+
+    try {
+        await dbClient.authenticate();
+        return await callback(dbClient, dialect);
+    } finally {
+        try {
+            await dbClient.close();
+        } catch {
+            // Best effort cleanup.
+        }
+    }
+}
+
+function quoteDatabaseTableIdentifier(dialect, tableName) {
+    if (dialect === 'postgres') {
+        return quotePgIdentifier(tableName);
+    }
+    return quoteMysqlIdentifier(tableName);
+}
+
+async function runCommandToFile(command, args, outputPath, extraEnv = {}) {
+    await fs.promises.mkdir(nodePath.dirname(outputPath), { recursive: true });
+    return new Promise((resolve, reject) => {
+        const env = { ...process.env, ...extraEnv };
+        const child = spawn(command, args, { env, stdio: ['ignore', 'pipe', 'pipe'] });
+        let stderr = '';
+        const output = fs.createWriteStream(outputPath);
+        child.stdout.pipe(output);
+        child.stderr.on('data', (chunk) => {
+            stderr += String(chunk || '');
+        });
+        child.on('error', (error) => {
+            output.end(() => reject(new Error(`Failed to run "${command}": ${error.message || error}`)));
+        });
+        child.on('close', (code) => {
+            output.end(() => {
+                if (code === 0) {
+                    resolve();
+                    return;
+                }
+                reject(new Error(`${command} exited with code ${code}. ${stderr.trim()}`.trim()));
+            });
+        });
+    });
+}
+
+async function runCommandWithInput(command, args, inputText, extraEnv = {}) {
+    return new Promise((resolve, reject) => {
+        const env = { ...process.env, ...extraEnv };
+        const child = spawn(command, args, { env, stdio: ['pipe', 'ignore', 'pipe'] });
+        let stderr = '';
+        child.stderr.on('data', (chunk) => {
+            stderr += String(chunk || '');
+        });
+        child.on('error', (error) => {
+            reject(new Error(`Failed to run "${command}": ${error.message || error}`));
+        });
+        child.on('close', (code) => {
+            if (code === 0) {
+                resolve();
+                return;
+            }
+            reject(new Error(`${command} exited with code ${code}. ${stderr.trim()}`.trim()));
+        });
+        child.stdin.end(String(inputText || ''));
+    });
+}
+
+async function exportServerDatabaseToSqlFile(entry, outputPath) {
+    if (!entry || !entry.host) {
+        throw new Error('Database host is not available.');
+    }
+    const host = entry.host;
+    const dialect = getDatabaseHostDialect(host.type);
+    const hostPort = Math.max(1, Number.parseInt(host.port, 10) || (dialect === 'postgres' ? 5432 : 3306));
+    const username = String(host.username || '').trim();
+    const password = String(host.password || '');
+    const databaseName = String(entry.name || '').trim();
+    if (!username || !databaseName) {
+        throw new Error('Database export requires valid host credentials.');
+    }
+
+    if (dialect === 'postgres') {
+        await runCommandToFile(
+            'pg_dump',
+            [
+                '--host', String(host.host || ''),
+                '--port', String(hostPort),
+                '--username', username,
+                '--format', 'plain',
+                '--no-owner',
+                '--no-privileges',
+                databaseName
+            ],
+            outputPath,
+            { PGPASSWORD: password }
+        );
+        return;
+    }
+
+    await runCommandToFile(
+        'mysqldump',
+        [
+            '--host', String(host.host || ''),
+            '--port', String(hostPort),
+            '--user', username,
+            '--single-transaction',
+            '--quick',
+            '--routines',
+            '--events',
+            '--triggers',
+            '--set-gtid-purged=OFF',
+            databaseName
+        ],
+        outputPath,
+        { MYSQL_PWD: password }
+    );
+}
+
+async function importSqlIntoServerDatabase(entry, sqlContent) {
+    if (!entry || !entry.host) {
+        throw new Error('Database host is not available.');
+    }
+    const host = entry.host;
+    const dialect = getDatabaseHostDialect(host.type);
+    const hostPort = Math.max(1, Number.parseInt(host.port, 10) || (dialect === 'postgres' ? 5432 : 3306));
+    const username = String(host.username || '').trim();
+    const password = String(host.password || '');
+    const databaseName = String(entry.name || '').trim();
+    if (!username || !databaseName) {
+        throw new Error('Database import requires valid host credentials.');
+    }
+
+    if (dialect === 'postgres') {
+        await runCommandWithInput(
+            'psql',
+            [
+                '--host', String(host.host || ''),
+                '--port', String(hostPort),
+                '--username', username,
+                '--dbname', databaseName,
+                '--set', 'ON_ERROR_STOP=1'
+            ],
+            sqlContent,
+            { PGPASSWORD: password }
+        );
+        return;
+    }
+
+    await runCommandWithInput(
+        'mysql',
+        [
+            '--host', String(host.host || ''),
+            '--port', String(hostPort),
+            '--user', username,
+            databaseName
+        ],
+        sqlContent,
+        { MYSQL_PWD: password }
+    );
+}
+
 async function resolveServerDatabasesState(containerId) {
     const server = await Server.findOne({
         where: { containerId },
@@ -7521,6 +7814,311 @@ app.get('/server/:containerId/databases', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error loading databases page:', error);
         return res.redirect('/?error=' + encodeURIComponent('Failed to load databases page.'));
+    }
+});
+
+app.get('/server/:containerId/database', requireAuth, async (req, res) => {
+    return res.redirect(`/server/${encodeURIComponent(req.params.containerId)}/databases`);
+});
+
+app.get('/server/:containerId/database/:databaseName', requireAuth, async (req, res) => {
+    try {
+        const state = await resolveServerDatabasesState(req.params.containerId);
+        if (!state || !state.server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(state.server, req.session.user);
+        if (!hasServerPermission(access, 'server.databases.view') && !hasServerPermission(access, 'server.view')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const entry = findServerDatabaseEntry(state.databases, req.params.databaseName);
+        if (!entry || !entry.host) {
+            return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('Database entry not found.')}`);
+        }
+
+        const pageSize = 50;
+        let currentPage = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+        let selectedTable = String(req.query.table || '').trim();
+        let tables = [];
+        let tableColumns = [];
+        let tableRows = [];
+        let totalRows = 0;
+        let totalPages = 0;
+        let dbInspectError = null;
+
+        try {
+            await withServerDatabaseConnection(entry, async (dbClient, dialect) => {
+                const tableQuery = dialect === 'postgres'
+                    ? `SELECT table_name AS name
+                       FROM information_schema.tables
+                       WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+                       ORDER BY table_name ASC`
+                    : `SELECT table_name AS name
+                       FROM information_schema.tables
+                       WHERE table_schema = ${escapeSqlLiteral(entry.name)}
+                       ORDER BY table_name ASC`;
+                const rawTables = await dbClient.query(tableQuery, { type: Sequelize.QueryTypes.SELECT });
+                tables = Array.isArray(rawTables)
+                    ? rawTables
+                        .map((row) => String((row && (row.name || row.table_name)) || '').trim())
+                        .filter(Boolean)
+                    : [];
+
+                if (selectedTable && !tables.includes(selectedTable)) {
+                    selectedTable = '';
+                }
+                if (!selectedTable && tables.length > 0) {
+                    selectedTable = tables[0];
+                }
+                if (!selectedTable) return;
+
+                const safeTableIdentifier = quoteDatabaseTableIdentifier(dialect, selectedTable);
+                const countQuery = dialect === 'postgres'
+                    ? `SELECT COUNT(*)::bigint AS total FROM ${safeTableIdentifier}`
+                    : `SELECT COUNT(*) AS total FROM ${safeTableIdentifier}`;
+                const countRows = await dbClient.query(countQuery, { type: Sequelize.QueryTypes.SELECT });
+                const countValue = countRows && countRows[0]
+                    ? (countRows[0].total ?? countRows[0].count ?? Object.values(countRows[0])[0])
+                    : 0;
+                totalRows = Math.max(0, Number.parseInt(countValue, 10) || 0);
+                totalPages = totalRows > 0 ? Math.ceil(totalRows / pageSize) : 0;
+                if (totalPages > 0 && currentPage > totalPages) {
+                    currentPage = totalPages;
+                }
+                const offset = Math.max(0, (currentPage - 1) * pageSize);
+                const dataQuery = `SELECT * FROM ${safeTableIdentifier} LIMIT ${pageSize} OFFSET ${offset}`;
+                const previewRows = await dbClient.query(dataQuery, { type: Sequelize.QueryTypes.SELECT });
+                tableRows = Array.isArray(previewRows) ? previewRows.map((row) => sanitizeDatabasePreviewRow(row)) : [];
+                tableColumns = tableRows[0] ? Object.keys(tableRows[0]) : [];
+
+                if (tableColumns.length === 0) {
+                    const columnsQuery = dialect === 'postgres'
+                        ? `SELECT column_name
+                           FROM information_schema.columns
+                           WHERE table_schema = 'public'
+                             AND table_name = ${escapeSqlLiteral(selectedTable)}
+                           ORDER BY ordinal_position`
+                        : `SELECT column_name
+                           FROM information_schema.columns
+                           WHERE table_schema = ${escapeSqlLiteral(entry.name)}
+                             AND table_name = ${escapeSqlLiteral(selectedTable)}
+                           ORDER BY ordinal_position`;
+                    const rawColumns = await dbClient.query(columnsQuery, { type: Sequelize.QueryTypes.SELECT });
+                    tableColumns = Array.isArray(rawColumns)
+                        ? rawColumns.map((row) => String((row && row.column_name) || '').trim()).filter(Boolean)
+                        : [];
+                }
+            });
+        } catch (inspectError) {
+            dbInspectError = inspectError && inspectError.message ? inspectError.message : String(inspectError);
+        }
+
+        const managerStateKey = resolveDatabaseManagerStateKey(state.server.id, entry.id);
+        const queryPreview = getDatabaseManagerPreview(req, managerStateKey);
+
+        return res.render('server/database-manager', {
+            server: state.server,
+            user: req.session.user,
+            title: `Database Manager ${state.server.name}`,
+            path: '/servers',
+            active: 'dbs',
+            entry,
+            tables,
+            selectedTable,
+            tableColumns,
+            tableRows,
+            totalRows,
+            totalPages,
+            currentPage,
+            pageSize,
+            dbInspectError,
+            queryPreview,
+            canManageDatabases: hasServerPermission(access, 'server.databases.manage'),
+            success: req.query.success || null,
+            error: req.query.error || null
+        });
+    } catch (error) {
+        console.error('Error loading database manager page:', error);
+        return res.redirect(`/server/${req.params.containerId}/databases?error=${encodeURIComponent('Failed to load database manager.')}`);
+    }
+});
+
+app.post('/server/:containerId/database/:databaseName/query', requireAuth, async (req, res) => {
+    try {
+        const state = await resolveServerDatabasesState(req.params.containerId);
+        if (!state || !state.server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(state.server, req.session.user);
+        if (!hasServerPermission(access, 'server.databases.manage')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const entry = findServerDatabaseEntry(state.databases, req.params.databaseName);
+        if (!entry || !entry.host) {
+            return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('Database entry not found.')}`);
+        }
+
+        const rawQuery = String(req.body.sqlQuery || '').trim();
+        if (!rawQuery) {
+            return res.redirect(`/server/${state.server.containerId}/database/${encodeURIComponent(entry.name)}?error=${encodeURIComponent('SQL query cannot be empty.')}`);
+        }
+        if (rawQuery.length > 20000) {
+            return res.redirect(`/server/${state.server.containerId}/database/${encodeURIComponent(entry.name)}?error=${encodeURIComponent('SQL query is too large (max 20,000 chars).')}`);
+        }
+
+        const managerStateKey = resolveDatabaseManagerStateKey(state.server.id, entry.id);
+        const isReadQuery = /^(select|show|with|describe|desc|explain)\b/i.test(rawQuery);
+        let executedQuery = rawQuery;
+        if (/^(select|with)\b/i.test(rawQuery) && !/\blimit\s+\d+\b/i.test(rawQuery)) {
+            executedQuery = `${rawQuery.replace(/;\s*$/, '')} LIMIT 200`;
+        }
+
+        await withServerDatabaseConnection(entry, async (dbClient) => {
+            if (isReadQuery) {
+                const rows = await dbClient.query(executedQuery, { type: Sequelize.QueryTypes.SELECT });
+                const safeRows = Array.isArray(rows) ? rows.slice(0, 200).map((row) => sanitizeDatabasePreviewRow(row)) : [];
+                const columns = safeRows[0] ? Object.keys(safeRows[0]) : [];
+                persistDatabaseManagerPreview(req, managerStateKey, {
+                    executedAt: new Date().toISOString(),
+                    query: executedQuery,
+                    message: `Query executed. Returned ${safeRows.length} row(s).`,
+                    columns,
+                    rows: safeRows
+                });
+            } else {
+                const [, metadata] = await dbClient.query(executedQuery);
+                const affectedRows = Number.parseInt(
+                    (metadata && (metadata.affectedRows ?? metadata.rowCount ?? metadata.changes)) || 0,
+                    10
+                ) || 0;
+                persistDatabaseManagerPreview(req, managerStateKey, {
+                    executedAt: new Date().toISOString(),
+                    query: executedQuery,
+                    message: `Write query executed successfully. Affected rows: ${affectedRows}.`,
+                    columns: [],
+                    rows: []
+                });
+            }
+        });
+
+        await createBillingAuditLog({
+            actorUserId: req.session.user.id,
+            action: 'server.database.query',
+            targetType: 'server',
+            targetId: state.server.id,
+            req,
+            metadata: {
+                serverId: state.server.id,
+                serverContainerId: state.server.containerId,
+                databaseId: entry.id,
+                databaseName: entry.name,
+                queryType: isReadQuery ? 'read' : 'write'
+            }
+        });
+
+        await new Promise((resolve) => req.session.save(resolve));
+        return res.redirect(`/server/${state.server.containerId}/database/${encodeURIComponent(entry.name)}?success=${encodeURIComponent('SQL query executed successfully.')}`);
+    } catch (error) {
+        console.error('Error executing database query:', error);
+        return res.redirect(`/server/${req.params.containerId}/database/${encodeURIComponent(req.params.databaseName)}?error=${encodeURIComponent(error.message || 'Failed to execute SQL query.')}`);
+    }
+});
+
+app.post(
+    '/server/:containerId/database/:databaseName/import',
+    requireAuth,
+    expressLib.text({ type: ['text/plain', 'application/sql', 'application/x-sql'], limit: '50mb' }),
+    async (req, res) => {
+        try {
+            const state = await resolveServerDatabasesState(req.params.containerId);
+            if (!state || !state.server) {
+                return res.status(404).json({ success: false, error: 'Server not found.' });
+            }
+            const access = await resolveServerAccess(state.server, req.session.user);
+            if (!hasServerPermission(access, 'server.databases.manage')) {
+                return res.status(403).json({ success: false, error: 'No permission.' });
+            }
+
+            const entry = findServerDatabaseEntry(state.databases, req.params.databaseName);
+            if (!entry || !entry.host) {
+                return res.status(404).json({ success: false, error: 'Database entry not found.' });
+            }
+
+            const sqlPayload = typeof req.body === 'string'
+                ? req.body
+                : String((req.body && (req.body.sql || req.body.sqlPayload)) || '');
+            const normalizedPayload = String(sqlPayload || '').trim();
+            if (!normalizedPayload) {
+                return res.status(400).json({ success: false, error: 'SQL payload is empty.' });
+            }
+            if (normalizedPayload.length > (50 * 1024 * 1024)) {
+                return res.status(413).json({ success: false, error: 'SQL payload is too large (max 50MB).' });
+            }
+
+            await importSqlIntoServerDatabase(entry, normalizedPayload);
+
+            await createBillingAuditLog({
+                actorUserId: req.session.user.id,
+                action: 'server.database.import_sql',
+                targetType: 'server',
+                targetId: state.server.id,
+                req,
+                metadata: {
+                    serverId: state.server.id,
+                    serverContainerId: state.server.containerId,
+                    databaseId: entry.id,
+                    databaseName: entry.name,
+                    bytes: Buffer.byteLength(normalizedPayload, 'utf8')
+                }
+            });
+
+            return res.json({ success: true, message: `SQL imported successfully into ${entry.name}.` });
+        } catch (error) {
+            console.error('Error importing SQL payload:', error);
+            return res.status(500).json({ success: false, error: error.message || 'Failed to import SQL payload.' });
+        }
+    }
+);
+
+app.get('/server/:containerId/database/:databaseName/export.sql', requireAuth, async (req, res) => {
+    try {
+        const state = await resolveServerDatabasesState(req.params.containerId);
+        if (!state || !state.server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(state.server, req.session.user);
+        if (!hasServerPermission(access, 'server.databases.view') && !hasServerPermission(access, 'server.view')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const entry = findServerDatabaseEntry(state.databases, req.params.databaseName);
+        if (!entry || !entry.host) {
+            return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('Database entry not found.')}`);
+        }
+
+        const exportDir = resolveDatabaseManagerExportDirectory();
+        const safeName = String(entry.name || 'database').replace(/[^a-zA-Z0-9._-]/g, '-');
+        const exportId = `${Date.now().toString(36)}_${nodeCrypto.randomBytes(4).toString('hex')}`;
+        const fileName = `${safeName}-${exportId}.sql`;
+        const filePath = nodePath.join(exportDir, fileName);
+        await exportServerDatabaseToSqlFile(entry, filePath);
+
+        await createBillingAuditLog({
+            actorUserId: req.session.user.id,
+            action: 'server.database.export_sql',
+            targetType: 'server',
+            targetId: state.server.id,
+            req,
+            metadata: {
+                serverId: state.server.id,
+                serverContainerId: state.server.containerId,
+                databaseId: entry.id,
+                databaseName: entry.name
+            }
+        });
+
+        return res.download(filePath, `${safeName}.sql`, async () => {
+            await fs.promises.unlink(filePath).catch(() => {});
+        });
+    } catch (error) {
+        console.error('Error exporting SQL:', error);
+        return res.redirect(`/server/${req.params.containerId}/database/${encodeURIComponent(req.params.databaseName)}?error=${encodeURIComponent(error.message || 'Failed to export SQL.')}`);
     }
 });
 

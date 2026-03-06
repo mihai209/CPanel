@@ -140,6 +140,9 @@ const canManage = Boolean(canManageDatabases);
                                     </td>
                                     <td class="small muted-2"><%= new Date(entry.createdAt).toLocaleString() %></td>
                                     <td class="text-end">
+                                        <a href="/server/<%= server.containerId %>/database/<%= encodeURIComponent(entry.name) %>" class="btn btn-sm btn-outline-primary" title="Open Database Manager">
+                                            <i class="bi bi-box-arrow-up-right"></i>
+                                        </a>
                                         <% if (canManage) { %>
                                             <form method="POST" action="/server/<%= server.containerId %>/databases/<%= entry.id %>/password" class="d-inline">
                                                 <button type="submit" class="btn btn-sm btn-outline-warning" title="Rotate Password"><i class="bi bi-key"></i></button>

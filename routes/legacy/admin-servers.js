@@ -559,15 +559,59 @@ async function resolvePrimaryAllocationForServer(server, options = {}) {
 
 function extractStartupPlaceholders(startup) {
     const text = String(startup || '');
-    const regex = /\{\{\s*([A-Z0-9_]+)\s*\}\}/g;
     const found = new Set();
-    let match;
-    while ((match = regex.exec(text)) !== null) {
-        if (match && match[1]) {
-            found.add(String(match[1]).trim());
+    const patterns = [
+        /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g,
+        /\{([A-Za-z0-9_]+)\}/g
+    ];
+
+    patterns.forEach((regex) => {
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            if (match && match[1]) {
+                found.add(String(match[1]).trim());
+            }
         }
-    }
+    });
     return Array.from(found);
+}
+
+function buildMigrationStartupEnv({ startupTemplate, baseEnv, remoteVariables, remoteStartupCommand }) {
+    const env = {
+        ...(baseEnv && typeof baseEnv === 'object' ? baseEnv : {})
+    };
+    const remoteEnv = remoteVariables && typeof remoteVariables === 'object'
+        ? remoteVariables
+        : {};
+    const startupFromRemote = String(remoteStartupCommand || '').trim();
+    const injectedKeys = [];
+    const placeholders = extractStartupPlaceholders(startupTemplate);
+
+    placeholders.forEach((key) => {
+        const currentValue = Object.prototype.hasOwnProperty.call(env, key)
+            ? String(env[key] || '').trim()
+            : '';
+        if (currentValue) return;
+
+        const remoteValue = Object.prototype.hasOwnProperty.call(remoteEnv, key)
+            ? String(remoteEnv[key] || '').trim()
+            : '';
+        if (remoteValue) {
+            env[key] = remoteValue;
+            injectedKeys.push(key);
+            return;
+        }
+
+        if ((key === 'STARTUPSCRIPT' || key === 'STARTUP') && startupFromRemote) {
+            env[key] = startupFromRemote;
+            injectedKeys.push(key);
+        }
+    });
+
+    return {
+        env,
+        injectedKeys: Array.from(new Set(injectedKeys))
+    };
 }
 
 function normalizeDockerCandidate(value) {
@@ -623,6 +667,7 @@ function buildMigrationPrecheckMatrix(snapshot, images) {
         const unresolvedPlaceholders = placeholderKeys.filter((key) => {
             if (remoteVariableSet.has(key)) return false;
             if (key === 'SERVER_MEMORY' || key === 'SERVER_PORT' || key === 'SERVER_IP') return false;
+            if ((key === 'STARTUPSCRIPT' || key === 'STARTUP') && remoteStartup) return false;
             return true;
         });
 
@@ -635,7 +680,13 @@ function buildMigrationPrecheckMatrix(snapshot, images) {
                 SERVER_IP: '0.0.0.0',
                 SERVER_PORT: String(defaultPort)
             });
-            buildStartupCommand(image && image.startup ? image.startup : '', previewEnv);
+            const { env: previewStartupEnv } = buildMigrationStartupEnv({
+                startupTemplate: image && image.startup ? image.startup : '',
+                baseEnv: previewEnv,
+                remoteVariables,
+                remoteStartupCommand: remoteStartup
+            });
+            buildStartupCommand(image && image.startup ? image.startup : '', previewStartupEnv);
         } catch (error) {
             startupPreviewError = String(error && error.message ? error.message : '').slice(0, 240);
         }
@@ -1079,7 +1130,13 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
             SERVER_IP: '0.0.0.0',
             SERVER_PORT: String(allocation.port)
         });
-        const startup = buildStartupCommand(image.startup, env);
+        const { env: startupEnv, injectedKeys: injectedStartupFallbackKeys } = buildMigrationStartupEnv({
+            startupTemplate: image.startup,
+            baseEnv: env,
+            remoteVariables,
+            remoteStartupCommand: snapshot.startup
+        });
+        const startup = buildStartupCommand(image.startup, startupEnv);
         const deploymentPorts = buildDeploymentPorts({
             imagePorts,
             env,
@@ -1408,6 +1465,9 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
         const warningFragments = [];
         if (ignoredVariables.length > 0) {
             warningFragments.push(`Ignored ${ignoredVariables.length} variables not supported by selected image: ${ignoredVariables.slice(0, 8).join(', ')}`);
+        }
+        if (injectedStartupFallbackKeys.length > 0) {
+            warningFragments.push(`Startup fallback variables injected during migration: ${injectedStartupFallbackKeys.join(', ')}`);
         }
         if (allocationAssignmentSummary.assigned > 0 || allocationAssignmentSummary.skipped > 0) {
             warningFragments.push(`Additional allocations migrated: ${allocationAssignmentSummary.assigned} assigned, ${allocationAssignmentSummary.skipped} skipped.`);

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Manager <%= server.name %> | <%= settings.brandName.toUpperCase() %></title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body { background:#0f0f12; color:#e1e1e6; margin:0; font-family:Inter,system-ui,-apple-system,sans-serif; height:100vh; overflow:hidden; }
+        .wrapper{display:flex;height:100vh}
+        .sidebar{width:260px;background:#121216;border-right:1px solid #2d2d35;overflow-y:auto}
+        .sidebar.collapsed{margin-left:-260px}
+        .content{flex:1;display:flex;flex-direction:column;min-width:0}
+        .top{background:#121216;border-bottom:1px solid #2d2d35;padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem}
+        .scroll{flex:1;overflow:auto;padding:1rem}
+        .cardx{background:#121216;border:1px solid #2d2d35;border-radius:.8rem}
+        .btn-icon{background:transparent;border:0;color:#8b8b9a;font-size:1.2rem}
+        .muted-2 { color:#9ea0aa; }
+        .form-control, .form-select { background:#1a1a20; border-color:#2d2d35; color:#e1e1e6; }
+        .form-control:focus, .form-select:focus { background:#1a1a20; color:#fff; border-color:#3b82f6; box-shadow:none; }
+        .table-dark { --bs-table-bg: transparent; }
+        .table-list-link.active {
+            background: rgba(59,130,246,.12);
+            border-color: rgba(59,130,246,.28);
+            color: #93b8ff !important;
+        }
+    </style>
+</head>
+<body>
+<%- include('../partials/error-modal') %>
+<%
+const tableList = Array.isArray(tables) ? tables : [];
+const previewColumns = Array.isArray(tableColumns) ? tableColumns : [];
+const previewRows = Array.isArray(tableRows) ? tableRows : [];
+const preview = queryPreview && typeof queryPreview === 'object' ? queryPreview : null;
+const pageNum = Math.max(1, Number.parseInt(currentPage, 10) || 1);
+const pages = Math.max(0, Number.parseInt(totalPages, 10) || 0);
+const hasPrev = pages > 0 && pageNum > 1;
+const hasNext = pages > 0 && pageNum < pages;
+const encodedDatabaseName = encodeURIComponent(entry.name || '');
+const selectedTableSafe = String(selectedTable || '').trim();
+const baseManagerPath = `/server/${server.containerId}/database/${encodedDatabaseName}`;
+const exportPath = `${baseManagerPath}/export.sql`;
+const queryPath = `${baseManagerPath}/query`;
+const importPath = `${baseManagerPath}/import`;
+%>
+<div class="wrapper">
+    <nav class="sidebar" id="sidebar"><div class="p-3"><%- include('../partials/server-sidebar', { server, active: 'dbs' }) %></div></nav>
+    <main class="content">
+        <header class="top">
+            <button class="btn-icon" id="sidebarToggle"><i class="bi bi-list"></i></button>
+            <h1 class="h5 mb-0">
+                Database Manager / <span class="text-secondary"><%= server.name %></span> / <span class="text-info"><%= entry.name %></span>
+            </h1>
+            <div class="ms-auto d-flex align-items-center gap-2">
+                <a href="/server/<%= server.containerId %>/databases" class="btn btn-sm btn-outline-light">
+                    <i class="bi bi-arrow-left me-1"></i>Back
+                </a>
+                <a href="<%= exportPath %>" class="btn btn-sm btn-outline-success desktop-only-control">
+                    <i class="bi bi-download me-1"></i>Export .sql
+                </a>
+            </div>
+        </header>
+        <section class="scroll">
+            <% if (dbInspectError) { %>
+                <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger mb-3">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    Failed to inspect database content: <%= dbInspectError %>
+                </div>
+            <% } %>
+            <div class="alert border-0 bg-warning bg-opacity-10 text-warning mb-3" id="desktopNotice">
+                <i class="bi bi-pc-display-horizontal me-2"></i>
+                This DB manager is <strong>desktop first</strong>. On mobile, write actions are blocked for safety.
+            </div>
+
+            <div class="row g-3">
+                <div class="col-lg-3">
+                    <div class="cardx p-3 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h2 class="h6 mb-0">Tables</h2>
+                            <span class="small muted-2"><%= tableList.length %></span>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            <% if (!tableList.length) { %>
+                                <div class="small muted-2">No tables found in this database.</div>
+                            <% } %>
+                            <% tableList.forEach((tableName) => { %>
+                                <a href="<%= baseManagerPath %>?table=<%= encodeURIComponent(tableName) %>"
+                                   class="list-group-item list-group-item-action bg-transparent border border-secondary border-opacity-25 rounded mb-1 text-light table-list-link <%= selectedTableSafe === tableName ? 'active' : '' %>">
+                                    <i class="bi bi-table me-1"></i><%= tableName %>
+                                </a>
+                            <% }) %>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-9">
+                    <div class="cardx p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                            <h2 class="h6 mb-0">Table Preview<% if (selectedTableSafe) { %> / <span class="text-info"><%= selectedTableSafe %></span><% } %></h2>
+                            <% if (selectedTableSafe) { %>
+                                <span class="small muted-2">Rows: <%= Number(totalRows || 0) %> | Page <%= pageNum %><% if (pages > 0) { %> / <%= pages %><% } %></span>
+                            <% } %>
+                        </div>
+
+                        <% if (!selectedTableSafe) { %>
+                            <div class="small muted-2">Pick a table from the left side to preview content.</div>
+                        <% } else { %>
+                            <div class="table-responsive">
+                                <table class="table table-dark table-sm table-hover align-middle mb-2">
+                                    <thead>
+                                        <tr>
+                                            <% if (!previewColumns.length) { %>
+                                                <th class="muted-2">No columns available.</th>
+                                            <% } %>
+                                            <% previewColumns.forEach((columnName) => { %>
+                                                <th><%= columnName %></th>
+                                            <% }) %>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% if (!previewRows.length) { %>
+                                            <tr><td colspan="<%= Math.max(previewColumns.length, 1) %>" class="text-center muted-2 py-3">No rows on this page.</td></tr>
+                                        <% } %>
+                                        <% previewRows.forEach((row) => { %>
+                                            <tr>
+                                                <% previewColumns.forEach((columnName) => { %>
+                                                    <td><%= row[columnName] === null || row[columnName] === undefined ? 'NULL' : String(row[columnName]) %></td>
+                                                <% }) %>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="small muted-2">Preview page size: <%= Number(pageSize || 50) %></div>
+                                <div class="btn-group btn-group-sm">
+                                    <a class="btn btn-outline-light <%= hasPrev ? '' : 'disabled' %>" href="<%= hasPrev ? (baseManagerPath + '?table=' + encodeURIComponent(selectedTableSafe) + '&page=' + encodeURIComponent(String(pageNum - 1))) : '#' %>">
+                                        <i class="bi bi-chevron-left"></i>
+                                    </a>
+                                    <a class="btn btn-outline-light <%= hasNext ? '' : 'disabled' %>" href="<%= hasNext ? (baseManagerPath + '?table=' + encodeURIComponent(selectedTableSafe) + '&page=' + encodeURIComponent(String(pageNum + 1))) : '#' %>">
+                                        <i class="bi bi-chevron-right"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        <% } %>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-lg-8">
+                            <div class="cardx p-3 h-100">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h2 class="h6 mb-0">SQL Console</h2>
+                                    <span class="small muted-2">Run read/write queries</span>
+                                </div>
+                                <form method="POST" action="<%= queryPath %>" data-turbo="false">
+                                    <textarea name="sqlQuery" class="form-control desktop-only-control" rows="7" placeholder="SELECT * FROM users LIMIT 50;" required></textarea>
+                                    <div class="d-flex justify-content-end mt-2">
+                                        <button type="submit" class="btn btn-primary desktop-only-control">
+                                            <i class="bi bi-play-fill me-1"></i>Run Query
+                                        </button>
+                                    </div>
+                                </form>
+
+                                <% if (preview) { %>
+                                    <div class="mt-3 pt-3 border-top border-secondary border-opacity-25">
+                                        <h3 class="h6 mb-2">Last Query Result</h3>
+                                        <div class="small muted-2 mb-2"><%= preview.executedAt ? new Date(preview.executedAt).toLocaleString() : '-' %> | <%= preview.message || '' %></div>
+                                        <pre class="small p-2 rounded" style="background:#0d0d11;border:1px solid #2d2d35;white-space:pre-wrap;word-break:break-word;"><%= preview.query || '' %></pre>
+                                        <% if (Array.isArray(preview.rows) && preview.rows.length > 0) { %>
+                                            <div class="table-responsive mt-2">
+                                                <table class="table table-dark table-sm mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <% (preview.columns || []).forEach((columnName) => { %>
+                                                                <th><%= columnName %></th>
+                                                            <% }) %>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <% preview.rows.forEach((row) => { %>
+                                                            <tr>
+                                                                <% (preview.columns || []).forEach((columnName) => { %>
+                                                                    <td><%= row[columnName] === null || row[columnName] === undefined ? 'NULL' : String(row[columnName]) %></td>
+                                                                <% }) %>
+                                                            </tr>
+                                                        <% }) %>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        <% } %>
+                                    </div>
+                                <% } %>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div class="cardx p-3 h-100">
+                                <h2 class="h6 mb-2">Import .sql</h2>
+                                <p class="small muted-2 mb-2">
+                                    Choose a local SQL file, then import directly into <code><%= entry.name %></code>.
+                                </p>
+                                <input type="file" id="sqlFileInput" class="form-control desktop-only-control mb-2" accept=".sql,text/plain">
+                                <button type="button" id="importSqlBtn" class="btn btn-warning w-100 desktop-only-control">
+                                    <i class="bi bi-upload me-1"></i>Import SQL File
+                                </button>
+                                <div class="small muted-2 mt-2" id="importSqlStatus">No import running.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script>
+(() => {
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebar = document.getElementById('sidebar');
+    const importSqlBtn = document.getElementById('importSqlBtn');
+    const sqlFileInput = document.getElementById('sqlFileInput');
+    const importSqlStatus = document.getElementById('importSqlStatus');
+    const desktopNotice = document.getElementById('desktopNotice');
+    const desktopControls = Array.from(document.querySelectorAll('.desktop-only-control'));
+    const mobileQuery = window.matchMedia('(max-width: 991.98px)');
+
+    sidebarToggle?.addEventListener('click', () => {
+        sidebar?.classList.toggle('collapsed');
+    });
+
+    function setDesktopGuard() {
+        const mobileMode = mobileQuery.matches;
+        if (desktopNotice) {
+            desktopNotice.className = mobileMode
+                ? 'alert border-0 bg-danger bg-opacity-10 text-danger mb-3'
+                : 'alert border-0 bg-warning bg-opacity-10 text-warning mb-3';
+            desktopNotice.innerHTML = mobileMode
+                ? '<i class="bi bi-phone me-2"></i><strong>Mobile mode detected.</strong> SQL write/import/export controls are disabled. Use desktop for full database management.'
+                : '<i class="bi bi-pc-display-horizontal me-2"></i>This DB manager is <strong>desktop first</strong>. On mobile, write actions are blocked for safety.';
+        }
+        desktopControls.forEach((control) => {
+            if ('disabled' in control) {
+                control.disabled = mobileMode;
+            }
+        });
+    }
+
+    setDesktopGuard();
+    if (typeof mobileQuery.addEventListener === 'function') {
+        mobileQuery.addEventListener('change', setDesktopGuard);
+    } else if (typeof mobileQuery.addListener === 'function') {
+        mobileQuery.addListener(setDesktopGuard);
+    }
+
+    importSqlBtn?.addEventListener('click', async () => {
+        const file = sqlFileInput && sqlFileInput.files && sqlFileInput.files[0] ? sqlFileInput.files[0] : null;
+        if (!file) {
+            if (importSqlStatus) importSqlStatus.textContent = 'Pick a .sql file first.';
+            return;
+        }
+        if (file.size > (50 * 1024 * 1024)) {
+            if (importSqlStatus) importSqlStatus.textContent = 'File too large. Max 50MB.';
+            return;
+        }
+
+        try {
+            const sqlText = await file.text();
+            if (!String(sqlText || '').trim()) {
+                if (importSqlStatus) importSqlStatus.textContent = 'Selected file is empty.';
+                return;
+            }
+            if (importSqlStatus) importSqlStatus.textContent = 'Import in progress...';
+            if (importSqlBtn) importSqlBtn.disabled = true;
+
+            const response = await fetch('<%= importPath %>', {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+                body: sqlText
+            });
+            let payload = null;
+            try {
+                payload = await response.json();
+            } catch {
+                payload = null;
+            }
+            if (!response.ok || !payload || payload.success !== true) {
+                throw new Error(payload && payload.error ? payload.error : 'Import failed');
+            }
+            window.location.href = '<%= baseManagerPath %>?success=' + encodeURIComponent(payload.message || 'SQL imported successfully.');
+        } catch (error) {
+            if (importSqlStatus) importSqlStatus.textContent = 'Import failed: ' + (error && error.message ? error.message : error);
+        } finally {
+            if (importSqlBtn) importSqlBtn.disabled = mobileQuery.matches;
+        }
+    });
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
+</body>
+</html>
