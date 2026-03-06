@@ -39,6 +39,48 @@ const toNumberString = (value, fallback, min = 0, max = 1_000_000) => {
     const clamped = Math.min(max, Math.max(min, parsed));
     return String(clamped);
 };
+const parseUploadToggle = (value, fallback = true) => {
+    if (value === undefined || value === null || value === '') return fallback;
+    const normalized = String(value).trim().toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+};
+const parseUploadMaxMb = (value, fallback = 50) => {
+    const parsed = Number.parseInt(String(value === undefined || value === null ? '' : value).trim(), 10);
+    if (!Number.isInteger(parsed)) return fallback;
+    return Math.max(1, Math.min(2048, parsed));
+};
+const clampConnectorWSReadLimitMb = (value) => {
+    const parsed = Number.parseInt(String(value === undefined || value === null ? '' : value).trim(), 10);
+    if (!Number.isInteger(parsed)) return 8;
+    return Math.max(8, Math.min(1024, parsed));
+};
+const deriveConnectorWSReadLimitMb = (uploadMaxMb, uploadEnabled = true) => {
+    if (!uploadEnabled) return clampConnectorWSReadLimitMb(16);
+    const normalizedUpload = parseUploadMaxMb(uploadMaxMb, 50);
+    // WS payload carries base64 + JSON envelope, so reserve headroom above raw upload size.
+    const estimatedLimit = Math.ceil((normalizedUpload * 4) / 3) + 16;
+    return clampConnectorWSReadLimitMb(estimatedLimit);
+};
+const pushConnectorWSReadLimitUpdate = (limitMb, source = 'admin_settings') => {
+    if (!connectorConnections || typeof connectorConnections.forEach !== 'function') return 0;
+    const openState = WebSocket && Number.isInteger(WebSocket.OPEN) ? WebSocket.OPEN : 1;
+    const payload = JSON.stringify({
+        type: 'connector_set_ws_read_limit',
+        limitMb: clampConnectorWSReadLimitMb(limitMb),
+        source
+    });
+    let sent = 0;
+    connectorConnections.forEach((connectorWs, connectorId) => {
+        if (!connectorWs || connectorWs.readyState !== openState || typeof connectorWs.send !== 'function') return;
+        try {
+            connectorWs.send(payload);
+            sent += 1;
+        } catch (error) {
+            console.warn(`Failed to push WS read limit update to connector ${connectorId}:`, error.message || error);
+        }
+    });
+    return sent;
+};
 const normalizeAfkPeriod = (value) => {
     const normalized = String(value || '').trim().toLowerCase();
     return ['minute', 'hour', 'day', 'week', 'month', 'year'].includes(normalized) ? normalized : 'minute';
@@ -624,6 +666,13 @@ app.post('/admin/settings', requireAuth, requireAdmin, [
         // Update locals for the current request
         res.locals.settings.brandName = nextSettings.brandName;
         res.locals.settings.faviconUrl = nextSettings.faviconUrl;
+        const uploadEnabled = parseUploadToggle(nextSettings.featureWebUploadEnabled, true);
+        const uploadMaxMb = parseUploadMaxMb(nextSettings.featureWebUploadMaxMb, 50);
+        const wsReadLimitMb = deriveConnectorWSReadLimitMb(uploadMaxMb, uploadEnabled);
+        const syncedConnectors = pushConnectorWSReadLimitUpdate(wsReadLimitMb, 'admin_settings_save');
+        if (syncedConnectors > 0) {
+            console.log(`Synced connector WS read limit to ${syncedConnectors} connector(s): ${wsReadLimitMb} MB`);
+        }
 
         return res.redirect('/admin/settings?success=' + encodeURIComponent('Settings updated successfully!'));
     } catch (error) {

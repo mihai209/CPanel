@@ -49,6 +49,9 @@ const serverConsoleBuffers = new Map(); // serverId -> { lines: string[], bytes:
 const SERVER_CONSOLE_BUFFER_MAX_LINES = 1200;
 const SERVER_CONSOLE_BUFFER_MAX_BYTES = 1024 * 1024;
 const SERVER_DEBUG_LOG_TAIL_MAX_CHARS = 32 * 1024;
+const CONNECTOR_WS_READ_LIMIT_MIN_MB = 8;
+const CONNECTOR_WS_READ_LIMIT_MAX_MB = 1024;
+const CONNECTOR_WS_READ_LIMIT_DEFAULT_UPLOAD_MB = 50;
 const WEBHOOKS_SETTING_KEY = 'extensionWebhooksConfig';
 const ANTI_MINER_STATE = new Map(); // serverId -> runtime detection state
 const ANTI_MINER_CONFIG_CACHE_TTL_MS = 15 * 1000;
@@ -82,6 +85,68 @@ const parseCrashNumber = (value, fallback, min, max) => {
     if (!Number.isFinite(parsed)) return fallback;
     return Math.min(max, Math.max(min, parsed));
 };
+
+const parseUploadToggle = (value, fallback = true) => {
+    if (value === undefined || value === null || value === '') return fallback;
+    const normalized = String(value).trim().toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+};
+
+const parseUploadMaxMb = (value, fallback = CONNECTOR_WS_READ_LIMIT_DEFAULT_UPLOAD_MB) => {
+    const parsed = Number.parseInt(String(value === undefined || value === null ? '' : value).trim(), 10);
+    if (!Number.isInteger(parsed)) return fallback;
+    return Math.max(1, Math.min(2048, parsed));
+};
+
+const clampConnectorWSReadLimitMb = (value) => {
+    const parsed = Number.parseInt(String(value === undefined || value === null ? '' : value).trim(), 10);
+    if (!Number.isInteger(parsed)) return CONNECTOR_WS_READ_LIMIT_MIN_MB;
+    return Math.max(CONNECTOR_WS_READ_LIMIT_MIN_MB, Math.min(CONNECTOR_WS_READ_LIMIT_MAX_MB, parsed));
+};
+
+const deriveConnectorWSReadLimitMb = (uploadMaxMb, uploadEnabled = true) => {
+    if (!uploadEnabled) return clampConnectorWSReadLimitMb(16);
+    const normalizedUpload = parseUploadMaxMb(uploadMaxMb, CONNECTOR_WS_READ_LIMIT_DEFAULT_UPLOAD_MB);
+    // WS payload is base64 + JSON envelope, so keep headroom above raw upload limit.
+    const estimatedLimit = Math.ceil((normalizedUpload * 4) / 3) + 16;
+    return clampConnectorWSReadLimitMb(estimatedLimit);
+};
+
+async function getConnectorWSReadLimitMbFromSettings() {
+    if (!Settings || typeof Settings.findAll !== 'function') {
+        return deriveConnectorWSReadLimitMb(CONNECTOR_WS_READ_LIMIT_DEFAULT_UPLOAD_MB, true);
+    }
+    const rows = await Settings.findAll({
+        where: { key: ['featureWebUploadEnabled', 'featureWebUploadMaxMb'] },
+        attributes: ['key', 'value']
+    });
+    const map = {};
+    rows.forEach((row) => {
+        map[row.key] = row.value;
+    });
+    return deriveConnectorWSReadLimitMb(
+        parseUploadMaxMb(map.featureWebUploadMaxMb, CONNECTOR_WS_READ_LIMIT_DEFAULT_UPLOAD_MB),
+        parseUploadToggle(map.featureWebUploadEnabled, true)
+    );
+}
+
+function pushConnectorWSReadLimitToSocket(ws, connectorId, limitMb, source = 'panel') {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    try {
+        ws.send(JSON.stringify({
+            type: 'connector_set_ws_read_limit',
+            limitMb: clampConnectorWSReadLimitMb(limitMb),
+            source
+        }));
+        if (Number.isInteger(Number(connectorId))) {
+            console.log(`Pushed connector WS read limit to connector ${connectorId}: ${clampConnectorWSReadLimitMb(limitMb)} MB`);
+        }
+        return true;
+    } catch (error) {
+        console.warn(`Failed to push WS read limit to connector ${connectorId || 'unknown'}:`, error.message || error);
+        return false;
+    }
+}
 
 async function getCrashPolicySettings() {
     const now = Date.now();
@@ -1421,6 +1486,12 @@ wss.on('connection', (ws, request) => {
                         usage: null
                     };
                     ws.send(JSON.stringify({ type: 'auth_success' }));
+                    try {
+                        const limitMb = await getConnectorWSReadLimitMbFromSettings();
+                        pushConnectorWSReadLimitToSocket(ws, connectorId, limitMb, 'auth_sync');
+                    } catch (limitError) {
+                        console.warn(`Failed to sync WS read limit for connector ${connectorId}:`, limitError.message || limitError);
+                    }
                     console.log(`Connector ${connectorId} authenticated via WebSocket`);
                 } else {
                     ws.send(JSON.stringify({ type: 'auth_fail', error: 'Invalid token' }));
