@@ -70,25 +70,13 @@ const canManage = Boolean(canManageDatabases);
                 </div>
 
                 <form method="POST" action="/server/<%= server.containerId %>/databases/create" class="row g-2">
-                    <div class="col-md-3">
+                    <div class="col-md-4">
                         <label class="form-label text-muted small">Host</label>
-                        <select name="databaseHostId" class="form-select" <%= canCreate ? '' : 'disabled' %>>
-                            <% hostsList.forEach((host) => { %>
-                                <option value="<%= host.id %>"><%= host.name %> (<%= host.type %>) - <%= host.host %>:<%= host.port %></option>
-                            <% }) %>
-                        </select>
+                        <input type="text" class="form-control" value="Auto selected by location policy" readonly>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-8">
                         <label class="form-label text-muted small">Database Name (optional)</label>
                         <input type="text" name="databaseName" class="form-control" maxlength="64" placeholder="example_db" <%= canCreate ? '' : 'disabled' %>>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label text-muted small">Username (optional)</label>
-                        <input type="text" name="databaseUser" class="form-control" maxlength="64" placeholder="example_user" <%= canCreate ? '' : 'disabled' %>>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label text-muted small">Password (optional)</label>
-                        <input type="text" name="databasePassword" class="form-control" maxlength="128" placeholder="auto-generate if empty" <%= canCreate ? '' : 'disabled' %>>
                     </div>
                     <div class="col-12 d-flex justify-content-end">
                         <button type="submit" class="btn btn-primary" <%= canCreate ? '' : 'disabled' %>>
@@ -97,7 +85,7 @@ const canManage = Boolean(canManageDatabases);
                     </div>
                 </form>
                 <div class="small muted-2 mt-2">
-                    Credentials are generated in Pterodactyl-style naming and bound to server slot limits.
+                    Username and password are generated automatically for manual create.
                 </div>
             </div>
 

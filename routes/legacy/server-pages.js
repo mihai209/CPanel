@@ -7349,6 +7349,43 @@ function escapeSqlLiteral(value) {
         .replace(/'/g, "''")}'`;
 }
 
+function extractSqlErrorCode(error) {
+    if (!error || typeof error !== 'object') return '';
+    return String(
+        error.code
+        || (error.parent && error.parent.code)
+        || (error.original && error.original.code)
+        || ''
+    ).trim();
+}
+
+function wrapDatabaseProvisioningError(error, host, dialect) {
+    const code = extractSqlErrorCode(error);
+    const hostUser = String(host && host.username ? host.username : '').trim() || 'configured-user';
+    const hostName = String(host && host.host ? host.host : '').trim() || 'database-host';
+    const dbDialect = getDatabaseHostDialect(dialect || (host && host.type));
+
+    if (dbDialect === 'postgres' && (code === '42501' || code.toLowerCase() === 'insufficient_privilege')) {
+        return new Error(
+            `Database host user "${hostUser}" on ${hostName} lacks PostgreSQL privileges. ` +
+            `Required privileges: CREATEDB and CREATEROLE (or a superuser role).`
+        );
+    }
+
+    if (dbDialect !== 'postgres' && (
+        code === 'ER_DBACCESS_DENIED_ERROR'
+        || code === 'ER_ACCESS_DENIED_ERROR'
+        || code === 'ER_SPECIFIC_ACCESS_DENIED_ERROR'
+    )) {
+        return new Error(
+            `Database host user "${hostUser}" on ${hostName} lacks MySQL/MariaDB privileges to provision databases/users. ` +
+            `Use an admin user or grant CREATE, ALTER, DROP, CREATE USER, and GRANT OPTION.`
+        );
+    }
+
+    return error;
+}
+
 async function withDatabaseHostConnection(host, callback) {
     const dialect = getDatabaseHostDialect(host && host.type);
     const hostPort = Math.max(1, Number.parseInt(host && host.port, 10) || (dialect === 'postgres' ? 5432 : 3306));
@@ -7383,40 +7420,44 @@ async function withDatabaseHostConnection(host, callback) {
 
 async function provisionServerDatabaseOnHost(host, { databaseName, databaseUser, databasePassword }) {
     return withDatabaseHostConnection(host, async (dbClient, dialect) => {
-        if (dialect === 'postgres') {
-            const dbName = quotePgIdentifier(databaseName);
-            const roleName = quotePgIdentifier(databaseUser);
-            const roleNameLiteral = escapeSqlLiteral(databaseUser);
-            const rolePassLiteral = escapeSqlLiteral(databasePassword);
-            const dbNameLiteral = escapeSqlLiteral(databaseName);
-            const rows = await dbClient.query(
-                `SELECT 1 FROM pg_database WHERE datname = ${dbNameLiteral} LIMIT 1`,
-                { type: Sequelize.QueryTypes.SELECT }
-            );
-            if (!Array.isArray(rows) || rows.length === 0) {
-                await dbClient.query(`CREATE DATABASE ${dbName}`);
+        try {
+            if (dialect === 'postgres') {
+                const dbName = quotePgIdentifier(databaseName);
+                const roleName = quotePgIdentifier(databaseUser);
+                const roleNameLiteral = escapeSqlLiteral(databaseUser);
+                const rolePassLiteral = escapeSqlLiteral(databasePassword);
+                const dbNameLiteral = escapeSqlLiteral(databaseName);
+                const rows = await dbClient.query(
+                    `SELECT 1 FROM pg_database WHERE datname = ${dbNameLiteral} LIMIT 1`,
+                    { type: Sequelize.QueryTypes.SELECT }
+                );
+                if (!Array.isArray(rows) || rows.length === 0) {
+                    await dbClient.query(`CREATE DATABASE ${dbName}`);
+                }
+                await dbClient.query(
+                    `DO $$ BEGIN
+                        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${roleNameLiteral}) THEN
+                            CREATE ROLE ${roleName} LOGIN PASSWORD ${rolePassLiteral};
+                        ELSE
+                            ALTER ROLE ${roleName} WITH LOGIN PASSWORD ${rolePassLiteral};
+                        END IF;
+                    END $$;`
+                );
+                await dbClient.query(`GRANT ALL PRIVILEGES ON DATABASE ${dbName} TO ${roleName}`);
+                return;
             }
-            await dbClient.query(
-                `DO $$ BEGIN
-                    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${roleNameLiteral}) THEN
-                        CREATE ROLE ${roleName} LOGIN PASSWORD ${rolePassLiteral};
-                    ELSE
-                        ALTER ROLE ${roleName} WITH LOGIN PASSWORD ${rolePassLiteral};
-                    END IF;
-                END $$;`
-            );
-            await dbClient.query(`GRANT ALL PRIVILEGES ON DATABASE ${dbName} TO ${roleName}`);
-            return;
-        }
 
-        const dbName = quoteMysqlIdentifier(databaseName);
-        const userLiteral = escapeSqlLiteral(databaseUser);
-        const passLiteral = escapeSqlLiteral(databasePassword);
-        await dbClient.query(`CREATE DATABASE IF NOT EXISTS ${dbName}`);
-        await dbClient.query(`CREATE USER IF NOT EXISTS ${userLiteral}@'%' IDENTIFIED BY ${passLiteral}`);
-        await dbClient.query(`ALTER USER ${userLiteral}@'%' IDENTIFIED BY ${passLiteral}`);
-        await dbClient.query(`GRANT ALL PRIVILEGES ON ${dbName}.* TO ${userLiteral}@'%'`);
-        await dbClient.query('FLUSH PRIVILEGES');
+            const dbName = quoteMysqlIdentifier(databaseName);
+            const userLiteral = escapeSqlLiteral(databaseUser);
+            const passLiteral = escapeSqlLiteral(databasePassword);
+            await dbClient.query(`CREATE DATABASE IF NOT EXISTS ${dbName}`);
+            await dbClient.query(`CREATE USER IF NOT EXISTS ${userLiteral}@'%' IDENTIFIED BY ${passLiteral}`);
+            await dbClient.query(`ALTER USER ${userLiteral}@'%' IDENTIFIED BY ${passLiteral}`);
+            await dbClient.query(`GRANT ALL PRIVILEGES ON ${dbName}.* TO ${userLiteral}@'%'`);
+            await dbClient.query('FLUSH PRIVILEGES');
+        } catch (error) {
+            throw wrapDatabaseProvisioningError(error, host, dialect);
+        }
     });
 }
 
@@ -8695,16 +8736,16 @@ app.post('/server/:containerId/databases/create', requireAuth, async (req, res) 
             return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('No database host is configured for this server location.')}`);
         }
 
-        const requestedHostId = Number.parseInt(req.body.databaseHostId, 10);
-        const selectedHost = state.hosts.find((entry) => Number(entry.id) === requestedHostId) || state.hosts[0];
+        const selectedHost = state.hosts[0];
         if (!selectedHost) {
-            return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('Select a valid database host.')}`);
+            return res.redirect(`/server/${state.server.containerId}/databases?error=${encodeURIComponent('No available database host for this server location.')}`);
         }
 
         const maxDbNameLen = getDatabaseNameMaxLen(selectedHost.type);
         const maxDbUserLen = getDatabaseUserMaxLen(selectedHost.type);
         const requestedDatabaseName = sanitizeDatabaseObjectName(req.body.databaseName, 'db', 24);
-        const requestedDatabaseUser = sanitizeDatabaseObjectName(req.body.databaseUser, 'user', 24);
+        const autoUserToken = nodeCrypto.randomBytes(3).toString('hex');
+        const requestedDatabaseUser = sanitizeDatabaseObjectName(`u${autoUserToken}`, 'user', 24);
         const dbNameBase = sanitizeDatabaseObjectName(`s${state.server.id}_${requestedDatabaseName}`, `s${state.server.id}_db`, maxDbNameLen);
         const dbUserBase = sanitizeDatabaseObjectName(`u${state.server.id}_${requestedDatabaseUser}`, `u${state.server.id}_user`, maxDbUserLen);
 
@@ -8716,10 +8757,7 @@ app.post('/server/:containerId/databases/create', requireAuth, async (req, res) 
         const usedUsers = new Set(hostEntries.map((entry) => String(entry.username || '').toLowerCase()));
         const databaseName = buildUniqueDatabaseObjectName(dbNameBase, usedNames, maxDbNameLen);
         const databaseUser = buildUniqueDatabaseObjectName(dbUserBase, usedUsers, maxDbUserLen);
-        const providedPassword = String(req.body.databasePassword || '').trim();
-        const databasePassword = providedPassword
-            ? providedPassword.slice(0, 128)
-            : nodeCrypto.randomBytes(12).toString('base64url').slice(0, 20);
+        const databasePassword = nodeCrypto.randomBytes(12).toString('base64url').slice(0, 20);
 
         await provisionServerDatabaseOnHost(selectedHost, {
             databaseName,
