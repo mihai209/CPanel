@@ -89,9 +89,30 @@
             }
 
             .permission-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-                gap: .4rem;
+                display: flex;
+                flex-direction: column;
+                gap: .45rem;
+            }
+
+            .permission-item {
+                display: flex;
+                align-items: flex-start;
+                gap: .6rem;
+                padding: .45rem .55rem;
+                border: 1px solid #2d2d35;
+                border-radius: .5rem;
+                background: #16161b;
+            }
+
+            .permission-item .form-check-input {
+                float: none;
+                position: static;
+                margin: .2rem 0 0 0;
+                flex: 0 0 auto;
+            }
+
+            .permission-item .form-check-label {
+                margin: 0;
             }
 
             code {
@@ -242,8 +263,7 @@
                             <label class="form-label small text-uppercase text-muted-2">Permissions</label>
                             <div class="permission-grid mb-3">
                                 <% (permissionCatalog || []).forEach((perm)=> { %>
-                                    <label class="form-check"
-                                        style="padding:.4rem .5rem;border:1px solid #2d2d35;border-radius:.5rem;background:#16161b;">
+                                    <label class="permission-item">
                                         <input class="form-check-input subuser-permission" type="checkbox"
                                             name="permissions" value="<%= perm %>" <%=perm==='server.view' ? 'checked'
                                             : '' %>>
