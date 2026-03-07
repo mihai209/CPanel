@@ -6156,6 +6156,85 @@ app.get('/server/:containerId/overview', requireAuth, async (req, res) => {
     }
 });
 
+app.post('/server/:containerId/overview/meta', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId }
+        });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.view')) {
+            return res.redirect('/server/no-permissions');
+        }
+        if (!access.isOwner && !access.isAdmin) {
+            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('You are not allowed to edit this server metadata.')}`);
+        }
+
+        const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
+        if (access.isOwner) {
+            const revenueManaged = await getServerRevenueManagedState(server.id);
+            let isRevenueManagedLocked = Boolean(revenueManaged && revenueManaged.managed);
+            if (!isRevenueManagedLocked && featureFlags.revenueModeEnabled) {
+                const revenueProfileRaw = await getUserRevenueProfileSafe(req.session.user.id);
+                const revenueProfile = normalizeUserRevenueProfile(revenueProfileRaw || {});
+                const revenuePlanCatalog = await getRevenuePlanCatalogSafe();
+                const activeRevenuePlan = resolveRevenuePlanById(revenuePlanCatalog, revenueProfile.planId);
+                isRevenueManagedLocked = Boolean(activeRevenuePlan) && isRevenueProfileProvisioningAllowed(revenueProfile);
+            }
+            if (isRevenueManagedLocked) {
+                return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Edit mode is disabled for revenue managed servers.')}`);
+            }
+        }
+
+        const nextName = String(req.body.name || '').trim();
+        const nextDescriptionRaw = String(req.body.description || '').trim();
+        const nextDescription = nextDescriptionRaw.length > 0 ? nextDescriptionRaw : null;
+
+        if (!nextName) {
+            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Server name is required.')}`);
+        }
+        if (nextName.length > 100) {
+            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Server name must be at most 100 characters.')}`);
+        }
+        if (nextDescriptionRaw.length > 50) {
+            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Description must be at most 50 characters.')}`);
+        }
+
+        const prevName = String(server.name || '').trim();
+        const prevDescription = String(server.description || '').trim();
+        const normalizedNextDescription = String(nextDescription || '').trim();
+        if (prevName === nextName && prevDescription === normalizedNextDescription) {
+            return res.redirect(`/server/${server.containerId}/overview?success=${encodeURIComponent('No changes detected.')}`);
+        }
+
+        await server.update({
+            name: nextName,
+            description: nextDescription
+        });
+
+        await createBillingAuditLog({
+            actorUserId: req.session.user.id,
+            action: 'billing.server.edit',
+            targetType: 'server',
+            targetId: server.id,
+            req,
+            metadata: {
+                previousName: prevName,
+                newName: nextName,
+                previousDescription: prevDescription || null,
+                newDescription: normalizedNextDescription || null,
+                source: 'server.overview'
+            }
+        });
+
+        return res.redirect(`/server/${server.containerId}/overview?success=${encodeURIComponent('Server metadata updated successfully.')}`);
+    } catch (error) {
+        console.error('Error editing server metadata from overview:', error);
+        return res.redirect(`/server/${req.params.containerId}/overview?error=${encodeURIComponent('Failed to update server metadata.')}`);
+    }
+});
+
 app.post('/server/:containerId/config-drift/baseline', requireAuth, async (req, res) => {
     try {
         const server = await Server.findOne({ where: { containerId: req.params.containerId } });
