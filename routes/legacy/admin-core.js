@@ -20,6 +20,11 @@ const REDIS_SETTING_KEYS = [
 const nodeFs = require('fs');
 const nodeFsPromises = nodeFs.promises;
 const nodePath = require('path');
+const getGoogleTokenSettingKey = (userId) => {
+    const parsed = Number.parseInt(userId, 10);
+    if (!Number.isInteger(parsed) || parsed <= 0) return '';
+    return `oauth_google_tokens_user_${parsed}`;
+};
 const LANG_DIRECTORY = nodePath.join(process.cwd(), 'public', 'lang');
 const MAX_LANGUAGE_JSON_SIZE_BYTES = 2 * 1024 * 1024;
 
@@ -1098,6 +1103,10 @@ app.post('/admin/users/:id/unlink/:provider', requireAuth, requireAdmin, async (
         if (targetUser.oauthProvider === provider) {
             await targetUser.update({ oauthProvider: null, oauthId: null });
         }
+        if (String(provider || '').trim().toLowerCase() === 'google' && Settings && typeof Settings.destroy === 'function') {
+            const tokenKey = getGoogleTokenSettingKey(id);
+            if (tokenKey) await Settings.destroy({ where: { key: tokenKey } }).catch(() => {});
+        }
 
         res.redirect(`/admin/users?success=Successfully unlinked ${provider} from ${targetUser.username}.`);
     } catch (err) {
@@ -1188,6 +1197,10 @@ app.post('/admin/users/delete/:id', requireAuth, requireAdmin, async (req, res) 
 
     try {
         await LinkedAccount.destroy({ where: { userId: id } });
+        if (Settings && typeof Settings.destroy === 'function') {
+            const tokenKey = getGoogleTokenSettingKey(id);
+            if (tokenKey) await Settings.destroy({ where: { key: tokenKey } }).catch(() => {});
+        }
         await User.destroy({ where: { id } });
         res.redirect('/admin/users?success=User deleted successfully!');
     } catch (error) {

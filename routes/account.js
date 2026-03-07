@@ -4,6 +4,7 @@ const {
     getUserThemeId,
     withThemeInPermissions
 } = require('../core/themes');
+const { getGoogleTokenSettingKey } = require('../core/backups/google-drive');
 
 function registerAccountRoutes({
     app,
@@ -11,6 +12,7 @@ function registerAccountRoutes({
     requireAdmin,
     User,
     LinkedAccount,
+    Settings,
     Op,
     md5,
     APP_URL,
@@ -106,6 +108,12 @@ function registerAccountRoutes({
 
             if (String(user.oauthProvider || '').trim().toLowerCase() === provider) {
                 await user.update({ oauthProvider: null, oauthId: null });
+            }
+            if (provider === 'google' && Settings && typeof Settings.destroy === 'function') {
+                const tokenKey = getGoogleTokenSettingKey(userId);
+                if (tokenKey) {
+                    await Settings.destroy({ where: { key: tokenKey } }).catch(() => {});
+                }
             }
 
             res.redirect('/account?success=Account unlinked successfully.');

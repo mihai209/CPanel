@@ -1,10 +1,10 @@
 :root {
     --bg-dark: #1f3d2b;
     --bg-sidebar: #1f3d2b;
-    --border-color: #f5c542;
+    --border-color: #e74c3c;       
     --text-primary: #eef7ea;
     --text-secondary: #c8d6c4;
-    --accent-blue: #4CAF50;
+    --accent-color: #e74c3c;       
     --cp-panel-surface: rgba(31, 61, 43, 0.88);
     --cp-panel-surface-2: rgba(31, 61, 43, 0.9);
     --cp-panel-input: #6b4f2a;
@@ -24,7 +24,7 @@ body {
 .stat-card,
 .terminal-container {
     background: rgba(31, 61, 43, 0.9) !important;
-    border-color: #f5c542 !important;
+    border-color: var(--border-color) !important;
 }
 
 .navbar,
@@ -34,63 +34,63 @@ body {
 .terminal-header,
 header.top {
     background: rgba(31, 61, 43, 0.94) !important;
-    border-color: #f5c542 !important;
+    border-color: var(--border-color) !important;
 }
 
 .form-control,
 .form-select,
 textarea {
     background: #6b4f2a !important;
-    border-color: #f5c542 !important;
-    color: #eef7ea !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
 }
 
 .form-control:focus,
 .form-select:focus,
 textarea:focus {
-    border-color: #f5c542 !important;
-    box-shadow: 0 0 0 0.2rem rgba(245, 197, 66, 0.22) !important;
+    border-color: var(--border-color) !important;
+    box-shadow: 0 0 0 0.2rem rgba(231, 76, 60, 0.22) !important; 
 }
 
 .btn-primary,
 .btn-success {
-    background: #4CAF50 !important;
-    border-color: #4CAF50 !important;
-    color: #f1fff0 !important;
+    background: inherit !important; 
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
 }
 
 .btn-primary:hover,
 .btn-success:hover {
-    background: #439a46 !important;
-    border-color: #439a46 !important;
+    background: rgba(231, 76, 60, 0.2) !important;
+    border-color: var(--border-color) !important;
 }
 
 .btn-outline-primary,
 .btn-outline-success {
-    color: #4CAF50 !important;
-    border-color: #4CAF50 !important;
+    color: var(--border-color) !important;
+    border-color: var(--border-color) !important;
 }
 
 .btn-outline-primary:hover,
 .btn-outline-success:hover {
-    background: #4CAF50 !important;
-    color: #f1fff0 !important;
+    background: rgba(231, 76, 60, 0.2) !important;
+    color: var(--text-primary) !important;
 }
 
 a,
 .text-primary,
 .link-primary {
-    color: #f5c542 !important;
+    color: var(--border-color) !important;
 }
 
 .table,
 .table-dark,
-.table-dark > :not(caption) > * > * {
-    border-color: #f5c542 !important;
+.table-dark > :not(caption)  * {
+    border-color: var(--border-color) !important;
 }
 
 .sidebar-item.active,
 .nav-link.active {
-    color: #f5c542 !important;
-    background: rgba(245, 197, 66, 0.12) !important;
+    color: var(--border-color) !important;
+    background: rgba(231, 76, 60, 0.12) !important;
 }

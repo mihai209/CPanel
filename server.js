@@ -281,9 +281,11 @@ jobQueue.start();
 
 const stopBackupPolicyScheduler = startBackupPolicyScheduler({
     ServerBackupPolicy,
+    Job,
     jobQueue,
     intervalMs: 60 * 1000,
-    bootInfo
+    bootInfo,
+    bootWarn
 });
 
 const stopServerScheduleRunner = startServerScheduleRunner({
@@ -445,6 +447,7 @@ registerOAuthRoutes({
     passport,
     User,
     LinkedAccount,
+    Settings,
     md5
 });
 registerAdminCoreRoutes(legacyRouteContext);
@@ -474,6 +477,7 @@ registerAccountRoutes({
     requireAdmin,
     User,
     LinkedAccount,
+    Settings,
     Op,
     md5,
     APP_URL,

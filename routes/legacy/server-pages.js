@@ -4,6 +4,13 @@ function registerServerPagesRoutes(ctx) {
     const nodePath = require('path');
     const nodeCrypto = require('crypto');
     const { spawn } = require('child_process');
+    const {
+        GOOGLE_DRIVE_BACKUP_DEST,
+        getGoogleTokenSettingKey,
+        parseGoogleTokenPayload,
+        parseScopes,
+        hasGoogleDriveScope
+    } = require('../../core/backups/google-drive');
     const { getUserThemeId } = require('../../core/themes');
     const { pickSmartAllocation } = require('../../core/helpers/smart-allocation');
     const {
@@ -7287,6 +7294,9 @@ app.get('/server/:containerId/backups', requireAuth, async (req, res) => {
                 model: Allocation,
                 as: 'allocation',
                 include: [{ model: Connector, as: 'connector' }]
+            }, {
+                model: ServerBackupPolicy,
+                as: 'backupPolicy'
             }]
         });
         if (!server) return res.redirect('/server/notfound');
@@ -7296,28 +7306,109 @@ app.get('/server/:containerId/backups', requireAuth, async (req, res) => {
             return res.redirect('/server/no-permissions');
         }
 
-        const connector = server.allocation && server.allocation.connector ? server.allocation.connector : null;
-        const sftpHost = connector ? String(connector.fqdn || '').trim() : '';
-        const parsedSftpPort = connector ? Number.parseInt(connector.sftpPort, 10) : NaN;
-        const sftpEnabledRaw = String((res.locals.settings && res.locals.settings.featureSftpEnabled) || 'true').trim().toLowerCase();
-        const sftpEnabled = sftpEnabledRaw === 'true' || sftpEnabledRaw === '1' || sftpEnabledRaw === 'on' || sftpEnabledRaw === 'yes';
-        const sftpDetails = {
-            host: sftpHost,
-            port: Number.isInteger(parsedSftpPort) ? parsedSftpPort : null,
-            username: buildSftpUsernameForServer(req.session.user, server),
-            passwordHint: 'Use your account password from this panel.',
-            available: sftpEnabled && !server.isSuspended && Boolean(sftpHost) && Number.isInteger(parsedSftpPort)
+        const canManageBackups = hasServerPermission(access, 'server.backups.manage');
+        const isOwnerSessionUser = Number.parseInt(req.session.user.id, 10) === Number.parseInt(server.ownerId, 10);
+        const canConnectGoogleDrive = canManageBackups && isOwnerSessionUser;
+        const policy = server.backupPolicy || null;
+        const defaultIntervalMinutes = 360;
+        const parsedInterval = Number.parseInt(policy && policy.intervalMinutes, 10);
+        const intervalMinutes = Number.isInteger(parsedInterval) && parsedInterval >= 5 && parsedInterval <= 10080
+            ? parsedInterval
+            : defaultIntervalMinutes;
+        const autoEnabled = Boolean(policy && policy.enabled && String(policy.destinationPath || '') === GOOGLE_DRIVE_BACKUP_DEST);
+
+        const ownerGoogleLink = await LinkedAccount.findOne({
+            where: {
+                userId: server.ownerId,
+                provider: 'google'
+            }
+        });
+
+        const googleTokenKey = getGoogleTokenSettingKey(server.ownerId);
+        const googleTokenSetting = googleTokenKey ? await Settings.findByPk(googleTokenKey) : null;
+        const googleTokenState = parseGoogleTokenPayload(googleTokenSetting && googleTokenSetting.value ? googleTokenSetting.value : '{}');
+        const googleScopes = parseScopes(googleTokenState && googleTokenState.scopes ? googleTokenState.scopes : []);
+        const hasDriveScope = hasGoogleDriveScope(googleScopes);
+        const hasRefreshToken = Boolean(String((googleTokenState && googleTokenState.refreshToken) || '').trim());
+        const hasAccessToken = Boolean(String((googleTokenState && googleTokenState.accessToken) || '').trim());
+        const googleDriveReady = Boolean(ownerGoogleLink) && hasDriveScope && (hasRefreshToken || hasAccessToken);
+
+        const backupHistoryRows = await ServerBackup.findAll({
+            where: { serverId: server.id },
+            order: [['createdAt', 'DESC']],
+            limit: 15
+        });
+        const backupHistory = backupHistoryRows.map((entry) => {
+            const raw = entry && typeof entry.toJSON === 'function' ? entry.toJSON() : entry;
+            const metadata = raw && raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : {};
+            const fileId = String(metadata.fileId || '').trim();
+            const folderId = String(metadata.folderId || '').trim();
+            return {
+                id: raw.id,
+                status: String(raw.status || ''),
+                createdAt: raw.createdAt,
+                sizeBytes: Number.isFinite(Number(raw.sizeBytes)) ? Number(raw.sizeBytes) : 0,
+                filePath: String(raw.filePath || ''),
+                fileId: fileId || null,
+                folderId: folderId || null,
+                provider: String(metadata.provider || ''),
+                trigger: String(metadata.trigger || ''),
+                error: String(metadata.error || ''),
+                webViewLink: String(metadata.webViewLink || '').trim() || (fileId ? `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/view` : ''),
+                folderLink: folderId ? `https://drive.google.com/drive/folders/${encodeURIComponent(folderId)}` : ''
+            };
+        });
+
+        const pendingBackupJobs = await Job.findAll({
+            where: {
+                type: { [Op.in]: ['server.backup.create', 'server.backup.google_drive'] },
+                status: { [Op.in]: ['queued', 'running', 'retrying'] }
+            },
+            attributes: ['id', 'type', 'status', 'payload', 'createdAt']
+        });
+        const activeJob = pendingBackupJobs.find((job) => {
+            const payload = job && job.payload && typeof job.payload === 'object' ? job.payload : {};
+            return Number.parseInt(payload.serverId, 10) === Number.parseInt(server.id, 10);
+        }) || null;
+
+        const googleDriveState = {
+            linked: Boolean(ownerGoogleLink),
+            hasDriveScope,
+            hasRefreshToken,
+            hasAccessToken,
+            ready: googleDriveReady,
+            ownerId: server.ownerId,
+            canConnect: canConnectGoogleDrive,
+            scopes: googleScopes,
+            connectUrl: `/auth/google?drive=1&next=${encodeURIComponent(`/server/${server.containerId}/backups`)}`,
+            statusText: !ownerGoogleLink
+                ? 'Google account is not linked for the server owner.'
+                : (!hasDriveScope
+                    ? 'Google account is linked but Drive permission is missing.'
+                    : ((!hasRefreshToken && !hasAccessToken)
+                        ? 'Google account is linked but tokens are missing.'
+                        : 'Google Drive is ready for backups.'))
         };
 
         return res.render('server/backups', {
             server,
             user: req.session.user,
-            title: `SFTP Backup ${server.name}`,
+            title: `Backups ${server.name}`,
             path: '/servers',
             active: 'backups',
-            sftpDetails,
-            sftpFeatureEnabled: sftpEnabled,
-            canManageBackups: hasServerPermission(access, 'server.backups.manage'),
+            canManageBackups,
+            canConnectGoogleDrive,
+            autoEnabled,
+            intervalMinutes,
+            policyLastRunAt: policy && policy.lastRunAt ? policy.lastRunAt : null,
+            googleDriveState,
+            backupHistory,
+            activeJob: activeJob ? {
+                id: activeJob.id,
+                status: activeJob.status,
+                type: activeJob.type,
+                createdAt: activeJob.createdAt
+            } : null,
             success: req.query.success || null,
             error: req.query.error || null
         });
@@ -7335,7 +7426,34 @@ app.post('/server/:containerId/backups/policy', requireAuth, async (req, res) =>
         if (!hasServerPermission(access, 'server.backups.manage')) {
             return res.redirect('/server/no-permissions');
         }
-        return res.redirect(`/server/${server.containerId}/backups?error=${encodeURIComponent('Built-in backup policy is disabled. Use SFTP backup workflow instead.')}`);
+
+        const enabled = String(req.body.enabled || '').trim().toLowerCase();
+        const autoEnabled = enabled === 'on' || enabled === '1' || enabled === 'true' || enabled === 'yes';
+        const rawInterval = Number.parseInt(req.body.intervalMinutes, 10);
+        const intervalMinutes = Number.isInteger(rawInterval)
+            ? Math.max(5, Math.min(10080, rawInterval))
+            : 360;
+
+        const [policy] = await ServerBackupPolicy.findOrCreate({
+            where: { serverId: server.id },
+            defaults: {
+                serverId: server.id,
+                enabled: autoEnabled,
+                intervalMinutes,
+                retentionCount: 1,
+                destinationPath: GOOGLE_DRIVE_BACKUP_DEST,
+                lastRunAt: null
+            }
+        });
+
+        await policy.update({
+            enabled: autoEnabled,
+            intervalMinutes,
+            retentionCount: 1,
+            destinationPath: GOOGLE_DRIVE_BACKUP_DEST
+        });
+
+        return res.redirect(`/server/${server.containerId}/backups?success=${encodeURIComponent('Backup policy saved.')}`);
     } catch (error) {
         console.error('Error updating backup policy:', error);
         return res.redirect(`/server/${req.params.containerId}/backups?error=${encodeURIComponent('Failed to update backup policy.')}`);
@@ -7350,7 +7468,61 @@ app.post('/server/:containerId/backups/run', requireAuth, async (req, res) => {
         if (!hasServerPermission(access, 'server.backups.manage')) {
             return res.redirect('/server/no-permissions');
         }
-        return res.redirect(`/server/${server.containerId}/backups?error=${encodeURIComponent('Built-in backup jobs are disabled. Use SFTP backup workflow instead.')}`);
+        if (server.isSuspended) {
+            return res.redirect(`/server/${server.containerId}/backups?error=${encodeURIComponent('Server is suspended.')}`);
+        }
+
+        const ownerGoogleLink = await LinkedAccount.findOne({
+            where: {
+                userId: server.ownerId,
+                provider: 'google'
+            }
+        });
+        if (!ownerGoogleLink) {
+            return res.redirect(`/server/${server.containerId}/backups?error=${encodeURIComponent('Server owner must link a Google account first.')}`);
+        }
+
+        const googleTokenKey = getGoogleTokenSettingKey(server.ownerId);
+        const googleTokenSetting = googleTokenKey ? await Settings.findByPk(googleTokenKey) : null;
+        const googleTokenState = parseGoogleTokenPayload(googleTokenSetting && googleTokenSetting.value ? googleTokenSetting.value : '{}');
+        const googleScopes = parseScopes(googleTokenState && googleTokenState.scopes ? googleTokenState.scopes : []);
+        const hasRefreshToken = Boolean(String((googleTokenState && googleTokenState.refreshToken) || '').trim());
+        const hasAccessToken = Boolean(String((googleTokenState && googleTokenState.accessToken) || '').trim());
+        if (!hasGoogleDriveScope(googleScopes)) {
+            return res.redirect(`/server/${server.containerId}/backups?error=${encodeURIComponent('Google Drive scope is missing. Reconnect Google with Drive permission.')}`);
+        }
+        if (!hasRefreshToken && !hasAccessToken) {
+            return res.redirect(`/server/${server.containerId}/backups?error=${encodeURIComponent('Google tokens are missing. Reconnect Google Drive first.')}`);
+        }
+
+        const pendingJobs = await Job.findAll({
+            where: {
+                type: { [Op.in]: ['server.backup.create', 'server.backup.google_drive'] },
+                status: { [Op.in]: ['queued', 'running', 'retrying'] }
+            },
+            attributes: ['id', 'payload']
+        });
+        const hasPending = pendingJobs.some((job) => {
+            const payload = job && job.payload && typeof job.payload === 'object' ? job.payload : {};
+            return Number.parseInt(payload.serverId, 10) === Number.parseInt(server.id, 10);
+        });
+        if (hasPending) {
+            return res.redirect(`/server/${server.containerId}/backups?error=${encodeURIComponent('A backup job is already queued or running for this server.')}`);
+        }
+
+        await jobQueue.enqueue({
+            type: 'server.backup.create',
+            payload: {
+                serverId: server.id,
+                trigger: 'manual',
+                requestedByUserId: req.session.user.id
+            },
+            priority: 10,
+            maxAttempts: 3,
+            createdByUserId: req.session.user.id
+        });
+
+        return res.redirect(`/server/${server.containerId}/backups?success=${encodeURIComponent('Backup job queued. Refresh in a few moments to see result.')}`);
     } catch (error) {
         console.error('Error queuing backup:', error);
         return res.redirect(`/server/${req.params.containerId}/backups?error=${encodeURIComponent('Failed to queue backup.')}`);
@@ -7366,7 +7538,7 @@ app.get('/server/:containerId/backups/download/:backupId', requireAuth, async (r
             return res.redirect('/server/no-permissions');
         }
 
-        return res.redirect(`/server/${server.containerId}/backups?error=${encodeURIComponent('Built-in backup downloads are disabled. Use SFTP to download backup archives.')}`);
+        return res.redirect(`/server/${server.containerId}/backups?error=${encodeURIComponent('Direct download from panel is not available. Open the file from Google Drive link.')}`);
     } catch (error) {
         console.error('Error downloading backup:', error);
         return res.redirect(`/server/${req.params.containerId}/backups?error=${encodeURIComponent('Failed to download backup.')}`);
@@ -7382,7 +7554,7 @@ app.post('/server/:containerId/backups/delete/:backupId', requireAuth, async (re
             return res.redirect('/server/no-permissions');
         }
 
-        return res.redirect(`/server/${server.containerId}/backups?error=${encodeURIComponent('Built-in backup delete is disabled. Manage backup files through SFTP.')}`);
+        return res.redirect(`/server/${server.containerId}/backups?error=${encodeURIComponent('Delete from panel is not available. A new backup run automatically replaces previous Drive file.')}`);
     } catch (error) {
         console.error('Error deleting backup:', error);
         return res.redirect(`/server/${req.params.containerId}/backups?error=${encodeURIComponent('Failed to delete backup.')}`);

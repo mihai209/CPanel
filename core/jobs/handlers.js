@@ -1,3 +1,8 @@
+const {
+    GOOGLE_DRIVE_BACKUP_DEST,
+    performGoogleDriveBackup
+} = require('../backups/google-drive');
+
 function registerDefaultJobHandlers(jobQueue, deps) {
     const {
         Server,
@@ -68,9 +73,107 @@ function registerDefaultJobHandlers(jobQueue, deps) {
         return { serverId, dispatched };
     });
 
-    jobQueue.registerHandler('server.backup.create', async (job) => {
-        throw new Error('Built-in backup jobs are disabled. Use SFTP backup workflow.');
-    });
+    async function executeGoogleDriveBackupJob(job) {
+        const payload = (job && job.payload) || {};
+        const serverId = Number.parseInt(payload.serverId, 10);
+        const trigger = String(payload.trigger || 'manual').trim().toLowerCase();
+        const isAuto = trigger === 'auto';
+        if (!Number.isInteger(serverId) || serverId <= 0) {
+            throw new Error('Invalid serverId for backup job.');
+        }
+
+        const server = await Server.findByPk(serverId, {
+            include: [{
+                model: Allocation,
+                as: 'allocation',
+                include: [{ model: Connector, as: 'connector' }]
+            }]
+        });
+        if (!server) throw new Error(`Server ${serverId} not found.`);
+        if (server.isSuspended) throw new Error('Server is suspended.');
+
+        const connector = server.allocation && server.allocation.connector
+            ? server.allocation.connector
+            : null;
+        if (!connector) throw new Error('Server connector details are missing.');
+
+        const policy = await ServerBackupPolicy.findOne({ where: { serverId } });
+        if (isAuto) {
+            if (!policy || !policy.enabled || String(policy.destinationPath || '') !== GOOGLE_DRIVE_BACKUP_DEST) {
+                return {
+                    success: false,
+                    skipped: true,
+                    reason: 'Policy disabled or not configured for Google Drive.'
+                };
+            }
+        }
+
+        try {
+            const result = await performGoogleDriveBackup({
+                server,
+                connector,
+                Settings
+            });
+
+            await ServerBackup.create({
+                serverId,
+                status: 'completed',
+                filePath: `gdrive://${result.fileId}`,
+                sizeBytes: result.sizeBytes || 0,
+                checksum: result.checksum || null,
+                metadata: {
+                    provider: 'google_drive',
+                    trigger,
+                    folderId: result.folderId || null,
+                    fileId: result.fileId || null,
+                    fileName: result.fileName || null,
+                    sourceDir: result.sourceDir || null,
+                    deletedOldCount: Number.isFinite(Number(result.deletedOldCount)) ? Number(result.deletedOldCount) : 0,
+                    webViewLink: result.webViewLink || null,
+                    webContentLink: result.webContentLink || null
+                }
+            });
+
+            if (policy) {
+                await policy.update({ lastRunAt: new Date() });
+            }
+
+            return {
+                success: true,
+                serverId,
+                provider: 'google_drive',
+                trigger,
+                backup: {
+                    fileId: result.fileId || null,
+                    fileName: result.fileName || null,
+                    sizeBytes: result.sizeBytes || 0,
+                    folderId: result.folderId || null,
+                    deletedOldCount: Number.isFinite(Number(result.deletedOldCount)) ? Number(result.deletedOldCount) : 0
+                }
+            };
+        } catch (error) {
+            await ServerBackup.create({
+                serverId,
+                status: 'failed',
+                filePath: 'gdrive://error',
+                sizeBytes: null,
+                checksum: null,
+                metadata: {
+                    provider: 'google_drive',
+                    trigger,
+                    error: error && error.message ? String(error.message) : String(error)
+                }
+            }).catch(() => {});
+
+            if (policy && isAuto) {
+                await policy.update({ lastRunAt: new Date() }).catch(() => {});
+            }
+            throw error;
+        }
+    }
+
+    jobQueue.registerHandler('server.backup.create', executeGoogleDriveBackupJob);
+    jobQueue.registerHandler('server.backup.google_drive', executeGoogleDriveBackupJob);
 
     jobQueue.registerHandler('server.install.dispatch', async (job) => {
         const payload = job.payload || {};

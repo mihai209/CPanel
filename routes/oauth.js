@@ -6,13 +6,65 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const { getUserThemeId } = require('../core/themes');
 
-function registerOAuthRoutes({ app, passport, User, LinkedAccount, md5 }) {
+function registerOAuthRoutes({ app, passport, User, LinkedAccount, Settings, md5 }) {
     const APP_OAUTH_URL = (process.env.APP_URL || '').replace(/\/$/, '');
     const OAUTH_DEBUG_ENABLED = ['1', 'true', 'yes', 'on'].includes(String(process.env.DEBUG || '').trim().toLowerCase());
+    const GOOGLE_TOKEN_SETTINGS_PREFIX = 'oauth_google_tokens_user_';
     const oauthDebug = (...args) => {
         if (!OAUTH_DEBUG_ENABLED) return;
         console.log(...args);
     };
+
+    function getGoogleTokenSettingKey(userId) {
+        const parsed = Number.parseInt(userId, 10);
+        if (!Number.isInteger(parsed) || parsed <= 0) return '';
+        return `${GOOGLE_TOKEN_SETTINGS_PREFIX}${parsed}`;
+    }
+
+    function normalizeGoogleScopes(scopeRaw) {
+        if (Array.isArray(scopeRaw)) {
+            return scopeRaw.map((entry) => String(entry || '').trim()).filter(Boolean);
+        }
+        return String(scopeRaw || '')
+            .split(/[\s,]+/)
+            .map((entry) => entry.trim())
+            .filter(Boolean);
+    }
+
+    async function persistGoogleTokens(userId, tokenPayload = {}) {
+        if (!Settings || typeof Settings.findByPk !== 'function' || typeof Settings.upsert !== 'function') return;
+        const key = getGoogleTokenSettingKey(userId);
+        if (!key) return;
+
+        let existing = {};
+        try {
+            const row = await Settings.findByPk(key);
+            if (row && row.value) existing = JSON.parse(String(row.value || '{}'));
+        } catch {
+            existing = {};
+        }
+
+        const accessToken = String(tokenPayload.accessToken || '').trim() || String(existing.accessToken || '').trim();
+        const refreshToken = String(tokenPayload.refreshToken || '').trim() || String(existing.refreshToken || '').trim();
+        const scopes = normalizeGoogleScopes(tokenPayload.scope || tokenPayload.scopes || existing.scopes || []);
+        const expiresIn = Number.parseInt(tokenPayload.expiresIn, 10);
+        const tokenExpiry = Number.isInteger(expiresIn) && expiresIn > 0
+            ? new Date(Date.now() + (expiresIn * 1000)).toISOString()
+            : (existing.tokenExpiry || null);
+
+        await Settings.upsert({
+            key,
+            value: JSON.stringify({
+                provider: 'google',
+                accessToken: accessToken || null,
+                refreshToken: refreshToken || null,
+                tokenType: String(tokenPayload.tokenType || existing.tokenType || 'Bearer'),
+                tokenExpiry,
+                scopes,
+                updatedAt: new Date().toISOString()
+            })
+        });
+    }
 
     // Helper: generate a unique username from a display name
     async function generateUniqueUsername(base) {
@@ -26,7 +78,7 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, md5 }) {
     }
 
     // Helper: finish OAuth login — upsert user, set session, redirect
-    async function handleOAuthCallback(profile, provider, done, req) {
+    async function handleOAuthCallback(profile, provider, done, req, tokenPayload = {}) {
         try {
             const oauthEmail = (
                 (profile.emails && profile.emails[0] && profile.emails[0].value) ||
@@ -73,6 +125,10 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, md5 }) {
 
                 if (!created) {
                     await link.update({ providerId: oauthId, providerEmail: oauthEmail, providerUsername: oauthUsername });
+                }
+
+                if (provider === 'google') {
+                    await persistGoogleTokens(loggedInUser.id, tokenPayload);
                 }
 
                 oauthDebug(`[OAuth Link] Provider ${provider} linked for user ${loggedInUser.id}`);
@@ -140,6 +196,10 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, md5 }) {
                 }
             }
 
+            if (provider === 'google') {
+                await persistGoogleTokens(user.id, tokenPayload);
+            }
+
             if (user.isSuspended) {
                 return done(null, false, { message: 'Your account has been suspended. Contact an administrator.' });
             }
@@ -177,6 +237,12 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, md5 }) {
 
     // Helper: finalize session after successful OAuth authentication
     async function finalizeOAuthLogin(user, req, res, next) {
+        const returnToRaw = req.session && req.session.oauthReturnTo ? String(req.session.oauthReturnTo) : '';
+        const returnTo = returnToRaw.startsWith('/') ? returnToRaw : '';
+        if (req.session) {
+            delete req.session.oauthReturnTo;
+            delete req.session.oauthGoogleDriveMode;
+        }
         const isAlreadyLoggedIn = (req.user && String(req.user.id) === String(user.id)) || (req.session.user && String(req.session.user.id) === String(user.id));
         const wasAutoLinked = req.session.oauthAutoLinked;
         delete req.session.oauthAutoLinked;
@@ -184,7 +250,10 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, md5 }) {
         oauthDebug(`[OAuth Finalize] User: ${user.username}, Already Logged In: ${isAlreadyLoggedIn}, Auto Linked: ${wasAutoLinked}`);
 
         if (isAlreadyLoggedIn || wasAutoLinked) {
-            return res.redirect('/account?success=' + encodeURIComponent(wasAutoLinked ? 'Account automatically linked by email!' : 'Account linked successfully!'));
+            const msg = wasAutoLinked ? 'Account automatically linked by email!' : 'Account linked successfully!';
+            const target = returnTo || '/account';
+            const separator = target.includes('?') ? '&' : '?';
+            return res.redirect(`${target}${separator}success=${encodeURIComponent(msg)}`);
         }
 
         if (user.twoFactorEnabled) {
@@ -224,7 +293,7 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, md5 }) {
                 gravatarHash: md5(user.email.trim().toLowerCase()),
                 uiTheme: getUserThemeId(user.toJSON ? user.toJSON() : user)
             };
-            req.session.save(() => res.redirect('/'));
+            req.session.save(() => res.redirect(returnTo || '/'));
         });
     }
 
@@ -237,7 +306,10 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, md5 }) {
                 callbackURL: `${APP_OAUTH_URL}/auth/discord/callback`,
                 scope: ['identify', 'email'],
                 passReqToCallback: true
-            }, (req, accessToken, refreshToken, profile, done) => handleOAuthCallback(profile, 'discord', done, req))
+            }, (req, accessToken, refreshToken, profile, done) => handleOAuthCallback(profile, 'discord', done, req, {
+                accessToken,
+                refreshToken
+            }))
         ),
         passport.authenticate('discord')
     );
@@ -254,7 +326,10 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, md5 }) {
                 callbackURL: `${APP_OAUTH_URL}/auth/discord/callback`,
                 scope: ['identify', 'email'],
                 passReqToCallback: true
-            }, (req, at, rt, profile, done) => handleOAuthCallback(profile, 'discord', done, req)));
+            }, (req, at, rt, profile, done) => handleOAuthCallback(profile, 'discord', done, req, {
+                accessToken: at,
+                refreshToken: rt
+            })));
             next();
         },
         (req, res, next) => {
@@ -274,9 +349,37 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, md5 }) {
                 clientSecret: clientSecret,
                 callbackURL: `${APP_OAUTH_URL}/auth/google/callback`,
                 passReqToCallback: true
-            }, (req, accessToken, refreshToken, profile, done) => handleOAuthCallback(profile, 'google', done, req))
+            }, (req, accessToken, refreshToken, params, profile, done) => handleOAuthCallback(profile, 'google', done, req, {
+                accessToken,
+                refreshToken,
+                scope: params && params.scope ? params.scope : '',
+                tokenType: params && params.token_type ? params.token_type : 'Bearer',
+                expiresIn: params && params.expires_in ? params.expires_in : 0
+            }))
         ),
-        passport.authenticate('google', { scope: ['profile', 'email'] })
+        (req, res, next) => {
+            const wantsDrive = String((req.query && req.query.drive) || '').trim() === '1';
+            const nextPathRaw = String((req.query && req.query.next) || '').trim();
+            const nextPath = nextPathRaw.startsWith('/') ? nextPathRaw : '';
+            if (req.session) {
+                req.session.oauthGoogleDriveMode = wantsDrive;
+                if (nextPath) req.session.oauthReturnTo = nextPath;
+            }
+
+            const scope = ['profile', 'email'];
+            if (wantsDrive) scope.push('https://www.googleapis.com/auth/drive.file');
+
+            const authOptions = {
+                scope,
+                includeGrantedScopes: true
+            };
+            if (wantsDrive) {
+                authOptions.accessType = 'offline';
+                authOptions.prompt = 'consent';
+            }
+
+            passport.authenticate('google', authOptions)(req, res, next);
+        }
     );
 
     app.get('/auth/google/callback',
@@ -290,7 +393,13 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, md5 }) {
                 clientSecret: clientSecret,
                 callbackURL: `${APP_OAUTH_URL}/auth/google/callback`,
                 passReqToCallback: true
-            }, (req, at, rt, profile, done) => handleOAuthCallback(profile, 'google', done, req)));
+            }, (req, at, rt, params, profile, done) => handleOAuthCallback(profile, 'google', done, req, {
+                accessToken: at,
+                refreshToken: rt,
+                scope: params && params.scope ? params.scope : '',
+                tokenType: params && params.token_type ? params.token_type : 'Bearer',
+                expiresIn: params && params.expires_in ? params.expires_in : 0
+            })));
             next();
         },
         (req, res, next) => {
