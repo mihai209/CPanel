@@ -443,9 +443,114 @@ function normalizeDashboardSecurityAlerts(raw) {
         .sort((a, b) => b.createdAtMs - a.createdAtMs);
 }
 
+function parseDashboardUserPermissions(rawPermissions) {
+    if (!rawPermissions) return {};
+    if (typeof rawPermissions === 'string') {
+        try {
+            const parsed = JSON.parse(rawPermissions);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+        } catch (_error) {
+            return {};
+        }
+        return {};
+    }
+    if (rawPermissions && typeof rawPermissions === 'object' && !Array.isArray(rawPermissions)) {
+        return rawPermissions;
+    }
+    return {};
+}
+
+function normalizeDashboardSortMode(mode) {
+    const normalized = String(mode || '').trim().toLowerCase();
+    if (normalized === 'alphabetical') return 'alphabetical';
+    if (normalized === 'custom') return 'custom';
+    return 'latest';
+}
+
+function normalizeDashboardCustomOrderIds(input, maxItems = 500) {
+    const source = Array.isArray(input) ? input : [];
+    const seen = new Set();
+    const output = [];
+
+    for (const value of source) {
+        const parsed = Number.parseInt(value, 10);
+        if (!Number.isInteger(parsed) || parsed <= 0 || seen.has(parsed)) continue;
+        seen.add(parsed);
+        output.push(parsed);
+        if (output.length >= maxItems) break;
+    }
+
+    return output;
+}
+
+function parseDashboardCustomOrderPayload(rawValue) {
+    if (Array.isArray(rawValue)) return rawValue;
+    if (typeof rawValue !== 'string') return [];
+
+    const trimmed = rawValue.trim();
+    if (!trimmed) return [];
+    try {
+        const parsed = JSON.parse(trimmed);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+        return trimmed.split(',').map((entry) => entry.trim()).filter(Boolean);
+    }
+}
+
+function getDashboardServerOrderPreference(rawPermissions) {
+    const permissions = parseDashboardUserPermissions(rawPermissions);
+    const rawPreference = permissions && typeof permissions.dashboardServerOrder === 'object' && !Array.isArray(permissions.dashboardServerOrder)
+        ? permissions.dashboardServerOrder
+        : {};
+
+    return {
+        mode: normalizeDashboardSortMode(rawPreference.mode),
+        customIds: normalizeDashboardCustomOrderIds(rawPreference.customIds)
+    };
+}
+
+function orderDashboardServers(servers, preference) {
+    const list = Array.isArray(servers) ? servers.slice() : [];
+    const mode = normalizeDashboardSortMode(preference && preference.mode);
+    const customIds = normalizeDashboardCustomOrderIds(preference && preference.customIds);
+
+    if (mode === 'alphabetical') {
+        list.sort((a, b) => {
+            const aName = String(a && a.name || '');
+            const bName = String(b && b.name || '');
+            return aName.localeCompare(bName, undefined, { sensitivity: 'base', numeric: true });
+        });
+        return list;
+    }
+
+    if (mode === 'custom') {
+        const customIndexById = new Map(customIds.map((id, index) => [id, index]));
+        list.sort((a, b) => {
+            const aId = Number.parseInt(a && a.id, 10);
+            const bId = Number.parseInt(b && b.id, 10);
+            const aIndex = customIndexById.has(aId) ? customIndexById.get(aId) : Number.MAX_SAFE_INTEGER;
+            const bIndex = customIndexById.has(bId) ? customIndexById.get(bId) : Number.MAX_SAFE_INTEGER;
+            if (aIndex !== bIndex) return aIndex - bIndex;
+            return (Number.parseInt(b && b.id, 10) || 0) - (Number.parseInt(a && a.id, 10) || 0);
+        });
+        return list;
+    }
+
+    return list;
+}
+
 // Dashboard (Home)
 app.get('/', requireAuth, async (req, res) => {
     try {
+        const account = await User.findByPk(req.session.user.id, {
+            attributes: ['id', 'permissions', 'isAdmin']
+        });
+        if (!account) {
+            req.session.destroy(() => {});
+            return res.redirect('/login?error=' + encodeURIComponent('Session expired. Please login again.'));
+        }
+
+        const dashboardServerOrderPreference = getDashboardServerOrderPreference(account.permissions);
         const isAdminDashboard = Boolean(req.session.user && req.session.user.isAdmin);
         const showOthersServers = isAdminDashboard && ['1', 'true', 'yes', 'on'].includes(String(req.query.others || '').trim().toLowerCase());
 
@@ -478,6 +583,10 @@ app.get('/', requireAuth, async (req, res) => {
             include: [{ model: User, as: 'owner', attributes: ['id', 'username'] }],
             order: [['id', 'DESC']]
         });
+        const dashboardLatestOrderIds = servers
+            .map((server) => Number.parseInt(server && server.id, 10))
+            .filter((id) => Number.isInteger(id) && id > 0);
+        const orderedServers = orderDashboardServers(servers, dashboardServerOrderPreference);
         const settingsMap = res.locals.settings || {};
         const incidentsEnabled = String(settingsMap.featureExtensionIncidentsEnabled || 'false') === 'true';
         const maintenanceEnabled = String(settingsMap.featureExtensionMaintenanceEnabled || 'false') === 'true';
@@ -492,17 +601,83 @@ app.get('/', requireAuth, async (req, res) => {
 
         res.render('dashboard', {
             user: req.session.user,
-            servers,
+            servers: orderedServers,
             isAdminDashboard,
             showOthersServers,
             openIncidents,
             pendingMaintenance,
             openSecurityAlerts,
+            dashboardSortMode: dashboardServerOrderPreference.mode,
+            dashboardCustomOrderIds: dashboardServerOrderPreference.customIds,
+            dashboardLatestOrderIds,
             dashboardNowMs: Date.now()
         });
     } catch (err) {
         console.error("Dashboard Error:", err);
         res.status(500).send('Error loading dashboard: ' + err.message);
+    }
+});
+
+app.post('/dashboard/server-order', requireAuth, async (req, res) => {
+    try {
+        const account = await User.findByPk(req.session.user.id, {
+            attributes: ['id', 'permissions', 'isAdmin']
+        });
+        if (!account) {
+            return res.status(401).json({ success: false, error: 'Session expired.' });
+        }
+
+        const currentPreference = getDashboardServerOrderPreference(account.permissions);
+        const nextMode = normalizeDashboardSortMode(req.body && req.body.mode);
+
+        const hasCustomIds = req.body && Object.prototype.hasOwnProperty.call(req.body, 'customIds');
+        const customIdsInput = hasCustomIds ? parseDashboardCustomOrderPayload(req.body.customIds) : currentPreference.customIds;
+        let nextCustomIds = normalizeDashboardCustomOrderIds(customIdsInput);
+
+        if (!account.isAdmin) {
+            const membershipRows = ServerSubuser
+                ? await ServerSubuser.findAll({
+                    where: { userId: account.id },
+                    attributes: ['serverId']
+                })
+                : [];
+            const membershipServerIds = membershipRows
+                .map((row) => Number.parseInt(row.serverId, 10))
+                .filter((id) => Number.isInteger(id) && id > 0);
+            const ownedRows = await Server.findAll({
+                where: { ownerId: account.id },
+                attributes: ['id'],
+                raw: true
+            });
+            const allowedIds = new Set([
+                ...ownedRows
+                    .map((row) => Number.parseInt(row && row.id, 10))
+                    .filter((id) => Number.isInteger(id) && id > 0),
+                ...membershipServerIds
+            ]);
+            nextCustomIds = nextCustomIds.filter((id) => allowedIds.has(id));
+        }
+
+        const permissions = parseDashboardUserPermissions(account.permissions);
+        permissions.dashboardServerOrder = {
+            mode: nextMode,
+            customIds: nextCustomIds
+        };
+
+        account.permissions = permissions;
+        await account.save();
+
+        return res.json({
+            success: true,
+            mode: nextMode,
+            customIds: nextCustomIds
+        });
+    } catch (error) {
+        console.error('Failed to save dashboard server order:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to save dashboard order.'
+        });
     }
 });
 

@@ -74,6 +74,27 @@ const formatLimit = (value) => {
     if (mb >= 1024) return `${(mb / 1024).toFixed(mb % 1024 === 0 ? 0 : 1)} GB`;
     return `${mb} MB`;
 };
+const normalizeServerIdList = (input) => {
+    if (!Array.isArray(input)) return [];
+    const seen = new Set();
+    const values = [];
+    input.forEach((entry) => {
+        const parsed = Number.parseInt(entry, 10);
+        if (!Number.isInteger(parsed) || parsed <= 0 || seen.has(parsed)) return;
+        seen.add(parsed);
+        values.push(parsed);
+    });
+    return values;
+};
+const activeDashboardSortMode = (() => {
+    const raw = String(typeof dashboardSortMode !== 'undefined' ? dashboardSortMode : 'latest').trim().toLowerCase();
+    if (raw === 'alphabetical' || raw === 'custom') return raw;
+    return 'latest';
+})();
+const dashboardCustomOrderIdsList = normalizeServerIdList(typeof dashboardCustomOrderIds !== 'undefined' ? dashboardCustomOrderIds : []);
+const dashboardLatestOrderIdsList = normalizeServerIdList(typeof dashboardLatestOrderIds !== 'undefined' ? dashboardLatestOrderIds : []);
+const dashboardLatestOrderIndexById = new Map(dashboardLatestOrderIdsList.map((id, index) => [id, index]));
+const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((id, index) => [id, index]));
 %>
 
 <style>
@@ -233,6 +254,29 @@ const formatLimit = (value) => {
         white-space: pre-wrap;
     }
 
+    .dashboard-sort-controls {
+        min-width: 220px;
+    }
+
+    .dashboard-sort-feedback {
+        min-height: 1.1rem;
+    }
+
+    .dashboard-custom-order-list .list-group-item {
+        background: #1f2023;
+        border-color: #2e3036;
+        color: #e5e7eb;
+    }
+
+    .dashboard-custom-order-handle {
+        cursor: grab;
+        color: #9ca3af;
+    }
+
+    .dashboard-custom-order-item.dragging {
+        opacity: 0.55;
+    }
+
     @media (max-width: 767px) {
         .dashboard-hero {
             padding: 1rem;
@@ -286,6 +330,11 @@ const formatLimit = (value) => {
         .ops-feed-item {
             padding: 0.55rem 0.6rem;
         }
+
+        .dashboard-sort-controls {
+            width: 100%;
+            min-width: 0;
+        }
     }
 </style>
 
@@ -318,6 +367,27 @@ const formatLimit = (value) => {
                             </div>
                             <label class="small text-muted mb-0" for="dashboardOthersToggle">See Other Servers</label>
                         </form>
+                    <% } %>
+                    <% if (serverList.length > 1) { %>
+                        <div class="dashboard-sort-controls">
+                            <label for="dashboardServerSort" class="small text-muted mb-1 d-block">Order Servers</label>
+                            <div class="d-flex align-items-center gap-2">
+                                <select id="dashboardServerSort" class="form-select form-select-sm bg-dark text-light border-secondary">
+                                    <option value="latest" <%= activeDashboardSortMode === 'latest' ? 'selected' : '' %>>Latest</option>
+                                    <option value="alphabetical" <%= activeDashboardSortMode === 'alphabetical' ? 'selected' : '' %>>Alphabetical</option>
+                                    <option value="custom" <%= activeDashboardSortMode === 'custom' ? 'selected' : '' %>>Custom</option>
+                                </select>
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-warning btn-sm fw-semibold d-none d-md-inline-flex align-items-center"
+                                    id="dashboardCustomOrderBtn"
+                                    title="Edit custom order"
+                                >
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+                            </div>
+                            <div id="dashboardSortFeedback" class="dashboard-sort-feedback text-muted small mt-1"></div>
+                        </div>
                     <% } %>
                     <div class="text-muted small">Signed in as <span class="text-light fw-semibold"><%= user.username %></span></div>
                 </div>
@@ -445,8 +515,8 @@ const formatLimit = (value) => {
                 <span class="text-muted small"><%= totalServers %> total</span>
             </div>
 
-            <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 servers-grid">
-                <% serverList.forEach((server) => { %>
+            <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3 servers-grid" id="dashboardServersGrid">
+                <% serverList.forEach((server, currentIndex) => { %>
                     <%
                     const rawStatus = String(server.status || 'unknown').toLowerCase();
                     let badgeClass = 'bg-secondary';
@@ -462,8 +532,18 @@ const formatLimit = (value) => {
                     } else if (rawStatus === 'installing') {
                         badgeClass = 'bg-warning text-dark';
                     }
+                    const serverIdValue = Number.parseInt(server && server.id, 10);
+                    const latestIndex = dashboardLatestOrderIndexById.has(serverIdValue) ? dashboardLatestOrderIndexById.get(serverIdValue) : currentIndex;
+                    const customIndex = dashboardCustomOrderIndexById.has(serverIdValue) ? dashboardCustomOrderIndexById.get(serverIdValue) : -1;
                     %>
-                    <div class="col">
+                    <div
+                        class="col dashboard-server-item"
+                        data-server-id="<%= Number.isInteger(serverIdValue) ? serverIdValue : 0 %>"
+                        data-server-name="<%= server.name || '' %>"
+                        data-latest-index="<%= latestIndex %>"
+                        data-custom-index="<%= customIndex %>"
+                        data-current-index="<%= currentIndex %>"
+                    >
                         <div class="server-card h-100">
                             <div class="d-flex justify-content-between align-items-start gap-2">
                                 <div>
@@ -520,6 +600,30 @@ const formatLimit = (value) => {
                 <% } %>
             </div>
         <% } %>
+
+        <% if (serverList.length > 1) { %>
+            <div class="modal fade" id="dashboardCustomOrderModal" tabindex="-1" aria-labelledby="dashboardCustomOrderModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content bg-dark text-light border-secondary">
+                        <div class="modal-header border-secondary">
+                            <h5 class="modal-title" id="dashboardCustomOrderModalLabel">Custom Server Order</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="small text-muted mb-2">Drag servers in the order you want, then save.</p>
+                            <div id="dashboardCustomOrderFeedback" class="small text-muted mb-2"></div>
+                            <div id="dashboardCustomOrderList" class="list-group dashboard-custom-order-list"></div>
+                        </div>
+                        <div class="modal-footer border-secondary">
+                            <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-warning btn-sm fw-semibold" id="dashboardCustomOrderSaveBtn">
+                                Save Custom Order
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <% } %>
     </div>
 </div>
 
@@ -529,8 +633,245 @@ const formatLimit = (value) => {
     (() => {
         const toggle = document.getElementById('dashboardOthersToggle');
         const form = document.getElementById('dashboardOthersToggleForm');
-        if (!toggle || !form) return;
-        toggle.addEventListener('change', () => form.submit());
+        if (toggle && form) {
+            toggle.addEventListener('change', () => form.submit());
+        }
+
+        const grid = document.getElementById('dashboardServersGrid');
+        const sortSelect = document.getElementById('dashboardServerSort');
+        const sortFeedback = document.getElementById('dashboardSortFeedback');
+        if (!grid || !sortSelect) return;
+
+        const initialMode = '<%= activeDashboardSortMode %>';
+        let savedCustomOrderIds = <%- JSON.stringify(dashboardCustomOrderIdsList) %>;
+
+        const normalizeServerIds = (input) => {
+            const source = Array.isArray(input) ? input : [];
+            const seen = new Set();
+            const output = [];
+            source.forEach((entry) => {
+                const parsed = Number.parseInt(entry, 10);
+                if (!Number.isInteger(parsed) || parsed <= 0 || seen.has(parsed)) return;
+                seen.add(parsed);
+                output.push(parsed);
+            });
+            return output;
+        };
+
+        savedCustomOrderIds = normalizeServerIds(savedCustomOrderIds);
+
+        const setSortFeedback = (message, variant = 'muted') => {
+            if (!sortFeedback) return;
+            sortFeedback.textContent = message || '';
+            sortFeedback.classList.remove('text-muted', 'text-success', 'text-danger', 'text-warning');
+            if (variant === 'success') sortFeedback.classList.add('text-success');
+            else if (variant === 'danger') sortFeedback.classList.add('text-danger');
+            else if (variant === 'warning') sortFeedback.classList.add('text-warning');
+            else sortFeedback.classList.add('text-muted');
+        };
+
+        const getServerItems = () => Array.from(grid.querySelectorAll('.dashboard-server-item'));
+        const getServerId = (element) => Number.parseInt(element && element.dataset ? element.dataset.serverId : '0', 10) || 0;
+        const getLatestIndex = (element) => Number.parseInt(element && element.dataset ? element.dataset.latestIndex : '999999', 10) || 999999;
+        const getServerName = (element) => String(element && element.dataset ? element.dataset.serverName : '').toLowerCase();
+        const applyGridOrder = (orderedItems) => {
+            orderedItems.forEach((item) => grid.appendChild(item));
+        };
+
+        const sortByLatest = (items) => {
+            return items.slice().sort((a, b) => getLatestIndex(a) - getLatestIndex(b));
+        };
+
+        const sortByAlphabetical = (items) => {
+            return items.slice().sort((a, b) => getServerName(a).localeCompare(getServerName(b), undefined, { sensitivity: 'base', numeric: true }));
+        };
+
+        const sortByCustom = (items, customIds) => {
+            const orderMap = new Map(normalizeServerIds(customIds).map((id, index) => [id, index]));
+            return items.slice().sort((a, b) => {
+                const aOrder = orderMap.has(getServerId(a)) ? orderMap.get(getServerId(a)) : Number.MAX_SAFE_INTEGER;
+                const bOrder = orderMap.has(getServerId(b)) ? orderMap.get(getServerId(b)) : Number.MAX_SAFE_INTEGER;
+                if (aOrder !== bOrder) return aOrder - bOrder;
+                return getLatestIndex(a) - getLatestIndex(b);
+            });
+        };
+
+        const persistServerOrder = async (mode, customIds) => {
+            const payload = new URLSearchParams();
+            payload.set('mode', mode);
+            if (Array.isArray(customIds)) payload.set('customIds', JSON.stringify(normalizeServerIds(customIds)));
+
+            const response = await fetch('/dashboard/server-order', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'Accept': 'application/json'
+                },
+                body: payload.toString()
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.success) {
+                throw new Error(data && data.error ? data.error : 'Failed to save dashboard order.');
+            }
+            return data;
+        };
+
+        const applyModeToGrid = (mode) => {
+            const items = getServerItems();
+            if (items.length < 2) return;
+            if (mode === 'alphabetical') {
+                applyGridOrder(sortByAlphabetical(items));
+                return;
+            }
+            if (mode === 'custom') {
+                applyGridOrder(sortByCustom(items, savedCustomOrderIds));
+                return;
+            }
+            applyGridOrder(sortByLatest(items));
+        };
+
+        sortSelect.addEventListener('change', async () => {
+            const selectedMode = String(sortSelect.value || 'latest').toLowerCase();
+            applyModeToGrid(selectedMode);
+
+            if (selectedMode === 'custom' && savedCustomOrderIds.length === 0) {
+                setSortFeedback('No custom order saved yet. Use the pencil button on desktop.', 'warning');
+            }
+
+            try {
+                const data = await persistServerOrder(selectedMode);
+                savedCustomOrderIds = normalizeServerIds(data.customIds || savedCustomOrderIds);
+                if (selectedMode === 'alphabetical') {
+                    setSortFeedback('Alphabetical order saved.', 'success');
+                } else if (selectedMode === 'latest') {
+                    setSortFeedback('Latest order saved.', 'success');
+                } else if (savedCustomOrderIds.length > 0) {
+                    setSortFeedback('Custom order mode saved.', 'success');
+                }
+            } catch (error) {
+                setSortFeedback(error.message || 'Failed to save dashboard order.', 'danger');
+            }
+        });
+
+        if (initialMode === 'alphabetical' || initialMode === 'custom') {
+            applyModeToGrid(initialMode);
+        }
+
+        const customButton = document.getElementById('dashboardCustomOrderBtn');
+        const customModalElement = document.getElementById('dashboardCustomOrderModal');
+        const customList = document.getElementById('dashboardCustomOrderList');
+        const customSaveButton = document.getElementById('dashboardCustomOrderSaveBtn');
+        const customFeedback = document.getElementById('dashboardCustomOrderFeedback');
+
+        if (!customButton || !customModalElement || !customList || !customSaveButton || !window.bootstrap) return;
+
+        const customModal = bootstrap.Modal.getOrCreateInstance(customModalElement);
+
+        const setCustomFeedback = (message, variant = 'muted') => {
+            if (!customFeedback) return;
+            customFeedback.textContent = message || '';
+            customFeedback.classList.remove('text-muted', 'text-success', 'text-danger', 'text-warning');
+            if (variant === 'success') customFeedback.classList.add('text-success');
+            else if (variant === 'danger') customFeedback.classList.add('text-danger');
+            else if (variant === 'warning') customFeedback.classList.add('text-warning');
+            else customFeedback.classList.add('text-muted');
+        };
+
+        const buildCustomList = () => {
+            customList.innerHTML = '';
+            const orderedItems = sortByCustom(getServerItems(), savedCustomOrderIds);
+            orderedItems.forEach((item) => {
+                const serverId = getServerId(item);
+                const name = String(item.dataset.serverName || `Server #${serverId}`);
+
+                const row = document.createElement('div');
+                row.className = 'list-group-item dashboard-custom-order-item d-flex align-items-center justify-content-between gap-2';
+                row.draggable = true;
+                row.dataset.serverId = String(serverId);
+
+                const left = document.createElement('div');
+                left.className = 'd-flex align-items-center gap-2';
+
+                const handle = document.createElement('i');
+                handle.className = 'bi bi-grip-vertical dashboard-custom-order-handle';
+                handle.setAttribute('aria-hidden', 'true');
+                left.appendChild(handle);
+
+                const label = document.createElement('span');
+                label.className = 'small';
+                label.textContent = name;
+                left.appendChild(label);
+
+                row.appendChild(left);
+                customList.appendChild(row);
+            });
+        };
+
+        const getDragAfterElement = (container, clientY) => {
+            const draggableElements = Array.from(container.querySelectorAll('.dashboard-custom-order-item:not(.dragging)'));
+            let closest = { offset: Number.NEGATIVE_INFINITY, element: null };
+
+            draggableElements.forEach((child) => {
+                const box = child.getBoundingClientRect();
+                const offset = clientY - box.top - (box.height / 2);
+                if (offset < 0 && offset > closest.offset) {
+                    closest = { offset, element: child };
+                }
+            });
+
+            return closest.element;
+        };
+
+        customList.addEventListener('dragstart', (event) => {
+            const row = event.target && event.target.closest ? event.target.closest('.dashboard-custom-order-item') : null;
+            if (!row) return;
+            row.classList.add('dragging');
+            if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+        });
+
+        customList.addEventListener('dragend', (event) => {
+            const row = event.target && event.target.closest ? event.target.closest('.dashboard-custom-order-item') : null;
+            if (!row) return;
+            row.classList.remove('dragging');
+        });
+
+        customList.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            const draggingRow = customList.querySelector('.dashboard-custom-order-item.dragging');
+            if (!draggingRow) return;
+            const nextRow = getDragAfterElement(customList, event.clientY);
+            if (!nextRow) customList.appendChild(draggingRow);
+            else customList.insertBefore(draggingRow, nextRow);
+        });
+
+        customButton.addEventListener('click', () => {
+            buildCustomList();
+            setCustomFeedback('Save and refresh the page to apply the new custom order.', 'muted');
+            customModal.show();
+        });
+
+        customSaveButton.addEventListener('click', async () => {
+            const orderedIds = normalizeServerIds(
+                Array.from(customList.querySelectorAll('.dashboard-custom-order-item')).map((row) => row.dataset.serverId)
+            );
+            if (orderedIds.length === 0) {
+                setCustomFeedback('No servers available for custom ordering.', 'warning');
+                return;
+            }
+
+            customSaveButton.disabled = true;
+            try {
+                const data = await persistServerOrder('custom', orderedIds);
+                savedCustomOrderIds = normalizeServerIds(data.customIds || orderedIds);
+                sortSelect.value = 'custom';
+                setCustomFeedback('Custom order saved. Refresh page to apply it.', 'success');
+                setSortFeedback('Custom order saved. Refresh page to apply it.', 'warning');
+            } catch (error) {
+                setCustomFeedback(error.message || 'Failed to save custom order.', 'danger');
+            } finally {
+                customSaveButton.disabled = false;
+            }
+        });
     })();
 </script>
 </body>
