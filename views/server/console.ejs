@@ -710,7 +710,9 @@
                     switch (data.type) {
                         case 'console_output':
                             const cleanOutput = this.scrubAnsi(data.output);
-                            term.write(this.rewritePromptBrand(cleanOutput));
+                            const mcStyledOutput = this.translateMinecraftFormatting(cleanOutput);
+                            const styledOutput = this.translateAdventureFormatting(mcStyledOutput);
+                            term.write(this.rewritePromptBrand(styledOutput));
                             break;
                         case 'server_status_update':
                             updateUIStatus(data.status);
@@ -756,6 +758,279 @@
                 scrubAnsi(text) {
                     if (!text) return '';
                     return text.replace(/\\x1b/g, '\x1b');
+                }
+
+                translateMinecraftFormatting(text) {
+                    if (!text || text.indexOf('§') === -1) return text || '';
+
+                    const colorMap = {
+                        '0': '\x1b[0m\x1b[30m',
+                        '1': '\x1b[0m\x1b[34m',
+                        '2': '\x1b[0m\x1b[32m',
+                        '3': '\x1b[0m\x1b[36m',
+                        '4': '\x1b[0m\x1b[31m',
+                        '5': '\x1b[0m\x1b[35m',
+                        '6': '\x1b[0m\x1b[33m',
+                        '7': '\x1b[0m\x1b[37m',
+                        '8': '\x1b[0m\x1b[90m',
+                        '9': '\x1b[0m\x1b[94m',
+                        'a': '\x1b[0m\x1b[92m',
+                        'b': '\x1b[0m\x1b[96m',
+                        'c': '\x1b[0m\x1b[91m',
+                        'd': '\x1b[0m\x1b[95m',
+                        'e': '\x1b[0m\x1b[93m',
+                        'f': '\x1b[0m\x1b[97m'
+                    };
+
+                    const formatMap = {
+                        'l': '\x1b[1m',
+                        'm': '\x1b[9m',
+                        'n': '\x1b[4m',
+                        'o': '\x1b[3m',
+                        'r': '\x1b[0m'
+                    };
+
+                    const isHex = (ch) => /[0-9a-f]/i.test(ch);
+                    const longHexToAnsi = (hex) => {
+                        const r = parseInt(hex.slice(0, 2), 16);
+                        const g = parseInt(hex.slice(2, 4), 16);
+                        const b = parseInt(hex.slice(4, 6), 16);
+                        return `\x1b[0m\x1b[38;2;${r};${g};${b}m`;
+                    };
+
+                    let out = '';
+                    let i = 0;
+                    while (i < text.length) {
+                        const ch = text[i];
+                        if (ch !== '§' || i + 1 >= text.length) {
+                            out += ch;
+                            i += 1;
+                            continue;
+                        }
+
+                        const codeRaw = text[i + 1];
+                        const code = String(codeRaw || '').toLowerCase();
+
+                        // Hex format: §x§R§R§G§G§B§B
+                        if (code === 'x') {
+                            if (i + 13 < text.length) {
+                                let hex = '';
+                                let validLongHex = true;
+                                for (let n = 0; n < 6; n += 1) {
+                                    const markerIdx = i + 2 + (n * 2);
+                                    const digitIdx = markerIdx + 1;
+                                    if (text[markerIdx] !== '§' || !isHex(text[digitIdx])) {
+                                        validLongHex = false;
+                                        break;
+                                    }
+                                    hex += text[digitIdx];
+                                }
+                                if (validLongHex) {
+                                    out += longHexToAnsi(hex);
+                                    i += 14;
+                                    continue;
+                                }
+                            }
+
+                            // Fallback hex format: §xRRGGBB
+                            if (i + 7 < text.length) {
+                                const compactHex = text.slice(i + 2, i + 8);
+                                if (/^[0-9a-f]{6}$/i.test(compactHex)) {
+                                    out += longHexToAnsi(compactHex);
+                                    i += 8;
+                                    continue;
+                                }
+                            }
+
+                            // Unknown §x variant, strip control token.
+                            i += 2;
+                            continue;
+                        }
+
+                        // Alternate hex format: §#RRGGBB
+                        if (code === '#' && i + 7 < text.length) {
+                            const hashHex = text.slice(i + 2, i + 8);
+                            if (/^[0-9a-f]{6}$/i.test(hashHex)) {
+                                out += longHexToAnsi(hashHex);
+                                i += 8;
+                                continue;
+                            }
+                        }
+
+                        if (colorMap[code]) {
+                            out += colorMap[code];
+                            i += 2;
+                            continue;
+                        }
+
+                        if (formatMap[code]) {
+                            out += formatMap[code];
+                            i += 2;
+                            continue;
+                        }
+
+                        // Ignore unsupported formatting code and keep parsing.
+                        i += 2;
+                    }
+
+                    return out;
+                }
+
+                translateAdventureFormatting(text) {
+                    if (!text || text.indexOf('<') === -1) return text || '';
+
+                    const colorTags = {
+                        'black': '\x1b[30m',
+                        'dark_blue': '\x1b[34m',
+                        'dark_green': '\x1b[32m',
+                        'dark_aqua': '\x1b[36m',
+                        'dark_red': '\x1b[31m',
+                        'dark_purple': '\x1b[35m',
+                        'gold': '\x1b[33m',
+                        'gray': '\x1b[37m',
+                        'grey': '\x1b[37m',
+                        'dark_gray': '\x1b[90m',
+                        'dark_grey': '\x1b[90m',
+                        'blue': '\x1b[94m',
+                        'green': '\x1b[92m',
+                        'aqua': '\x1b[96m',
+                        'red': '\x1b[91m',
+                        'light_purple': '\x1b[95m',
+                        'yellow': '\x1b[93m',
+                        'white': '\x1b[97m'
+                    };
+
+                    const styleOn = {
+                        'bold': '\x1b[1m',
+                        'b': '\x1b[1m',
+                        'italic': '\x1b[3m',
+                        'i': '\x1b[3m',
+                        'underlined': '\x1b[4m',
+                        'underline': '\x1b[4m',
+                        'u': '\x1b[4m',
+                        'strikethrough': '\x1b[9m',
+                        'st': '\x1b[9m',
+                        'obfuscated': '\x1b[2m',
+                        'obf': '\x1b[2m'
+                    };
+
+                    const styleOff = {
+                        'bold': '\x1b[22m',
+                        'b': '\x1b[22m',
+                        'italic': '\x1b[23m',
+                        'i': '\x1b[23m',
+                        'underlined': '\x1b[24m',
+                        'underline': '\x1b[24m',
+                        'u': '\x1b[24m',
+                        'strikethrough': '\x1b[29m',
+                        'st': '\x1b[29m',
+                        'obfuscated': '\x1b[22m',
+                        'obf': '\x1b[22m'
+                    };
+
+                    const osc8Link = (url, label) => `\x1b]8;;${url}\x1b\\${label}\x1b]8;;\x1b\\`;
+                    const hexToAnsi = (hex) => {
+                        const r = parseInt(hex.slice(0, 2), 16);
+                        const g = parseInt(hex.slice(2, 4), 16);
+                        const b = parseInt(hex.slice(4, 6), 16);
+                        return `\x1b[38;2;${r};${g};${b}m`;
+                    };
+
+                    // Common MiniMessage case: <link:url>https://... (without explicit </link>)
+                    let input = text.replace(/<link:([^>\s]+)>([^\s<]+)/gi, (match, rawUrl, label) => {
+                        const url = String(rawUrl || '').trim();
+                        if (!url) return label || '';
+                        return osc8Link(url, label || url);
+                    });
+
+                    let out = '';
+                    let i = 0;
+                    while (i < input.length) {
+                        if (input[i] !== '<') {
+                            out += input[i];
+                            i += 1;
+                            continue;
+                        }
+
+                        const end = input.indexOf('>', i + 1);
+                        if (end === -1) {
+                            out += input[i];
+                            i += 1;
+                            continue;
+                        }
+
+                        const rawTag = input.slice(i + 1, end).trim();
+                        if (!rawTag) {
+                            out += input[i];
+                            i += 1;
+                            continue;
+                        }
+
+                        const lowerTag = rawTag.toLowerCase();
+
+                        if (lowerTag === 'reset' || lowerTag === 'r') {
+                            out += '\x1b[0m';
+                            i = end + 1;
+                            continue;
+                        }
+
+                        if (lowerTag.startsWith('/')) {
+                            const closeTag = lowerTag.slice(1).trim();
+                            if (!closeTag) {
+                                i = end + 1;
+                                continue;
+                            }
+
+                            if (closeTag === 'reset' || closeTag === 'r') {
+                                out += '\x1b[0m';
+                                i = end + 1;
+                                continue;
+                            }
+                            if (closeTag === 'link') {
+                                out += '\x1b]8;;\x1b\\';
+                                i = end + 1;
+                                continue;
+                            }
+                            if (styleOff[closeTag]) {
+                                out += styleOff[closeTag];
+                                i = end + 1;
+                                continue;
+                            }
+                            if (colorTags[closeTag] || /^#[0-9a-f]{6}$/i.test(closeTag)) {
+                                out += '\x1b[39m';
+                                i = end + 1;
+                                continue;
+                            }
+                        } else {
+                            if (lowerTag.startsWith('link:')) {
+                                const rawUrl = rawTag.slice(rawTag.indexOf(':') + 1).trim();
+                                if (rawUrl) out += `\x1b]8;;${rawUrl}\x1b\\`;
+                                i = end + 1;
+                                continue;
+                            }
+                            if (/^#[0-9a-f]{6}$/i.test(lowerTag)) {
+                                out += hexToAnsi(lowerTag.slice(1));
+                                i = end + 1;
+                                continue;
+                            }
+                            if (colorTags[lowerTag]) {
+                                out += colorTags[lowerTag];
+                                i = end + 1;
+                                continue;
+                            }
+                            if (styleOn[lowerTag]) {
+                                out += styleOn[lowerTag];
+                                i = end + 1;
+                                continue;
+                            }
+                        }
+
+                        // Unknown tag: keep text untouched.
+                        out += input.slice(i, end + 1);
+                        i = end + 1;
+                    }
+
+                    return out;
                 }
 
                 rewritePromptBrand(text) {
