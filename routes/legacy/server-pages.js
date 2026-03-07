@@ -6885,6 +6885,87 @@ async function resolvePrimaryAllocationForServer(server, options = {}) {
     return Allocation.findOne(query);
 }
 
+async function queueServerRuntimeBindingRefresh(server, settingsMap, actorUserId, options = {}) {
+    if (!server || !Number.isInteger(Number.parseInt(server.id, 10))) {
+        throw new Error('Invalid server.');
+    }
+
+    const image = await Image.findByPk(server.imageId);
+    if (!image) {
+        throw new Error('Server image not found.');
+    }
+
+    const primaryAllocation = await resolvePrimaryAllocationForServer(server);
+    if (!primaryAllocation) {
+        throw new Error('Primary allocation is missing.');
+    }
+
+    const imagePorts = resolveImagePorts(image.ports);
+    const { resolvedVariables, env } = buildServerEnvironment(image, server.variables || {}, {
+        SERVER_MEMORY: String(server.memory || ''),
+        SERVER_IP: '0.0.0.0',
+        SERVER_PORT: String(primaryAllocation.port || '')
+    });
+    const startup = buildStartupCommand(server.startup || image.startup, env);
+    const startupMode = shouldUseCommandStartup(image) ? 'command' : 'environment';
+
+    const assignedAllocations = await Allocation.findAll({
+        where: { serverId: server.id },
+        attributes: ['id', 'ip', 'port'],
+        order: [['port', 'ASC']]
+    });
+
+    const deploymentPorts = buildDeploymentPorts({
+        imagePorts,
+        env,
+        primaryAllocation,
+        allocations: assignedAllocations
+    });
+
+    const mountConfig = typeof getServerMountsForInstall === 'function'
+        ? await getServerMountsForInstall(server.id)
+        : [];
+
+    const startAfterInstall = Boolean(options && options.startAfterInstall === true);
+    const job = await jobQueue.enqueue({
+        type: 'server.install.dispatch',
+        payload: {
+            serverId: server.id,
+            reinstall: false,
+            clearSuspended: false,
+            resolvedVariables,
+            config: {
+                image: server.dockerImage || image.dockerImage,
+                memory: server.memory,
+                cpu: server.cpu,
+                disk: server.disk,
+                swapLimit: server.swapLimit,
+                ioWeight: server.ioWeight,
+                pidsLimit: server.pidsLimit,
+                oomKillDisable: Boolean(server.oomKillDisable),
+                oomScoreAdj: server.oomScoreAdj,
+                env,
+                startup,
+                startupMode,
+                eggConfig: image.eggConfig,
+                eggScripts: image.eggScripts,
+                installation: image.installation || null,
+                skipInstallationScript: true,
+                configFiles: image.configFiles || null,
+                brandName: String((settingsMap && settingsMap.brandName) || 'cpanel'),
+                startAfterInstall,
+                ports: deploymentPorts,
+                mounts: mountConfig
+            }
+        },
+        priority: 10,
+        maxAttempts: 2,
+        createdByUserId: Number.isInteger(Number.parseInt(actorUserId, 10)) ? Number.parseInt(actorUserId, 10) : null
+    });
+
+    return { jobId: job.id };
+}
+
 app.get('/server/:containerId/network', requireAuth, async (req, res) => {
     try {
         const server = await Server.findOne({
@@ -7024,7 +7105,25 @@ app.post('/server/:containerId/network/allocations', requireAuth, async (req, re
 
         await allocation.update({ serverId: server.id });
 
-        return res.redirect(`/server/${server.containerId}/network?success=${encodeURIComponent('Additional allocation assigned. Reinstall/restart may be required for full runtime apply.')}`);
+        let successMessage = 'Additional allocation assigned.';
+        const serverStatus = String(server.status || '').trim().toLowerCase();
+        if (Boolean(server.isSuspended)) {
+            successMessage += ' Server is suspended, runtime refresh was not queued.';
+        } else if (serverStatus === 'running') {
+            successMessage += ' Restart is required to refresh runtime port bindings.';
+        } else {
+            try {
+                const refresh = await queueServerRuntimeBindingRefresh(server, res.locals.settings || {}, req.session && req.session.user ? req.session.user.id : null, {
+                    startAfterInstall: false
+                });
+                successMessage += ` Runtime refresh queued (job #${refresh.jobId}).`;
+            } catch (runtimeError) {
+                console.error('Failed to queue runtime binding refresh after allocation assign:', runtimeError);
+                successMessage += ' Runtime refresh could not be queued.';
+            }
+        }
+
+        return res.redirect(`/server/${server.containerId}/network?success=${encodeURIComponent(successMessage)}`);
     } catch (error) {
         console.error('Error assigning additional allocation:', error);
         return res.redirect(`/server/${req.params.containerId}/network?error=${encodeURIComponent('Failed to assign allocation.')}`);
@@ -7069,7 +7168,25 @@ app.post('/server/:containerId/network/allocations/:allocationId/delete', requir
 
         await allocation.update({ serverId: null });
 
-        return res.redirect(`/server/${server.containerId}/network?success=${encodeURIComponent('Additional allocation removed.')}`);
+        let successMessage = 'Additional allocation removed.';
+        const serverStatus = String(server.status || '').trim().toLowerCase();
+        if (Boolean(server.isSuspended)) {
+            successMessage += ' Server is suspended, runtime refresh was not queued.';
+        } else if (serverStatus === 'running') {
+            successMessage += ' Restart is required to refresh runtime port bindings.';
+        } else {
+            try {
+                const refresh = await queueServerRuntimeBindingRefresh(server, res.locals.settings || {}, req.session && req.session.user ? req.session.user.id : null, {
+                    startAfterInstall: false
+                });
+                successMessage += ` Runtime refresh queued (job #${refresh.jobId}).`;
+            } catch (runtimeError) {
+                console.error('Failed to queue runtime binding refresh after allocation remove:', runtimeError);
+                successMessage += ' Runtime refresh could not be queued.';
+            }
+        }
+
+        return res.redirect(`/server/${server.containerId}/network?success=${encodeURIComponent(successMessage)}`);
     } catch (error) {
         console.error('Error removing additional allocation:', error);
         return res.redirect(`/server/${req.params.containerId}/network?error=${encodeURIComponent('Failed to remove allocation.')}`);
@@ -7113,8 +7230,27 @@ app.post('/server/:containerId/network/allocations/:allocationId/primary', requi
         }
 
         await server.update({ allocationId: allocation.id });
+        server.allocationId = allocation.id;
 
-        return res.redirect(`/server/${server.containerId}/network?success=${encodeURIComponent('Primary allocation updated. Restart/reinstall may be required to refresh runtime port bindings.')}`);
+        let successMessage = 'Primary allocation updated.';
+        const serverStatus = String(server.status || '').trim().toLowerCase();
+        if (Boolean(server.isSuspended)) {
+            successMessage += ' Server is suspended, runtime refresh was not queued.';
+        } else if (serverStatus === 'running') {
+            successMessage += ' Restart is required to refresh runtime port bindings.';
+        } else {
+            try {
+                const refresh = await queueServerRuntimeBindingRefresh(server, res.locals.settings || {}, req.session && req.session.user ? req.session.user.id : null, {
+                    startAfterInstall: false
+                });
+                successMessage += ` Runtime refresh queued (job #${refresh.jobId}).`;
+            } catch (runtimeError) {
+                console.error('Failed to queue runtime binding refresh after primary allocation update:', runtimeError);
+                successMessage += ' Runtime refresh could not be queued.';
+            }
+        }
+
+        return res.redirect(`/server/${server.containerId}/network?success=${encodeURIComponent(successMessage)}`);
     } catch (error) {
         console.error('Error switching primary allocation:', error);
         return res.redirect(`/server/${req.params.containerId}/network?error=${encodeURIComponent('Failed to switch primary allocation.')}`);
