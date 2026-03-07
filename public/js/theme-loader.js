@@ -179,14 +179,14 @@
         },
         'm-bunicii': {
             '--bg-dark': '#1f3d2b',
-            '--bg-sidebar': '#264733',
-            '--border-color': 'rgba(245, 197, 66, 0.44)',
+            '--bg-sidebar': '#1f3d2b',
+            '--border-color': '#f5c542',
             '--text-primary': '#eef6e6',
             '--text-secondary': '#b8ccb7',
             '--accent-blue': '#4CAF50',
             '--cp-panel-surface': 'rgba(31, 61, 43, 0.86)',
-            '--cp-panel-surface-2': 'rgba(27, 52, 37, 0.9)',
-            '--cp-panel-input': 'rgba(22, 43, 30, 0.92)'
+            '--cp-panel-surface-2': 'rgba(31, 61, 43, 0.9)',
+            '--cp-panel-input': '#6b4f2a'
         }
     };
 
