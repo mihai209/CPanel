@@ -80,6 +80,11 @@ const THEME_CATALOG = Object.freeze([
         id: 'retro-synth',
         label: 'Retro Synth',
         cssPath: '/themes/retro-synth/index.css'
+    },
+    {
+        id: 'm-bunicii',
+        label: 'M-Bunicii Nature',
+        cssPath: '/themes/m-bunicii/index.css'
     }
 ]);
 

@@ -176,6 +176,17 @@
             '--cp-panel-surface': 'rgba(26, 15, 47, 0.86)',
             '--cp-panel-surface-2': 'rgba(22, 13, 40, 0.88)',
             '--cp-panel-input': 'rgba(20, 11, 36, 0.9)'
+        },
+        'm-bunicii': {
+            '--bg-dark': '#1f3d2b',
+            '--bg-sidebar': '#264733',
+            '--border-color': 'rgba(245, 197, 66, 0.44)',
+            '--text-primary': '#eef6e6',
+            '--text-secondary': '#b8ccb7',
+            '--accent-blue': '#4CAF50',
+            '--cp-panel-surface': 'rgba(31, 61, 43, 0.86)',
+            '--cp-panel-surface-2': 'rgba(27, 52, 37, 0.9)',
+            '--cp-panel-input': 'rgba(22, 43, 30, 0.92)'
         }
     };
 

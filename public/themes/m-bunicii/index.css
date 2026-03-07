@@ -1,0 +1,138 @@
+:root {
+    --bg-dark: #1f3d2b;
+    --bg-sidebar: #274833;
+    --border-color: rgba(245, 197, 66, 0.45);
+    --text-primary: #eef7ea;
+    --text-secondary: #b8c8b3;
+    --accent-blue: #4CAF50;
+    --cp-panel-surface: rgba(31, 61, 43, 0.88);
+    --cp-panel-surface-2: rgba(27, 52, 37, 0.9);
+    --cp-panel-input: rgba(24, 46, 32, 0.92);
+}
+
+body {
+    background:
+        linear-gradient(rgba(20, 40, 28, 0.7), rgba(13, 24, 17, 0.86)),
+        url('https://images2.alphacoders.com/137/thumb-1920-1370592.jpeg') center/cover no-repeat !important;
+    background-attachment: scroll !important;
+}
+
+/* M-Bunicii logo top area */
+body::before {
+    content: "";
+    position: fixed;
+    top: 12px;
+    right: 14px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2px solid #f5c542;
+    background: #1f3d2b url('/themes/m-bunicii/m-bunicii.png') center/cover no-repeat;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    z-index: 1200;
+    pointer-events: none;
+}
+
+body::after {
+    content: "M-Bunicii";
+    position: fixed;
+    top: 24px;
+    right: 70px;
+    color: #f5c542;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    z-index: 1200;
+    pointer-events: none;
+}
+
+.card,
+.modal-content,
+.bg-dark,
+.details-panel,
+.stat-card,
+.terminal-container {
+    background: rgba(31, 61, 43, 0.88) !important;
+    border-color: rgba(245, 197, 66, 0.4) !important;
+}
+
+.navbar,
+.top-navbar,
+#sidebar,
+.sidebar,
+.terminal-header,
+header.top {
+    background: rgba(27, 52, 37, 0.94) !important;
+    border-color: rgba(245, 197, 66, 0.35) !important;
+}
+
+.form-control,
+.form-select,
+textarea {
+    background: rgba(22, 42, 30, 0.92) !important;
+    border-color: rgba(245, 197, 66, 0.45) !important;
+    color: #eef7ea !important;
+}
+
+.form-control:focus,
+.form-select:focus,
+textarea:focus {
+    border-color: #f5c542 !important;
+    box-shadow: 0 0 0 0.2rem rgba(245, 197, 66, 0.22) !important;
+}
+
+.btn-primary,
+.btn-success {
+    background: #4CAF50 !important;
+    border-color: #4CAF50 !important;
+    color: #f1fff0 !important;
+}
+
+.btn-primary:hover,
+.btn-success:hover {
+    background: #439a46 !important;
+    border-color: #439a46 !important;
+}
+
+.btn-outline-primary,
+.btn-outline-success {
+    color: #4CAF50 !important;
+    border-color: #4CAF50 !important;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-success:hover {
+    background: #4CAF50 !important;
+    color: #f1fff0 !important;
+}
+
+a,
+.text-primary,
+.link-primary {
+    color: #f5c542 !important;
+}
+
+.table,
+.table-dark,
+.table-dark > :not(caption) > * > * {
+    border-color: rgba(245, 197, 66, 0.25) !important;
+}
+
+.sidebar-item.active,
+.nav-link.active {
+    color: #f5c542 !important;
+    background: rgba(245, 197, 66, 0.12) !important;
+}
+
+@media (max-width: 768px) {
+    body::before {
+        width: 36px;
+        height: 36px;
+        top: 10px;
+        right: 10px;
+    }
+
+    body::after {
+        display: none;
+    }
+}
