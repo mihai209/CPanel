@@ -734,19 +734,20 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
             const selectedMode = String(sortSelect.value || 'latest').toLowerCase();
             applyModeToGrid(selectedMode);
 
-            if (selectedMode === 'custom' && savedCustomOrderIds.length === 0) {
-                setSortFeedback('No custom order saved yet. Use the pencil button on desktop.', 'warning');
-            }
-
             try {
                 const data = await persistServerOrder(selectedMode);
                 savedCustomOrderIds = normalizeServerIds(data.customIds || savedCustomOrderIds);
+                if (selectedMode === 'custom') {
+                    applyModeToGrid('custom');
+                }
                 if (selectedMode === 'alphabetical') {
                     setSortFeedback('Alphabetical order saved.', 'success');
                 } else if (selectedMode === 'latest') {
                     setSortFeedback('Latest order saved.', 'success');
                 } else if (savedCustomOrderIds.length > 0) {
                     setSortFeedback('Custom order mode saved.', 'success');
+                } else {
+                    setSortFeedback('No custom order saved yet. Use the pencil button on desktop.', 'warning');
                 }
             } catch (error) {
                 setSortFeedback(error.message || 'Failed to save dashboard order.', 'danger');
@@ -755,6 +756,17 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
 
         if (initialMode === 'alphabetical' || initialMode === 'custom') {
             applyModeToGrid(initialMode);
+        }
+
+        if (initialMode === 'custom' && savedCustomOrderIds.length === 0) {
+            persistServerOrder('custom')
+                .then((data) => {
+                    savedCustomOrderIds = normalizeServerIds(data.customIds || []);
+                    if (savedCustomOrderIds.length > 0) {
+                        applyModeToGrid('custom');
+                    }
+                })
+                .catch(() => {});
         }
 
         const customButton = document.getElementById('dashboardCustomOrderBtn');
