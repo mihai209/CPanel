@@ -2022,11 +2022,11 @@ function buildMinecraftPlayerHeadUrl(playerName, playerUuid) {
     const uuidRaw = String(playerUuid || '').trim();
     const uuidCompact = uuidRaw.replace(/-/g, '');
     if (/^[a-f0-9]{32}$/i.test(uuidCompact)) {
-        return `https://crafatar.com/avatars/${uuidCompact}?size=40&overlay`;
+        return `https://mc-heads.net/avatar/${uuidCompact}/40`;
     }
     const safeName = String(playerName || '').trim();
     if (!safeName) {
-        return 'https://mc-heads.net/avatar/Steve/40';
+        return 'https://minotar.net/avatar/Steve/40';
     }
     return `https://mc-heads.net/avatar/${encodeURIComponent(safeName)}/40`;
 }

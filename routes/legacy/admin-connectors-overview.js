@@ -349,6 +349,9 @@ app.get('/admin/connectors/:id/allocations', requireAuth, requireAdmin, async (r
             where: { connectorId: req.params.id },
             order: [['port', 'ASC'], ['id', 'ASC']]
         });
+        const allocationIds = allocations
+            .map((allocation) => Number.parseInt(allocation && allocation.id, 10))
+            .filter((allocationId) => Number.isInteger(allocationId) && allocationId > 0);
         const assignedServerIds = Array.from(new Set(
             allocations
                 .map((allocation) => Number.parseInt(allocation && allocation.serverId, 10))
@@ -361,12 +364,35 @@ app.get('/admin/connectors/:id/allocations', requireAuth, requireAdmin, async (r
                 raw: true
             })
             : [];
+        const primaryServersByAllocation = allocationIds.length
+            ? await Server.findAll({
+                where: { allocationId: allocationIds },
+                attributes: ['id', 'name', 'containerId', 'allocationId'],
+                raw: true
+            })
+            : [];
         const assignedServerById = new Map(
             assignedServers.map((entry) => [Number.parseInt(entry.id, 10), entry])
         );
+        const primaryServerByAllocationId = new Map(
+            primaryServersByAllocation
+                .map((entry) => {
+                    const allocationId = Number.parseInt(entry && entry.allocationId, 10);
+                    if (!Number.isInteger(allocationId) || allocationId <= 0) return null;
+                    return [allocationId, entry];
+                })
+                .filter(Boolean)
+        );
         allocations.forEach((allocation) => {
+            const allocationId = Number.parseInt(allocation && allocation.id, 10);
             const serverId = Number.parseInt(allocation && allocation.serverId, 10);
-            const assignedServer = Number.isInteger(serverId) ? (assignedServerById.get(serverId) || null) : null;
+            const assignedServerByPrimary = Number.isInteger(allocationId)
+                ? (primaryServerByAllocationId.get(allocationId) || null)
+                : null;
+            const assignedServerByLink = Number.isInteger(serverId)
+                ? (assignedServerById.get(serverId) || null)
+                : null;
+            const assignedServer = assignedServerByPrimary || assignedServerByLink || null;
             allocation.setDataValue('assignedServer', assignedServer);
         });
         const statusData = (global.connectorStatus && global.connectorStatus[req.params.id]) || { status: 'offline', lastSeen: null, usage: null };

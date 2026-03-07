@@ -328,7 +328,7 @@
                                         <tr>
                                             <td>
                                                 <div class="d-flex align-items-center gap-2">
-                                                    <img class="head-avatar" src="<%= player.headUrl %>" alt="Head" onerror="this.src='https://mc-heads.net/avatar/Steve/40'">
+                                                    <img class="head-avatar" src="<%= player.headUrl %>" alt="Head" onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='https://minotar.net/avatar/Steve/40';}else{this.onerror=null;}">
                                                     <div class="fw-semibold"><%= player.name %></div>
                                                 </div>
                                             </td>
