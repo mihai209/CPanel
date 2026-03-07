@@ -108,11 +108,59 @@ function registerDefaultJobHandlers(jobQueue, deps) {
             }
         }
 
+        const startedAt = Date.now();
+        let lastProgressWriteAt = 0;
+        let lastProgressPercent = -1;
+        const persistProgress = async (stage, percent, extras = {}) => {
+            const normalizedPercent = Math.max(0, Math.min(100, Number(percent || 0)));
+            const now = Date.now();
+            const percentDelta = Math.abs(normalizedPercent - lastProgressPercent);
+            if (normalizedPercent < 100 && (now - lastProgressWriteAt) < 1200 && percentDelta < 0.7) {
+                return;
+            }
+            lastProgressWriteAt = now;
+            lastProgressPercent = normalizedPercent;
+
+            const progress = {
+                stage: String(stage || 'working'),
+                percent: Number(normalizedPercent.toFixed(1)),
+                etaSeconds: Number.isFinite(Number(extras.etaSeconds)) ? Math.max(0, Math.round(Number(extras.etaSeconds))) : null,
+                uploadedBytes: Number.isFinite(Number(extras.uploadedBytes)) ? Math.max(0, Number(extras.uploadedBytes)) : null,
+                totalBytes: Number.isFinite(Number(extras.totalBytes)) ? Math.max(0, Number(extras.totalBytes)) : null,
+                message: extras.message ? String(extras.message).slice(0, 240) : null,
+                elapsedSeconds: Math.max(0, Math.round((now - startedAt) / 1000)),
+                updatedAt: new Date(now).toISOString()
+            };
+            await job.update({
+                result: {
+                    provider: 'google_drive',
+                    trigger,
+                    progress
+                }
+            }).catch(() => {});
+        };
+
+        await persistProgress('queued', 1, { message: 'Backup job started.' });
+
         try {
             const result = await performGoogleDriveBackup({
                 server,
                 connector,
-                Settings
+                Settings,
+                onProgress: (progressPayload) => {
+                    persistProgress(
+                        progressPayload && progressPayload.stage ? progressPayload.stage : 'working',
+                        progressPayload && Number.isFinite(Number(progressPayload.percent)) ? Number(progressPayload.percent) : 50,
+                        progressPayload || {}
+                    );
+                }
+            });
+
+            await persistProgress('completed', 100, {
+                etaSeconds: 0,
+                uploadedBytes: result.sizeBytes || 0,
+                totalBytes: result.sourceSizeBytes || null,
+                message: 'Backup upload completed.'
             });
 
             await ServerBackup.create({
@@ -128,6 +176,7 @@ function registerDefaultJobHandlers(jobQueue, deps) {
                     fileId: result.fileId || null,
                     fileName: result.fileName || null,
                     sourceDir: result.sourceDir || null,
+                    sourceSizeBytes: result.sourceSizeBytes || 0,
                     deletedOldCount: Number.isFinite(Number(result.deletedOldCount)) ? Number(result.deletedOldCount) : 0,
                     webViewLink: result.webViewLink || null,
                     webContentLink: result.webContentLink || null
@@ -143,6 +192,11 @@ function registerDefaultJobHandlers(jobQueue, deps) {
                 serverId,
                 provider: 'google_drive',
                 trigger,
+                progress: {
+                    stage: 'completed',
+                    percent: 100,
+                    etaSeconds: 0
+                },
                 backup: {
                     fileId: result.fileId || null,
                     fileName: result.fileName || null,
@@ -152,6 +206,10 @@ function registerDefaultJobHandlers(jobQueue, deps) {
                 }
             };
         } catch (error) {
+            await persistProgress('failed', Math.min(99, Math.max(lastProgressPercent, 5)), {
+                message: error && error.message ? String(error.message) : 'Backup failed.'
+            });
+
             await ServerBackup.create({
                 serverId,
                 status: 'failed',

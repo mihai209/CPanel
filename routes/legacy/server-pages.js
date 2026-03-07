@@ -825,6 +825,7 @@ const SERVER_PERMISSIONS = Object.freeze([
     'minecraft.deop',
     'server.backups.view',
     'server.backups.manage',
+    'server.gdrive',
     'server.databases.view',
     'server.databases.manage',
     'server.schedules.view',
@@ -7306,7 +7307,9 @@ app.get('/server/:containerId/backups', requireAuth, async (req, res) => {
             return res.redirect('/server/no-permissions');
         }
 
-        const canManageBackups = hasServerPermission(access, 'server.backups.manage');
+        const canManageBackupPolicy = hasServerPermission(access, 'server.backups.manage');
+        const canUseGdrive = hasServerPermission(access, 'server.gdrive');
+        const canManageBackups = canManageBackupPolicy && canUseGdrive;
         const isOwnerSessionUser = Number.parseInt(req.session.user.id, 10) === Number.parseInt(server.ownerId, 10);
         const canConnectGoogleDrive = canManageBackups && isOwnerSessionUser;
         const policy = server.backupPolicy || null;
@@ -7364,7 +7367,7 @@ app.get('/server/:containerId/backups', requireAuth, async (req, res) => {
                 type: { [Op.in]: ['server.backup.create', 'server.backup.google_drive'] },
                 status: { [Op.in]: ['queued', 'running', 'retrying'] }
             },
-            attributes: ['id', 'type', 'status', 'payload', 'createdAt']
+            attributes: ['id', 'type', 'status', 'payload', 'result', 'createdAt', 'updatedAt']
         });
         const activeJob = pendingBackupJobs.find((job) => {
             const payload = job && job.payload && typeof job.payload === 'object' ? job.payload : {};
@@ -7397,6 +7400,8 @@ app.get('/server/:containerId/backups', requireAuth, async (req, res) => {
             path: '/servers',
             active: 'backups',
             canManageBackups,
+            canManageBackupPolicy,
+            canUseGdrive,
             canConnectGoogleDrive,
             autoEnabled,
             intervalMinutes,
@@ -7407,7 +7412,9 @@ app.get('/server/:containerId/backups', requireAuth, async (req, res) => {
                 id: activeJob.id,
                 status: activeJob.status,
                 type: activeJob.type,
-                createdAt: activeJob.createdAt
+                createdAt: activeJob.createdAt,
+                updatedAt: activeJob.updatedAt,
+                progress: activeJob.result && typeof activeJob.result === 'object' ? activeJob.result.progress || null : null
             } : null,
             success: req.query.success || null,
             error: req.query.error || null
@@ -7425,6 +7432,9 @@ app.post('/server/:containerId/backups/policy', requireAuth, async (req, res) =>
         const access = await resolveServerAccess(server, req.session.user);
         if (!hasServerPermission(access, 'server.backups.manage')) {
             return res.redirect('/server/no-permissions');
+        }
+        if (!hasServerPermission(access, 'server.gdrive')) {
+            return res.redirect(`/server/${server.containerId}/backups?error=${encodeURIComponent('Missing permission: server.gdrive')}`);
         }
 
         const enabled = String(req.body.enabled || '').trim().toLowerCase();
@@ -7467,6 +7477,9 @@ app.post('/server/:containerId/backups/run', requireAuth, async (req, res) => {
         const access = await resolveServerAccess(server, req.session.user);
         if (!hasServerPermission(access, 'server.backups.manage')) {
             return res.redirect('/server/no-permissions');
+        }
+        if (!hasServerPermission(access, 'server.gdrive')) {
+            return res.redirect(`/server/${server.containerId}/backups?error=${encodeURIComponent('Missing permission: server.gdrive')}`);
         }
         if (server.isSuspended) {
             return res.redirect(`/server/${server.containerId}/backups?error=${encodeURIComponent('Server is suspended.')}`);
@@ -7526,6 +7539,56 @@ app.post('/server/:containerId/backups/run', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error queuing backup:', error);
         return res.redirect(`/server/${req.params.containerId}/backups?error=${encodeURIComponent('Failed to queue backup.')}`);
+    }
+});
+
+app.get('/server/:containerId/backups/progress', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+        if (!server) {
+            return res.status(404).json({ success: false, error: 'Server not found.' });
+        }
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.backups.view')) {
+            return res.status(403).json({ success: false, error: 'No permission.' });
+        }
+
+        const jobs = await Job.findAll({
+            where: {
+                type: { [Op.in]: ['server.backup.create', 'server.backup.google_drive'] },
+                status: { [Op.in]: ['queued', 'running', 'retrying'] }
+            },
+            attributes: ['id', 'type', 'status', 'payload', 'result', 'createdAt', 'updatedAt'],
+            order: [['createdAt', 'DESC']]
+        });
+        const activeJob = jobs.find((job) => {
+            const payload = job && job.payload && typeof job.payload === 'object' ? job.payload : {};
+            return Number.parseInt(payload.serverId, 10) === Number.parseInt(server.id, 10);
+        }) || null;
+
+        if (!activeJob) {
+            return res.json({ success: true, active: false });
+        }
+
+        const progress = activeJob.result && typeof activeJob.result === 'object'
+            ? (activeJob.result.progress || null)
+            : null;
+
+        return res.json({
+            success: true,
+            active: true,
+            job: {
+                id: activeJob.id,
+                type: activeJob.type,
+                status: activeJob.status,
+                createdAt: activeJob.createdAt,
+                updatedAt: activeJob.updatedAt,
+                progress
+            }
+        });
+    } catch (error) {
+        console.error('Error loading backup progress:', error);
+        return res.status(500).json({ success: false, error: 'Failed to load backup progress.' });
     }
 });
 

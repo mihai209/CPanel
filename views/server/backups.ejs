@@ -35,6 +35,9 @@
     const selectedInterval = Number.parseInt(intervalMinutes, 10) || 360;
     const intervalOptions = [15, 30, 60, 120, 180, 360, 720, 1440, 2880, 10080];
     const hasActiveJob = Boolean(activeJob);
+    const initialProgress = activeJob && activeJob.progress && typeof activeJob.progress === 'object'
+        ? activeJob.progress
+        : null;
 
     function fmtDate(raw) {
         if (!raw) return '-';
@@ -100,8 +103,10 @@
 
             <div class="cardx p-3 mb-3">
                 <h2 class="h6 mb-3">Backup Controls</h2>
-                <% if (!canManageBackups) { %>
+                <% if (!canManageBackupPolicy) { %>
                     <div class="alert alert-warning mb-0">You do not have permission to manage backups.</div>
+                <% } else if (!canUseGdrive) { %>
+                    <div class="alert alert-warning mb-0">Missing permission: <code>server.gdrive</code>.</div>
                 <% } else { %>
                     <div class="d-flex flex-wrap gap-2 mb-3">
                         <form method="POST" action="/server/<%= server.containerId %>/backups/run" class="mb-0" id="manualBackupForm">
@@ -142,6 +147,21 @@
                         </div>
                     </form>
                 <% } %>
+            </div>
+
+            <div class="cardx p-3 mb-3" id="backupProgressCard" <%= hasActiveJob ? '' : 'style="display:none;"' %>>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <h2 class="h6 mb-0">Backup Progress</h2>
+                    <span class="small text-muted" id="backupProgressPercent"><%= initialProgress && Number.isFinite(Number(initialProgress.percent)) ? Number(initialProgress.percent).toFixed(1) : '0.0' %>%</span>
+                </div>
+                <div class="progress mb-2" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar bg-success" id="backupProgressBar" style="width: <%= initialProgress && Number.isFinite(Number(initialProgress.percent)) ? Math.max(0, Math.min(100, Number(initialProgress.percent))) : 0 %>%"></div>
+                </div>
+                <div class="small text-secondary d-flex flex-wrap gap-3">
+                    <span>Stage: <span id="backupProgressStage" class="text-mono"><%= initialProgress && initialProgress.stage ? initialProgress.stage : (hasActiveJob ? 'queued' : '-') %></span></span>
+                    <span>ETA: <span id="backupProgressEta" class="text-mono">-</span></span>
+                    <span>Transferred: <span id="backupProgressBytes" class="text-mono">-</span></span>
+                </div>
             </div>
 
             <div class="cardx p-3">
@@ -221,6 +241,8 @@
 
     const googleDriveReady = <%= drive.ready ? 'true' : 'false' %>;
     const canConnectGoogleDrive = <%= canConnectGoogleDrive ? 'true' : 'false' %>;
+    const progressEndpoint = '/server/<%= server.containerId %>/backups/progress';
+    const initialActiveJob = <%- JSON.stringify(activeJob || null) %>;
 
     const modalEl = document.getElementById('gdriveLinkModal');
     const modalBodyEl = document.getElementById('gdriveLinkModalBody');
@@ -228,6 +250,59 @@
     const manualBackupForm = document.getElementById('manualBackupForm');
     const backupPolicyForm = document.getElementById('backupPolicyForm');
     const backupEnabledInput = document.getElementById('backupEnabled');
+    const progressCard = document.getElementById('backupProgressCard');
+    const progressBar = document.getElementById('backupProgressBar');
+    const progressPercent = document.getElementById('backupProgressPercent');
+    const progressStage = document.getElementById('backupProgressStage');
+    const progressEta = document.getElementById('backupProgressEta');
+    const progressBytes = document.getElementById('backupProgressBytes');
+
+    function formatEta(seconds) {
+        const value = Number(seconds);
+        if (!Number.isFinite(value) || value < 0) return '-';
+        if (value < 60) return `${Math.round(value)}s`;
+        const minutes = Math.floor(value / 60);
+        const sec = Math.round(value % 60);
+        if (minutes < 60) return `${minutes}m ${sec}s`;
+        const hours = Math.floor(minutes / 60);
+        const remMin = minutes % 60;
+        return `${hours}h ${remMin}m`;
+    }
+
+    function formatBytes(value) {
+        const bytes = Number(value);
+        if (!Number.isFinite(bytes) || bytes <= 0) return '-';
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let current = bytes;
+        let idx = 0;
+        while (current >= 1024 && idx < units.length - 1) {
+            current /= 1024;
+            idx += 1;
+        }
+        return `${current.toFixed(current >= 10 || idx === 0 ? 0 : 1)} ${units[idx]}`;
+    }
+
+    function renderProgress(progress) {
+        if (!progressCard || !progressBar || !progressPercent || !progressStage || !progressEta || !progressBytes) return;
+        if (!progress || typeof progress !== 'object') {
+            progressCard.style.display = 'none';
+            return;
+        }
+        progressCard.style.display = '';
+        const percent = Math.max(0, Math.min(100, Number(progress.percent || 0)));
+        progressBar.style.width = `${percent}%`;
+        progressBar.setAttribute('aria-valuenow', String(percent.toFixed(1)));
+        progressPercent.textContent = `${percent.toFixed(1)}%`;
+        progressStage.textContent = String(progress.stage || 'working');
+        progressEta.textContent = formatEta(progress.etaSeconds);
+        if (Number.isFinite(Number(progress.uploadedBytes)) && Number.isFinite(Number(progress.totalBytes)) && Number(progress.totalBytes) > 0) {
+            progressBytes.textContent = `${formatBytes(progress.uploadedBytes)} / ${formatBytes(progress.totalBytes)}`;
+        } else if (Number.isFinite(Number(progress.uploadedBytes)) && Number(progress.uploadedBytes) > 0) {
+            progressBytes.textContent = formatBytes(progress.uploadedBytes);
+        } else {
+            progressBytes.textContent = '-';
+        }
+    }
 
     function showGoogleModal(message) {
         if (!modalEl) return;
@@ -263,6 +338,44 @@
             : 'Auto-backup needs a linked Google Drive account from the server owner.';
         showGoogleModal(message);
     });
+
+    let hadActiveBackupJob = Boolean(initialActiveJob && initialActiveJob.id);
+    if (initialActiveJob && initialActiveJob.progress) {
+        renderProgress(initialActiveJob.progress);
+    }
+
+    async function pollBackupProgress() {
+        try {
+            const response = await fetch(progressEndpoint, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            if (!data || data.success !== true) return;
+
+            if (data.active && data.job) {
+                hadActiveBackupJob = true;
+                const progress = data.job.progress && typeof data.job.progress === 'object'
+                    ? data.job.progress
+                    : { stage: data.job.status || 'running', percent: 0 };
+                renderProgress(progress);
+                return;
+            }
+
+            if (hadActiveBackupJob) {
+                window.location.reload();
+                return;
+            }
+            renderProgress(null);
+        } catch {
+            // ignore polling errors
+        }
+    }
+
+    pollBackupProgress();
+    setInterval(pollBackupProgress, 2500);
 </script>
 </body>
 </html>

@@ -177,6 +177,36 @@ function sanitizeNameForArchive(raw) {
     return normalized || 'server-backup';
 }
 
+function emitProgress(onProgress, payload) {
+    if (typeof onProgress !== 'function') return;
+    try {
+        onProgress(payload || {});
+    } catch {
+        // ignore progress callback errors
+    }
+}
+
+async function getDirectorySizeBytes(sourceDir) {
+    return new Promise((resolve) => {
+        const child = spawn('du', ['-sb', sourceDir], {
+            stdio: ['ignore', 'pipe', 'ignore']
+        });
+
+        let stdout = '';
+        child.stdout.on('data', (chunk) => {
+            stdout += String(chunk || '');
+        });
+        child.on('error', () => resolve(0));
+        child.on('close', (code) => {
+            if (code !== 0) return resolve(0);
+            const firstToken = String(stdout || '').trim().split(/\s+/)[0];
+            const parsed = Number.parseInt(firstToken, 10);
+            if (!Number.isInteger(parsed) || parsed < 0) return resolve(0);
+            resolve(parsed);
+        });
+    });
+}
+
 function driveAuthHeaders(accessToken) {
     return {
         Authorization: `Bearer ${String(accessToken || '').trim()}`
@@ -292,7 +322,7 @@ async function cleanupFolderFiles({ accessToken, folderId, namePrefix = 'cpanel-
     return filtered.length;
 }
 
-async function uploadTarStreamToDriveMultipart({ accessToken, sourceDir, fileName, parentFolderId }) {
+async function uploadTarStreamToDriveMultipart({ accessToken, sourceDir, fileName, parentFolderId, estimatedSourceBytes = 0, onProgress = null }) {
     const boundary = `cpanel_backup_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
     const metadata = {
         name: String(fileName || 'cpanel-backup.tar.gz'),
@@ -315,6 +345,37 @@ async function uploadTarStreamToDriveMultipart({ accessToken, sourceDir, fileNam
     const child = spawn('tar', ['-czf', '-', '-C', sourceDir, '.'], {
         stdio: ['ignore', 'pipe', 'pipe']
     });
+    const uploadStartedAt = Date.now();
+    let uploadedBytes = 0;
+    let estimatedTotalBytes = Math.max(Math.floor(Number(estimatedSourceBytes || 0) * 0.65), 64 * 1024 * 1024);
+    let lastEmitMs = 0;
+    let lastEmittedPercent = 0;
+
+    const maybeEmitUploadProgress = (force = false) => {
+        const now = Date.now();
+        if (uploadedBytes >= estimatedTotalBytes * 0.98) {
+            estimatedTotalBytes = Math.max(Math.floor(uploadedBytes * 1.2), uploadedBytes + 8 * 1024 * 1024);
+        }
+        const ratio = Math.min(0.995, uploadedBytes / Math.max(1, estimatedTotalBytes));
+        const percent = 35 + (ratio * 60); // 35..95%
+        const elapsedSec = Math.max(1, (now - uploadStartedAt) / 1000);
+        const speedBytesPerSec = uploadedBytes / elapsedSec;
+        const remainingBytes = Math.max(0, estimatedTotalBytes - uploadedBytes);
+        const etaSeconds = speedBytesPerSec > 0 ? Math.round(remainingBytes / speedBytesPerSec) : null;
+
+        if (!force && (now - lastEmitMs) < 1500 && Math.abs(percent - lastEmittedPercent) < 0.8) {
+            return;
+        }
+        lastEmitMs = now;
+        lastEmittedPercent = percent;
+        emitProgress(onProgress, {
+            stage: 'uploading',
+            percent,
+            etaSeconds,
+            uploadedBytes,
+            totalBytes: estimatedTotalBytes
+        });
+    };
 
     let stderr = '';
     child.stderr.on('data', (chunk) => {
@@ -339,13 +400,16 @@ async function uploadTarStreamToDriveMultipart({ accessToken, sourceDir, fileNam
 
     bodyStream.write(Buffer.from(preamble, 'utf8'));
     child.stdout.on('data', (chunk) => {
+        uploadedBytes += chunk.length;
         hash.update(chunk);
+        maybeEmitUploadProgress(false);
     });
     child.stdout.on('error', (error) => {
         bodyStream.destroy(error);
     });
     child.stdout.pipe(bodyStream, { end: false });
     child.stdout.on('end', () => {
+        maybeEmitUploadProgress(true);
         bodyStream.end(Buffer.from(epilogue, 'utf8'));
     });
 
@@ -385,14 +449,16 @@ async function uploadTarStreamToDriveMultipart({ accessToken, sourceDir, fileNam
 
     return {
         uploadData: uploadResponse.data,
-        checksum: hash.digest('hex')
+        checksum: hash.digest('hex'),
+        uploadedBytes
     };
 }
 
 async function performGoogleDriveBackup({
     server,
     connector,
-    Settings
+    Settings,
+    onProgress = null
 }) {
     if (!server || !connector) {
         throw new Error('Cannot run backup: missing server or connector details.');
@@ -423,6 +489,12 @@ async function performGoogleDriveBackup({
 
     const baseDirectoryRaw = String(connector.fileDirectory || '/var/lib/cpanel/volumes').trim() || '/var/lib/cpanel/volumes';
     const sourceDir = path.resolve(baseDirectoryRaw, String(server.id));
+    emitProgress(onProgress, {
+        stage: 'scanning',
+        percent: 10,
+        etaSeconds: null,
+        message: 'Scanning server files...'
+    });
     let sourceStat;
     try {
         sourceStat = await fsp.stat(sourceDir);
@@ -432,12 +504,32 @@ async function performGoogleDriveBackup({
     if (!sourceStat.isDirectory()) {
         throw new Error(`Server files path is not a directory: ${sourceDir}`);
     }
+    const sourceSizeBytes = await getDirectorySizeBytes(sourceDir);
+    emitProgress(onProgress, {
+        stage: 'preparing',
+        percent: 18,
+        etaSeconds: null,
+        totalBytes: sourceSizeBytes || 0,
+        message: 'Preparing Google Drive backup...'
+    });
 
+    emitProgress(onProgress, {
+        stage: 'drive_folder',
+        percent: 24,
+        etaSeconds: null,
+        message: 'Preparing Drive folder...'
+    });
     const folderId = await ensureDriveFolder({
         accessToken: tokenState.accessToken,
         folderName: String(server.name || `server-${server.id}`)
     });
 
+    emitProgress(onProgress, {
+        stage: 'cleanup',
+        percent: 30,
+        etaSeconds: null,
+        message: 'Removing old Drive backup...'
+    });
     const deletedOldCount = await cleanupFolderFiles({
         accessToken: tokenState.accessToken,
         folderId,
@@ -449,12 +541,23 @@ async function performGoogleDriveBackup({
         accessToken: tokenState.accessToken,
         sourceDir,
         fileName: archiveName,
-        parentFolderId: folderId
+        parentFolderId: folderId,
+        estimatedSourceBytes: sourceSizeBytes,
+        onProgress
     });
     const uploadData = uploadResult.uploadData || {};
+    emitProgress(onProgress, {
+        stage: 'finalizing',
+        percent: 98,
+        etaSeconds: 0,
+        uploadedBytes: uploadResult.uploadedBytes || 0,
+        totalBytes: sourceSizeBytes || 0,
+        message: 'Finalizing backup metadata...'
+    });
 
     return {
         sourceDir,
+        sourceSizeBytes,
         folderId,
         deletedOldCount,
         fileId: String(uploadData.id),
