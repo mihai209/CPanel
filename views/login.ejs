@@ -120,6 +120,28 @@
                 color: #ffffff;
             }
 
+            .auth-providers-toggle {
+                border: 1px solid #3f3f46;
+                color: #e5e7eb;
+                background: #1a1b1f;
+                font-weight: 700;
+                letter-spacing: 0.03em;
+                text-transform: uppercase;
+                font-size: 0.76rem;
+                padding: 0.72rem 0.9rem;
+            }
+
+            .auth-providers-toggle:hover,
+            .auth-providers-toggle:focus {
+                border-color: #52525b;
+                color: #ffffff;
+                background: #202229;
+            }
+
+            .auth-providers-list {
+                margin-top: 0.9rem;
+            }
+
             /* Modal Styles */
             .modal-content {
                 background-color: #1f2023;
@@ -294,11 +316,12 @@
                                             </form>
                                             <% } %>
 
-                                                <% const hasOAuth=settings.authDiscordEnabled==='true' ||
-                                                    settings.authGoogleEnabled==='true' ||
-                                                    settings.authRedditEnabled==='true' ||
-                                                    settings.authGithubEnabled==='true' ; if (hasOAuth) { %>
-                                                    <% if (settings.authStandardEnabled !=='false' ) { %>
+                                        <% const standardAuthEnabled=settings.authStandardEnabled !=='false' ;
+                                            const hasOAuth=settings.authDiscordEnabled==='true' ||
+                                            settings.authGoogleEnabled==='true' ||
+                                            settings.authRedditEnabled==='true' ||
+                                            settings.authGithubEnabled==='true' ; if (hasOAuth) { %>
+                                                    <% if (standardAuthEnabled) { %>
                                                         <div class="d-flex align-items-center my-4">
                                                             <hr class="flex-grow-1 border-secondary border-opacity-25"
                                                                 style="margin: 0;">
@@ -307,14 +330,20 @@
                                                             <hr class="flex-grow-1 border-secondary border-opacity-25"
                                                                 style="margin: 0;">
                                                         </div>
+                                                        <button class="btn auth-providers-toggle w-100 d-flex align-items-center justify-content-center gap-2"
+                                                            type="button" data-bs-toggle="collapse" data-bs-target="#authProvidersCollapse"
+                                                            aria-expanded="false" aria-controls="authProvidersCollapse">
+                                                            <i class="bi bi-shield-lock"></i>
+                                                            Auth Providers
+                                                        </button>
                                                         <% } else { %>
                                                             <div class="mb-4 text-center mt-3">
                                                                 <span class="text-muted small text-uppercase fw-bold"
                                                                     style="letter-spacing: 0.05em;">LOGIN WITH</span>
                                                             </div>
                                                             <% } %>
-
-                                                                <div class="d-flex flex-column gap-3">
+                                                                <div class="<%= standardAuthEnabled ? 'collapse' : '' %>" id="<%= standardAuthEnabled ? 'authProvidersCollapse' : '' %>">
+                                                                <div class="d-flex flex-column gap-3 auth-providers-list">
                                                                     <% if (settings.authDiscordEnabled==='true' ) { %>
                                                                         <a href="/auth/discord"
                                                                             class="btn w-100 d-flex align-items-center justify-content-center gap-2"
@@ -362,6 +391,7 @@
                                                                                                     GitHub
                                                                                                 </a>
                                                                                                 <% } %>
+                                                                </div>
                                                                 </div>
                                                                 <% } %>
 
