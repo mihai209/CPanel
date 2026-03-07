@@ -448,14 +448,14 @@ function parseDashboardUserPermissions(rawPermissions) {
     if (typeof rawPermissions === 'string') {
         try {
             const parsed = JSON.parse(rawPermissions);
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return { ...parsed };
         } catch (_error) {
             return {};
         }
         return {};
     }
     if (rawPermissions && typeof rawPermissions === 'object' && !Array.isArray(rawPermissions)) {
-        return rawPermissions;
+        return { ...rawPermissions };
     }
     return {};
 }
@@ -664,7 +664,8 @@ app.post('/dashboard/server-order', requireAuth, async (req, res) => {
             customIds: nextCustomIds
         };
 
-        account.permissions = permissions;
+        account.set('permissions', permissions);
+        account.changed('permissions', true);
         await account.save();
 
         return res.json({
