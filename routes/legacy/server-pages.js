@@ -1936,6 +1936,42 @@ function waitForConnectorMessage(connectorWs, predicate, timeoutMs = 12000) {
     });
 }
 
+function resolveModrinthProjectType(kind) {
+    if (kind === 'plugin') return 'plugin';
+    if (kind === 'mod') return 'mod';
+    if (kind === 'datapack') return 'datapack';
+    return '';
+}
+
+function isMinecraftAddonArchiveFileName(fileName) {
+    const name = String(fileName || '').trim().toLowerCase();
+    return /\.(zip|tar|tar\.gz|tgz|tar\.bz2|tbz2|tar\.xz|txz|gz|bz2|xz|mcworld)$/.test(name);
+}
+
+function normalizeRemoteDownloadUrl(rawUrl) {
+    const value = String(rawUrl || '').trim();
+    if (!value) return '';
+    try {
+        const parsed = new URL(value);
+        const protocol = String(parsed.protocol || '').toLowerCase();
+        if (protocol !== 'http:' && protocol !== 'https:') return '';
+        return parsed.toString();
+    } catch {
+        return '';
+    }
+}
+
+function inferDownloadFileNameFromUrl(downloadUrl, fallback = 'download.zip') {
+    try {
+        const parsed = new URL(downloadUrl);
+        const pathname = String(parsed.pathname || '').trim();
+        const base = nodePath.posix.basename(pathname);
+        return sanitizeDownloadFileName(decodeURIComponent(base), fallback);
+    } catch {
+        return sanitizeDownloadFileName('', fallback);
+    }
+}
+
 function normalizeServerDirectoryInput(rawDirectory) {
     const directoryRaw = String(rawDirectory || '/').trim() || '/';
     return directoryRaw.startsWith('/') ? directoryRaw : `/${directoryRaw}`;
@@ -10174,7 +10210,9 @@ app.get('/server/:containerId/minecraft', requireAuth, async (req, res) => {
             },
             minecraftCatalog: {
                 plugins: MODRINTH_PLUGIN_LOADERS,
-                mods: MODRINTH_MOD_LOADERS
+                mods: MODRINTH_MOD_LOADERS,
+                datapacks: [],
+                worlds: []
             }
         });
     } catch (err) {
@@ -10354,13 +10392,32 @@ app.get('/server/:containerId/minecraft/search', requireAuth, async (req, res) =
 
         const query = String(req.query.q || '').trim().slice(0, 100);
         const kind = normalizeMinecraftProjectKind(req.query.kind);
+        const projectType = resolveModrinthProjectType(kind);
         const loader = normalizeMinecraftLoader(req.query.loader, kind);
         const gameVersion = normalizeMinecraftVersion(req.query.version);
         const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 12, 1), MODRINTH_MAX_SEARCH_LIMIT);
         const offset = Math.max(Number.parseInt(req.query.offset, 10) || 0, 0);
 
+        if (!projectType) {
+            return res.json({
+                success: true,
+                query,
+                kind,
+                loader,
+                version: gameVersion,
+                manualOnly: true,
+                relaxedVersionFilter: false,
+                pagination: {
+                    total: 0,
+                    offset,
+                    limit
+                },
+                results: []
+            });
+        }
+
         const executeModrinthSearch = async (includeVersionFacet) => {
-            const facets = [[`project_type:${kind}`]];
+            const facets = [[`project_type:${projectType}`]];
             if (loader) facets.push([`categories:${loader}`]);
             if (includeVersionFacet && gameVersion) facets.push([`versions:${gameVersion}`]);
             const response = await axios.get(`${MODRINTH_API_BASE_URL}/search`, {
@@ -10405,7 +10462,7 @@ app.get('/server/:containerId/minecraft/search', requireAuth, async (req, res) =
             categories: Array.isArray(hit.categories) ? hit.categories : [],
             latestVersionId: String(hit.latest_version || ''),
             dateModified: String(hit.date_modified || ''),
-            projectType: String(hit.project_type || kind)
+            projectType: String(hit.project_type || projectType)
         })).filter((result) => result.id);
 
         return res.json({
@@ -10474,11 +10531,16 @@ app.get('/server/:containerId/minecraft/installed', requireAuth, async (req, res
 
         const trackedRecords = await getServerMinecraftInstallRecords(server.id);
         const trackedByPath = new Map(trackedRecords.map((record) => [record.path, record]));
+        const allowDirectories = kind === 'datapack' || kind === 'world';
 
         const installed = (listing.files || [])
             .filter((entry) => {
-                if (!entry || entry.isDirectory) return false;
+                if (!entry) return false;
                 const name = String(entry.name || '').trim();
+                if (!name) return false;
+                if (entry.isDirectory) return allowDirectories;
+                if (kind === 'world') return isMinecraftAddonArchiveFileName(name);
+                if (kind === 'datapack') return /\.(zip|jar)$/i.test(name);
                 return /\.(jar|zip)$/i.test(name);
             })
             .map((entry) => {
@@ -10494,6 +10556,7 @@ app.get('/server/:containerId/minecraft/installed', requireAuth, async (req, res
                     size: Number.parseInt(entry.size, 10) || 0,
                     mtime: entry.mtime || null,
                     permissions: String(entry.permissions || ''),
+                    isDirectory: Boolean(entry.isDirectory),
                     tracked: Boolean(tracked),
                     canUpdate: Boolean(tracked && tracked.projectId),
                     source: tracked ? 'modrinth' : 'manual',
@@ -10709,6 +10772,176 @@ app.post('/server/:containerId/minecraft/update', requireAuth, async (req, res) 
     }
 });
 
+app.post('/server/:containerId/minecraft/install-url', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }],
+            attributes: ['id', 'containerId', 'ownerId', 'isSuspended']
+        });
+
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft')) {
+            return res.status(403).json({ success: false, error: 'Forbidden.' });
+        }
+        if (server.isSuspended) {
+            return res.status(423).json({ success: false, error: 'Server is suspended.' });
+        }
+        const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
+        if (!featureFlags.remoteDownloadEnabled) {
+            return res.status(403).json({ success: false, error: 'Remote downloads are disabled by admin.' });
+        }
+        if (!server.allocation || !server.allocation.connectorId) {
+            return res.status(400).json({ success: false, error: 'Server allocation is missing.' });
+        }
+
+        const kind = normalizeMinecraftProjectKind(req.body.kind);
+        const downloadUrl = normalizeRemoteDownloadUrl(req.body.url);
+        if (!downloadUrl) {
+            return res.status(400).json({ success: false, error: 'Invalid download URL. Only HTTP/HTTPS is allowed.' });
+        }
+
+        const targetDirectory = resolveMinecraftTargetDirectory(kind, req.body.targetDirectory);
+        const rawCustomFileName = String(req.body.fileName || '').trim();
+        const customFileName = rawCustomFileName
+            ? sanitizeDownloadFileName(rawCustomFileName, '')
+            : '';
+        let fileName = customFileName || inferDownloadFileNameFromUrl(
+            downloadUrl,
+            kind === 'plugin' || kind === 'mod' ? 'download.jar' : 'download.zip'
+        );
+        const extractArchive = parseBooleanInput(req.body.extractArchive, kind === 'world');
+        const extractTargetDirectory = sanitizeServerDirectoryPath(
+            req.body.extractTargetDirectory,
+            kind === 'world' ? '/' : targetDirectory
+        );
+        const deleteArchiveAfterExtract = parseBooleanInput(req.body.deleteArchiveAfterExtract, kind === 'world');
+
+        if (extractArchive && !isMinecraftAddonArchiveFileName(fileName)) {
+            if (!/[.][A-Za-z0-9]{2,8}$/.test(fileName)) {
+                fileName = `${fileName}.zip`;
+            }
+            if (!isMinecraftAddonArchiveFileName(fileName)) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Archive extraction requires an archive file name (.zip/.tar/.gz/etc).'
+                });
+            }
+        }
+
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return res.status(503).json({ success: false, error: 'Connector is offline.' });
+        }
+
+        const requestId = createWsRequestId();
+        connectorWs.send(JSON.stringify({
+            type: 'download_file',
+            serverId: server.id,
+            requestId,
+            directory: targetDirectory,
+            url: downloadUrl,
+            fileName
+        }));
+
+        const installResult = await waitForConnectorDownloadResult(connectorWs, server.id, requestId, 45000);
+        if (!installResult.success) {
+            return res.status(500).json({
+                success: false,
+                error: installResult.error || 'Connector failed to download file.'
+            });
+        }
+
+        const fallbackPath = targetDirectory === '/' ? `/${fileName}` : `${targetDirectory}/${fileName}`;
+        const installedPath = parseServerAddonPath(installResult.path || fallbackPath) || {
+            directory: targetDirectory,
+            fileName,
+            path: fallbackPath
+        };
+
+        let extracted = false;
+        let warning = '';
+        if (extractArchive) {
+            const extractPayload = {
+                type: 'extract_archive',
+                serverId: server.id,
+                directory: installedPath.directory,
+                name: installedPath.fileName,
+                targetDirectory: extractTargetDirectory
+            };
+            try {
+                connectorWs.send(JSON.stringify(extractPayload));
+            } catch (error) {
+                return res.status(500).json({
+                    success: false,
+                    error: error && error.message ? error.message : 'Failed to dispatch extract request.'
+                });
+            }
+
+            const expectedPath = installedPath.path;
+            const extractResult = await waitForConnectorMessage(connectorWs, (message) => {
+                if (!message || message.type !== 'extract_complete') return null;
+                if (Number.parseInt(message.serverId, 10) !== server.id) return null;
+                if (String(message.directory || '') !== installedPath.directory) return null;
+                if (String(message.targetDirectory || '') !== extractTargetDirectory) return null;
+
+                const archivePath = String(message.archivePath || '').replace(/\\/g, '/');
+                const sameArchive = archivePath === expectedPath
+                    || archivePath.endsWith(`/${installedPath.fileName}`);
+                if (!sameArchive) return null;
+
+                return {
+                    success: Boolean(message.success),
+                    error: String(message.error || '')
+                };
+            }, 60000);
+
+            if (!extractResult.success) {
+                return res.status(500).json({
+                    success: false,
+                    error: extractResult.error || 'Archive extraction failed.'
+                });
+            }
+
+            extracted = true;
+            if (deleteArchiveAfterExtract) {
+                const deleteResult = await runConnectorFileAction(connectorWs, {
+                    type: 'delete_files',
+                    serverId: server.id,
+                    directory: installedPath.directory,
+                    files: [installedPath.fileName]
+                }, installedPath.directory, server.id, 12000);
+
+                if (!deleteResult.success) {
+                    warning = 'Archive extracted, but original archive could not be deleted automatically.';
+                }
+            }
+        }
+
+        return res.json({
+            success: true,
+            message: extracted ? 'Downloaded and extracted successfully.' : 'Downloaded successfully.',
+            warning,
+            installed: {
+                kind,
+                fileName: installedPath.fileName,
+                path: installedPath.path,
+                directory: installedPath.directory,
+                size: Number.isFinite(installResult.size) ? installResult.size : 0,
+                extracted,
+                extractTargetDirectory: extracted ? extractTargetDirectory : ''
+            }
+        });
+    } catch (err) {
+        console.error('Error installing minecraft addon from URL:', err);
+        return res.status(500).json({
+            success: false,
+            error: err && err.message ? String(err.message) : 'Failed to download addon.'
+        });
+    }
+});
+
 app.post('/server/:containerId/minecraft/install', requireAuth, async (req, res) => {
     try {
         const server = await Server.findOne({
@@ -10729,12 +10962,20 @@ app.post('/server/:containerId/minecraft/install', requireAuth, async (req, res)
         }
 
         const kind = normalizeMinecraftProjectKind(req.body.kind);
+        const projectType = resolveModrinthProjectType(kind);
         const projectId = String(req.body.projectId || '').trim();
         const versionId = String(req.body.versionId || '').trim();
         const loader = normalizeMinecraftLoader(req.body.loader, kind);
         const gameVersion = normalizeMinecraftVersion(req.body.version);
         const targetDirectory = resolveMinecraftTargetDirectory(kind, req.body.targetDirectory);
         const projectTitle = String(req.body.projectTitle || '').trim().slice(0, 120);
+
+        if (!projectType) {
+            return res.status(400).json({
+                success: false,
+                error: 'World installs are available via Direct URL download.'
+            });
+        }
 
         if (!/^[A-Za-z0-9_-]{2,64}$/.test(projectId)) {
             return res.status(400).json({ success: false, error: 'Invalid Modrinth project ID.' });

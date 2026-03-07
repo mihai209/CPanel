@@ -353,13 +353,14 @@
                 <div id="alerts"></div>
 
                 <div class="d-flex justify-content-between align-items-center mb-3 mode-switch">
-                    <div class="btn-group">
-                        <button type="button" class="btn btn-sm btn-primary-soft" id="browseModeBtn">Browse</button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" id="installedModeBtn">Installed</button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="installedModeBtn" data-bs-toggle="modal" data-bs-target="#installedModal">
+                            <i class="bi bi-archive me-1"></i> Installed
+                        </button>
+                        <a href="/server/<%= server.containerId %>/minecraft-configs" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-sliders2 me-1"></i> Configs
+                        </a>
                     </div>
-                    <a href="/server/<%= server.containerId %>/minecraft-configs" class="btn btn-sm btn-outline-secondary">
-                        <i class="bi bi-sliders2 me-1"></i> Configs
-                    </a>
                 </div>
 
                 <div id="browseSection">
@@ -374,6 +375,8 @@
                                     <select class="form-select" id="kindInput">
                                         <option value="plugin" <%= minecraftDefaults.kind === 'plugin' ? 'selected' : '' %>>Plugins</option>
                                         <option value="mod" <%= minecraftDefaults.kind === 'mod' ? 'selected' : '' %>>Mods</option>
+                                        <option value="datapack" <%= minecraftDefaults.kind === 'datapack' ? 'selected' : '' %>>Datapacks</option>
+                                        <option value="world" <%= minecraftDefaults.kind === 'world' ? 'selected' : '' %>>Worlds</option>
                                     </select>
                                 </div>
                                 <div class="col-md-2">
@@ -399,7 +402,45 @@
                                 </div>
                             </div>
                             <div class="small text-secondary mt-2">
-                                Search is powered by Modrinth. Install downloads directly into your server folder.
+                                Search is powered by Modrinth for plugins/mods/datapacks. World archives can be downloaded with the direct URL installer below.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-card">
+                        <div class="settings-card-header">
+                            <h6 class="mb-0 fw-semibold">Direct URL Download</h6>
+                        </div>
+                        <div class="settings-card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label" for="downloadUrlInput">File URL</label>
+                                    <input class="form-control" id="downloadUrlInput" placeholder="https://example.com/world.zip">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="downloadFileNameInput">File Name (optional)</label>
+                                    <input class="form-control" id="downloadFileNameInput" placeholder="world.zip">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label" for="extractTargetDirectoryInput">Extract Target</label>
+                                    <input class="form-control" id="extractTargetDirectoryInput" value="/">
+                                </div>
+                                <div class="col-md-9 d-flex align-items-end">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" role="switch" id="extractArchiveInput">
+                                        <label class="form-check-label text-secondary" for="extractArchiveInput">
+                                            Extract archive after download
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end justify-content-md-end">
+                                    <button class="btn btn-primary-soft w-100" id="downloadUrlBtn" type="button">
+                                        <i class="bi bi-cloud-download me-1"></i> Download URL
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="small text-secondary mt-2">
+                                For worlds, keep extract enabled and target <code>/</code> unless your setup needs a custom folder.
                             </div>
                         </div>
                     </div>
@@ -414,22 +455,27 @@
 
                     <div id="results" class="result-grid"></div>
                 </div>
+            </div>
+        </div>
+    </div>
 
-                <div id="installedSection" class="d-none">
-                    <div class="settings-card">
-                        <div class="settings-card-header d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0 fw-semibold">Installed Addons</h6>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshInstalledBtn">
-                                <i class="bi bi-arrow-clockwise me-1"></i> Refresh
-                            </button>
+    <div class="modal fade" id="installedModal" tabindex="-1" aria-labelledby="installedModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content bg-dark border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title" id="installedModalLabel">Installed Addons</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="small text-secondary">
+                            Update works only for addons installed from this panel (tracked source: Modrinth).
                         </div>
-                        <div class="settings-card-body">
-                            <div class="small text-secondary mb-3">
-                                Update works only for addons installed from this panel (tracked source: Modrinth).
-                            </div>
-                            <div id="installedList" class="installed-list"></div>
-                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshInstalledBtn">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                        </button>
                     </div>
+                    <div id="installedList" class="installed-list"></div>
                 </div>
             </div>
         </div>
@@ -446,7 +492,9 @@
         const serverId = '<%= server.containerId %>';
         const loaderCatalog = {
             plugin: <%- JSON.stringify(minecraftCatalog.plugins || []) %>,
-            mod: <%- JSON.stringify(minecraftCatalog.mods || []) %>
+            mod: <%- JSON.stringify(minecraftCatalog.mods || []) %>,
+            datapack: <%- JSON.stringify(minecraftCatalog.datapacks || []) %>,
+            world: <%- JSON.stringify(minecraftCatalog.worlds || []) %>
         };
 
         const kindInput = document.getElementById('kindInput');
@@ -455,17 +503,20 @@
         const targetDirectoryInput = document.getElementById('targetDirectoryInput');
         const queryInput = document.getElementById('queryInput');
         const searchBtn = document.getElementById('searchBtn');
+        const downloadUrlInput = document.getElementById('downloadUrlInput');
+        const downloadFileNameInput = document.getElementById('downloadFileNameInput');
+        const extractTargetDirectoryInput = document.getElementById('extractTargetDirectoryInput');
+        const extractArchiveInput = document.getElementById('extractArchiveInput');
+        const downloadUrlBtn = document.getElementById('downloadUrlBtn');
         const resultsElement = document.getElementById('results');
         const alertsElement = document.getElementById('alerts');
         const paginationInfo = document.getElementById('paginationInfo');
         const prevBtn = document.getElementById('prevBtn');
         const nextBtn = document.getElementById('nextBtn');
-        const browseModeBtn = document.getElementById('browseModeBtn');
         const installedModeBtn = document.getElementById('installedModeBtn');
-        const browseSection = document.getElementById('browseSection');
-        const installedSection = document.getElementById('installedSection');
         const installedList = document.getElementById('installedList');
         const refreshInstalledBtn = document.getElementById('refreshInstalledBtn');
+        const installedModalElement = document.getElementById('installedModal');
 
         const state = {
             offset: 0,
@@ -509,6 +560,7 @@
                 const isSelected = loader === selected ? 'selected' : '';
                 return `<option value="${escapeHtml(loader)}" ${isSelected}>${escapeHtml(loader)}</option>`;
             }).join('');
+            loaderInput.disabled = options.length === 0;
         }
 
         function getCurrentFilters() {
@@ -527,17 +579,6 @@
             searchBtn.innerHTML = loading
                 ? '<span class="spinner-border spinner-border-sm"></span>'
                 : '<i class="bi bi-search"></i>';
-        }
-
-        function setMode(mode) {
-            const installed = mode === 'installed';
-            browseSection.classList.toggle('d-none', installed);
-            installedSection.classList.toggle('d-none', !installed);
-            browseModeBtn.className = installed ? 'btn btn-sm btn-outline-secondary' : 'btn btn-sm btn-primary-soft';
-            installedModeBtn.className = installed ? 'btn btn-sm btn-primary-soft' : 'btn btn-sm btn-outline-secondary';
-            if (installed) {
-                loadInstalled();
-            }
         }
 
         function updatePagination() {
@@ -593,23 +634,29 @@
             }
 
             installedList.innerHTML = items.map((item) => {
+                const isDirectory = Boolean(item.isDirectory);
                 const trackedBadge = item.tracked
                     ? '<span class="badge text-bg-success">Tracked</span>'
                     : '<span class="badge text-bg-secondary">Manual</span>';
-                const updateDisabled = item.canUpdate ? '' : 'disabled';
-                const updateTitle = item.canUpdate ? 'Update from Modrinth' : 'Only tracked addons can be auto-updated';
+                const updateDisabled = item.canUpdate && !isDirectory ? '' : 'disabled';
+                const updateTitle = item.canUpdate && !isDirectory
+                    ? 'Update from Modrinth'
+                    : (isDirectory ? 'Folders cannot be auto-updated' : 'Only tracked addons can be auto-updated');
                 const modrinthHint = item.projectTitle ? ` · ${escapeHtml(item.projectTitle)}` : '';
+                const typeLabel = isDirectory ? 'Folder' : 'File';
                 return `
                     <div class="installed-item">
                         <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
                             <div>
-                                <div class="installed-item-name">${escapeHtml(item.name)}</div>
+                                <div class="installed-item-name">
+                                    <i class="bi ${isDirectory ? 'bi-folder2-open' : 'bi-file-earmark-zip'} me-1"></i>${escapeHtml(item.name)}
+                                </div>
                                 <div class="installed-item-meta">${escapeHtml(item.path)}${modrinthHint}</div>
                             </div>
                             ${trackedBadge}
                         </div>
                         <div class="installed-item-meta mb-3">
-                            ${formatBytes(item.size)} · ${escapeHtml(item.permissions || '---')}
+                            ${typeLabel}${isDirectory ? '' : ` · ${formatBytes(item.size)}`} · ${escapeHtml(item.permissions || '---')}
                         </div>
                         <div class="d-flex justify-content-end gap-2">
                             <button class="btn btn-sm btn-outline-secondary update-installed-btn" ${updateDisabled}
@@ -661,6 +708,9 @@
 
                 renderResults(payload.results || []);
                 updatePagination();
+                if (payload.manualOnly) {
+                    setAlert('warning', 'World projects are installed using Direct URL download.');
+                }
                 if (payload.relaxedVersionFilter) {
                     setAlert('warning', `No results were found for MC version "${filters.version}". Showing closest matches without version filter.`);
                 }
@@ -815,16 +865,97 @@
             }
         }
 
-        kindInput.addEventListener('change', () => {
-            const kind = kindInput.value === 'mod' ? 'mod' : 'plugin';
-            renderLoaderOptions(kind, '');
-            const currentTarget = targetDirectoryInput.value.trim().toLowerCase();
-            if (!currentTarget || currentTarget === '/plugins' || currentTarget === '/mods') {
-                targetDirectoryInput.value = kind === 'mod' ? '/mods' : '/plugins';
+        function defaultTargetDirectoryForKind(kind) {
+            if (kind === 'mod') return '/mods';
+            if (kind === 'datapack') return '/world/datapacks';
+            if (kind === 'world') return '/';
+            return '/plugins';
+        }
+
+        function syncKindUi(kind, selectedLoader = '') {
+            renderLoaderOptions(kind, selectedLoader);
+            const lowerTarget = String(targetDirectoryInput.value || '').trim().toLowerCase();
+            const knownDefaults = ['/plugins', '/mods', '/world/datapacks', '/'];
+            if (!lowerTarget || knownDefaults.includes(lowerTarget)) {
+                targetDirectoryInput.value = defaultTargetDirectoryForKind(kind);
             }
+
+            const worldMode = kind === 'world';
+            if (worldMode) {
+                extractArchiveInput.checked = true;
+                extractTargetDirectoryInput.value = '/';
+            } else {
+                extractArchiveInput.checked = false;
+                const currentExtractTarget = String(extractTargetDirectoryInput.value || '').trim();
+                if (!currentExtractTarget || currentExtractTarget === '/') {
+                    extractTargetDirectoryInput.value = targetDirectoryInput.value.trim() || defaultTargetDirectoryForKind(kind);
+                }
+            }
+        }
+
+        async function installFromUrl() {
+            const kind = kindInput.value || 'plugin';
+            const url = downloadUrlInput.value.trim();
+            const fileName = downloadFileNameInput.value.trim();
+            const targetDirectory = targetDirectoryInput.value.trim();
+            const extractArchive = Boolean(extractArchiveInput.checked);
+            const extractTargetDirectory = extractTargetDirectoryInput.value.trim() || '/';
+
+            if (!url) {
+                setAlert('error', 'Please enter a direct download URL.');
+                return;
+            }
+
+            downloadUrlBtn.disabled = true;
+            const oldHtml = downloadUrlBtn.innerHTML;
+            downloadUrlBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Downloading...';
+
+            try {
+                const response = await fetch(`/server/${serverId}/minecraft/install-url`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        kind,
+                        url,
+                        fileName,
+                        targetDirectory,
+                        extractArchive,
+                        extractTargetDirectory,
+                        deleteArchiveAfterExtract: kind === 'world'
+                    })
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.error || 'Download failed.');
+                }
+
+                const installedName = payload.installed && payload.installed.fileName
+                    ? payload.installed.fileName
+                    : 'file';
+                setAlert('success', `Downloaded ${installedName} successfully.`);
+                if (payload.warning) {
+                    setAlert('warning', payload.warning);
+                }
+                if (installedModalElement && installedModalElement.classList.contains('show')) {
+                    loadInstalled();
+                }
+            } catch (error) {
+                setAlert('error', error.message || 'Download failed.');
+            } finally {
+                downloadUrlBtn.disabled = false;
+                downloadUrlBtn.innerHTML = oldHtml;
+            }
+        }
+
+        kindInput.addEventListener('change', () => {
+            syncKindUi(kindInput.value || 'plugin');
         });
 
         searchBtn.addEventListener('click', () => searchProjects(0));
+        downloadUrlBtn.addEventListener('click', () => installFromUrl());
+        extractArchiveInput.addEventListener('change', () => {
+            extractTargetDirectoryInput.disabled = !extractArchiveInput.checked;
+        });
         queryInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();
@@ -844,12 +975,14 @@
             }
         });
 
-        browseModeBtn.addEventListener('click', () => setMode('browse'));
-        installedModeBtn.addEventListener('click', () => setMode('installed'));
+        installedModeBtn.addEventListener('click', () => loadInstalled());
         refreshInstalledBtn.addEventListener('click', () => loadInstalled());
+        if (installedModalElement) {
+            installedModalElement.addEventListener('shown.bs.modal', () => loadInstalled());
+        }
 
-        renderLoaderOptions('<%= minecraftDefaults.kind %>', '<%= minecraftDefaults.loader || '' %>');
-        setMode('browse');
+        syncKindUi('<%= minecraftDefaults.kind %>', '<%= minecraftDefaults.loader || '' %>');
+        extractTargetDirectoryInput.disabled = !extractArchiveInput.checked;
         searchProjects(0);
     </script>
 </body>

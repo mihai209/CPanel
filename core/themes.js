@@ -27,11 +27,6 @@ const THEME_CATALOG = Object.freeze([
         cssPath: '/themes/light/index.css'
     },
     {
-        id: 'discord-l',
-        label: 'Discord L',
-        cssPath: '/themes/discord-l/index.css'
-    },
-    {
         id: 'tropical-island',
         label: 'Tropical Island',
         cssPath: '/themes/tropical-island/index.css'

@@ -56,17 +56,6 @@
             '--cp-panel-surface-2': 'rgba(248, 252, 255, 0.96)',
             '--cp-panel-input': '#f7faff'
         },
-        'discord-l': {
-            '--bg-dark': '#171c2d',
-            '--bg-sidebar': '#1f2439',
-            '--border-color': 'rgba(132, 142, 255, 0.34)',
-            '--text-primary': '#f1f3ff',
-            '--text-secondary': '#b8bfdc',
-            '--accent-blue': '#a5b2ff',
-            '--cp-panel-surface': 'rgba(34, 39, 62, 0.86)',
-            '--cp-panel-surface-2': 'rgba(28, 33, 52, 0.88)',
-            '--cp-panel-input': 'rgba(24, 28, 44, 0.92)'
-        },
         'tropical-island': {
             '--bg-dark': '#082532',
             '--bg-sidebar': '#0b2f3f',

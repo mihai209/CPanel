@@ -1442,11 +1442,15 @@ function normalizeMinecraftProjectKind(value) {
     const normalized = String(value || '').trim().toLowerCase();
     if (normalized === 'plugins' || normalized === 'plugin') return 'plugin';
     if (normalized === 'mods' || normalized === 'mod') return 'mod';
+    if (normalized === 'datapacks' || normalized === 'datapack') return 'datapack';
+    if (normalized === 'worlds' || normalized === 'world') return 'world';
     return 'plugin';
 }
 
 function getMinecraftLoaderCatalog(kind) {
-    return kind === 'mod' ? MODRINTH_MOD_LOADERS : MODRINTH_PLUGIN_LOADERS;
+    if (kind === 'mod') return MODRINTH_MOD_LOADERS;
+    if (kind === 'plugin') return MODRINTH_PLUGIN_LOADERS;
+    return [];
 }
 
 function normalizeMinecraftLoader(value, kind) {
@@ -1555,7 +1559,10 @@ function createWsRequestId() {
 }
 
 function resolveMinecraftTargetDirectory(kind, requestedDirectory) {
-    const fallback = kind === 'mod' ? '/mods' : '/plugins';
+    let fallback = '/plugins';
+    if (kind === 'mod') fallback = '/mods';
+    if (kind === 'datapack') fallback = '/world/datapacks';
+    if (kind === 'world') fallback = '/';
     return sanitizeServerDirectoryPath(requestedDirectory, fallback);
 }
 
