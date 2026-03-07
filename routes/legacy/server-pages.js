@@ -812,6 +812,10 @@ const SERVER_PERMISSIONS = Object.freeze([
     'server.files',
     'server.startup',
     'server.minecraft',
+    'minecraft.kick',
+    'minecraft.ban',
+    'minecraft.op',
+    'minecraft.deop',
     'server.backups.view',
     'server.backups.manage',
     'server.databases.view',
@@ -1965,6 +1969,216 @@ function isServerLikelyMinecraft(serverLike) {
         'pufferfish'
     ];
     return keywords.some((keyword) => haystack.includes(keyword));
+}
+
+const MCSRVSTAT_API_BASE_URL = 'https://api.mcsrvstat.us';
+
+function inferMinecraftBedrockMode(serverLike) {
+    const image = serverLike && serverLike.image ? serverLike.image : {};
+    const candidates = [
+        image.name,
+        image.description,
+        image.startup,
+        image.dockerImage,
+        serverLike && serverLike.dockerImage
+    ];
+    const haystack = String(candidates.filter(Boolean).join(' ')).toLowerCase();
+    if (!haystack) return false;
+    const keywords = [
+        'bedrock',
+        'pocketmine',
+        'pmmp',
+        'nukkit',
+        'dragonfly'
+    ];
+    return keywords.some((keyword) => haystack.includes(keyword));
+}
+
+function resolveMinecraftStatusAddress(serverLike) {
+    const allocation = serverLike && serverLike.allocation ? serverLike.allocation : null;
+    if (!allocation) return '';
+
+    const alias = String(allocation.alias || '').trim();
+    const ip = String(allocation.ip || '').trim();
+    const port = Number.parseInt(allocation.port, 10);
+
+    if (alias) {
+        if (alias.includes(':')) return alias;
+        if (Number.isInteger(port) && port > 0) return `${alias}:${port}`;
+        return alias;
+    }
+
+    if (!ip) return '';
+    if (Number.isInteger(port) && port > 0) return `${ip}:${port}`;
+    return ip;
+}
+
+function buildMcsrvstatUserAgent(settingsMap) {
+    const brand = String((settingsMap && settingsMap.brandName) || 'CPanel').trim() || 'CPanel';
+    return `${brand}/MinecraftStatus (admin panel; +https://cpanel-rocky.netlify.app)`;
+}
+
+function buildMinecraftPlayerHeadUrl(playerName, playerUuid) {
+    const uuidRaw = String(playerUuid || '').trim();
+    const uuidCompact = uuidRaw.replace(/-/g, '');
+    if (/^[a-f0-9]{32}$/i.test(uuidCompact)) {
+        return `https://crafatar.com/avatars/${uuidCompact}?size=40&overlay`;
+    }
+    const safeName = String(playerName || '').trim();
+    if (!safeName) {
+        return 'https://mc-heads.net/avatar/Steve/40';
+    }
+    return `https://mc-heads.net/avatar/${encodeURIComponent(safeName)}/40`;
+}
+
+function normalizeMcsrvstatStatusPayload(payload, requestedAddress, bedrockMode) {
+    const online = Boolean(payload && payload.online);
+    const motdClean = payload && payload.motd && Array.isArray(payload.motd.clean)
+        ? payload.motd.clean.map((line) => String(line || '').trim()).filter(Boolean)
+        : [];
+
+    const playersRaw = payload && payload.players && Array.isArray(payload.players.list)
+        ? payload.players.list
+        : [];
+    const playersList = playersRaw
+        .map((entry) => ({
+            name: String(entry && entry.name || '').trim(),
+            uuid: String(entry && entry.uuid || '').trim()
+        }))
+        .filter((entry) => entry.name.length > 0)
+        .slice(0, 150)
+        .map((entry) => ({
+            ...entry,
+            headUrl: buildMinecraftPlayerHeadUrl(entry.name, entry.uuid)
+        }));
+
+    const cacheExpireRaw = Number.parseInt(payload && payload.debug && payload.debug.cacheexpire, 10);
+    const cacheExpireMs = Number.isInteger(cacheExpireRaw) && cacheExpireRaw > 0
+        ? (cacheExpireRaw < 10000000000 ? cacheExpireRaw * 1000 : cacheExpireRaw)
+        : 0;
+
+    return {
+        ok: true,
+        online,
+        requestedAddress,
+        bedrockMode,
+        hostname: String(payload && payload.hostname || '').trim(),
+        ip: String(payload && payload.ip || '').trim(),
+        port: Number.parseInt(payload && payload.port, 10) || null,
+        version: String(payload && payload.version || '').trim(),
+        protocolName: String(payload && payload.protocol && payload.protocol.name || '').trim(),
+        software: String(payload && payload.software || '').trim(),
+        gamemode: String(payload && payload.gamemode || '').trim(),
+        mapName: String(payload && payload.map && payload.map.clean || '').trim(),
+        iconDataUri: String(payload && payload.icon || '').trim(),
+        eulaBlocked: Boolean(payload && payload.eula_blocked),
+        playersOnline: Number.parseInt(payload && payload.players && payload.players.online, 10) || 0,
+        playersMax: Number.parseInt(payload && payload.players && payload.players.max, 10) || 0,
+        playersList,
+        motdClean,
+        cacheExpireAtIso: cacheExpireMs > 0 ? new Date(cacheExpireMs).toISOString() : null,
+        raw: payload || {}
+    };
+}
+
+async function fetchMinecraftServerStatusPreview({
+    address,
+    bedrockMode,
+    settingsMap,
+    timeoutMs = 8000
+}) {
+    const requestedAddress = String(address || '').trim();
+    const useBedrock = Boolean(bedrockMode);
+    if (!requestedAddress) {
+        return {
+            ok: false,
+            online: false,
+            requestedAddress: '',
+            bedrockMode: useBedrock,
+            error: 'Missing allocation address.',
+            playersOnline: 0,
+            playersMax: 0,
+            playersList: [],
+            motdClean: []
+        };
+    }
+
+    const endpoint = useBedrock
+        ? `${MCSRVSTAT_API_BASE_URL}/bedrock/3/${encodeURIComponent(requestedAddress)}`
+        : `${MCSRVSTAT_API_BASE_URL}/3/${encodeURIComponent(requestedAddress)}`;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.max(2000, Number.parseInt(timeoutMs, 10) || 8000));
+
+    try {
+        const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'User-Agent': buildMcsrvstatUserAgent(settingsMap)
+            },
+            signal: controller.signal
+        });
+
+        if (!response.ok) {
+            return {
+                ok: false,
+                online: false,
+                requestedAddress,
+                bedrockMode: useBedrock,
+                error: `Status API returned ${response.status}.`,
+                playersOnline: 0,
+                playersMax: 0,
+                playersList: [],
+                motdClean: []
+            };
+        }
+
+        const payload = await response.json();
+        return normalizeMcsrvstatStatusPayload(payload, requestedAddress, useBedrock);
+    } catch (error) {
+        const message = error && error.name === 'AbortError'
+            ? 'Status request timed out.'
+            : String(error && error.message || 'Failed to fetch Minecraft status.');
+        return {
+            ok: false,
+            online: false,
+            requestedAddress,
+            bedrockMode: useBedrock,
+            error: message,
+            playersOnline: 0,
+            playersMax: 0,
+            playersList: [],
+            motdClean: []
+        };
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function normalizeMinecraftPlayerTarget(value) {
+    const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!normalized) return '';
+    if (normalized.length > 32) return '';
+    if (!/^[A-Za-z0-9_.: -]+$/.test(normalized)) return '';
+    if (/[`"'\\\/;|&$<>]/.test(normalized)) return '';
+    return normalized;
+}
+
+function formatMinecraftCommandTarget(targetName) {
+    const safeTarget = normalizeMinecraftPlayerTarget(targetName);
+    if (!safeTarget) return '';
+    if (safeTarget.includes(' ')) return `"${safeTarget}"`;
+    return safeTarget;
+}
+
+function normalizeMinecraftCommandReason(value, maxLength = 100) {
+    return String(value || '')
+        .replace(/[\r\n\t]+/g, ' ')
+        .replace(/[`"'\\|&$<>;]+/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, Math.max(1, maxLength));
 }
 
 const MINECRAFT_PROPERTIES_FIELD_GROUPS = [
@@ -9985,7 +10199,7 @@ app.get('/server/:containerId/minecraft-configs', requireAuth, async (req, res) 
             return res.redirect('/server/no-permissions');
         }
         if (!isServerLikelyMinecraft(server)) {
-            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Minecraft Config Manager is available only for Minecraft servers.')}`);
+            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Minecraft controls are available only for Minecraft servers.')}`);
         }
         if (server.isSuspended) {
             return res.redirect(`/server/${server.containerId}/suspended`);
@@ -9994,86 +10208,40 @@ app.get('/server/:containerId/minecraft-configs', requireAuth, async (req, res) 
             return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Server allocation is missing.')}`);
         }
 
-        const connectorWs = connectorConnections.get(server.allocation.connectorId);
-        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
-            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Connector is offline. Cannot load config files.')}`);
-        }
-
-        const [serverPropertiesFile, eulaFile, whitelistFile, opsFile, permissionsFile] = await Promise.all([
-            readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.serverProperties),
-            readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.eula),
-            readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.whitelist),
-            readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.ops),
-            readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.permissions)
-        ]);
-
-        const readFailures = [serverPropertiesFile, eulaFile, whitelistFile, opsFile, permissionsFile]
-            .filter((result) => !result.success);
-        if (readFailures.length > 0) {
-            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent(readFailures[0].error || 'Failed to read one or more Minecraft config files.')}`);
-        }
-
-        const parsedProperties = parseMinecraftProperties(serverPropertiesFile.content);
-        const propertyValues = {};
-        MINECRAFT_PROPERTIES_FIELD_GROUPS.forEach((group) => {
-            group.fields.forEach((field) => {
-                let value = Object.prototype.hasOwnProperty.call(parsedProperties, field.key)
-                    ? String(parsedProperties[field.key] || '')
-                    : String(field.fallback === undefined || field.fallback === null ? '' : field.fallback);
-
-                if (field.key === 'server-port') {
-                    value = String(Number.parseInt(server.allocation && server.allocation.port, 10) || 25565);
-                }
-                if (field.type === 'boolean') {
-                    value = normalizeMinecraftBooleanString(value, normalizeMinecraftBooleanString(field.fallback || 'false'));
-                } else if (field.type === 'number') {
-                    const parsed = Number.parseInt(value, 10);
-                    if (Number.isInteger(parsed)) {
-                        const min = Number.isInteger(field.min) ? field.min : parsed;
-                        const max = Number.isInteger(field.max) ? field.max : parsed;
-                        value = String(Math.min(max, Math.max(min, parsed)));
-                    } else if (field.fallback !== undefined) {
-                        value = String(field.fallback);
-                    }
-                } else if (field.type === 'select') {
-                    const options = Array.isArray(field.options) ? field.options.map((entry) => String(entry)) : [];
-                    if (!options.includes(value)) {
-                        value = options.includes(String(field.fallback || '')) ? String(field.fallback) : (options[0] || '');
-                    }
-                }
-
-                propertyValues[field.key] = value;
-            });
+        const bedrockFallback = inferMinecraftBedrockMode(server) ? 'true' : 'false';
+        const bedrockMode = normalizeMinecraftBooleanString(req.query.bedrock, bedrockFallback) === 'true';
+        const statusAddress = resolveMinecraftStatusAddress(server);
+        const statusPreview = await fetchMinecraftServerStatusPreview({
+            address: statusAddress,
+            bedrockMode,
+            settingsMap: res.locals.settings || {}
         });
 
-        const whitelistEntries = parseJSONArray(whitelistFile.content);
-        const opsEntries = parseJSONArray(opsFile.content);
-        const permissionsEntries = parseSimplePermissionsYaml(permissionsFile.content);
-        const permissionsRawTrimmed = String(permissionsFile.content || '').trim();
-        const permissionsDetectedComplex = permissionsRawTrimmed.length > 0
-            && permissionsEntries.length === 0
-            && permissionsRawTrimmed.includes(':')
-            && !/^permissions\s*:\s*\{\s*\}\s*$/i.test(permissionsRawTrimmed);
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        const connectorOnline = Boolean(connectorWs && connectorWs.readyState === WebSocket.OPEN);
+        const actionPermissions = {
+            canKick: hasServerPermission(access, 'minecraft.kick'),
+            canBan: hasServerPermission(access, 'minecraft.ban'),
+            canOp: hasServerPermission(access, 'minecraft.op'),
+            canDeop: hasServerPermission(access, 'minecraft.deop')
+        };
 
         return res.render('server/minecraft-configs', {
             server,
             user: req.session.user,
-            title: `Minecraft Configs ${server.name}`,
+            title: `Minecraft Control ${server.name}`,
             path: '/servers',
-            minecraftPropertyFieldGroups: MINECRAFT_PROPERTIES_FIELD_GROUPS,
-            minecraftPropertyValues: propertyValues,
-            eulaAccepted: parseMinecraftEulaAccepted(eulaFile.content),
-            whitelistNamesText: formatWhitelistNamesForTextarea(whitelistEntries),
-            opsEntriesText: formatOpsEntriesForTextarea(opsEntries),
-            permissionsEntriesText: formatPermissionsEntriesForTextarea(permissionsEntries),
-            permissionsDetectedComplex,
-            permissionsFileMissing: Boolean(permissionsFile.missing),
+            minecraftStatusAddress: statusAddress,
+            minecraftStatusPreview: statusPreview,
+            minecraftBedrockMode: bedrockMode,
+            minecraftActionPermissions: actionPermissions,
+            connectorOnline,
             success: req.query.success || null,
             error: req.query.error || null
         });
     } catch (err) {
-        console.error('Error loading minecraft config manager:', err);
-        return res.redirect('/?error=' + encodeURIComponent('Error loading Minecraft config manager.'));
+        console.error('Error loading minecraft control center:', err);
+        return res.redirect('/?error=' + encodeURIComponent('Error loading Minecraft control center.'));
     }
 });
 
@@ -10093,7 +10261,7 @@ app.post('/server/:containerId/minecraft-configs', requireAuth, async (req, res)
             return res.redirect('/server/no-permissions');
         }
         if (!isServerLikelyMinecraft(server)) {
-            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Minecraft Config Manager is available only for Minecraft servers.')}`);
+            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Minecraft controls are available only for Minecraft servers.')}`);
         }
         if (server.isSuspended) {
             return res.redirect(`/server/${server.containerId}/suspended`);
@@ -10104,113 +10272,67 @@ app.post('/server/:containerId/minecraft-configs', requireAuth, async (req, res)
 
         const connectorWs = connectorConnections.get(server.allocation.connectorId);
         if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
-            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Connector is offline. Cannot save config files.')}`);
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Connector is offline.')}`);
         }
 
-        const existingProperties = await readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.serverProperties);
-        if (!existingProperties.success) {
-            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent(existingProperties.error || 'Failed to read server.properties before saving.')}`);
+        const bedrockMode = normalizeMinecraftBooleanString(req.body.bedrock, inferMinecraftBedrockMode(server) ? 'true' : 'false') === 'true';
+        const redirectBase = `/server/${server.containerId}/minecraft-configs?bedrock=${bedrockMode ? '1' : '0'}`;
+
+        const action = String(req.body.action || '').trim().toLowerCase();
+        const actionCatalog = {
+            op: { permission: 'minecraft.op', label: 'OP', command: 'op' },
+            deop: { permission: 'minecraft.deop', label: 'DEOP', command: 'deop' },
+            kick: { permission: 'minecraft.kick', label: 'KICK', command: 'kick' },
+            ban: { permission: 'minecraft.ban', label: 'BAN', command: 'ban' }
+        };
+        const selectedAction = Object.prototype.hasOwnProperty.call(actionCatalog, action) ? actionCatalog[action] : null;
+        if (!selectedAction) {
+            return res.redirect(`${redirectBase}&error=${encodeURIComponent('Invalid minecraft action.')}`);
         }
 
-        const propertyUpdates = {};
-        MINECRAFT_PROPERTIES_FIELD_GROUPS.forEach((group) => {
-            group.fields.forEach((field) => {
-                if (field.readonly && field.key === 'server-port') {
-                    propertyUpdates[field.key] = String(Number.parseInt(server.allocation && server.allocation.port, 10) || 25565);
-                    return;
+        if (!hasServerPermission(access, selectedAction.permission)) {
+            return res.redirect(`${redirectBase}&error=${encodeURIComponent(`Missing permission: ${selectedAction.permission}`)}`);
+        }
+
+        const targetRaw = req.body.player || req.body.target || req.body.username;
+        const target = formatMinecraftCommandTarget(targetRaw);
+        if (!target) {
+            return res.redirect(`${redirectBase}&error=${encodeURIComponent('Invalid player name.')}`);
+        }
+
+        const reason = normalizeMinecraftCommandReason(req.body.reason, 96);
+        const command = (selectedAction.command === 'kick' || selectedAction.command === 'ban')
+            ? `${selectedAction.command} ${target}${reason ? ` ${reason}` : ''}`
+            : `${selectedAction.command} ${target}`;
+
+        const requestId = `mc_${action}_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`;
+        connectorWs.send(JSON.stringify({
+            type: 'server_command',
+            serverId: server.id,
+            command,
+            requestId
+        }));
+
+        if (typeof writeServerAuditLog === 'function') {
+            await writeServerAuditLog({
+                actorUserId: req.session && req.session.user ? req.session.user.id : null,
+                serverId: server.id,
+                action: 'server:minecraft.control',
+                ip: req.headers['x-forwarded-for'] || req.ip || null,
+                userAgent: req.headers['user-agent'] || null,
+                metadata: {
+                    requestId,
+                    minecraftAction: action,
+                    target: String(targetRaw || '').trim().slice(0, 64),
+                    command: command.slice(0, 140)
                 }
-
-                const inputKey = `prop_${field.key}`;
-                let rawValue = req.body[inputKey];
-                if (Array.isArray(rawValue)) rawValue = rawValue[rawValue.length - 1];
-                rawValue = String(rawValue === undefined || rawValue === null ? '' : rawValue).trim();
-
-                if (field.type === 'boolean') {
-                    propertyUpdates[field.key] = normalizeMinecraftBooleanString(rawValue, normalizeMinecraftBooleanString(field.fallback || 'false'));
-                    return;
-                }
-
-                if (field.type === 'number') {
-                    const parsed = Number.parseInt(rawValue, 10);
-                    const fallbackParsed = Number.parseInt(String(field.fallback === undefined ? '' : field.fallback), 10);
-                    const effective = Number.isInteger(parsed)
-                        ? parsed
-                        : (Number.isInteger(fallbackParsed) ? fallbackParsed : 0);
-                    const min = Number.isInteger(field.min) ? field.min : effective;
-                    const max = Number.isInteger(field.max) ? field.max : effective;
-                    propertyUpdates[field.key] = String(Math.min(max, Math.max(min, effective)));
-                    return;
-                }
-
-                if (field.type === 'select') {
-                    const options = Array.isArray(field.options) ? field.options.map((entry) => String(entry)) : [];
-                    if (options.includes(rawValue)) {
-                        propertyUpdates[field.key] = rawValue;
-                    } else if (options.includes(String(field.fallback || ''))) {
-                        propertyUpdates[field.key] = String(field.fallback);
-                    } else {
-                        propertyUpdates[field.key] = options[0] || '';
-                    }
-                    return;
-                }
-
-                propertyUpdates[field.key] = rawValue.slice(0, 300);
-            });
-        });
-
-        propertyUpdates['server-port'] = String(Number.parseInt(server.allocation && server.allocation.port, 10) || 25565);
-        if (!propertyUpdates['query.port']) {
-            propertyUpdates['query.port'] = propertyUpdates['server-port'];
+            }).catch(() => {});
         }
 
-        const nextServerProperties = upsertMinecraftPropertiesContent(existingProperties.content, propertyUpdates);
-        const eulaAccepted = normalizeMinecraftBooleanString(req.body.eulaAccepted, 'false') === 'true';
-        const nextEula = buildMinecraftEulaContent(eulaAccepted);
-
-        const existingWhitelist = await readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.whitelist);
-        const existingOps = await readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.ops);
-        const existingPermissions = await readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.permissions);
-        if (!existingWhitelist.success || !existingOps.success || !existingPermissions.success) {
-            const failure = [existingWhitelist, existingOps, existingPermissions].find((entry) => !entry.success);
-            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent((failure && failure.error) || 'Failed to read current config files.')}`);
-        }
-
-        const whitelistNames = parseUniqueNamesMultiline(req.body.whitelistNames, 500);
-        const whitelistCurrent = parseJSONArray(existingWhitelist.content);
-        const nextWhitelist = JSON.stringify(buildWhitelistEntriesFromNames(whitelistNames, whitelistCurrent), null, 2) + '\n';
-
-        const opsParsed = parseOpsEntriesMultiline(req.body.opsEntries);
-        const opsCurrent = parseJSONArray(existingOps.content);
-        const nextOps = JSON.stringify(buildOpsEntriesFromParsed(opsParsed, opsCurrent), null, 2) + '\n';
-
-        const applyPermissionsEditor = normalizeMinecraftBooleanString(req.body.applyPermissionsEditor, 'false') === 'true';
-        const permissionsParsed = parsePermissionsEntriesMultiline(req.body.permissionsEntries);
-        const nextPermissions = buildPermissionsYaml(permissionsParsed);
-
-        const writeOperations = [
-            { path: MINECRAFT_CONFIG_PATHS.serverProperties, content: nextServerProperties },
-            { path: MINECRAFT_CONFIG_PATHS.eula, content: nextEula },
-            { path: MINECRAFT_CONFIG_PATHS.whitelist, content: nextWhitelist },
-            { path: MINECRAFT_CONFIG_PATHS.ops, content: nextOps }
-        ];
-        if (applyPermissionsEditor) {
-            writeOperations.push({ path: MINECRAFT_CONFIG_PATHS.permissions, content: nextPermissions });
-        }
-
-        for (const operation of writeOperations) {
-            const writeResult = await writeConnectorTextFile(connectorWs, server.id, operation.path, operation.content, 20000);
-            if (!writeResult.success) {
-                return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent(writeResult.error || `Failed to write ${operation.path}.`)}`);
-            }
-        }
-
-        const successMessage = applyPermissionsEditor
-            ? 'Minecraft configs updated successfully.'
-            : 'Minecraft configs updated successfully. permissions.yml unchanged (toggle disabled).';
-        return res.redirect(`/server/${server.containerId}/minecraft-configs?success=${encodeURIComponent(successMessage)}`);
+        return res.redirect(`${redirectBase}&success=${encodeURIComponent(`${selectedAction.label} command sent for ${String(targetRaw || '').trim() || 'player'}.`)}`);
     } catch (err) {
-        console.error('Error saving minecraft config manager:', err);
-        return res.redirect(`/server/${req.params.containerId}/minecraft-configs?error=${encodeURIComponent('Failed to save Minecraft configs.')}`);
+        console.error('Error executing minecraft action:', err);
+        return res.redirect(`/server/${req.params.containerId}/minecraft-configs?error=${encodeURIComponent('Failed to execute Minecraft action.')}`);
     }
 });
 

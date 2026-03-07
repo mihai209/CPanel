@@ -15,7 +15,7 @@ const navItems = [
     { id: 'activity', label: 'Activity', icon: 'bi-activity', link: `/server/${server.containerId}/activity` },
     { id: 'debuglogs', label: 'Debug Logs', icon: 'bi-bug', link: `/server/${server.containerId}/debug-logs` },
     { id: 'minecraft', label: 'Minecraft', icon: 'bi-magic', link: `/server/${server.containerId}/minecraft` },
-    { id: 'mcconfigs', label: 'Minecraft Configs', icon: 'bi-sliders2', link: `/server/${server.containerId}/minecraft-configs` }
+    { id: 'mcconfigs', label: 'Minecraft Control', icon: 'bi-controller', link: `/server/${server.containerId}/minecraft-configs` }
 ];
 if (String(settings.featureScheduledScalingEnabled || 'false') === 'true') {
     navItems.push({ id: 'scaling', label: 'Scheduled Scaling', icon: 'bi-sliders2-vertical', link: `/server/${server.containerId}/scaling` });

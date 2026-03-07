@@ -644,6 +644,10 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
 
         const initialMode = '<%= activeDashboardSortMode %>';
         let savedCustomOrderIds = <%- JSON.stringify(dashboardCustomOrderIdsList) %>;
+        const userId = Number.parseInt('<%= Number.parseInt(user && user.id, 10) || 0 %>', 10) || 0;
+        const storagePrefix = userId > 0 ? `dashboardServerOrder:${userId}` : 'dashboardServerOrder:default';
+        const sortModeStorageKey = `${storagePrefix}:mode`;
+        const sortCustomIdsStorageKey = `${storagePrefix}:customIds`;
 
         const normalizeServerIds = (input) => {
             const source = Array.isArray(input) ? input : [];
@@ -658,7 +662,54 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
             return output;
         };
 
+        const normalizeSortMode = (input) => {
+            const normalized = String(input || '').trim().toLowerCase();
+            if (normalized === 'alphabetical' || normalized === 'custom') return normalized;
+            return 'latest';
+        };
+
+        const readStoredSortMode = () => {
+            try {
+                return normalizeSortMode(window.localStorage.getItem(sortModeStorageKey));
+            } catch (_error) {
+                return 'latest';
+            }
+        };
+
+        const readStoredCustomOrderIds = () => {
+            try {
+                const raw = window.localStorage.getItem(sortCustomIdsStorageKey);
+                if (!raw) return [];
+                const parsed = JSON.parse(raw);
+                return normalizeServerIds(parsed);
+            } catch (_error) {
+                return [];
+            }
+        };
+
+        const persistSortStateLocally = (mode, customIds) => {
+            try {
+                window.localStorage.setItem(sortModeStorageKey, normalizeSortMode(mode));
+                if (Array.isArray(customIds)) {
+                    window.localStorage.setItem(sortCustomIdsStorageKey, JSON.stringify(normalizeServerIds(customIds)));
+                }
+            } catch (_error) {
+                // Ignore localStorage failures.
+            }
+        };
+
         savedCustomOrderIds = normalizeServerIds(savedCustomOrderIds);
+        const storedCustomOrderIds = readStoredCustomOrderIds();
+        if (savedCustomOrderIds.length === 0 && storedCustomOrderIds.length > 0) {
+            savedCustomOrderIds = storedCustomOrderIds;
+        }
+
+        let activeMode = normalizeSortMode(initialMode);
+        const storedMode = readStoredSortMode();
+        if (activeMode === 'latest' && (storedMode === 'alphabetical' || storedMode === 'custom')) {
+            activeMode = storedMode;
+        }
+        sortSelect.value = activeMode;
 
         const setSortFeedback = (message, variant = 'muted') => {
             if (!sortFeedback) return;
@@ -737,6 +788,8 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
             try {
                 const data = await persistServerOrder(selectedMode);
                 savedCustomOrderIds = normalizeServerIds(data.customIds || savedCustomOrderIds);
+                activeMode = selectedMode;
+                persistSortStateLocally(activeMode, savedCustomOrderIds);
                 if (selectedMode === 'custom') {
                     applyModeToGrid('custom');
                 }
@@ -754,14 +807,15 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
             }
         });
 
-        if (initialMode === 'alphabetical' || initialMode === 'custom') {
-            applyModeToGrid(initialMode);
+        if (activeMode === 'alphabetical' || activeMode === 'custom') {
+            applyModeToGrid(activeMode);
         }
 
-        if (initialMode === 'custom' && savedCustomOrderIds.length === 0) {
+        if (activeMode === 'custom' && savedCustomOrderIds.length === 0) {
             persistServerOrder('custom')
                 .then((data) => {
                     savedCustomOrderIds = normalizeServerIds(data.customIds || []);
+                    persistSortStateLocally('custom', savedCustomOrderIds);
                     if (savedCustomOrderIds.length > 0) {
                         applyModeToGrid('custom');
                     }
@@ -875,7 +929,10 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
             try {
                 const data = await persistServerOrder('custom', orderedIds);
                 savedCustomOrderIds = normalizeServerIds(data.customIds || orderedIds);
+                activeMode = 'custom';
+                persistSortStateLocally(activeMode, savedCustomOrderIds);
                 sortSelect.value = 'custom';
+                applyModeToGrid('custom');
                 setCustomFeedback('Custom order saved. Refresh page to apply it.', 'success');
                 setSortFeedback('Custom order saved. Refresh page to apply it.', 'warning');
             } catch (error) {

@@ -4,31 +4,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="turbo-visit-control" content="reload">
-    <title>
-        Minecraft Configs <%= server.name %> | <%= settings.brandName.toUpperCase() %>
-    </title>
+    <title>Minecraft Control <%= server.name %> | <%= settings.brandName.toUpperCase() %></title>
     <%- include('../partials/favicon') %>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
         :root {
-            --bg-dark: #0f0f12;
-            --bg-sidebar: #121216;
-            --border-color: #2d2d35;
-            --text-primary: #e1e1e6;
-            --text-secondary: #8b8b9a;
-            --accent-blue: #3b82f6;
-            --accent-yellow: #f59e0b;
+            --bg: #0f0f12;
+            --panel: #121216;
+            --border: #2d2d35;
+            --text: #e1e1e6;
+            --muted: #8b8b9a;
+            --accent: #3b82f6;
         }
 
         body {
-            background-color: var(--bg-dark);
-            color: var(--text-primary);
-            overflow: hidden;
-            height: 100vh;
+            background: var(--bg);
+            color: var(--text);
             margin: 0;
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            font-family: Inter, system-ui, -apple-system, sans-serif;
+            height: 100vh;
+            overflow: hidden;
         }
 
         .wrapper {
@@ -39,316 +35,348 @@
 
         .sidebar {
             width: 260px;
-            background: var(--bg-sidebar);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            flex-shrink: 0;
+            background: var(--panel);
+            border-right: 1px solid var(--border);
             overflow-y: auto;
         }
 
-        .sidebar .sidebar-content {
-            padding: 1.5rem 0.75rem;
+        .sidebar.collapsed {
+            margin-left: -260px;
         }
 
         .content {
             flex: 1;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            min-width: 0;
         }
 
         .top-navbar {
-            background: var(--bg-sidebar);
-            border-bottom: 1px solid var(--border-color);
-            padding: 0.75rem 1.5rem;
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            padding: .75rem 1rem;
             display: flex;
             align-items: center;
-            flex-shrink: 0;
-        }
-
-        .navbar-toggle {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 1.5rem;
-            margin-right: 1rem;
-            cursor: pointer;
-            padding: 0;
-        }
-
-        .navbar-toggle:hover {
-            color: var(--text-primary);
-        }
-
-        .server-name {
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin: 0;
+            gap: .75rem;
         }
 
         .scroll-area {
             flex: 1;
             overflow-y: auto;
-            padding: 1.5rem;
-        }
-
-        .settings-card {
-            background: var(--bg-sidebar);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            overflow: hidden;
-            margin-bottom: 1rem;
-        }
-
-        .settings-card-header {
-            border-bottom: 1px solid var(--border-color);
-            background: rgba(255, 255, 255, 0.02);
-            padding: 1rem 1.25rem;
-        }
-
-        .settings-card-body {
             padding: 1.25rem;
         }
 
-        .form-label {
-            color: var(--text-secondary);
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            font-weight: 600;
+        .cardx {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: .8rem;
         }
 
-        .form-control,
-        .form-select,
-        .form-check-input {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
+        .text-muted-2 {
+            color: var(--muted);
         }
 
-        .form-select option {
-            background-color: #141419;
-            color: var(--text-primary);
+        .btn-icon {
+            background: transparent;
+            border: 0;
+            color: var(--muted);
+            font-size: 1.2rem;
         }
 
-        .form-control:focus,
-        .form-select:focus,
-        .form-check-input:focus {
-            border-color: var(--accent-blue);
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-            color: var(--text-primary);
+        .head-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            border: 1px solid #2f2f39;
+            object-fit: cover;
+            background: #0f1115;
         }
 
-        .btn-primary-soft {
-            background: var(--accent-blue);
-            border: 1px solid var(--accent-blue);
-            color: #fff;
+        .motd-line {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            font-size: 0.83rem;
+            color: #d1d5db;
+            background: #16161b;
+            border: 1px solid #2d2d35;
+            border-radius: 0.45rem;
+            padding: 0.4rem 0.55rem;
+            margin-bottom: 0.4rem;
+            white-space: pre-wrap;
+            word-break: break-word;
         }
 
-        .btn-primary-soft:hover {
-            background: #2563eb;
-            border-color: #2563eb;
-            color: #fff;
-        }
-
-        .text-muted-soft {
-            color: var(--text-secondary);
-        }
-
-        .warning-box {
-            border: 1px solid rgba(245, 158, 11, 0.5);
-            background: rgba(245, 158, 11, 0.09);
-            color: #fbbf24;
+        .status-icon {
+            width: 54px;
+            height: 54px;
             border-radius: 10px;
-            padding: 0.8rem 0.9rem;
+            border: 1px solid #2d2d35;
+            object-fit: cover;
+            background: #0e1014;
         }
 
-        @media (max-width: 992px) {
-            .sidebar {
-                position: absolute;
-                z-index: 1000;
-                transform: translateX(-100%);
-                transition: transform 0.3s ease;
-            }
+        .permission-note {
+            border: 1px dashed #3a3a45;
+            background: #16161b;
+            border-radius: 0.55rem;
+            padding: 0.6rem;
+            font-size: 0.82rem;
+            color: #a1a1aa;
+        }
 
-            .sidebar.open {
-                transform: translateX(0);
-            }
-
-            .scroll-area {
-                padding: 1rem;
-            }
+        .table-dark {
+            --bs-table-bg: transparent;
         }
     </style>
 </head>
 
-<body data-turbo="false">
-    <%- include ('../partials/error-modal') %>
+<body>
     <div class="wrapper">
-        <nav id="sidebar" class="sidebar">
-            <div class="sidebar-content">
-                <%- include('../partials/server-sidebar', { server, active: 'mcconfigs', settings }) %>
+        <nav class="sidebar" id="sidebar">
+            <div class="p-3">
+                <%- include('../partials/server-sidebar', { server, active: 'mcconfigs' }) %>
             </div>
         </nav>
 
-        <div class="content">
-            <div class="top-navbar">
-                <button id="sidebarToggle" class="navbar-toggle" type="button">
-                    <i class="bi bi-list"></i>
-                </button>
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <h1 class="server-name">Minecraft Configs</h1>
-                    <span class="text-muted-soft opacity-50">/</span>
-                    <span class="text-muted-soft"><%= server.name %></span>
-                </div>
-            </div>
+        <main class="content">
+            <header class="top-navbar">
+                <button class="btn-icon" id="sidebarToggle"><i class="bi bi-list"></i></button>
+                <h1 class="h5 mb-0">Minecraft Control / <span class="text-muted-2"><%= server.name %></span></h1>
+            </header>
 
-            <div class="scroll-area">
-                <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs">
-                    <div class="settings-card">
-                        <div class="settings-card-header">
-                            <h6 class="mb-1 fw-semibold">Server Properties</h6>
-                            <div class="small text-muted-soft">Structured editor for common <code>server.properties</code> keys.</div>
+            <section class="scroll-area">
+                <% const status = minecraftStatusPreview || {}; %>
+                <% const players = Array.isArray(status.playersList) ? status.playersList : []; %>
+                <% const online = Boolean(status.online); %>
+                <% const canKick = Boolean(minecraftActionPermissions && minecraftActionPermissions.canKick); %>
+                <% const canBan = Boolean(minecraftActionPermissions && minecraftActionPermissions.canBan); %>
+                <% const canOp = Boolean(minecraftActionPermissions && minecraftActionPermissions.canOp); %>
+                <% const canDeop = Boolean(minecraftActionPermissions && minecraftActionPermissions.canDeop); %>
+                <% const cacheExpiresLabel = status.cacheExpireAtIso ? new Date(status.cacheExpireAtIso).toLocaleString() : 'N/A'; %>
+
+                <% if (success) { %>
+                    <div class="alert alert-success"><%= success %></div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger"><%= error %></div>
+                <% } %>
+
+                <div class="cardx p-3 mb-3">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div>
+                            <div class="small text-muted-2 text-uppercase mb-1">Status Endpoint</div>
+                            <div class="fw-semibold"><%= minecraftStatusAddress || 'Unknown allocation' %></div>
                         </div>
-                        <div class="settings-card-body">
-                            <% minecraftPropertyFieldGroups.forEach((group) => { %>
-                                <div class="mb-4">
-                                    <h6 class="mb-3 text-muted-soft"><%= group.title %></h6>
-                                    <div class="row g-3">
-                                        <% group.fields.forEach((field) => { %>
-                                            <div class="col-md-4">
-                                                <label class="form-label"><%= field.label %></label>
-                                                <% if (field.type === 'boolean') { %>
-                                                    <input type="hidden" name="prop_<%= field.key %>" value="false">
-                                                    <div class="form-check form-switch mt-2">
-                                                        <input class="form-check-input" type="checkbox" role="switch"
-                                                            name="prop_<%= field.key %>" value="true"
-                                                            id="prop_<%= field.key %>"
-                                                            <%= minecraftPropertyValues[field.key] === 'true' ? 'checked' : '' %>>
-                                                        <label class="form-check-label text-muted-soft" for="prop_<%= field.key %>">
-                                                            <%= minecraftPropertyValues[field.key] === 'true' ? 'Enabled' : 'Disabled' %>
-                                                        </label>
-                                                    </div>
-                                                <% } else if (field.type === 'select') { %>
-                                                    <select class="form-select" name="prop_<%= field.key %>" <%= field.readonly ? 'readonly disabled' : '' %>>
-                                                        <% (field.options || []).forEach((opt) => { %>
-                                                            <option value="<%= opt %>" <%= minecraftPropertyValues[field.key] === String(opt) ? 'selected' : '' %>><%= opt %></option>
-                                                        <% }) %>
-                                                    </select>
-                                                <% } else { %>
-                                                    <input class="form-control" type="<%= field.type === 'number' ? 'number' : 'text' %>"
-                                                        name="prop_<%= field.key %>"
-                                                        value="<%= minecraftPropertyValues[field.key] %>"
-                                                        <%= Number.isInteger(field.min) ? `min=\"${field.min}\"` : '' %>
-                                                        <%= Number.isInteger(field.max) ? `max=\"${field.max}\"` : '' %>
-                                                        <%= field.placeholder ? `placeholder=\"${field.placeholder}\"` : '' %>
-                                                        <%= field.readonly ? 'readonly' : '' %>>
-                                                <% } %>
-                                            </div>
-                                        <% }) %>
+                        <div class="d-flex align-items-center gap-2">
+                            <form method="GET" action="/server/<%= server.containerId %>/minecraft-configs" class="mb-0" data-turbo="false">
+                                <input type="hidden" name="bedrock" value="0">
+                                <div class="form-check form-switch m-0">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="bedrockSwitch" name="bedrock" value="1" <%= minecraftBedrockMode ? 'checked' : '' %> onchange="this.form.submit()">
+                                    <label class="form-check-label small" for="bedrockSwitch">Bedrock mode</label>
+                                </div>
+                            </form>
+                            <a href="/server/<%= server.containerId %>/minecraft-configs?bedrock=<%= minecraftBedrockMode ? '1' : '0' %>" class="btn btn-sm btn-outline-light">
+                                <i class="bi bi-arrow-repeat"></i> Refresh
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-xl-7">
+                        <div class="cardx p-3 h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h2 class="h6 mb-0">Server Preview</h2>
+                                <% if (online) { %>
+                                    <span class="badge bg-success">ONLINE</span>
+                                <% } else { %>
+                                    <span class="badge bg-danger">OFFLINE</span>
+                                <% } %>
+                            </div>
+
+                            <% if (!status.ok) { %>
+                                <div class="alert alert-warning mb-0">
+                                    Could not fetch live status: <%= status.error || 'Unknown error.' %>
+                                </div>
+                            <% } else { %>
+                                <div class="d-flex align-items-center gap-3 mb-3">
+                                    <img src="<%= status.iconDataUri || 'https://api.mcsrvstat.us/icon/' + encodeURIComponent(minecraftStatusAddress || '') %>" class="status-icon" alt="Server Icon">
+                                    <div>
+                                        <div class="fw-semibold"><%= status.hostname || status.ip || minecraftStatusAddress %></div>
+                                        <div class="small text-muted-2">
+                                            Version: <%= status.version || status.protocolName || 'Unknown' %>
+                                            <% if (status.software) { %>· Software: <%= status.software %><% } %>
+                                            <% if (minecraftBedrockMode && status.gamemode) { %>· Mode: <%= status.gamemode %><% } %>
+                                        </div>
+                                        <div class="small text-muted-2">Cache expires: <%= cacheExpiresLabel %></div>
                                     </div>
                                 </div>
-                            <% }) %>
-                        </div>
-                    </div>
 
-                    <div class="settings-card">
-                        <div class="settings-card-header">
-                            <h6 class="mb-1 fw-semibold">EULA</h6>
-                            <div class="small text-muted-soft">Manage <code>eula.txt</code> without opening file editor.</div>
-                        </div>
-                        <div class="settings-card-body">
-                            <input type="hidden" name="eulaAccepted" value="false">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" role="switch" name="eulaAccepted" value="true"
-                                    id="eulaAcceptedSwitch" <%= eulaAccepted ? 'checked' : '' %>>
-                                <label class="form-check-label text-muted-soft" for="eulaAcceptedSwitch">
-                                    Accept Mojang EULA (<code>eula=true</code>)
-                                </label>
-                            </div>
-                            <div class="small text-muted-soft mt-2">
-                                EULA URL: <a href="https://www.minecraft.net/eula" target="_blank" class="link-info">minecraft.net/eula</a>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="settings-card">
-                        <div class="settings-card-header">
-                            <h6 class="mb-1 fw-semibold">Whitelist & Operators</h6>
-                            <div class="small text-muted-soft">
-                                Whitelist names: one username per line. Ops format: <code>name:level:bypass</code> (example <code>Mihai:4:true</code>).
-                            </div>
-                        </div>
-                        <div class="settings-card-body">
-                            <div class="row g-3">
-                                <div class="col-lg-6">
-                                    <label class="form-label">Whitelist Usernames</label>
-                                    <textarea class="form-control" name="whitelistNames" rows="10" placeholder="PlayerOne&#10;PlayerTwo"><%= whitelistNamesText %></textarea>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-6 col-md-4">
+                                        <div class="cardx p-2">
+                                            <div class="small text-muted-2">Players</div>
+                                            <div class="fw-semibold"><%= Number(status.playersOnline || 0) %> / <%= Number(status.playersMax || 0) %></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4">
+                                        <div class="cardx p-2">
+                                            <div class="small text-muted-2">Port</div>
+                                            <div class="fw-semibold"><%= status.port || 'N/A' %></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <div class="cardx p-2">
+                                            <div class="small text-muted-2">EULA Blocked</div>
+                                            <div class="fw-semibold"><%= status.eulaBlocked ? 'Yes' : 'No' %></div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="col-lg-6">
-                                    <label class="form-label">Operator Entries</label>
-                                    <textarea class="form-control" name="opsEntries" rows="10" placeholder="Admin:4:true&#10;Moderator:2:true"><%= opsEntriesText %></textarea>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div class="settings-card">
-                        <div class="settings-card-header">
-                            <h6 class="mb-1 fw-semibold">permissions.yml (Simplified)</h6>
-                            <div class="small text-muted-soft">
-                                One entry per line: <code>permission.node|default|description</code>. Default supports: <code>true</code>, <code>false</code>, <code>op</code>, <code>notop</code>.
-                            </div>
-                        </div>
-                        <div class="settings-card-body">
-                            <% if (permissionsDetectedComplex) { %>
-                                <div class="warning-box mb-3">
-                                    <strong>Complex permissions.yml detected.</strong> Current file has a structure outside this simplified editor.
-                                    Keep "Apply simplified permissions.yml" OFF if you don't want overwrite.
+                                <div>
+                                    <div class="small text-muted-2 text-uppercase mb-2">MOTD</div>
+                                    <% if (Array.isArray(status.motdClean) && status.motdClean.length > 0) { %>
+                                        <% status.motdClean.forEach((line) => { %>
+                                            <div class="motd-line"><%= line %></div>
+                                        <% }) %>
+                                    <% } else { %>
+                                        <div class="text-muted-2 small">No MOTD data available.</div>
+                                    <% } %>
                                 </div>
                             <% } %>
-                            <% if (permissionsFileMissing) { %>
-                                <div class="alert alert-secondary py-2">
-                                    <i class="bi bi-info-circle me-1"></i>
-                                    permissions.yml was missing and will be created if apply toggle is enabled.
-                                </div>
-                            <% } %>
-                            <input type="hidden" name="applyPermissionsEditor" value="false">
-                            <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" role="switch" name="applyPermissionsEditor" value="true"
-                                    id="applyPermissionsEditorSwitch" <%= permissionsDetectedComplex ? '' : 'checked' %>>
-                                <label class="form-check-label text-muted-soft" for="applyPermissionsEditorSwitch">
-                                    Apply simplified permissions.yml on save
-                                </label>
-                            </div>
-                            <textarea class="form-control" name="permissionsEntries" rows="8"
-                                placeholder="bukkit.command.plugins|op|Allow plugin list&#10;minecraft.command.say|true|Allow /say"><%= permissionsEntriesText %></textarea>
                         </div>
                     </div>
 
-                    <div class="d-flex justify-content-end gap-2 mb-5">
-                        <a href="/server/<%= server.containerId %>/minecraft" class="btn btn-outline-secondary">
-                            <i class="bi bi-box me-1"></i> Minecraft Addons
-                        </a>
-                        <button type="submit" class="btn btn-primary-soft">
-                            <i class="bi bi-save me-1"></i> Save Minecraft Configs
-                        </button>
+                    <div class="col-12 col-xl-5">
+                        <div class="cardx p-3 h-100">
+                            <h2 class="h6 mb-3">Minecraft Commands</h2>
+
+                            <% if (!connectorOnline) { %>
+                                <div class="alert alert-warning py-2">Connector is offline. Commands are disabled.</div>
+                            <% } %>
+
+                            <div class="permission-note mb-3">
+                                Required permissions: <code>minecraft.op</code>, <code>minecraft.deop</code>, <code>minecraft.kick</code>, <code>minecraft.ban</code>.
+                            </div>
+
+                            <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="mb-2" data-turbo="false">
+                                <input type="hidden" name="action" value="op">
+                                <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
+                                <label class="form-label small text-uppercase text-muted-2">OP Player</label>
+                                <div class="input-group">
+                                    <input name="player" class="form-control" required maxlength="32" placeholder="Player name" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                                    <button class="btn btn-success" type="submit" <%= (!connectorOnline || !canOp) ? 'disabled' : '' %>>OP</button>
+                                </div>
+                            </form>
+
+                            <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="mb-2" data-turbo="false">
+                                <input type="hidden" name="action" value="deop">
+                                <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
+                                <label class="form-label small text-uppercase text-muted-2">DEOP Player</label>
+                                <div class="input-group">
+                                    <input name="player" class="form-control" required maxlength="32" placeholder="Player name" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                                    <button class="btn btn-outline-warning" type="submit" <%= (!connectorOnline || !canDeop) ? 'disabled' : '' %>>DEOP</button>
+                                </div>
+                            </form>
+
+                            <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="mb-2" data-turbo="false">
+                                <input type="hidden" name="action" value="kick">
+                                <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
+                                <label class="form-label small text-uppercase text-muted-2">Kick Player</label>
+                                <div class="input-group mb-2">
+                                    <input name="player" class="form-control" required maxlength="32" placeholder="Player name" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                                    <button class="btn btn-outline-light" type="submit" <%= (!connectorOnline || !canKick) ? 'disabled' : '' %>>KICK</button>
+                                </div>
+                                <input name="reason" class="form-control" maxlength="96" placeholder="Reason (optional)" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                            </form>
+
+                            <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" data-turbo="false">
+                                <input type="hidden" name="action" value="ban">
+                                <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
+                                <label class="form-label small text-uppercase text-muted-2">Ban Player</label>
+                                <div class="input-group mb-2">
+                                    <input name="player" class="form-control" required maxlength="32" placeholder="Player name" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                                    <button class="btn btn-danger" type="submit" <%= (!connectorOnline || !canBan) ? 'disabled' : '' %>>BAN</button>
+                                </div>
+                                <input name="reason" class="form-control" maxlength="96" placeholder="Reason (optional)" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                            </form>
+                        </div>
                     </div>
-                </form>
-            </div>
-        </div>
+                </div>
+
+                <div class="cardx p-3">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <h2 class="h6 mb-0">Online Players</h2>
+                        <span class="text-muted-2 small"><%= Number(status.playersOnline || 0) %> detected</span>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Player</th>
+                                    <th>UUID</th>
+                                    <th class="text-end">Quick Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (players.length === 0) { %>
+                                    <tr>
+                                        <td colspan="3" class="text-muted-2">No player sample available from status API.</td>
+                                    </tr>
+                                <% } else { %>
+                                    <% players.forEach((player) => { %>
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <img class="head-avatar" src="<%= player.headUrl %>" alt="Head" onerror="this.src='https://mc-heads.net/avatar/Steve/40'">
+                                                    <div class="fw-semibold"><%= player.name %></div>
+                                                </div>
+                                            </td>
+                                            <td><code><%= player.uuid || '-' %></code></td>
+                                            <td class="text-end">
+                                                <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
+                                                    <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="d-inline" data-turbo="false">
+                                                        <input type="hidden" name="action" value="op">
+                                                        <input type="hidden" name="player" value="<%= player.name %>">
+                                                        <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
+                                                        <button type="submit" class="btn btn-sm btn-outline-success" title="OP" <%= (!connectorOnline || !canOp) ? 'disabled' : '' %>>OP</button>
+                                                    </form>
+                                                    <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="d-inline" data-turbo="false">
+                                                        <input type="hidden" name="action" value="deop">
+                                                        <input type="hidden" name="player" value="<%= player.name %>">
+                                                        <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
+                                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="DEOP" <%= (!connectorOnline || !canDeop) ? 'disabled' : '' %>>DEOP</button>
+                                                    </form>
+                                                    <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="d-inline" data-turbo="false">
+                                                        <input type="hidden" name="action" value="kick">
+                                                        <input type="hidden" name="player" value="<%= player.name %>">
+                                                        <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
+                                                        <button type="submit" class="btn btn-sm btn-outline-light" title="KICK" <%= (!connectorOnline || !canKick) ? 'disabled' : '' %>>KICK</button>
+                                                    </form>
+                                                    <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="d-inline" data-turbo="false">
+                                                        <input type="hidden" name="action" value="ban">
+                                                        <input type="hidden" name="player" value="<%= player.name %>">
+                                                        <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="BAN" <%= (!connectorOnline || !canBan) ? 'disabled' : '' %>>BAN</button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <% }) %>
+                                <% } %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
     <script>
-        const sidebar = document.getElementById('sidebar');
-        const toggleBtn = document.getElementById('sidebarToggle');
-        if (toggleBtn && sidebar) {
-            toggleBtn.addEventListener('click', () => {
-                sidebar.classList.toggle('open');
-            });
-        }
+        document.getElementById('sidebarToggle')?.addEventListener('click', function () {
+            document.getElementById('sidebar')?.classList.toggle('collapsed');
+        });
     </script>
 </body>
 
