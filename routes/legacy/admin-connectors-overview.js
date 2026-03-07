@@ -51,6 +51,42 @@ function normalizeAllocationNotes(raw) {
     return sliced || null;
 }
 
+function normalizeAllocationAlias(raw) {
+    const compact = String(raw || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const sliced = compact.slice(0, 191);
+    return sliced || null;
+}
+
+function parseAllocationIds(rawIds, maxItems = 2000) {
+    const values = Array.isArray(rawIds) ? rawIds : (rawIds === undefined || rawIds === null ? [] : [rawIds]);
+    const seen = new Set();
+    const output = [];
+
+    for (const value of values) {
+        const parsed = Number.parseInt(value, 10);
+        if (!Number.isInteger(parsed) || parsed <= 0 || seen.has(parsed)) continue;
+        seen.add(parsed);
+        output.push(parsed);
+        if (output.length >= maxItems) break;
+    }
+
+    return output;
+}
+
+function renderAllocationAliasTemplate(template, allocation) {
+    const sourceTemplate = String(template || '');
+    const currentAlias = String(allocation && allocation.alias || '');
+    const rendered = sourceTemplate
+        .replace(/\{ip\}/gi, String(allocation && allocation.ip || ''))
+        .replace(/\{port\}/gi, String(allocation && allocation.port || ''))
+        .replace(/\{id\}/gi, String(allocation && allocation.id || ''))
+        .replace(/\{alias\}/gi, currentAlias);
+
+    return normalizeAllocationAlias(rendered);
+}
+
 function normalizeBooleanInput(value, fallback = false) {
     if (value === undefined || value === null || value === '') return fallback;
     const normalized = String(value).trim().toLowerCase();
@@ -309,7 +345,30 @@ app.get('/admin/connectors/:id/allocations', requireAuth, requireAdmin, async (r
         if (!connector) {
             return res.redirect('/admin/connectors?error=Connector not found.');
         }
-        const allocations = await Allocation.findAll({ where: { connectorId: req.params.id } });
+        const allocations = await Allocation.findAll({
+            where: { connectorId: req.params.id },
+            order: [['port', 'ASC'], ['id', 'ASC']]
+        });
+        const assignedServerIds = Array.from(new Set(
+            allocations
+                .map((allocation) => Number.parseInt(allocation && allocation.serverId, 10))
+                .filter((serverId) => Number.isInteger(serverId) && serverId > 0)
+        ));
+        const assignedServers = assignedServerIds.length
+            ? await Server.findAll({
+                where: { id: assignedServerIds },
+                attributes: ['id', 'name', 'containerId'],
+                raw: true
+            })
+            : [];
+        const assignedServerById = new Map(
+            assignedServers.map((entry) => [Number.parseInt(entry.id, 10), entry])
+        );
+        allocations.forEach((allocation) => {
+            const serverId = Number.parseInt(allocation && allocation.serverId, 10);
+            const assignedServer = Number.isInteger(serverId) ? (assignedServerById.get(serverId) || null) : null;
+            allocation.setDataValue('assignedServer', assignedServer);
+        });
         const statusData = (global.connectorStatus && global.connectorStatus[req.params.id]) || { status: 'offline', lastSeen: null, usage: null };
         const allocatedUsage = await getConnectorAllocatedUsage(req.params.id);
 
@@ -466,6 +525,7 @@ app.get('/admin/connectors/:id/webserver-template', requireAuth, requireAdmin, a
 app.post('/admin/connectors/:id/allocations', requireAuth, requireAdmin, async (req, res) => {
     try {
         const { ip, port, portEnd, alias } = req.body;
+        const normalizedAlias = normalizeAllocationAlias(alias);
         const notes = normalizeAllocationNotes(req.body.notes);
 
         // Check if it's a port range
@@ -478,7 +538,7 @@ app.post('/admin/connectors/:id/allocations', requireAuth, requireAdmin, async (
                 allocations.push({
                     ip,
                     port: p,
-                    alias: alias || null,
+                    alias: normalizedAlias,
                     notes,
                     connectorId: req.params.id
                 });
@@ -491,7 +551,7 @@ app.post('/admin/connectors/:id/allocations', requireAuth, requireAdmin, async (
             await Allocation.create({
                 ip,
                 port: parseInt(port),
-                alias: alias || null,
+                alias: normalizedAlias,
                 notes,
                 connectorId: req.params.id
             });
@@ -522,15 +582,71 @@ app.post('/admin/connectors/:id/allocations/delete', requireAuth, requireAdmin, 
 // Admin Connector Allocations (POST - Update Alias)
 app.post('/admin/connectors/:id/allocations/:allocId/alias', requireAuth, requireAdmin, async (req, res) => {
     try {
-        const { alias } = req.body;
+        const alias = normalizeAllocationAlias(req.body.alias);
         await Allocation.update(
-            { alias: alias || null },
+            { alias },
             { where: { id: req.params.allocId, connectorId: req.params.id } }
         );
-        res.json({ success: true, alias: alias || null });
+        res.json({ success: true, alias });
     } catch (error) {
         console.error("Error updating alias:", error);
         res.status(500).json({ success: false, error: 'Failed to update alias' });
+    }
+});
+
+app.post('/admin/connectors/:id/allocations/alias/bulk', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const ids = parseAllocationIds(req.body['ids[]'] || req.body.ids);
+        if (ids.length === 0) {
+            return res.status(400).json({ success: false, error: 'No allocations selected.' });
+        }
+
+        const modeRaw = String(req.body.mode || 'set').trim().toLowerCase();
+        const mode = modeRaw === 'clear' ? 'clear' : 'set';
+
+        const allocations = await Allocation.findAll({
+            where: { connectorId: req.params.id, id: ids },
+            attributes: ['id', 'ip', 'port', 'alias']
+        });
+        if (!allocations.length) {
+            return res.status(404).json({ success: false, error: 'No matching allocations found.' });
+        }
+
+        if (mode === 'clear') {
+            await Allocation.update(
+                { alias: null },
+                { where: { connectorId: req.params.id, id: allocations.map((entry) => entry.id) } }
+            );
+            return res.json({
+                success: true,
+                mode,
+                updated: allocations.map((entry) => ({ id: entry.id, alias: null }))
+            });
+        }
+
+        const template = normalizeAllocationAlias(req.body.alias);
+        if (!template) {
+            return res.status(400).json({ success: false, error: 'Alias template is required.' });
+        }
+
+        const updates = allocations.map((entry) => ({
+            id: entry.id,
+            alias: renderAllocationAliasTemplate(template, entry)
+        }));
+
+        await Promise.all(updates.map((entry) => Allocation.update(
+            { alias: entry.alias },
+            { where: { connectorId: req.params.id, id: entry.id } }
+        )));
+
+        return res.json({
+            success: true,
+            mode,
+            updated: updates
+        });
+    } catch (error) {
+        console.error('Error bulk-updating allocation aliases:', error);
+        return res.status(500).json({ success: false, error: 'Failed to bulk update aliases.' });
     }
 });
 
