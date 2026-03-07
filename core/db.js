@@ -99,6 +99,7 @@ const Image = sequelize.define('Image', {
 
 const Server = sequelize.define('Server', {
     name: { type: DataTypes.STRING, allowNull: false },
+    description: { type: DataTypes.STRING(50), allowNull: true },
     containerId: { type: DataTypes.STRING, unique: true },
     status: { type: DataTypes.STRING, defaultValue: 'installing' },
     isSuspended: { type: DataTypes.BOOLEAN, defaultValue: false },

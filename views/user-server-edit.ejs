@@ -72,6 +72,19 @@
                         style="background-color:#1a1a20;border-color:#2d2d35;"
                     >
                 </div>
+                <div class="col-12">
+                    <label class="form-label text-muted small text-uppercase fw-bold">Description</label>
+                    <input
+                        type="text"
+                        class="form-control"
+                        name="description"
+                        maxlength="50"
+                        value="<%= server.description || '' %>"
+                        placeholder="Short note (max 50 chars)"
+                        style="background-color:#1a1a20;border-color:#2d2d35;"
+                    >
+                    <div class="form-text text-muted">Optional. Visible in admin server listings.</div>
+                </div>
                 <div class="col-12 d-flex justify-content-end gap-2">
                     <a href="/store" class="btn btn-outline-light">Cancel</a>
                     <button type="submit" class="btn btn-primary">Save Changes</button>

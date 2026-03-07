@@ -1645,9 +1645,11 @@ app.post('/admin/migrations/pterodactyl/import', requireAuth, requireAdmin, asyn
 });
 
 app.post('/admin/servers', requireAuth, requireAdmin, async (req, res) => {
-    const { name, ownerId, imageId, memory, cpu, disk, allocationId, connectorId, dockerImage } = req.body;
+    const { name, description, ownerId, imageId, memory, cpu, disk, allocationId, connectorId, dockerImage } = req.body;
 
     try {
+        const safeDescriptionRaw = String(description || '').trim();
+        const safeDescription = safeDescriptionRaw.length > 0 ? safeDescriptionRaw : null;
         const parsedMemory = Number.parseInt(memory, 10);
         const parsedCpu = Number.parseInt(cpu, 10);
         const parsedDisk = Number.parseInt(disk, 10);
@@ -1658,6 +1660,9 @@ app.post('/admin/servers', requireAuth, requireAdmin, async (req, res) => {
 
         if (![parsedMemory, parsedCpu, parsedDisk].every(Number.isInteger)) {
             return res.redirect('/admin/servers?error=Memory, CPU, and Disk must be valid numbers.');
+        }
+        if (safeDescriptionRaw.length > 50) {
+            return res.redirect('/admin/servers?error=' + encodeURIComponent('Description must be at most 50 characters.'));
         }
         if (!advancedLimits.valid) {
             return res.redirect(`/admin/servers?error=${encodeURIComponent(advancedLimits.error)}`);
@@ -1736,6 +1741,7 @@ app.post('/admin/servers', requireAuth, requireAdmin, async (req, res) => {
         const containerId = nodeCrypto.randomBytes(4).toString('hex');
         const server = await Server.create({
             name,
+            description: safeDescription,
             containerId,
             ownerId,
             imageId,
@@ -2021,10 +2027,15 @@ app.post('/admin/servers/delete/:containerId', requireAuth, requireAdmin, async 
 });
 
 app.post('/admin/servers/edit/:containerId', requireAuth, requireAdmin, async (req, res) => {
-    const { name, ownerId, imageId, allocationId, memory, cpu, disk, dockerImage, startup } = req.body;
+    const { name, description, ownerId, imageId, allocationId, memory, cpu, disk, dockerImage, startup } = req.body;
     try {
+        const safeDescriptionRaw = String(description || '').trim();
+        const safeDescription = safeDescriptionRaw.length > 0 ? safeDescriptionRaw : null;
         const server = await Server.findOne({ where: { containerId: req.params.containerId } });
         if (!server) return res.redirect('/admin/servers?error=Server not found.');
+        if (safeDescriptionRaw.length > 50) {
+            return res.redirect(`/admin/servers/${req.params.containerId}/manage?error=${encodeURIComponent('Description must be at most 50 characters.')}`);
+        }
         const advancedLimits = normalizeServerAdvancedLimits(req.body, {
             swapLimit: Number.parseInt(server.swapLimit, 10),
             ioWeight: Number.parseInt(server.ioWeight, 10),
@@ -2075,6 +2086,7 @@ app.post('/admin/servers/edit/:containerId', requireAuth, requireAdmin, async (r
 
         await server.update({
             name,
+            description: safeDescription,
             ownerId,
             imageId,
             memory: parsedMemory,

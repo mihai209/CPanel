@@ -475,6 +475,7 @@ app.get('/', requireAuth, async (req, res) => {
 
         const servers = await Server.findAll({
             where,
+            include: [{ model: User, as: 'owner', attributes: ['id', 'username'] }],
             order: [['id', 'DESC']]
         });
         const settingsMap = res.locals.settings || {};
@@ -5024,19 +5025,29 @@ app.post('/user/server/:containerId/edit', requireAuth, async (req, res) => {
         }
 
         const nextName = String(req.body.name || '').trim();
+        const nextDescriptionRaw = String(req.body.description || '').trim();
+        const nextDescription = nextDescriptionRaw.length > 0 ? nextDescriptionRaw : null;
         if (!nextName) {
             return res.redirect(`/user/server/${server.containerId}/edit?error=${encodeURIComponent('Server name is required.')}`);
         }
         if (nextName.length > 100) {
             return res.redirect(`/user/server/${server.containerId}/edit?error=${encodeURIComponent('Server name must be at most 100 characters.')}`);
         }
+        if (nextDescriptionRaw.length > 50) {
+            return res.redirect(`/user/server/${server.containerId}/edit?error=${encodeURIComponent('Description must be at most 50 characters.')}`);
+        }
 
         const prevName = String(server.name || '').trim();
-        if (prevName === nextName) {
+        const prevDescription = String(server.description || '').trim();
+        const normalizedNextDescription = String(nextDescription || '').trim();
+        if (prevName === nextName && prevDescription === normalizedNextDescription) {
             return res.redirect(`/user/server/${server.containerId}/edit?success=${encodeURIComponent('No changes detected.')}`);
         }
 
-        await server.update({ name: nextName });
+        await server.update({
+            name: nextName,
+            description: nextDescription
+        });
 
         await createBillingAuditLog({
             actorUserId: account.id,
@@ -5046,11 +5057,19 @@ app.post('/user/server/:containerId/edit', requireAuth, async (req, res) => {
             req,
             metadata: {
                 previousName: prevName,
-                newName: nextName
+                newName: nextName,
+                previousDescription: prevDescription || null,
+                newDescription: normalizedNextDescription || null
             }
         });
 
-        return res.redirect('/store?success=' + encodeURIComponent(`Server renamed to "${nextName}".`));
+        if (prevName !== nextName && prevDescription !== normalizedNextDescription) {
+            return res.redirect('/store?success=' + encodeURIComponent(`Server "${nextName}" updated (name + description).`));
+        }
+        if (prevName !== nextName) {
+            return res.redirect('/store?success=' + encodeURIComponent(`Server renamed to "${nextName}".`));
+        }
+        return res.redirect('/store?success=' + encodeURIComponent(`Server description updated for "${nextName}".`));
     } catch (error) {
         console.error('Error editing user server:', error);
         return res.redirect(`/user/server/${req.params.containerId}/edit?error=${encodeURIComponent('Failed to edit server.')}`);
@@ -5539,6 +5558,8 @@ app.post('/user/create', requireAuth, async (req, res) => {
         }
 
         const name = String(req.body.name || '').trim();
+        const descriptionRaw = String(req.body.description || '').trim();
+        const description = descriptionRaw.length > 0 ? descriptionRaw : null;
         const imageId = req.body.imageId;
         const requestedAllocationId = Number.parseInt(req.body.allocationId, 10);
         const smartAllocationEnabled = parseSmartAllocationToggle(req.body.smartAllocation, true);
@@ -5564,6 +5585,9 @@ app.post('/user/create', requireAuth, async (req, res) => {
 
         if (!name) {
             return res.redirect('/user/create?error=' + encodeURIComponent('Server name is required.'));
+        }
+        if (descriptionRaw.length > 50) {
+            return res.redirect('/user/create?error=' + encodeURIComponent('Description must be at most 50 characters.'));
         }
         if (!imageId) {
             return res.redirect('/user/create?error=' + encodeURIComponent('Image is required.'));
@@ -5776,6 +5800,7 @@ app.post('/user/create', requireAuth, async (req, res) => {
         const containerId = nodeCrypto.randomBytes(4).toString('hex');
         const server = await Server.create({
             name,
+            description,
             containerId,
             ownerId: account.id,
             imageId: image.id,
@@ -5975,7 +6000,8 @@ app.get('/server/:containerId', requireAuth, async (req, res) => {
             where: { containerId: req.params.containerId },
             include: [
                 { model: Allocation, as: 'allocation', include: [{ model: Connector, as: 'connector' }] },
-                { model: Image, as: 'image' }
+                { model: Image, as: 'image' },
+                { model: User, as: 'owner', attributes: ['id', 'username'] }
             ]
         });
 

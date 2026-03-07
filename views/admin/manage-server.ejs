@@ -65,6 +65,12 @@
                                                         style="background-color: #1a1a20; border-color: #2d2d35; color: white;"
                                                         value="<%= server.name %>" required>
                                                 </div>
+                                                <div class="col-12">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Description</label>
+                                                    <input type="text" name="description" class="form-control"
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;"
+                                                        value="<%= server.description || '' %>" maxlength="50" placeholder="Optional short note (max 50 chars)">
+                                                </div>
                                                 <div class="col-md-6">
                                                     <label
                                                         class="form-label text-muted small text-uppercase fw-bold">Owner</label>

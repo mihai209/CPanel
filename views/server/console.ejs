@@ -133,6 +133,7 @@
                 display: flex;
                 align-items: center;
                 flex-shrink: 0;
+                gap: 0.75rem;
             }
 
             .navbar-toggle {
@@ -157,6 +158,22 @@
                 align-items: center;
                 flex-wrap: wrap;
                 gap: 1rem;
+            }
+
+            .server-meta-line {
+                color: var(--text-secondary);
+                font-size: 0.78rem;
+                width: 100%;
+                margin-top: -0.25rem;
+            }
+
+            .top-navbar-right {
+                margin-left: auto;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                justify-content: flex-end;
             }
 
             .server-name {
@@ -387,6 +404,12 @@
                     padding: 1rem;
                 }
 
+                .top-navbar-right {
+                    margin-left: 0;
+                    width: 100%;
+                    justify-content: flex-start;
+                }
+
                 .terminal-header {
                     flex-direction: column;
                     align-items: flex-start;
@@ -469,6 +492,12 @@
                         <h1 class="server-name">
                             <%= server.name %>
                         </h1>
+                        <% if (server.description) { %>
+                            <div class="server-meta-line"><%= server.description %></div>
+                        <% } %>
+                        <% if (user && user.isAdmin) { %>
+                            <div class="server-meta-line">Owner: @<%= server.owner && server.owner.username ? server.owner.username : 'unknown' %></div>
+                        <% } %>
 
                         <span id="statusBadge" class="status-badge status-<%= server.status %>">
                             <span class="status-dot"></span>
@@ -477,7 +506,18 @@
                             </span>
                         </span>
                     </div>
-                    <!-- Optional: quick stats can go here -->
+                    <div class="top-navbar-right">
+                        <% if (Number(server.ownerId) === Number(user && user.id)) { %>
+                            <a href="/user/server/<%= server.containerId %>/edit" class="btn btn-outline-light btn-sm">
+                                <i class="bi bi-pencil-square me-1"></i>Edit Details
+                            </a>
+                        <% } %>
+                        <% if (user && user.isAdmin) { %>
+                            <a href="/admin/servers/<%= server.containerId %>/manage" class="btn btn-outline-info btn-sm">
+                                <i class="bi bi-gear me-1"></i>Admin Manage
+                            </a>
+                        <% } %>
+                    </div>
                 </div>
 
                 <!-- Terminal Wrapper -->

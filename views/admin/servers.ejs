@@ -66,6 +66,9 @@
                                                                     <div class="fw-bold text-light">
                                                                         <%= server.name %>
                                                                     </div>
+                                                                    <% if (server.description) { %>
+                                                                        <div class="small text-info"><%= server.description %></div>
+                                                                    <% } %>
                                                                     <small class="text-muted">
                                                                         <%= server.containerId ?
                                                                             server.containerId.substring(0, 8)
@@ -74,7 +77,7 @@
                                                                 </td>
                                                                 <td>
                                                                     <div class="text-light">
-                                                                        <%= server.owner ? server.owner.username
+                                                                        @<%= server.owner ? server.owner.username
                                                                             : 'Unknown' %>
                                                                     </div>
                                                                     <small class="text-muted">
@@ -117,7 +120,7 @@
                                                                     </a>
                                                                     <a href="/admin/servers/<%= server.containerId %>/manage"
                                                                         class="btn btn-sm btn-outline-primary">
-                                                                        <i class="bi bi-gear text-info"></i>
+                                                                        <i class="bi bi-gear text-info me-1"></i>Admin Manage
                                                                     </a>
                                                                 </td>
                                                             </tr>

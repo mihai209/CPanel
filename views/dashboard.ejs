@@ -469,6 +469,12 @@ const formatLimit = (value) => {
                                 <div>
                                     <div class="server-name"><%= server.name %></div>
                                     <div class="server-subtext">Container ID: <%= server.containerId ? server.containerId.substring(0, 12) : 'N/A' %></div>
+                                    <% if (server.description) { %>
+                                        <div class="server-subtext text-info"><%= server.description %></div>
+                                    <% } %>
+                                    <% if (isAdminDashboardView) { %>
+                                        <div class="server-subtext">Owner: @<%= server.owner && server.owner.username ? server.owner.username : 'unknown' %></div>
+                                    <% } %>
                                 </div>
                                 <span class="badge <%= badgeClass %> text-uppercase"><%= statusLabel %></span>
                             </div>
@@ -488,8 +494,11 @@ const formatLimit = (value) => {
                                 </div>
                             </div>
 
-                            <div class="mt-3">
-                                <a href="/server/<%= server.containerId %>" class="btn btn-primary w-100 btn-sm fw-semibold">Manage Server</a>
+                            <div class="mt-3 d-grid gap-2">
+                                <a href="/server/<%= server.containerId %>" class="btn btn-primary btn-sm fw-semibold">Manage Server</a>
+                                <% if (isAdminDashboardView) { %>
+                                    <a href="/admin/servers/<%= server.containerId %>/manage" class="btn btn-outline-info btn-sm fw-semibold">Admin Manage Page</a>
+                                <% } %>
                             </div>
                         </div>
                     </div>

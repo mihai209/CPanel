@@ -125,6 +125,10 @@ const statusBadgeClass = (() => {
                     <input type="text" class="form-control" name="name" maxlength="100" required style="background-color:#1a1a20;border-color:#2d2d35;">
                 </div>
                 <div class="col-md-6">
+                    <label class="form-label text-muted small text-uppercase fw-bold">Description</label>
+                    <input type="text" class="form-control" name="description" maxlength="50" placeholder="Optional short note" style="background-color:#1a1a20;border-color:#2d2d35;">
+                </div>
+                <div class="col-md-6">
                     <label class="form-label text-muted small text-uppercase fw-bold">Image</label>
                     <select class="form-select" name="imageId" id="imageId" required style="background-color:#1a1a20;border-color:#2d2d35;" <%= hasAnyImages ? '' : 'disabled' %>>
                         <% imagesList.forEach((img) => { %>
