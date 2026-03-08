@@ -12668,6 +12668,85 @@ app.post('/server/:containerId/files/upload', requireAuth, async (req, res) => {
 
 
 // API: Fetch file list (JSON) for auto-refresh
+app.get('/server/:containerId/files-search', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }]
+        });
+
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found' });
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.files')) {
+            return res.status(403).json({ success: false, error: 'Forbidden' });
+        }
+
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return res.status(503).json({ success: false, error: 'Connector is offline' });
+        }
+
+        const query = String(req.query.q || '').trim().slice(0, 120);
+        const directory = normalizeServerDirectoryInput(req.query.path || '/');
+        const filterRaw = String(req.query.filter || 'all').trim().toLowerCase();
+        const filterMode = (filterRaw === 'files' || filterRaw === 'folders') ? filterRaw : 'all';
+        const requestId = typeof nodeCrypto.randomUUID === 'function'
+            ? nodeCrypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+        const maxResultsRaw = Number.parseInt(String(req.query.maxResults || ''), 10);
+        const maxDirectoriesRaw = Number.parseInt(String(req.query.maxDirectories || ''), 10);
+        const maxResults = Number.isFinite(maxResultsRaw) && maxResultsRaw > 0
+            ? Math.min(maxResultsRaw, 1000)
+            : 300;
+        const maxDirectories = Number.isFinite(maxDirectoriesRaw) && maxDirectoriesRaw > 0
+            ? Math.min(maxDirectoriesRaw, 5000)
+            : 1500;
+
+        connectorWs.send(JSON.stringify({
+            type: 'search_files',
+            serverId: server.id,
+            requestId,
+            query,
+            directory,
+            filterMode,
+            maxResults,
+            maxDirectories
+        }));
+
+        const response = await waitForConnectorMessage(connectorWs, (message) => {
+            if (Number.parseInt(message.serverId, 10) !== Number.parseInt(server.id, 10)) return null;
+            if (String(message.type || '') !== 'file_search_result') return null;
+            if (String(message.requestId || '') !== requestId) return null;
+            return message;
+        }, 20000);
+
+        if (!response || response.success === false) {
+            const errorText = String((response && response.error) || 'Search request failed.');
+            const isTimeout = errorText.toLowerCase().includes('timed out');
+            return res.status(isTimeout ? 504 : 500).json({
+                success: false,
+                error: errorText
+            });
+        }
+
+        return res.json({
+            success: true,
+            query: String(response.query || query),
+            filterMode: String(response.filterMode || filterMode),
+            directory: String(response.directory || directory),
+            results: Array.isArray(response.results) ? response.results : [],
+            truncated: Boolean(response.truncated),
+            scannedDirectories: Number.isFinite(Number(response.scannedDirectories)) ? Number(response.scannedDirectories) : 0,
+            durationMs: Number.isFinite(Number(response.durationMs)) ? Number(response.durationMs) : 0
+        });
+    } catch (err) {
+        console.error('Error in files-search:', err);
+        return res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
 app.get('/server/:containerId/files-fetch', requireAuth, async (req, res) => {
     try {
         const server = await Server.findOne({

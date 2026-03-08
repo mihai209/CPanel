@@ -2392,17 +2392,30 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 });
             }
 
-            async function fetchDirectoryForSearch(directory, signal) {
-                const normalizedDir = normalizeServerPath(directory);
-                const response = await fetch(`/server/${serverId}/files-fetch?path=${encodeURIComponent(normalizedDir)}`, { signal });
+            async function fetchServerFileSearch(query, filterMode, signal) {
+                const params = new URLSearchParams();
+                params.set('q', String(query || ''));
+                params.set('filter', String(filterMode || 'all'));
+                params.set('path', '/');
+                params.set('maxResults', '300');
+                params.set('maxDirectories', '1500');
+
+                const response = await fetch(`/server/${serverId}/files-search?${params.toString()}`, { signal });
                 if (!response.ok) {
-                    throw new Error(`Search failed in ${normalizedDir}`);
+                    let fallback = `Search request failed (${response.status})`;
+                    try {
+                        const maybePayload = await response.json();
+                        if (maybePayload && maybePayload.error) fallback = String(maybePayload.error);
+                    } catch {
+                        // Ignore parse errors.
+                    }
+                    throw new Error(fallback);
                 }
                 const payload = await response.json();
-                if (!payload || payload.error) {
+                if (!payload || payload.success === false) {
                     throw new Error(payload && payload.error ? payload.error : 'Search request failed.');
                 }
-                return Array.isArray(payload.files) ? payload.files : [];
+                return payload;
             }
 
             function renderSearchResults(results) {
@@ -2446,7 +2459,7 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
 
             async function runFileSearch(rawQuery) {
                 if (searchInProgress) return;
-                const query = String(rawQuery || '').trim().toLowerCase();
+                const query = String(rawQuery || '').trim();
                 const filterMode = getSearchFilterValue();
                 if (!query) {
                     if (searchFilesStatus) searchFilesStatus.textContent = 'Type a file name to search.';
@@ -2462,65 +2475,15 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 searchCancelRequested = false;
                 searchAbortController = new AbortController();
                 setSearchBusyState(true);
-                if (searchFilesStatus) searchFilesStatus.textContent = 'Starting recursive search...';
+                if (searchFilesStatus) searchFilesStatus.textContent = 'Searching...';
                 if (searchResultsList) searchResultsList.innerHTML = '';
 
-                const queue = ['/'];
-                const visited = new Set();
-                const found = [];
-                const maxDirectories = 600;
-                const maxResults = 300;
+                let found = [];
                 let canceled = false;
 
                 try {
-                    while (queue.length > 0 && visited.size < maxDirectories && found.length < maxResults) {
-                        if (searchCancelRequested) {
-                            canceled = true;
-                            break;
-                        }
-                        const directory = normalizeServerPath(queue.shift());
-                        if (visited.has(directory)) continue;
-                        visited.add(directory);
-                        if (searchFilesStatus) {
-                            searchFilesStatus.textContent = `Searching in ${directory} (${found.length} hits)...`;
-                        }
-
-                        let entries = [];
-                        try {
-                            entries = await fetchDirectoryForSearch(directory, searchAbortController.signal);
-                        } catch (dirError) {
-                            if (searchCancelRequested || (dirError && dirError.name === 'AbortError')) {
-                                canceled = true;
-                                break;
-                            }
-                            continue;
-                        }
-
-                        for (const entry of entries) {
-                            if (!entry) continue;
-                            const name = String(entry.name || '').trim();
-                            if (!name || name === '.' || name === '..') continue;
-                            const isDirectory = Boolean(entry.isDirectory);
-                            const path = joinServerPath(directory, name);
-                            const includeByFilter = filterMode === 'all'
-                                || (filterMode === 'files' && !isDirectory)
-                                || (filterMode === 'folders' && isDirectory);
-
-                            if (includeByFilter && name.toLowerCase().includes(query)) {
-                                found.push({
-                                    name,
-                                    path,
-                                    parentPath: directory,
-                                    isDirectory
-                                });
-                                if (found.length >= maxResults) break;
-                            }
-
-                            if (isDirectory) {
-                                queue.push(path);
-                            }
-                        }
-                    }
+                    const payload = await fetchServerFileSearch(query, filterMode, searchAbortController.signal);
+                    found = Array.isArray(payload.results) ? payload.results : [];
 
                     lastSearchResults = found;
                     refreshSearchHitsForCurrentPath();
@@ -2528,14 +2491,16 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                     renderSearchResults(found);
                     persistSearchPreference(query, filterMode);
 
-                    const limitHit = found.length >= maxResults || visited.size >= maxDirectories;
                     if (searchFilesStatus) {
                         if (canceled) {
                             searchFilesStatus.textContent = `Search canceled. ${found.length} result(s) collected.`;
                         } else {
-                            searchFilesStatus.textContent = limitHit
-                                ? `Found ${found.length} result(s). Search stopped at safety limit.`
-                                : `Found ${found.length} result(s).`;
+                            const scannedDirs = Number.isFinite(Number(payload.scannedDirectories)) ? Number(payload.scannedDirectories) : 0;
+                            const durationMs = Number.isFinite(Number(payload.durationMs)) ? Number(payload.durationMs) : 0;
+                            const wasTruncated = Boolean(payload.truncated);
+                            searchFilesStatus.textContent = wasTruncated
+                                ? `Found ${found.length} result(s) in ${scannedDirs} folder(s). Limited for safety (${durationMs} ms).`
+                                : `Found ${found.length} result(s) in ${scannedDirs} folder(s) (${durationMs} ms).`;
                         }
                     }
                 } catch (error) {
