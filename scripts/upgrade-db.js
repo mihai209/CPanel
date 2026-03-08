@@ -53,6 +53,23 @@ const LinkedAccount = sequelize.define('LinkedAccount', {
     providerUsername: { type: DataTypes.STRING, allowNull: true }
 });
 
+const UserLoginEvent = sequelize.define('UserLoginEvent', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    userId: { type: DataTypes.INTEGER, allowNull: false },
+    usernameSnapshot: { type: DataTypes.STRING(100), allowNull: false },
+    loginType: { type: DataTypes.STRING(16), allowNull: false, defaultValue: 'email' },
+    ipAddress: { type: DataTypes.STRING(120), allowNull: false, defaultValue: 'unknown' },
+    location: { type: DataTypes.STRING(160), allowNull: true },
+    operatingSystem: { type: DataTypes.STRING(120), allowNull: true },
+    userAgent: { type: DataTypes.TEXT, allowNull: true }
+}, {
+    indexes: [
+        { fields: ['userId'] },
+        { fields: ['createdAt'] },
+        { fields: ['userId', 'createdAt'] }
+    ]
+});
+
 // Associations are declared after all models are defined.
 
 const Settings = sequelize.define('Settings', {
@@ -154,6 +171,8 @@ const Image = sequelize.define('Image', {
 const Server = sequelize.define('Server', {
     name: { type: DataTypes.STRING, allowNull: false },
     description: { type: DataTypes.STRING(50), allowNull: true },
+    folder: { type: DataTypes.STRING(64), allowNull: true },
+    tags: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
     containerId: { type: DataTypes.STRING, unique: true },
     status: { type: DataTypes.STRING, defaultValue: 'installing' },
     isSuspended: { type: DataTypes.BOOLEAN, defaultValue: false },
@@ -208,6 +227,37 @@ const ServerApiKey = sequelize.define('ServerApiKey', {
         { fields: ['ownerUserId'] },
         { fields: ['keyHash'], unique: true },
         { fields: ['serverId', 'keyPrefix'] }
+    ]
+});
+
+const ServerCommandMacro = sequelize.define('ServerCommandMacro', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    serverId: { type: DataTypes.INTEGER, allowNull: false },
+    createdByUserId: { type: DataTypes.INTEGER, allowNull: true },
+    name: { type: DataTypes.STRING(80), allowNull: false },
+    description: { type: DataTypes.STRING(160), allowNull: true },
+    command: { type: DataTypes.STRING(1024), allowNull: false },
+    position: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 }
+}, {
+    indexes: [
+        { fields: ['serverId'] },
+        { fields: ['createdByUserId'] },
+        { fields: ['serverId', 'position'] }
+    ]
+});
+
+const ServerResourceSample = sequelize.define('ServerResourceSample', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    serverId: { type: DataTypes.INTEGER, allowNull: false },
+    cpuPercent: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 0 },
+    memoryMb: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    diskMb: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    collectedAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW }
+}, {
+    indexes: [
+        { fields: ['serverId'] },
+        { fields: ['collectedAt'] },
+        { fields: ['serverId', 'collectedAt'] }
     ]
 });
 
@@ -330,6 +380,19 @@ const ServerMount = sequelize.define('ServerMount', {
 // Associations
 User.hasMany(LinkedAccount, { foreignKey: 'userId', as: 'linkedAccounts' });
 LinkedAccount.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(UserLoginEvent, {
+    foreignKey: 'userId',
+    as: 'loginEvents',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+    hooks: true
+});
+UserLoginEvent.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
+});
 
 User.hasMany(Server, { foreignKey: 'ownerId', as: 'servers' });
 Server.belongsTo(User, { foreignKey: 'ownerId', as: 'owner' });
@@ -426,6 +489,44 @@ User.hasMany(ServerApiKey, {
 ServerApiKey.belongsTo(User, {
     foreignKey: 'ownerUserId',
     as: 'owner',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
+});
+Server.hasMany(ServerCommandMacro, {
+    foreignKey: 'serverId',
+    as: 'commandMacros',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+    hooks: true
+});
+ServerCommandMacro.belongsTo(Server, {
+    foreignKey: 'serverId',
+    as: 'server',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
+});
+User.hasMany(ServerCommandMacro, {
+    foreignKey: 'createdByUserId',
+    as: 'createdServerMacros',
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+});
+ServerCommandMacro.belongsTo(User, {
+    foreignKey: 'createdByUserId',
+    as: 'creator',
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+});
+Server.hasMany(ServerResourceSample, {
+    foreignKey: 'serverId',
+    as: 'resourceSamples',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+    hooks: true
+});
+ServerResourceSample.belongsTo(Server, {
+    foreignKey: 'serverId',
+    as: 'server',
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE'
 });
@@ -590,6 +691,10 @@ async function upgrade() {
         await LinkedAccount.sync({ alter: true });
         console.log('LinkedAccount table synced.');
 
+        // Sync the UserLoginEvent model
+        await UserLoginEvent.sync({ alter: true });
+        console.log('UserLoginEvent table synced.');
+
         // Sync the Connector model
         await Connector.sync({ alter: true });
         console.log('Connector table synced.');
@@ -623,6 +728,14 @@ async function upgrade() {
         // Sync the ServerApiKey model
         await ServerApiKey.sync({ alter: true });
         console.log('ServerApiKey table synced.');
+
+        // Sync the ServerCommandMacro model
+        await ServerCommandMacro.sync({ alter: true });
+        console.log('ServerCommandMacro table synced.');
+
+        // Sync the ServerResourceSample model
+        await ServerResourceSample.sync({ alter: true });
+        console.log('ServerResourceSample table synced.');
 
         // Sync the AdminApiKey model
         await AdminApiKey.sync({ alter: true });
@@ -665,6 +778,18 @@ async function upgrade() {
             { permissions: {} },
             { where: { permissions: null } }
         );
+        await UserLoginEvent.update(
+            { loginType: 'email' },
+            { where: { loginType: null } }
+        );
+        await UserLoginEvent.update(
+            { ipAddress: 'unknown' },
+            { where: { ipAddress: null } }
+        );
+        await UserLoginEvent.update(
+            { usernameSnapshot: 'unknown' },
+            { where: { usernameSnapshot: null } }
+        );
         await Server.update(
             { status: 'offline' },
             { where: { status: null } }
@@ -672,6 +797,10 @@ async function upgrade() {
         await Server.update(
             { variables: {} },
             { where: { variables: null } }
+        );
+        await Server.update(
+            { tags: [] },
+            { where: { tags: null } }
         );
         await Server.update(
             { databaseLimit: 0 },
@@ -806,10 +935,13 @@ async function upgrade() {
             await sequelize.query(`ALTER TABLE \`${tempTable}\` RENAME TO \`${tableName}\``);
         };
         const userTable = resolveTableName(User);
+        const userLoginEventTable = resolveTableName(UserLoginEvent);
         const serverTable = resolveTableName(Server);
         const allocationTable = resolveTableName(Allocation);
         const serverSubuserTable = resolveTableName(ServerSubuser);
         const serverApiKeyTable = resolveTableName(ServerApiKey);
+        const serverCommandMacroTable = resolveTableName(ServerCommandMacro);
+        const serverResourceSampleTable = resolveTableName(ServerResourceSample);
         const adminApiKeyTable = resolveTableName(AdminApiKey);
         const adminApiKeyAuditTable = resolveTableName(AdminApiKeyAudit);
         const jobTable = resolveTableName(Job);
@@ -828,6 +960,12 @@ async function upgrade() {
         await addIndexIfMissing(serverApiKeyTable, ['ownerUserId'], { name: 'server_api_keys_owner_user_id_idx' });
         await addIndexIfMissing(serverApiKeyTable, ['serverId', 'keyPrefix'], { name: 'server_api_keys_server_prefix_idx' });
         await addIndexIfMissing(serverApiKeyTable, ['keyHash'], { name: 'server_api_keys_key_hash_uq', unique: true });
+        await addIndexIfMissing(serverCommandMacroTable, ['serverId'], { name: 'server_command_macros_server_id_idx' });
+        await addIndexIfMissing(serverCommandMacroTable, ['createdByUserId'], { name: 'server_command_macros_creator_user_id_idx' });
+        await addIndexIfMissing(serverCommandMacroTable, ['serverId', 'position'], { name: 'server_command_macros_server_position_idx' });
+        await addIndexIfMissing(serverResourceSampleTable, ['serverId'], { name: 'server_resource_samples_server_id_idx' });
+        await addIndexIfMissing(serverResourceSampleTable, ['collectedAt'], { name: 'server_resource_samples_collected_at_idx' });
+        await addIndexIfMissing(serverResourceSampleTable, ['serverId', 'collectedAt'], { name: 'server_resource_samples_server_collected_idx' });
         await addIndexIfMissing(adminApiKeyTable, ['creatorUserId'], { name: 'admin_api_keys_creator_user_id_idx' });
         await addIndexIfMissing(adminApiKeyTable, ['name'], { name: 'admin_api_keys_name_uq', unique: true });
         await addIndexIfMissing(adminApiKeyTable, ['keyHash'], { name: 'admin_api_keys_key_hash_uq', unique: true });
@@ -838,6 +976,9 @@ async function upgrade() {
 
         await addIndexIfMissing(userTable, ['username'], { name: 'users_username_idx' });
         await addIndexIfMissing(userTable, ['email'], { name: 'users_email_idx' });
+        await addIndexIfMissing(userLoginEventTable, ['userId'], { name: 'user_login_events_user_id_idx' });
+        await addIndexIfMissing(userLoginEventTable, ['createdAt'], { name: 'user_login_events_created_at_idx' });
+        await addIndexIfMissing(userLoginEventTable, ['userId', 'createdAt'], { name: 'user_login_events_user_created_idx' });
 
         await addIndexIfMissing(serverTable, ['ownerId'], { name: 'servers_owner_id_idx' });
         await addIndexIfMissing(serverTable, ['allocationId'], { name: 'servers_allocation_id_idx' });
@@ -908,6 +1049,7 @@ async function upgrade() {
             { key: 'featureServiceHealthChecksEnabled', value: 'false' },
             { key: 'serviceHealthCheckIntervalSeconds', value: '300' },
             { key: 'featurePolicyEngineEnabled', value: 'false' },
+            { key: 'featurePlaybooksAutomationEnabled', value: 'false' },
             { key: 'featureSftpEnabled', value: 'true' },
             { key: 'featureWebUploadEnabled', value: 'true' },
             { key: 'featureWebUploadMaxMb', value: '50' },

@@ -262,20 +262,22 @@
                                 <input type="hidden" name="action" value="op">
                                 <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
                                 <label class="form-label small text-uppercase text-muted-2">OP Player</label>
-                                <div class="input-group">
+                                <div class="input-group mb-2">
                                     <input name="player" class="form-control" required maxlength="32" placeholder="Player name" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
                                     <button class="btn btn-success" type="submit" <%= (!connectorOnline || !canOp) ? 'disabled' : '' %>>OP</button>
                                 </div>
+                                <input name="reason" class="form-control" required minlength="3" maxlength="96" placeholder="Reason (required)" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
                             </form>
 
                             <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="mb-2" data-turbo="false">
                                 <input type="hidden" name="action" value="deop">
                                 <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
                                 <label class="form-label small text-uppercase text-muted-2">DEOP Player</label>
-                                <div class="input-group">
+                                <div class="input-group mb-2">
                                     <input name="player" class="form-control" required maxlength="32" placeholder="Player name" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
                                     <button class="btn btn-outline-warning" type="submit" <%= (!connectorOnline || !canDeop) ? 'disabled' : '' %>>DEOP</button>
                                 </div>
+                                <input name="reason" class="form-control" required minlength="3" maxlength="96" placeholder="Reason (required)" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
                             </form>
 
                             <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="mb-2" data-turbo="false">
@@ -286,7 +288,7 @@
                                     <input name="player" class="form-control" required maxlength="32" placeholder="Player name" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
                                     <button class="btn btn-outline-light" type="submit" <%= (!connectorOnline || !canKick) ? 'disabled' : '' %>>KICK</button>
                                 </div>
-                                <input name="reason" class="form-control" maxlength="96" placeholder="Reason (optional)" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                                <input name="reason" class="form-control" required minlength="3" maxlength="96" placeholder="Reason (required)" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
                             </form>
 
                             <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" data-turbo="false">
@@ -297,7 +299,7 @@
                                     <input name="player" class="form-control" required maxlength="32" placeholder="Player name" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
                                     <button class="btn btn-danger" type="submit" <%= (!connectorOnline || !canBan) ? 'disabled' : '' %>>BAN</button>
                                 </div>
-                                <input name="reason" class="form-control" maxlength="96" placeholder="Reason (optional)" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                                <input name="reason" class="form-control" required minlength="3" maxlength="96" placeholder="Reason (required)" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
                             </form>
                         </div>
                     </div>
@@ -339,25 +341,29 @@
                                                         <input type="hidden" name="action" value="op">
                                                         <input type="hidden" name="player" value="<%= player.name %>">
                                                         <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
-                                                        <button type="submit" class="btn btn-sm btn-outline-success" title="OP" <%= (!connectorOnline || !canOp) ? 'disabled' : '' %>>OP</button>
+                                                        <input type="hidden" name="reason" value="">
+                                                        <button type="submit" class="btn btn-sm btn-outline-success js-mc-guarded-action" data-action-label="OP" title="OP" <%= (!connectorOnline || !canOp) ? 'disabled' : '' %>>OP</button>
                                                     </form>
                                                     <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="d-inline" data-turbo="false">
                                                         <input type="hidden" name="action" value="deop">
                                                         <input type="hidden" name="player" value="<%= player.name %>">
                                                         <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
-                                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="DEOP" <%= (!connectorOnline || !canDeop) ? 'disabled' : '' %>>DEOP</button>
+                                                        <input type="hidden" name="reason" value="">
+                                                        <button type="submit" class="btn btn-sm btn-outline-warning js-mc-guarded-action" data-action-label="DEOP" title="DEOP" <%= (!connectorOnline || !canDeop) ? 'disabled' : '' %>>DEOP</button>
                                                     </form>
                                                     <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="d-inline" data-turbo="false">
                                                         <input type="hidden" name="action" value="kick">
                                                         <input type="hidden" name="player" value="<%= player.name %>">
                                                         <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
-                                                        <button type="submit" class="btn btn-sm btn-outline-light" title="KICK" <%= (!connectorOnline || !canKick) ? 'disabled' : '' %>>KICK</button>
+                                                        <input type="hidden" name="reason" value="">
+                                                        <button type="submit" class="btn btn-sm btn-outline-light js-mc-guarded-action" data-action-label="KICK" title="KICK" <%= (!connectorOnline || !canKick) ? 'disabled' : '' %>>KICK</button>
                                                     </form>
                                                     <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="d-inline" data-turbo="false">
                                                         <input type="hidden" name="action" value="ban">
                                                         <input type="hidden" name="player" value="<%= player.name %>">
                                                         <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="BAN" <%= (!connectorOnline || !canBan) ? 'disabled' : '' %>>BAN</button>
+                                                        <input type="hidden" name="reason" value="">
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger js-mc-guarded-action" data-action-label="BAN" title="BAN" <%= (!connectorOnline || !canBan) ? 'disabled' : '' %>>BAN</button>
                                                     </form>
                                                 </div>
                                             </td>
@@ -376,6 +382,33 @@
     <script>
         document.getElementById('sidebarToggle')?.addEventListener('click', function () {
             document.getElementById('sidebar')?.classList.toggle('collapsed');
+        });
+
+        document.querySelectorAll('.js-mc-guarded-action').forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                const form = button.closest('form');
+                if (!form) return;
+                const actionLabel = String(button.getAttribute('data-action-label') || 'ACTION').trim();
+                const playerInput = form.querySelector('input[name="player"]');
+                const playerName = playerInput ? String(playerInput.value || '').trim() : 'player';
+                const reason = window.prompt(`${actionLabel} reason for ${playerName}:`, '');
+                if (reason === null) return;
+                const normalized = String(reason || '').trim();
+                if (normalized.length < 3) {
+                    if (window.showStatusModal) {
+                        window.showStatusModal('Reason must be at least 3 characters.', 'error');
+                    } else {
+                        alert('Reason must be at least 3 characters.');
+                    }
+                    return;
+                }
+                const reasonInput = form.querySelector('input[name="reason"]');
+                if (reasonInput) {
+                    reasonInput.value = normalized.slice(0, 96);
+                }
+                form.submit();
+            });
         });
     </script>
 </body>

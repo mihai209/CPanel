@@ -261,6 +261,28 @@
                             </div>
 
                             <label class="form-label small text-uppercase text-muted-2">Permissions</label>
+                            <div class="cardx p-2 mb-2" style="background:#16161b;">
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-7">
+                                        <label class="form-label small text-uppercase text-muted-2 mb-1">Preset</label>
+                                        <select id="subuserPresetSelect" class="form-select form-select-sm" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
+                                            <option value="">Custom</option>
+                                            <% (permissionPresets || []).forEach((preset) => { %>
+                                                <option value="<%= preset.id %>"><%= preset.label %></option>
+                                            <% }) %>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-5 d-flex gap-2">
+                                        <button type="button" class="btn btn-sm btn-outline-info w-100" id="btnApplySubuserPreset">
+                                            <i class="bi bi-magic me-1"></i>Apply Preset
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary w-100" id="btnResetSubuserPreset">
+                                            Reset
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="small text-muted-2 mt-2" id="subuserPresetHint">Choose a preset to auto-select permissions.</div>
+                            </div>
                             <div class="permission-grid mb-3">
                                 <% (permissionCatalog || []).forEach((perm)=> { %>
                                     <label class="permission-item">
@@ -303,11 +325,53 @@
                 const identifierInput = document.getElementById('subuserIdentifier');
                 const removeForm = document.getElementById('subuserRemoveForm');
                 const submitBtn = document.getElementById('subuserSubmitBtn');
+                const presetSelect = document.getElementById('subuserPresetSelect');
+                const presetApplyBtn = document.getElementById('btnApplySubuserPreset');
+                const presetResetBtn = document.getElementById('btnResetSubuserPreset');
+                const presetHint = document.getElementById('subuserPresetHint');
+                const permissionPresets = <%- JSON.stringify(permissionPresets || []) %>;
+                const permissionPresetMap = new Map((Array.isArray(permissionPresets) ? permissionPresets : []).map((preset) => [
+                    String(preset && preset.id || ''),
+                    {
+                        id: String(preset && preset.id || ''),
+                        label: String(preset && preset.label || ''),
+                        description: String(preset && preset.description || ''),
+                        permissions: Array.isArray(preset && preset.permissions) ? preset.permissions.map((p) => String(p || '').trim()).filter(Boolean) : []
+                    }
+                ]).filter((entry) => entry[0]));
 
                 function resetPermissions(defaults = ['server.view']) {
                     document.querySelectorAll('.subuser-permission').forEach((checkbox) => {
                         checkbox.checked = defaults.includes(checkbox.value);
                     });
+                }
+
+                function findPresetByPermissions(currentPermissions = []) {
+                    const currentSorted = Array.from(new Set((Array.isArray(currentPermissions) ? currentPermissions : [])
+                        .map((entry) => String(entry || '').trim())
+                        .filter(Boolean))).sort();
+
+                    for (const preset of permissionPresetMap.values()) {
+                        const presetSorted = Array.from(new Set((preset.permissions || []).map((entry) => String(entry || '').trim()).filter(Boolean))).sort();
+                        if (presetSorted.length !== currentSorted.length) continue;
+                        const same = presetSorted.every((entry, idx) => entry === currentSorted[idx]);
+                        if (same) return preset;
+                    }
+                    return null;
+                }
+
+                function applyPresetById(presetId) {
+                    const preset = permissionPresetMap.get(String(presetId || '').trim());
+                    if (!preset) {
+                        resetPermissions(['server.view']);
+                        if (presetHint) presetHint.textContent = 'Choose a preset to auto-select permissions.';
+                        return;
+                    }
+                    const selectedPermissions = Array.from(new Set([...(preset.permissions || []), 'server.view']));
+                    resetPermissions(selectedPermissions);
+                    if (presetHint) {
+                        presetHint.textContent = `${preset.label}: ${preset.description}`;
+                    }
                 }
 
                 function openInviteModal() {
@@ -316,6 +380,8 @@
                     if (userSelect) userSelect.value = '';
                     if (identifierInput) identifierInput.value = '';
                     resetPermissions(['server.view']);
+                    if (presetSelect) presetSelect.value = '';
+                    if (presetHint) presetHint.textContent = 'Choose a preset to auto-select permissions.';
                     if (removeForm) removeForm.classList.add('d-none');
                     if (submitBtn) submitBtn.textContent = 'Save Subuser';
                 }
@@ -332,6 +398,13 @@
                     if (userSelect) userSelect.value = userId;
                     if (identifierInput) identifierInput.value = email || username || '';
                     resetPermissions(permissions.length ? permissions : ['server.view']);
+                    const matchingPreset = findPresetByPermissions(permissions);
+                    if (presetSelect) presetSelect.value = matchingPreset ? matchingPreset.id : '';
+                    if (presetHint) {
+                        presetHint.textContent = matchingPreset
+                            ? `${matchingPreset.label}: ${matchingPreset.description}`
+                            : 'Custom permissions selected.';
+                    }
 
                     if (removeForm && membershipId) {
                         removeForm.action = `/server/<%= server.containerId %>/users/${membershipId}/delete`;
@@ -348,8 +421,37 @@
                     btn.addEventListener('click', () => openEditModal(btn));
                 });
 
+                if (presetApplyBtn) {
+                    presetApplyBtn.addEventListener('click', () => {
+                        applyPresetById(presetSelect ? presetSelect.value : '');
+                    });
+                }
+                if (presetResetBtn) {
+                    presetResetBtn.addEventListener('click', () => {
+                        if (presetSelect) presetSelect.value = '';
+                        resetPermissions(['server.view']);
+                        if (presetHint) presetHint.textContent = 'Choose a preset to auto-select permissions.';
+                    });
+                }
+                if (presetSelect) {
+                    presetSelect.addEventListener('change', () => {
+                        const value = String(presetSelect.value || '').trim();
+                        if (!value) {
+                            if (presetHint) presetHint.textContent = 'Custom permissions selected.';
+                            return;
+                        }
+                        const preset = permissionPresetMap.get(value);
+                        if (presetHint) {
+                            presetHint.textContent = preset
+                                ? `${preset.label}: ${preset.description}`
+                                : 'Choose a preset to auto-select permissions.';
+                        }
+                    });
+                }
+
                 const userPermissionDescriptions = {
                     'server.view': 'Access the server overview and basic details.',
+                    'server.tags.manage': 'Edit server folder and tags on overview.',
                     'server.console': 'View the console and send commands.',
                     'server.power': 'Start, stop, restart, or kill the server.',
                     'server.files': 'View and edit server files.',
@@ -372,6 +474,10 @@
                     'server.users.view': 'View subusers list.',
                     'server.users.manage': 'Invite/remove subusers and edit permissions.',
                     'server.activity.view': 'View activity logs.',
+                    'server.audit.read': 'Read audit console events (read-only).',
+                    'server.timeline.view': 'View live resource timeline.',
+                    'server.macros': 'Manage and run command macros.',
+                    'server.recovery': 'Use recovery assistant actions.',
                     'server.smartalerts': 'Configure smart alerts.',
                     'server.policy': 'Configure policy engine.'
                 };

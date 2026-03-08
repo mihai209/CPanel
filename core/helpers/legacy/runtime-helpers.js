@@ -57,6 +57,7 @@ const SERVER_MIGRATION_TRANSFER_KEY_PREFIX = 'server_migration_transfer_';
 const MIGRATION_TRANSFER_STATUSES = new Set(['queued', 'running', 'completed', 'failed', 'skipped']);
 const SERVER_POLICY_ENGINE_KEY_PREFIX = 'server_policy_engine_';
 const POLICY_REMEDIATION_STATE = new Map(); // serverId -> remediation counters, cooldown and anomaly hits
+const POLICY_PLAYBOOK_STATE = new Map(); // serverId -> { crashEvents: number[] }
 const FEATURE_FLAGS_CACHE_TTL_MS = 10 * 1000;
 const SERVER_POLICY_CACHE_TTL_MS = 10 * 1000;
 let featureFlagsCache = null;
@@ -84,6 +85,7 @@ const FEATURE_FLAG_SETTING_KEYS = [
     'featureAutoRemediationEnabled',
     'featureAntiMinerEnabled',
     'featurePolicyEngineEnabled',
+    'featurePlaybooksAutomationEnabled',
     'featureSftpEnabled',
     'featureWebUploadEnabled',
     'featureWebUploadMaxMb',
@@ -277,6 +279,7 @@ function defaultPanelFeatureFlags() {
         autoRemediationEnabled: false,
         antiMinerEnabled: false,
         policyEngineEnabled: false,
+        playbooksAutomationEnabled: false,
         sftpEnabled: true,
         webUploadEnabled: true,
         remoteDownloadEnabled: true,
@@ -353,6 +356,7 @@ function getPanelFeatureFlagsFromMap(settingsMap) {
         autoRemediationEnabled: parseBooleanInput(source.featureAutoRemediationEnabled, base.autoRemediationEnabled),
         antiMinerEnabled: parseBooleanInput(source.featureAntiMinerEnabled, base.antiMinerEnabled),
         policyEngineEnabled: parseBooleanInput(source.featurePolicyEngineEnabled, base.policyEngineEnabled),
+        playbooksAutomationEnabled: parseBooleanInput(source.featurePlaybooksAutomationEnabled, base.playbooksAutomationEnabled),
         sftpEnabled: parseBooleanInput(source.featureSftpEnabled, base.sftpEnabled),
         webUploadEnabled: parseBooleanInput(source.featureWebUploadEnabled, base.webUploadEnabled),
         remoteDownloadEnabled: parseBooleanInput(source.featureRemoteDownloadEnabled, base.remoteDownloadEnabled),
@@ -2010,7 +2014,20 @@ function defaultServerPolicyEngineConfig() {
         anomalyCpuThreshold: 95,
         anomalyMemoryThreshold: 95,
         anomalyDurationSamples: 3,
-        maxRemediationsPerHour: 3
+        maxRemediationsPerHour: 3,
+        playbooks: {
+            enabled: false,
+            crashLoop: {
+                enabled: false,
+                crashCount: 3,
+                windowMinutes: 10,
+                action: 'stop' // none|start|restart|stop
+            },
+            oomRecovery: {
+                enabled: true,
+                action: 'start' // none|start|restart
+            }
+        }
     };
 }
 
@@ -2029,6 +2046,23 @@ function normalizeServerPolicyEngineConfig(raw) {
 
     const actionRaw = String(parsed.anomalyAction || base.anomalyAction).trim().toLowerCase();
     const anomalyAction = ['none', 'restart', 'stop'].includes(actionRaw) ? actionRaw : base.anomalyAction;
+    const playbooksRaw = parsed.playbooks && typeof parsed.playbooks === 'object'
+        ? parsed.playbooks
+        : {};
+    const crashLoopRaw = playbooksRaw.crashLoop && typeof playbooksRaw.crashLoop === 'object'
+        ? playbooksRaw.crashLoop
+        : {};
+    const oomRecoveryRaw = playbooksRaw.oomRecovery && typeof playbooksRaw.oomRecovery === 'object'
+        ? playbooksRaw.oomRecovery
+        : {};
+    const crashLoopActionRaw = String(crashLoopRaw.action || base.playbooks.crashLoop.action).trim().toLowerCase();
+    const crashLoopAction = ['none', 'start', 'restart', 'stop'].includes(crashLoopActionRaw)
+        ? crashLoopActionRaw
+        : base.playbooks.crashLoop.action;
+    const oomRecoveryActionRaw = String(oomRecoveryRaw.action || base.playbooks.oomRecovery.action).trim().toLowerCase();
+    const oomRecoveryAction = ['none', 'start', 'restart'].includes(oomRecoveryActionRaw)
+        ? oomRecoveryActionRaw
+        : base.playbooks.oomRecovery.action;
 
     return {
         enabled: parseBooleanInput(parsed.enabled, base.enabled),
@@ -2037,7 +2071,20 @@ function normalizeServerPolicyEngineConfig(raw) {
         anomalyCpuThreshold: Math.min(1000, Math.max(1, parseFiniteNumberInput(parsed.anomalyCpuThreshold, base.anomalyCpuThreshold, 1, 1000))),
         anomalyMemoryThreshold: Math.min(1000, Math.max(1, parseFiniteNumberInput(parsed.anomalyMemoryThreshold, base.anomalyMemoryThreshold, 1, 1000))),
         anomalyDurationSamples: Math.min(20, Math.max(1, Number.parseInt(parseFiniteNumberInput(parsed.anomalyDurationSamples, base.anomalyDurationSamples, 1, 20), 10) || base.anomalyDurationSamples)),
-        maxRemediationsPerHour: Math.min(100, Math.max(1, Number.parseInt(parseFiniteNumberInput(parsed.maxRemediationsPerHour, base.maxRemediationsPerHour, 1, 100), 10) || base.maxRemediationsPerHour))
+        maxRemediationsPerHour: Math.min(100, Math.max(1, Number.parseInt(parseFiniteNumberInput(parsed.maxRemediationsPerHour, base.maxRemediationsPerHour, 1, 100), 10) || base.maxRemediationsPerHour)),
+        playbooks: {
+            enabled: parseBooleanInput(playbooksRaw.enabled, base.playbooks.enabled),
+            crashLoop: {
+                enabled: parseBooleanInput(crashLoopRaw.enabled, base.playbooks.crashLoop.enabled),
+                crashCount: Math.min(20, Math.max(2, Number.parseInt(parseFiniteNumberInput(crashLoopRaw.crashCount, base.playbooks.crashLoop.crashCount, 2, 20), 10) || base.playbooks.crashLoop.crashCount)),
+                windowMinutes: Math.min(120, Math.max(1, Number.parseInt(parseFiniteNumberInput(crashLoopRaw.windowMinutes, base.playbooks.crashLoop.windowMinutes, 1, 120), 10) || base.playbooks.crashLoop.windowMinutes)),
+                action: crashLoopAction
+            },
+            oomRecovery: {
+                enabled: parseBooleanInput(oomRecoveryRaw.enabled, base.playbooks.oomRecovery.enabled),
+                action: oomRecoveryAction
+            }
+        }
     };
 }
 
@@ -2241,6 +2288,107 @@ async function handlePolicyAnomalyRemediation(serverId, cpuRaw, memoryRaw) {
         return { handled: Boolean(result.dispatched), action: result.action || null, reason: result.reason || null };
     } catch (error) {
         console.warn(`Anomaly auto-remediation failed for server ${serverId}:`, error.message);
+        return { handled: false, reason: 'error' };
+    }
+}
+
+async function handlePolicyPlaybooksOnStop(serverId, options = {}) {
+    try {
+        if (!Number.isInteger(serverId) || serverId <= 0) return { handled: false, reason: 'invalid_server' };
+
+        const flags = await getPanelFeatureFlags(false);
+        if (!flags.policyEngineEnabled || !flags.autoRemediationEnabled || !flags.playbooksAutomationEnabled) {
+            return { handled: false, reason: 'feature_disabled' };
+        }
+
+        const policy = await getServerPolicyEngineConfig(serverId, false);
+        if (!policy.enabled || !policy.playbooks || !policy.playbooks.enabled) {
+            return { handled: false, reason: 'policy_disabled' };
+        }
+
+        const state = getPolicyRemediationState(serverId);
+        const now = Date.now();
+        const cooldownMs = Math.max(10000, Number.parseInt(flags.autoRemediationCooldownSeconds, 10) * 1000);
+        if (state.lastActionAt > 0 && now - state.lastActionAt < cooldownMs) {
+            POLICY_REMEDIATION_STATE.set(serverId, state);
+            return { handled: false, reason: 'cooldown' };
+        }
+        if (state.actionsInWindow >= policy.maxRemediationsPerHour) {
+            POLICY_REMEDIATION_STATE.set(serverId, state);
+            return { handled: false, reason: 'rate_limited' };
+        }
+
+        const expectedStop = parseBooleanInput(options.expectedStop, false);
+        const oomKilled = parseBooleanInput(options.oomKilled, false);
+
+        const playbookState = POLICY_PLAYBOOK_STATE.get(serverId) || { crashEvents: [] };
+        if (!Array.isArray(playbookState.crashEvents)) playbookState.crashEvents = [];
+
+        const crashLoop = policy.playbooks.crashLoop || {};
+        if (!expectedStop && parseBooleanInput(crashLoop.enabled, false)) {
+            const windowMinutes = Math.max(1, Number.parseInt(crashLoop.windowMinutes, 10) || 10);
+            const crashCount = Math.max(2, Number.parseInt(crashLoop.crashCount, 10) || 3);
+            const windowMs = windowMinutes * 60 * 1000;
+
+            playbookState.crashEvents = playbookState.crashEvents
+                .map((value) => Number.parseInt(value, 10))
+                .filter((value) => Number.isInteger(value) && now - value <= windowMs);
+            playbookState.crashEvents.push(now);
+
+            const action = String(crashLoop.action || 'none').trim().toLowerCase();
+            if (playbookState.crashEvents.length >= crashCount && ['start', 'restart', 'stop'].includes(action)) {
+                const result = await dispatchAutoRemediation(serverId, action, 'playbook_crash_loop', {
+                    message: `Crash loop detected (${playbookState.crashEvents.length} crashes in ${windowMinutes}m).`
+                });
+                if (result.dispatched) {
+                    state.actionsInWindow += 1;
+                    state.lastActionAt = now;
+                    playbookState.crashEvents = [];
+                    POLICY_REMEDIATION_STATE.set(serverId, state);
+                    POLICY_PLAYBOOK_STATE.set(serverId, playbookState);
+                    return {
+                        handled: true,
+                        playbook: 'crash_loop_guard',
+                        action: result.action || action,
+                        reason: 'crash_loop'
+                    };
+                }
+                POLICY_REMEDIATION_STATE.set(serverId, state);
+                POLICY_PLAYBOOK_STATE.set(serverId, playbookState);
+                return { handled: false, reason: result.reason || 'dispatch_failed' };
+            }
+        }
+
+        const oomRecovery = policy.playbooks.oomRecovery || {};
+        if (oomKilled && parseBooleanInput(oomRecovery.enabled, false)) {
+            const action = String(oomRecovery.action || 'none').trim().toLowerCase();
+            if (['start', 'restart'].includes(action)) {
+                const result = await dispatchAutoRemediation(serverId, action, 'playbook_oom_recovery', {
+                    message: 'OOM kill detected and OOM recovery playbook is enabled.'
+                });
+                if (result.dispatched) {
+                    state.actionsInWindow += 1;
+                    state.lastActionAt = now;
+                    POLICY_REMEDIATION_STATE.set(serverId, state);
+                    POLICY_PLAYBOOK_STATE.set(serverId, playbookState);
+                    return {
+                        handled: true,
+                        playbook: 'oom_recovery',
+                        action: result.action || action,
+                        reason: 'oom_kill'
+                    };
+                }
+                POLICY_REMEDIATION_STATE.set(serverId, state);
+                POLICY_PLAYBOOK_STATE.set(serverId, playbookState);
+                return { handled: false, reason: result.reason || 'dispatch_failed' };
+            }
+        }
+
+        POLICY_REMEDIATION_STATE.set(serverId, state);
+        POLICY_PLAYBOOK_STATE.set(serverId, playbookState);
+        return { handled: false, reason: 'not_triggered' };
+    } catch (error) {
+        console.warn(`Policy playbooks automation failed for server ${serverId}:`, error.message);
         return { handled: false, reason: 'error' };
     }
 }
@@ -2804,6 +2952,7 @@ async function getConnectorAllowedOriginsMap(connectorIds, fallbackOrigin) {
         normalizeServerPolicyEngineConfig,
         getServerPolicyEngineConfig,
         setServerPolicyEngineConfig,
+        handlePolicyPlaybooksOnStop,
         handleCrashAutoRemediation,
         handlePolicyAnomalyRemediation,
         dispatchServerLogCleanup,
@@ -2848,6 +2997,7 @@ async function getConnectorAllowedOriginsMap(connectorIds, fallbackOrigin) {
         MIGRATION_TRANSFER_STATUSES,
         SERVER_POLICY_ENGINE_KEY_PREFIX,
         POLICY_REMEDIATION_STATE,
+        POLICY_PLAYBOOK_STATE,
         serverLogCleanupScheduleState,
         SERVER_STORE_BILLING_KEY_PREFIX,
         STORE_BILLING_SUSPEND_REASON_PREFIX,

@@ -116,6 +116,15 @@
                                                             <div class="col-md-4">
                                                                 <div class="form-check form-switch">
                                                                     <input class="form-check-input" type="checkbox"
+                                                                        id="featurePlaybooksAutomationEnabled"
+                                                                        name="featurePlaybooksAutomationEnabled" value="1"
+                                                                        <%= String(settings.featurePlaybooksAutomationEnabled || 'false') === 'true' ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-light" for="featurePlaybooksAutomationEnabled">Playbooks Automation</label>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <div class="form-check form-switch">
+                                                                    <input class="form-check-input" type="checkbox"
                                                                         id="featureAntiMinerEnabled"
                                                                         name="featureAntiMinerEnabled" value="1"
                                                                         <%= String(settings.featureAntiMinerEnabled || 'false') === 'true' ? 'checked' : '' %>>

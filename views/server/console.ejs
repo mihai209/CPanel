@@ -582,6 +582,22 @@
                         </div>
                         <div id="terminal"></div>
                         <div class="terminal-footer">
+                            <% if (canUseMacros && Array.isArray(commandMacros) && commandMacros.length > 0) { %>
+                                <div class="d-flex flex-wrap gap-2 mb-2">
+                                    <select id="macroSelect" class="form-select form-select-sm bg-dark text-light border-secondary" style="max-width: 340px;">
+                                        <option value="">Select macro...</option>
+                                        <% commandMacros.forEach((macro) => { %>
+                                            <option value="<%= macro.command %>"><%= macro.name %> - <%= macro.command %></option>
+                                        <% }); %>
+                                    </select>
+                                    <button id="btnRunMacro" class="btn btn-outline-info btn-sm" type="button">
+                                        <i class="bi bi-play-fill me-1"></i>Run Macro
+                                    </button>
+                                    <a href="/server/<%= server.containerId %>/macros" class="btn btn-outline-light btn-sm">
+                                        <i class="bi bi-lightning-charge me-1"></i>Manage Macros
+                                    </a>
+                                </div>
+                            <% } %>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
                                 <input type="text" id="consoleInput" class="form-control"
@@ -1151,6 +1167,8 @@
 
             // UI Event Listeners
             const consoleInput = document.getElementById('consoleInput');
+            const macroSelect = document.getElementById('macroSelect');
+            const btnRunMacro = document.getElementById('btnRunMacro');
             consoleInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter' && connectorOnline) {
                     const command = consoleInput.value;
@@ -1160,6 +1178,19 @@
                     }
                 }
             });
+
+            if (btnRunMacro && macroSelect) {
+                btnRunMacro.addEventListener('click', () => {
+                    if (!connectorOnline) {
+                        term.writeln('\x1b[1;31m[!] Cannot run macro: connector is offline.\x1b[0m');
+                        return;
+                    }
+                    const command = String(macroSelect.value || '').trim();
+                    if (!command) return;
+                    client.send('console_input', { command });
+                    term.writeln(`\x1b[1;36m[*] Macro command sent: ${command}\x1b[0m`);
+                });
+            }
 
             const btnPopout = document.getElementById('btnPopout');
             if (btnPopout) {

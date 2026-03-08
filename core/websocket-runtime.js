@@ -1,4 +1,5 @@
 const { appendIncidentCenterRecord } = require('./incidents');
+const { Op } = require('sequelize');
 
 function registerWebSocketRuntime(deps) {
     const {
@@ -9,6 +10,7 @@ function registerWebSocketRuntime(deps) {
         Server,
         ServerSubuser,
         AuditLog,
+        ServerResourceSample,
         Allocation,
         Image,
         Connector,
@@ -21,6 +23,7 @@ function registerWebSocketRuntime(deps) {
         sendTelegramSmartAlert,
         handlePluginConflictAlert,
         handleResourceAnomalyAlert,
+        handlePolicyPlaybooksOnStop,
         handleCrashAutoRemediation,
         handlePolicyAnomalyRemediation,
         pendingMigrationFileImports,
@@ -75,6 +78,10 @@ const CRASH_POLICY_SETTING_KEYS = [
 ];
 let crashPolicyCache = { ts: 0, config: null };
 const SERVER_CRASH_COOLDOWN_STATE = new Map(); // serverId -> last crash ts
+const RESOURCE_TIMELINE_LAST_WRITE_TS = new Map(); // serverId -> timestamp
+const RESOURCE_TIMELINE_WRITE_INTERVAL_MS = 10 * 1000;
+const RESOURCE_TIMELINE_RETENTION_MS = 12 * 60 * 60 * 1000;
+let resourceTimelineLastCleanupTs = 0;
 
 const parseCrashBool = (value, fallback = false) => {
     if (value === undefined || value === null || value === '') return fallback;
@@ -769,6 +776,7 @@ function clearServerConsoleBuffer(serverId) {
     RESOURCE_ANOMALY_SAMPLE_TS.delete(serverId);
     PLUGIN_CONFLICT_STATE.delete(serverId);
     ANTI_MINER_STATE.delete(serverId);
+    RESOURCE_TIMELINE_LAST_WRITE_TS.delete(serverId);
 }
 
 async function writeServerAuditLog(payload) {
@@ -1013,6 +1021,43 @@ async function evaluateAntiMinerGuardScore(serverId, signal, triggerMetadata = {
         state.lastSuspendAtMs = now;
         ANTI_MINER_STATE.set(parsedServerId, state);
         await suspendServerForAntiMinerDetection(parsedServerId, state, triggerMetadata);
+    }
+}
+
+function parseResourceNumber(value, fallback = 0) {
+    const parsed = Number.parseFloat(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return parsed;
+}
+
+async function persistResourceTimelineSample(serverId, cpu, memory, disk) {
+    try {
+        if (!ServerResourceSample || !Number.isInteger(Number.parseInt(serverId, 10))) return;
+        const parsedServerId = Number.parseInt(serverId, 10);
+        if (parsedServerId <= 0) return;
+
+        const now = Date.now();
+        const lastWrite = RESOURCE_TIMELINE_LAST_WRITE_TS.get(parsedServerId) || 0;
+        if (now - lastWrite < RESOURCE_TIMELINE_WRITE_INTERVAL_MS) return;
+        RESOURCE_TIMELINE_LAST_WRITE_TS.set(parsedServerId, now);
+
+        await ServerResourceSample.create({
+            serverId: parsedServerId,
+            cpuPercent: Math.max(0, Math.min(1000, parseResourceNumber(cpu, 0))),
+            memoryMb: Math.max(0, Math.round(parseResourceNumber(memory, 0))),
+            diskMb: Math.max(0, Math.round(parseResourceNumber(disk, 0))),
+            collectedAt: new Date(now)
+        });
+
+        if (now - resourceTimelineLastCleanupTs > 15 * 60 * 1000) {
+            resourceTimelineLastCleanupTs = now;
+            const threshold = new Date(now - RESOURCE_TIMELINE_RETENTION_MS);
+            await ServerResourceSample.destroy({
+                where: { collectedAt: { [Op.lt]: threshold } }
+            }).catch(() => {});
+        }
+    } catch {
+        // Ignore timeline persistence failures.
     }
 }
 
@@ -1794,7 +1839,23 @@ wss.on('connection', (ws, request) => {
                                     }
                                 });
                             }
-                            if (!expectedStop && typeof handleCrashAutoRemediation === 'function') {
+                            let playbookHandled = false;
+                            if (typeof handlePolicyPlaybooksOnStop === 'function') {
+                                const playbook = await handlePolicyPlaybooksOnStop(data.serverId, {
+                                    expectedStop,
+                                    oomKilled,
+                                    exitCode,
+                                    previousStatus
+                                });
+                                if (playbook && playbook.handled) {
+                                    playbookHandled = true;
+                                    sendToServerConsole(data.serverId, {
+                                        type: 'console_output',
+                                        output: `[!] Automated playbook triggered (${playbook.playbook || 'policy'}): ${playbook.action || 'unknown'}\n`
+                                    });
+                                }
+                            }
+                            if (!playbookHandled && !expectedStop && typeof handleCrashAutoRemediation === 'function') {
                                 const remediation = await handleCrashAutoRemediation(data.serverId);
                                 if (remediation && remediation.handled) {
                                     sendToServerConsole(data.serverId, {
@@ -1904,6 +1965,7 @@ wss.on('connection', (ws, request) => {
                     memory: data.memory,
                     disk: data.disk || '0'
                 });
+                await persistResourceTimelineSample(data.serverId, data.cpu, data.memory, data.disk || '0');
                 await handleResourceAnomalyAlert(data.serverId, data.cpu, data.memory);
                 await handleAntiMinerFromStats(data.serverId, data.cpu);
                 if (typeof handlePolicyAnomalyRemediation === 'function') {

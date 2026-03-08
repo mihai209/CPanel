@@ -11,6 +11,12 @@ function registerAdminServersRoutes(ctx) {
         crypto,
         Server,
         ServerApiKey,
+        ServerCommandMacro,
+        ServerResourceSample,
+        ServerSubuser,
+        ServerBackupPolicy,
+        ServerBackup,
+        ServerMount,
         User,
         Image,
         Settings,
@@ -1966,6 +1972,63 @@ app.post('/api/admin/servers/:containerId/resource-caps', requireAuth, requireAd
     }
 });
 
+app.get('/api/admin/servers/:containerId/delete-preview', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }]
+        });
+        if (!server) {
+            return res.status(404).json({ success: false, error: 'Server not found.' });
+        }
+
+        const connectorOnline = Boolean(
+            server.allocation
+            && server.allocation.connectorId
+            && connectorConnections.has(server.allocation.connectorId)
+            && connectorConnections.get(server.allocation.connectorId).readyState === WebSocket.OPEN
+        );
+
+        const [
+            subusersCount,
+            backupsCount,
+            databasesCount,
+            apiKeysCount,
+            macrosCount,
+            timelineSamplesCount
+        ] = await Promise.all([
+            ServerSubuser ? ServerSubuser.count({ where: { serverId: server.id } }) : 0,
+            ServerBackup ? ServerBackup.count({ where: { serverId: server.id } }) : 0,
+            ServerDatabase ? ServerDatabase.count({ where: { serverId: server.id } }) : 0,
+            ServerApiKey ? ServerApiKey.count({ where: { serverId: server.id } }) : 0,
+            ServerCommandMacro ? ServerCommandMacro.count({ where: { serverId: server.id } }) : 0,
+            ServerResourceSample ? ServerResourceSample.count({ where: { serverId: server.id } }) : 0
+        ]);
+
+        return res.json({
+            success: true,
+            server: {
+                id: server.id,
+                containerId: server.containerId,
+                name: server.name || `Server #${server.id}`
+            },
+            connectorOnline,
+            canSafeDelete: connectorOnline,
+            counts: {
+                subusers: subusersCount,
+                backups: backupsCount,
+                databases: databasesCount,
+                apiKeys: apiKeysCount,
+                macros: macrosCount,
+                timelineSamples: timelineSamplesCount
+            }
+        });
+    } catch (error) {
+        console.error('Error loading delete preview:', error);
+        return res.status(500).json({ success: false, error: 'Failed to load delete preview.' });
+    }
+});
+
 app.post('/admin/servers/delete/:containerId', requireAuth, requireAdmin, async (req, res) => {
     try {
         const { force } = req.query;
@@ -2011,6 +2074,15 @@ app.post('/admin/servers/delete/:containerId', requireAuth, requireAdmin, async 
         pendingMigrationFileImports.delete(server.id);
         if (ServerApiKey) {
             await ServerApiKey.destroy({ where: { serverId: server.id } }).catch(() => {});
+        }
+        if (ServerCommandMacro) {
+            await ServerCommandMacro.destroy({ where: { serverId: server.id } }).catch(() => {});
+        }
+        if (ServerResourceSample) {
+            await ServerResourceSample.destroy({ where: { serverId: server.id } }).catch(() => {});
+        }
+        if (ServerMount) {
+            await ServerMount.destroy({ where: { serverId: server.id } }).catch(() => {});
         }
         if (ServerSubuser) {
             await ServerSubuser.destroy({ where: { serverId: server.id } }).catch(() => {});

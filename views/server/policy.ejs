@@ -261,6 +261,71 @@
                         </div>
                     </div>
 
+                    <% if (playbooksFeatureEnabled) { %>
+                    <div class="settings-card">
+                        <div class="settings-card-header">Automated Playbooks</div>
+                        <div class="settings-card-body row g-3">
+                            <div class="col-12">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="playbooksEnabled" name="playbooksEnabled" value="1" <%= policyConfig && policyConfig.playbooks && policyConfig.playbooks.enabled ? 'checked' : '' %>>
+                                    <label class="form-check-label ms-1" for="playbooksEnabled">Enable automated playbooks</label>
+                                </div>
+                                <div class="hint">Playbooks can apply additional safety actions after stop/crash events.</div>
+                            </div>
+
+                            <div class="col-12">
+                                <hr class="border-secondary border-opacity-25 my-2">
+                                <h6 class="mb-2">Crash Loop Guard</h6>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="playbookCrashLoopEnabled" name="playbookCrashLoopEnabled" value="1" <%= policyConfig && policyConfig.playbooks && policyConfig.playbooks.crashLoop && policyConfig.playbooks.crashLoop.enabled ? 'checked' : '' %>>
+                                    <label class="form-check-label ms-1" for="playbookCrashLoopEnabled">Enabled</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Crash Count</label>
+                                <input type="number" min="2" max="20" name="playbookCrashLoopCrashCount" class="form-control" value="<%= policyConfig && policyConfig.playbooks && policyConfig.playbooks.crashLoop ? policyConfig.playbooks.crashLoop.crashCount : 3 %>">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Window (Minutes)</label>
+                                <input type="number" min="1" max="120" name="playbookCrashLoopWindowMinutes" class="form-control" value="<%= policyConfig && policyConfig.playbooks && policyConfig.playbooks.crashLoop ? policyConfig.playbooks.crashLoop.windowMinutes : 10 %>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Action</label>
+                                <select class="form-select" name="playbookCrashLoopAction">
+                                    <option value="none" <%= policyConfig && policyConfig.playbooks && policyConfig.playbooks.crashLoop && policyConfig.playbooks.crashLoop.action === 'none' ? 'selected' : '' %>>None</option>
+                                    <option value="start" <%= policyConfig && policyConfig.playbooks && policyConfig.playbooks.crashLoop && policyConfig.playbooks.crashLoop.action === 'start' ? 'selected' : '' %>>Start</option>
+                                    <option value="restart" <%= policyConfig && policyConfig.playbooks && policyConfig.playbooks.crashLoop && policyConfig.playbooks.crashLoop.action === 'restart' ? 'selected' : '' %>>Restart</option>
+                                    <option value="stop" <%= policyConfig && policyConfig.playbooks && policyConfig.playbooks.crashLoop && policyConfig.playbooks.crashLoop.action === 'stop' ? 'selected' : '' %>>Stop</option>
+                                </select>
+                            </div>
+
+                            <div class="col-12">
+                                <hr class="border-secondary border-opacity-25 my-2">
+                                <h6 class="mb-2">OOM Recovery</h6>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="playbookOomRecoveryEnabled" name="playbookOomRecoveryEnabled" value="1" <%= policyConfig && policyConfig.playbooks && policyConfig.playbooks.oomRecovery && policyConfig.playbooks.oomRecovery.enabled ? 'checked' : '' %>>
+                                    <label class="form-check-label ms-1" for="playbookOomRecoveryEnabled">Enabled</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Action</label>
+                                <select class="form-select" name="playbookOomRecoveryAction">
+                                    <option value="none" <%= policyConfig && policyConfig.playbooks && policyConfig.playbooks.oomRecovery && policyConfig.playbooks.oomRecovery.action === 'none' ? 'selected' : '' %>>None</option>
+                                    <option value="start" <%= policyConfig && policyConfig.playbooks && policyConfig.playbooks.oomRecovery && policyConfig.playbooks.oomRecovery.action === 'start' ? 'selected' : '' %>>Start</option>
+                                    <option value="restart" <%= policyConfig && policyConfig.playbooks && policyConfig.playbooks.oomRecovery && policyConfig.playbooks.oomRecovery.action === 'restart' ? 'selected' : '' %>>Restart</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <div class="hint">OOM recovery triggers when container reports an OOM kill.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <% } %>
+
                     <div class="text-end">
                         <button type="submit" class="btn btn-primary px-4 fw-medium">
                             Save Policy

@@ -70,6 +70,23 @@ const LinkedAccount = sequelize.define('LinkedAccount', {
     providerUsername: { type: DataTypes.STRING, allowNull: true }
 });
 
+const UserLoginEvent = sequelize.define('UserLoginEvent', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    userId: { type: DataTypes.INTEGER, allowNull: false },
+    usernameSnapshot: { type: DataTypes.STRING(100), allowNull: false },
+    loginType: { type: DataTypes.STRING(16), allowNull: false, defaultValue: 'email' },
+    ipAddress: { type: DataTypes.STRING(120), allowNull: false, defaultValue: 'unknown' },
+    location: { type: DataTypes.STRING(160), allowNull: true },
+    operatingSystem: { type: DataTypes.STRING(120), allowNull: true },
+    userAgent: { type: DataTypes.TEXT, allowNull: true }
+}, {
+    indexes: [
+        { fields: ['userId'] },
+        { fields: ['createdAt'] },
+        { fields: ['userId', 'createdAt'] }
+    ]
+});
+
 const Package = sequelize.define('Package', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     name: { type: DataTypes.STRING, allowNull: false },
@@ -100,6 +117,8 @@ const Image = sequelize.define('Image', {
 const Server = sequelize.define('Server', {
     name: { type: DataTypes.STRING, allowNull: false },
     description: { type: DataTypes.STRING(50), allowNull: true },
+    folder: { type: DataTypes.STRING(64), allowNull: true },
+    tags: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
     containerId: { type: DataTypes.STRING, unique: true },
     status: { type: DataTypes.STRING, defaultValue: 'installing' },
     isSuspended: { type: DataTypes.BOOLEAN, defaultValue: false },
@@ -154,6 +173,37 @@ const ServerApiKey = sequelize.define('ServerApiKey', {
         { fields: ['ownerUserId'] },
         { fields: ['keyHash'], unique: true },
         { fields: ['serverId', 'keyPrefix'] }
+    ]
+});
+
+const ServerCommandMacro = sequelize.define('ServerCommandMacro', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    serverId: { type: DataTypes.INTEGER, allowNull: false },
+    createdByUserId: { type: DataTypes.INTEGER, allowNull: true },
+    name: { type: DataTypes.STRING(80), allowNull: false },
+    description: { type: DataTypes.STRING(160), allowNull: true },
+    command: { type: DataTypes.STRING(1024), allowNull: false },
+    position: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 }
+}, {
+    indexes: [
+        { fields: ['serverId'] },
+        { fields: ['createdByUserId'] },
+        { fields: ['serverId', 'position'] }
+    ]
+});
+
+const ServerResourceSample = sequelize.define('ServerResourceSample', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    serverId: { type: DataTypes.INTEGER, allowNull: false },
+    cpuPercent: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 0 },
+    memoryMb: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    diskMb: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    collectedAt: { type: DataTypes.DATE, allowNull: false, defaultValue: DataTypes.NOW }
+}, {
+    indexes: [
+        { fields: ['serverId'] },
+        { fields: ['collectedAt'] },
+        { fields: ['serverId', 'collectedAt'] }
     ]
 });
 
@@ -344,6 +394,19 @@ const ServerMount = sequelize.define('ServerMount', {
 
 User.hasMany(LinkedAccount, { foreignKey: 'userId', as: 'linkedAccounts' });
 LinkedAccount.belongsTo(User, { foreignKey: 'userId' });
+User.hasMany(UserLoginEvent, {
+    foreignKey: 'userId',
+    as: 'loginEvents',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+    hooks: true
+});
+UserLoginEvent.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
+});
 
 User.hasMany(Server, { foreignKey: 'ownerId', as: 'servers' });
 Server.belongsTo(User, { foreignKey: 'ownerId', as: 'owner' });
@@ -446,6 +509,46 @@ ServerApiKey.belongsTo(User, {
     onUpdate: 'CASCADE'
 });
 
+Server.hasMany(ServerCommandMacro, {
+    foreignKey: 'serverId',
+    as: 'commandMacros',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+    hooks: true
+});
+ServerCommandMacro.belongsTo(Server, {
+    foreignKey: 'serverId',
+    as: 'server',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
+});
+User.hasMany(ServerCommandMacro, {
+    foreignKey: 'createdByUserId',
+    as: 'createdServerMacros',
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+});
+ServerCommandMacro.belongsTo(User, {
+    foreignKey: 'createdByUserId',
+    as: 'creator',
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+});
+
+Server.hasMany(ServerResourceSample, {
+    foreignKey: 'serverId',
+    as: 'resourceSamples',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+    hooks: true
+});
+ServerResourceSample.belongsTo(Server, {
+    foreignKey: 'serverId',
+    as: 'server',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
+});
+
 User.hasMany(AdminApiKey, {
     foreignKey: 'creatorUserId',
     as: 'adminApiKeys',
@@ -489,6 +592,7 @@ module.exports = {
     dbConnection,
     User,
     LinkedAccount,
+    UserLoginEvent,
     Package,
     Image,
     Server,
@@ -506,6 +610,8 @@ module.exports = {
     ServerMount,
     ServerSubuser,
     ServerApiKey,
+    ServerCommandMacro,
+    ServerResourceSample,
     AdminApiKey,
     AdminApiKeyAudit
 };

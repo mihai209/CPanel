@@ -34,6 +34,7 @@ const {
     dbConnection,
     User,
     LinkedAccount,
+    UserLoginEvent,
     Package,
     Image,
     Server,
@@ -51,6 +52,8 @@ const {
     ServerMount,
     ServerSubuser,
     ServerApiKey,
+    ServerCommandMacro,
+    ServerResourceSample,
     AdminApiKey,
     AdminApiKeyAudit
 } = require('./core/db');
@@ -64,6 +67,7 @@ const { registerPlatformRoutes } = require('./routes/internal/platform');
 const { registerAdminApiKeyRoutes } = require('./routes/internal/admin-api-keys');
 const { registerOAuthRoutes } = require('./routes/oauth');
 const { registerAccountRoutes } = require('./routes/account');
+const { recordUserLoginEvent } = require('./core/helpers/login-history');
 const { registerAdminServersRoutes } = require('./routes/legacy/admin-servers');
 const { registerServerPagesRoutes } = require('./routes/legacy/server-pages');
 const { registerAdminAuthSettingsRoutes } = require('./routes/legacy/admin-auth-settings');
@@ -235,6 +239,7 @@ const {
     sendServerSmartAlert,
     handlePluginConflictAlert,
     handleResourceAnomalyAlert,
+    handlePolicyPlaybooksOnStop,
     handleCrashAutoRemediation,
     handlePolicyAnomalyRemediation,
     getConnectorAllowedOrigins,
@@ -368,6 +373,7 @@ const legacyRouteContextData = {
     DEBUG_ENABLED,
     User,
     LinkedAccount,
+    UserLoginEvent,
     Package,
     Image,
     Server,
@@ -385,6 +391,8 @@ const legacyRouteContextData = {
     ServerMount,
     ServerSubuser,
     ServerApiKey,
+    ServerCommandMacro,
+    ServerResourceSample,
     AdminApiKey,
     AdminApiKeyAudit,
     SERVER_API_KEY_PERMISSION_CATALOG,
@@ -420,6 +428,7 @@ const legacyRouteContextData = {
     getRedisRuntimeInfo,
     normalizeRedisConfig,
     getEnvRedisConfig,
+    recordUserLoginEvent,
     ...legacyHelpers
 };
 
@@ -448,7 +457,10 @@ registerOAuthRoutes({
     User,
     LinkedAccount,
     Settings,
-    md5
+    md5,
+    UserLoginEvent,
+    axios,
+    recordUserLoginEvent
 });
 registerAdminCoreRoutes(legacyRouteContext);
 
@@ -477,6 +489,7 @@ registerAccountRoutes({
     requireAdmin,
     User,
     LinkedAccount,
+    UserLoginEvent,
     Settings,
     Op,
     md5,
@@ -507,6 +520,7 @@ registerWebSocketRuntime({
     Server,
     ServerSubuser,
     AuditLog,
+    ServerResourceSample,
     Allocation,
     Image,
     Connector,
@@ -519,6 +533,7 @@ registerWebSocketRuntime({
     sendTelegramSmartAlert: legacyHelpers.sendTelegramSmartAlert,
     handlePluginConflictAlert,
     handleResourceAnomalyAlert,
+    handlePolicyPlaybooksOnStop,
     handleCrashAutoRemediation,
     handlePolicyAnomalyRemediation,
     pendingMigrationFileImports,

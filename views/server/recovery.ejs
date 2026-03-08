@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recovery Assistant <%= server.name %> | <%= settings.brandName.toUpperCase() %></title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body { background:#0f0f12; color:#e1e1e6; margin:0; font-family:Inter,system-ui,-apple-system,sans-serif; height:100vh; overflow:hidden; }
+        .wrapper{display:flex;height:100vh}.sidebar{width:260px;background:#121216;border-right:1px solid #2d2d35;overflow-y:auto}.sidebar.collapsed{margin-left:-260px}
+        .content{flex:1;display:flex;flex-direction:column;min-width:0}.top{background:#121216;border-bottom:1px solid #2d2d35;padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem}
+        .scroll{flex:1;overflow:auto;padding:1rem}.cardx{background:#121216;border:1px solid #2d2d35;border-radius:.8rem}
+        .btn-icon{background:transparent;border:0;color:#8b8b9a;font-size:1.2rem}
+        .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+    </style>
+</head>
+<body>
+<div class="wrapper">
+    <nav class="sidebar" id="sidebar"><div class="p-3"><%- include('../partials/server-sidebar', { server, active: 'recovery' }) %></div></nav>
+    <main class="content">
+        <header class="top">
+            <button class="btn-icon" id="sidebarToggle"><i class="bi bi-list"></i></button>
+            <h1 class="h5 mb-0">Recovery Assistant / <span class="text-secondary"><%= server.name %></span></h1>
+        </header>
+        <section class="scroll">
+            <% if (success) { %><div class="alert alert-success py-2"><%= success %></div><% } %>
+            <% if (error) { %><div class="alert alert-danger py-2"><%= error %></div><% } %>
+
+            <div class="cardx p-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h2 class="h6 mb-0">Diagnosis</h2>
+                    <span class="badge <%= connectorOnline ? 'bg-success' : 'bg-danger' %>"><%= connectorOnline ? 'Connector Online' : 'Connector Offline' %></span>
+                </div>
+                <div class="small text-secondary mb-2"><%= issueHint %></div>
+                <% if (latestDebug) { %>
+                    <div class="small">Latest event: <code class="mono"><%= latestDebug.action %></code> at <%= new Date(latestDebug.createdAt).toLocaleString() %></div>
+                    <% if (latestMeta && latestMeta.error) { %>
+                        <div class="small text-warning mt-1"><%= String(latestMeta.error).slice(0, 280) %></div>
+                    <% } %>
+                <% } else { %>
+                    <div class="small text-secondary">No debug event was recorded yet.</div>
+                <% } %>
+            </div>
+
+            <div class="cardx p-3 mb-3">
+                <h2 class="h6 mb-3">Recovery Actions</h2>
+                <div class="d-flex flex-wrap gap-2">
+                    <% if (canPower) { %>
+                        <form method="POST" action="/server/<%= server.containerId %>/recovery/action">
+                            <input type="hidden" name="action" value="start">
+                            <button class="btn btn-success btn-sm" type="submit"><i class="bi bi-play-fill me-1"></i>Start</button>
+                        </form>
+                        <form method="POST" action="/server/<%= server.containerId %>/recovery/action">
+                            <input type="hidden" name="action" value="restart">
+                            <button class="btn btn-warning btn-sm" type="submit"><i class="bi bi-arrow-clockwise me-1"></i>Restart</button>
+                        </form>
+                        <form method="POST" action="/server/<%= server.containerId %>/recovery/action">
+                            <input type="hidden" name="action" value="stop">
+                            <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-stop-fill me-1"></i>Stop</button>
+                        </form>
+                        <form method="POST" action="/server/<%= server.containerId %>/recovery/action">
+                            <input type="hidden" name="action" value="kill">
+                            <button class="btn btn-danger btn-sm" type="submit"><i class="bi bi-lightning-fill me-1"></i>Kill</button>
+                        </form>
+                    <% } %>
+                    <% if (canConsole) { %>
+                        <form method="POST" action="/server/<%= server.containerId %>/recovery/action">
+                            <input type="hidden" name="action" value="save-all">
+                            <button class="btn btn-outline-info btn-sm" type="submit"><i class="bi bi-floppy me-1"></i>Run save-all</button>
+                        </form>
+                    <% } %>
+                    <a href="/server/<%= server.containerId %>/debug-logs" class="btn btn-outline-light btn-sm"><i class="bi bi-bug me-1"></i>Open Debug Logs</a>
+                    <a href="/server/<%= server.containerId %>/startup" class="btn btn-outline-light btn-sm"><i class="bi bi-sliders me-1"></i>Open Startup</a>
+                    <a href="/server/<%= server.containerId %>/files" class="btn btn-outline-light btn-sm"><i class="bi bi-folder2-open me-1"></i>Open Files</a>
+                </div>
+            </div>
+
+            <div class="cardx p-3">
+                <h2 class="h6 mb-3">Recent Debug Events</h2>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm align-middle mb-0">
+                        <thead>
+                        <tr>
+                            <th>When</th>
+                            <th>Action</th>
+                            <th>Details</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <% if (!debugEvents || debugEvents.length === 0) { %>
+                            <tr><td colspan="3" class="text-secondary">No debug events.</td></tr>
+                        <% } else { debugEvents.forEach((entry) => { const meta = entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {}; %>
+                            <tr>
+                                <td><%= new Date(entry.createdAt).toLocaleString() %></td>
+                                <td><code class="mono"><%= entry.action %></code></td>
+                                <td class="small">
+                                    <% if (meta.error) { %><%= String(meta.error).slice(0, 160) %>
+                                    <% } else if (meta.message) { %><%= String(meta.message).slice(0, 160) %>
+                                    <% } else if (meta.exitCode !== undefined) { %>Exit code: <%= meta.exitCode %>
+                                    <% } else { %><span class="text-secondary">-</span><% } %>
+                                </td>
+                            </tr>
+                        <% }) } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+<script>document.getElementById('sidebarToggle')?.addEventListener('click',()=>document.getElementById('sidebar')?.classList.toggle('collapsed'));</script>
+</body>
+</html>

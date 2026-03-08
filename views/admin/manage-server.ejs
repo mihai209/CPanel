@@ -508,28 +508,77 @@
 
             // Safe Delete Handler
             document.getElementById('safeDeleteBtn')?.addEventListener('click', function () {
-                Swal.fire({
-                    title: 'Safe Deletion',
-                    text: "This will remove the server from the panel and cleanup all files on the connector. Are you sure?",
-                    imageUrl: SAD_ROCKY,
-                    imageWidth: 150,
-                    imageAlt: 'Sad Rocky',
-                    showCancelButton: true,
-                    confirmButtonColor: '#3b82f6',
-                    cancelButtonColor: '#2d2d35',
-                    confirmButtonText: 'Yes, cleanup & delete',
-                    background: '#141419',
-                    color: '#ffffff',
-                    customClass: {
-                        popup: 'border border-secondary border-opacity-10 shadow-lg',
-                        title: 'text-light fw-bold'
+                const serverName = <%- JSON.stringify(String(server && server.name || '').trim()) %>;
+                const loadPreview = async () => {
+                    const response = await fetch('/api/admin/servers/<%= server.containerId %>/delete-preview', {
+                        headers: { 'Accept': 'application/json' },
+                        cache: 'no-store'
+                    });
+                    const payload = await response.json().catch(() => ({}));
+                    if (!response.ok || !payload.success) {
+                        throw new Error(payload && payload.error ? payload.error : `Failed (${response.status})`);
                     }
-                }).then((result) => {
-                    if (result.isConfirmed) {
+                    return payload;
+                };
+
+                loadPreview().then((preview) => {
+                    const counts = preview && preview.counts ? preview.counts : {};
+                    const cleanupSummary = [
+                        `Subusers: ${Number(counts.subusers || 0)}`,
+                        `Backups: ${Number(counts.backups || 0)}`,
+                        `Databases: ${Number(counts.databases || 0)}`,
+                        `API keys: ${Number(counts.apiKeys || 0)}`,
+                        `Macros: ${Number(counts.macros || 0)}`,
+                        `Timeline points: ${Number(counts.timelineSamples || 0)}`
+                    ].join('\n');
+
+                    Swal.fire({
+                        title: 'Safe Delete Wizard',
+                        html: `
+                            <div class="text-start small">
+                                <p class="mb-2">This action will remove the server and clean data from connector and panel.</p>
+                                <p class="mb-2"><strong>Connector online:</strong> ${preview.connectorOnline ? 'Yes' : 'No'}</p>
+                                <div class="p-2 rounded border border-secondary border-opacity-25 mb-2" style="white-space:pre-line;background:rgba(255,255,255,0.03);">${cleanupSummary}</div>
+                                <label class="form-label fw-bold">Type server name to confirm:</label>
+                                <input id="safeDeleteNameInput" class="form-control form-control-sm" placeholder="${serverName}">
+                            </div>
+                        `,
+                        imageUrl: SAD_ROCKY,
+                        imageWidth: 150,
+                        imageAlt: 'Sad Rocky',
+                        showCancelButton: true,
+                        confirmButtonColor: '#3b82f6',
+                        cancelButtonColor: '#2d2d35',
+                        confirmButtonText: 'Cleanup & Delete',
+                        background: '#141419',
+                        color: '#ffffff',
+                        preConfirm: () => {
+                            const typed = String(document.getElementById('safeDeleteNameInput')?.value || '').trim();
+                            if (typed !== serverName) {
+                                Swal.showValidationMessage('Server name does not match.');
+                                return false;
+                            }
+                            return true;
+                        },
+                        customClass: {
+                            popup: 'border border-secondary border-opacity-10 shadow-lg',
+                            title: 'text-light fw-bold'
+                        }
+                    }).then((result) => {
+                        if (!result.isConfirmed) return;
                         const form = document.getElementById('delete-form');
                         form.action = '/admin/servers/delete/<%= server.containerId %>';
                         form.submit();
-                    }
+                    });
+                }).catch((error) => {
+                    Swal.fire({
+                        title: 'Delete Preview Failed',
+                        text: String(error && error.message ? error.message : 'Failed to load delete preview.'),
+                        icon: 'error',
+                        background: '#141419',
+                        color: '#ffffff',
+                        confirmButtonColor: '#ef4444'
+                    });
                 });
             });
 

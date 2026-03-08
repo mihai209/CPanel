@@ -31,6 +31,12 @@
             overflow:auto;
         }
         .muted { color:#8b8b9a; }
+        .mirror-check-row-ok { color:#86efac; }
+        .mirror-check-row-bad { color:#fca5a5; }
+        .mirror-check-table code {
+            color: #c4b5fd;
+            font-size: .78rem;
+        }
     </style>
 </head>
 <body>
@@ -46,6 +52,9 @@
                         <button type="submit" class="btn btn-sm btn-warning">Fix Permissions</button>
                     </form>
                 <% } %>
+                <button id="runDependencyMirrorCheckBtn" type="button" class="btn btn-sm btn-outline-info">
+                    <i class="bi bi-diagram-3 me-1"></i>Dependency Mirror Check
+                </button>
                 <a class="btn btn-sm btn-outline-light" href="/server/<%= server.containerId %>">Console</a>
                 <a class="btn btn-sm btn-primary" href="/server/<%= server.containerId %>/debug-logs">Refresh</a>
             </div>
@@ -57,6 +66,51 @@
             <% if (error) { %>
                 <div class="alert alert-danger"><%= error %></div>
             <% } %>
+
+            <div id="dependencyMirrorCheckCard" class="cardx p-3 mb-3 d-none">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                    <h2 class="h6 mb-0">Dependency Mirror Check</h2>
+                    <span id="dependencyMirrorCheckStatus" class="badge text-bg-secondary">Idle</span>
+                </div>
+                <div id="dependencyMirrorCheckSummary" class="small muted mb-2">Run a check to validate mirror DNS/connectivity and container network state.</div>
+                <div class="row g-2 mb-2">
+                    <div class="col-md-4">
+                        <div class="cardx p-2">
+                            <div class="small muted">Container</div>
+                            <div id="dependencyMirrorContainerState" class="fw-semibold">-</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="cardx p-2">
+                            <div class="small muted">Network</div>
+                            <div id="dependencyMirrorNetworkState" class="fw-semibold">-</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="cardx p-2">
+                            <div class="small muted">Reachable Mirrors</div>
+                            <div id="dependencyMirrorReachableState" class="fw-semibold">-</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive mirror-check-table">
+                    <table class="table table-dark table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Host</th>
+                                <th>DNS</th>
+                                <th>Connect</th>
+                                <th>Latency</th>
+                                <th>Error</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dependencyMirrorCheckResultsBody">
+                            <tr><td colspan="5" class="muted">No check run yet.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <% if (!logs || logs.length === 0) { %>
                 <div class="cardx p-4">
                     <h2 class="h6 mb-2">No debug entries yet</h2>
@@ -104,6 +158,110 @@
 </div>
 <script>
 document.getElementById('sidebarToggle')?.addEventListener('click', () => document.getElementById('sidebar')?.classList.toggle('collapsed'));
+
+(() => {
+    const runButton = document.getElementById('runDependencyMirrorCheckBtn');
+    const card = document.getElementById('dependencyMirrorCheckCard');
+    const statusBadge = document.getElementById('dependencyMirrorCheckStatus');
+    const summary = document.getElementById('dependencyMirrorCheckSummary');
+    const containerState = document.getElementById('dependencyMirrorContainerState');
+    const networkState = document.getElementById('dependencyMirrorNetworkState');
+    const reachableState = document.getElementById('dependencyMirrorReachableState');
+    const resultBody = document.getElementById('dependencyMirrorCheckResultsBody');
+    if (!runButton || !card || !statusBadge || !summary || !resultBody) return;
+
+    function setStatus(label, badgeClass) {
+        statusBadge.className = `badge ${badgeClass || 'text-bg-secondary'}`;
+        statusBadge.textContent = label;
+    }
+
+    function renderRows(rows) {
+        if (!Array.isArray(rows) || rows.length === 0) {
+            resultBody.innerHTML = '<tr><td colspan="5" class="muted">No mirror hosts were tested.</td></tr>';
+            return;
+        }
+        const escapeHtml = (value) => String(value === undefined || value === null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+        resultBody.innerHTML = rows.map((row) => {
+            const ok = Boolean(row && row.reachable);
+            const dns = Boolean(row && row.dnsResolved);
+            const latency = Number.isFinite(Number(row && row.latencyMs)) ? `${Number(row.latencyMs)} ms` : '-';
+            const error = String(row && row.error || '').trim();
+            return `
+                <tr class="${ok ? 'mirror-check-row-ok' : 'mirror-check-row-bad'}">
+                    <td><code>${escapeHtml(String(row && row.host || '-'))}</code></td>
+                    <td>${dns ? 'OK' : 'Fail'}</td>
+                    <td>${ok ? 'OK' : 'Fail'}</td>
+                    <td>${latency}</td>
+                    <td class="text-break">${escapeHtml(error || '-')}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    async function runCheck() {
+        card.classList.remove('d-none');
+        setStatus('Running', 'text-bg-info');
+        summary.textContent = 'Running dependency mirror diagnostics...';
+        runButton.disabled = true;
+        runButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Checking';
+
+        try {
+            const response = await fetch('/server/<%= server.containerId %>/debug-logs/dependency-mirror-check', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: '{}'
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || !payload.success) {
+                const message = String(payload && payload.error || `Request failed (${response.status}).`);
+                setStatus('Failed', 'text-bg-danger');
+                summary.textContent = message;
+                renderRows(payload && payload.mirrors);
+                containerState.textContent = '-';
+                networkState.textContent = '-';
+                reachableState.textContent = '-';
+                return;
+            }
+
+            const container = payload.container || {};
+            const summaryData = payload.summary || {};
+            const networks = Array.isArray(container.networks) ? container.networks : [];
+            const reachable = Number.parseInt(summaryData.reachableMirrors, 10) || 0;
+            const total = Number.parseInt(summaryData.totalMirrors, 10) || 0;
+
+            setStatus('Completed', 'text-bg-success');
+            summary.textContent = String(summaryData.likelyRootCause || 'Dependency mirror diagnostics completed.');
+            containerState.textContent = container.exists
+                ? (container.running ? `Running (${String(container.status || 'running')})` : `Stopped (${String(container.status || 'stopped')})`)
+                : 'Missing';
+            networkState.textContent = networks.length > 0
+                ? `${networks.join(', ')}`
+                : 'No network attached';
+            reachableState.textContent = `${reachable} / ${total}`;
+            renderRows(payload.mirrors);
+        } catch (error) {
+            setStatus('Failed', 'text-bg-danger');
+            summary.textContent = String(error && error.message || 'Dependency mirror check failed.');
+            containerState.textContent = '-';
+            networkState.textContent = '-';
+            reachableState.textContent = '-';
+            renderRows([]);
+        } finally {
+            runButton.disabled = false;
+            runButton.innerHTML = '<i class="bi bi-diagram-3 me-1"></i>Dependency Mirror Check';
+        }
+    }
+
+    runButton.addEventListener('click', runCheck);
+})();
 </script>
 </body>
 </html>

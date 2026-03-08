@@ -95,6 +95,10 @@ const dashboardCustomOrderIdsList = normalizeServerIdList(typeof dashboardCustom
 const dashboardLatestOrderIdsList = normalizeServerIdList(typeof dashboardLatestOrderIds !== 'undefined' ? dashboardLatestOrderIds : []);
 const dashboardLatestOrderIndexById = new Map(dashboardLatestOrderIdsList.map((id, index) => [id, index]));
 const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((id, index) => [id, index]));
+const dashboardFoldersRaw = typeof dashboardFolders !== 'undefined' ? dashboardFolders : [];
+const dashboardTagsRaw = typeof dashboardTags !== 'undefined' ? dashboardTags : [];
+const dashboardFoldersList = Array.isArray(dashboardFoldersRaw) ? dashboardFoldersRaw : [];
+const dashboardTagsList = Array.isArray(dashboardTagsRaw) ? dashboardTagsRaw : [];
 %>
 
 <style>
@@ -160,6 +164,18 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
         color: #9ca3af;
         font-size: 0.78rem;
         margin-top: 0.25rem;
+    }
+
+    .server-tag {
+        display: inline-block;
+        font-size: 0.7rem;
+        border: 1px solid #3f3f46;
+        border-radius: 999px;
+        padding: 0.08rem 0.45rem;
+        margin-right: 0.32rem;
+        margin-top: 0.24rem;
+        color: #d1d5db;
+        background: rgba(255, 255, 255, 0.04);
     }
 
     .resource-grid {
@@ -389,6 +405,25 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
                             <div id="dashboardSortFeedback" class="dashboard-sort-feedback text-muted small mt-1"></div>
                         </div>
                     <% } %>
+                    <% if (serverList.length > 0) { %>
+                        <div class="dashboard-sort-controls">
+                            <label class="small text-muted mb-1 d-block">Filter</label>
+                            <div class="d-flex align-items-center gap-2">
+                                <select id="dashboardFolderFilter" class="form-select form-select-sm bg-dark text-light border-secondary">
+                                    <option value="">All folders</option>
+                                    <% dashboardFoldersList.forEach((folderName) => { %>
+                                        <option value="<%= folderName %>"><%= folderName %></option>
+                                    <% }); %>
+                                </select>
+                                <select id="dashboardTagFilter" class="form-select form-select-sm bg-dark text-light border-secondary">
+                                    <option value="">All tags</option>
+                                    <% dashboardTagsList.forEach((tagName) => { %>
+                                        <option value="<%= tagName %>"><%= tagName %></option>
+                                    <% }); %>
+                                </select>
+                            </div>
+                        </div>
+                    <% } %>
                     <div class="text-muted small">Signed in as <span class="text-light fw-semibold"><%= user.username %></span></div>
                 </div>
             </div>
@@ -535,11 +570,15 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
                     const serverIdValue = Number.parseInt(server && server.id, 10);
                     const latestIndex = dashboardLatestOrderIndexById.has(serverIdValue) ? dashboardLatestOrderIndexById.get(serverIdValue) : currentIndex;
                     const customIndex = dashboardCustomOrderIndexById.has(serverIdValue) ? dashboardCustomOrderIndexById.get(serverIdValue) : -1;
+                    const folderName = String(server && server.folder || '').trim();
+                    const tagsValue = Array.isArray(server && server.tags) ? server.tags : [];
                     %>
                     <div
                         class="col dashboard-server-item"
                         data-server-id="<%= Number.isInteger(serverIdValue) ? serverIdValue : 0 %>"
                         data-server-name="<%= server.name || '' %>"
+                        data-folder="<%= folderName %>"
+                        data-tags="<%= tagsValue.join('|').toLowerCase() %>"
                         data-latest-index="<%= latestIndex %>"
                         data-custom-index="<%= customIndex %>"
                         data-current-index="<%= currentIndex %>"
@@ -551,6 +590,16 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
                                     <div class="server-subtext">Container ID: <%= server.containerId ? server.containerId.substring(0, 12) : 'N/A' %></div>
                                     <% if (server.description) { %>
                                         <div class="server-subtext text-info"><%= server.description %></div>
+                                    <% } %>
+                                    <% if (folderName) { %>
+                                        <div class="server-subtext">Folder: <span class="text-warning"><%= folderName %></span></div>
+                                    <% } %>
+                                    <% if (tagsValue.length > 0) { %>
+                                        <div class="server-subtext">
+                                            <% tagsValue.forEach((tagItem) => { %>
+                                                <span class="server-tag"><%= tagItem %></span>
+                                            <% }); %>
+                                        </div>
                                     <% } %>
                                     <% if (isAdminDashboardView) { %>
                                         <div class="server-subtext">Owner: @<%= server.owner && server.owner.username ? server.owner.username : 'unknown' %></div>
@@ -639,8 +688,10 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
 
         const grid = document.getElementById('dashboardServersGrid');
         const sortSelect = document.getElementById('dashboardServerSort');
+        const folderFilter = document.getElementById('dashboardFolderFilter');
+        const tagFilter = document.getElementById('dashboardTagFilter');
         const sortFeedback = document.getElementById('dashboardSortFeedback');
-        if (!grid || !sortSelect) return;
+        if (!grid) return;
 
         const initialMode = '<%= activeDashboardSortMode %>';
         let savedCustomOrderIds = <%- JSON.stringify(dashboardCustomOrderIdsList) %>;
@@ -709,7 +760,9 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
         if (activeMode === 'latest' && (storedMode === 'alphabetical' || storedMode === 'custom')) {
             activeMode = storedMode;
         }
-        sortSelect.value = activeMode;
+        if (sortSelect) {
+            sortSelect.value = activeMode;
+        }
 
         const setSortFeedback = (message, variant = 'muted') => {
             if (!sortFeedback) return;
@@ -725,8 +778,26 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
         const getServerId = (element) => Number.parseInt(element && element.dataset ? element.dataset.serverId : '0', 10) || 0;
         const getLatestIndex = (element) => Number.parseInt(element && element.dataset ? element.dataset.latestIndex : '999999', 10) || 999999;
         const getServerName = (element) => String(element && element.dataset ? element.dataset.serverName : '').toLowerCase();
+        const getServerFolder = (element) => String(element && element.dataset ? element.dataset.folder : '').trim().toLowerCase();
+        const getServerTags = (element) => String(element && element.dataset ? element.dataset.tags : '').trim().toLowerCase();
         const applyGridOrder = (orderedItems) => {
             orderedItems.forEach((item) => grid.appendChild(item));
+        };
+        const applyVisibilityFilters = () => {
+            const selectedFolder = String(folderFilter && folderFilter.value || '').trim().toLowerCase();
+            const selectedTag = String(tagFilter && tagFilter.value || '').trim().toLowerCase();
+            let visibleCount = 0;
+            getServerItems().forEach((item) => {
+                const folderMatch = !selectedFolder || getServerFolder(item) === selectedFolder;
+                const tags = getServerTags(item) ? getServerTags(item).split('|').filter(Boolean) : [];
+                const tagMatch = !selectedTag || tags.includes(selectedTag);
+                const visible = folderMatch && tagMatch;
+                item.style.display = visible ? '' : 'none';
+                if (visible) visibleCount += 1;
+            });
+            if ((selectedFolder || selectedTag) && sortFeedback) {
+                setSortFeedback(`Showing ${visibleCount} server(s) after filters.`, 'muted');
+            }
         };
 
         const sortByLatest = (items) => {
@@ -769,19 +840,26 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
 
         const applyModeToGrid = (mode) => {
             const items = getServerItems();
-            if (items.length < 2) return;
+            if (items.length < 2) {
+                applyVisibilityFilters();
+                return;
+            }
             if (mode === 'alphabetical') {
                 applyGridOrder(sortByAlphabetical(items));
+                applyVisibilityFilters();
                 return;
             }
             if (mode === 'custom') {
                 applyGridOrder(sortByCustom(items, savedCustomOrderIds));
+                applyVisibilityFilters();
                 return;
             }
             applyGridOrder(sortByLatest(items));
+            applyVisibilityFilters();
         };
 
-        sortSelect.addEventListener('change', async () => {
+        if (sortSelect) {
+            sortSelect.addEventListener('change', async () => {
             const selectedMode = String(sortSelect.value || 'latest').toLowerCase();
             applyModeToGrid(selectedMode);
 
@@ -805,10 +883,20 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
             } catch (error) {
                 setSortFeedback(error.message || 'Failed to save dashboard order.', 'danger');
             }
-        });
+            });
+        }
+
+        if (folderFilter) {
+            folderFilter.addEventListener('change', applyVisibilityFilters);
+        }
+        if (tagFilter) {
+            tagFilter.addEventListener('change', applyVisibilityFilters);
+        }
 
         if (activeMode === 'alphabetical' || activeMode === 'custom') {
             applyModeToGrid(activeMode);
+        } else {
+            applyVisibilityFilters();
         }
 
         if (activeMode === 'custom' && savedCustomOrderIds.length === 0) {
@@ -931,7 +1019,7 @@ const dashboardCustomOrderIndexById = new Map(dashboardCustomOrderIdsList.map((i
                 savedCustomOrderIds = normalizeServerIds(data.customIds || orderedIds);
                 activeMode = 'custom';
                 persistSortStateLocally(activeMode, savedCustomOrderIds);
-                sortSelect.value = 'custom';
+                if (sortSelect) sortSelect.value = 'custom';
                 applyModeToGrid('custom');
                 setCustomFeedback('Custom order saved. Refresh page to apply it.', 'success');
                 setSortFeedback('Custom order saved. Refresh page to apply it.', 'warning');

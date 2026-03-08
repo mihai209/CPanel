@@ -181,7 +181,8 @@ app.post('/login',
                     gravatarHash: md5(user.email.trim().toLowerCase()),
                     avatarUrl: user.avatarUrl,
                     avatarProvider: user.avatarProvider,
-                    uiTheme: getUserThemeId(user.toJSON ? user.toJSON() : user)
+                    uiTheme: getUserThemeId(user.toJSON ? user.toJSON() : user),
+                    loginMethod: 'email'
                 };
 
                 await new Promise((resolve, reject) => {
@@ -214,6 +215,18 @@ app.post('/login',
                     resolve();
                 });
             });
+
+            if (typeof recordUserLoginEvent === 'function') {
+                Promise.resolve(
+                    recordUserLoginEvent({
+                        req,
+                        user,
+                        loginType: 'email',
+                        UserLoginEvent,
+                        axios
+                    })
+                ).catch(() => {});
+            }
 
             console.log(`Successful login for user: ${user.username} (${user.email})`);
             res.redirect('/');
@@ -274,6 +287,18 @@ app.post('/login/2fa', loginLimiter, async (req, res) => {
                     resolve();
                 });
             });
+
+            if (typeof recordUserLoginEvent === 'function') {
+                Promise.resolve(
+                    recordUserLoginEvent({
+                        req,
+                        user,
+                        loginType: loginUser.loginMethod || 'email',
+                        UserLoginEvent,
+                        axios
+                    })
+                ).catch(() => {});
+            }
 
             console.log(`Successful 2FA login for user: ${user.username}`);
             res.redirect('/');
@@ -501,6 +526,47 @@ function normalizeDashboardSortMode(mode) {
     return 'latest';
 }
 
+function normalizeServerFolderName(value) {
+    const clean = String(value || '').trim().replace(/\s+/g, ' ');
+    if (!clean) return null;
+    return clean.slice(0, 64);
+}
+
+function normalizeServerTags(value, maxItems = 12) {
+    let source = [];
+    if (Array.isArray(value)) {
+        source = value;
+    } else if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (Array.isArray(parsed)) source = parsed;
+            } catch {
+                source = trimmed.split(',');
+            }
+        } else {
+            source = trimmed.split(',');
+        }
+    } else if (value && typeof value === 'object') {
+        source = Object.values(value);
+    }
+
+    const seen = new Set();
+    const output = [];
+    for (const entry of source) {
+        const clean = String(entry || '').trim().replace(/\s+/g, ' ');
+        if (!clean) continue;
+        const normalized = clean.slice(0, 24);
+        const key = normalized.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        output.push(normalized);
+        if (output.length >= maxItems) break;
+    }
+    return output;
+}
+
 function normalizeDashboardCustomOrderIds(input, maxItems = 500) {
     const source = Array.isArray(input) ? input : [];
     const seen = new Set();
@@ -617,6 +683,20 @@ app.get('/', requireAuth, async (req, res) => {
             include: [{ model: User, as: 'owner', attributes: ['id', 'username'] }],
             order: [['id', 'DESC']]
         });
+        servers.forEach((serverRow) => {
+            const nextFolder = normalizeServerFolderName(serverRow && serverRow.folder);
+            const nextTags = normalizeServerTags(serverRow && serverRow.tags);
+            if (serverRow) {
+                serverRow.setDataValue('folder', nextFolder);
+                serverRow.setDataValue('tags', nextTags);
+            }
+        });
+        const dashboardFolders = Array.from(new Set(servers
+            .map((serverRow) => String(serverRow && serverRow.folder || '').trim())
+            .filter(Boolean)))
+            .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }));
+        const dashboardTags = Array.from(new Set(servers.flatMap((serverRow) => normalizeServerTags(serverRow && serverRow.tags))))
+            .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true }));
         const dashboardLatestOrderIds = servers
             .map((server) => Number.parseInt(server && server.id, 10))
             .filter((id) => Number.isInteger(id) && id > 0);
@@ -644,6 +724,8 @@ app.get('/', requireAuth, async (req, res) => {
             dashboardSortMode: dashboardServerOrderPreference.mode,
             dashboardCustomOrderIds: dashboardServerOrderPreference.customIds,
             dashboardLatestOrderIds,
+            dashboardFolders,
+            dashboardTags,
             dashboardNowMs: Date.now()
         });
     } catch (err) {
@@ -841,6 +923,7 @@ function normalizeEconomyUnit(value) {
 
 const SERVER_PERMISSIONS = Object.freeze([
     'server.view',
+    'server.tags.manage',
     'server.console',
     'server.power',
     'server.files',
@@ -863,8 +946,64 @@ const SERVER_PERMISSIONS = Object.freeze([
     'server.users.view',
     'server.users.manage',
     'server.activity.view',
+    'server.audit.read',
+    'server.timeline.view',
+    'server.macros',
+    'server.recovery',
     'server.smartalerts',
     'server.policy'
+]);
+
+const DEFAULT_DEPENDENCY_MIRROR_HOSTS = Object.freeze([
+    'mohistmc.github.io',
+    'api.github.com',
+    'api.modrinth.com',
+    'api.spigotmc.org',
+    'maven.minecraftforge.net',
+    'repo.spongepowered.org',
+    'libraries.minecraft.net'
+]);
+
+const SUBUSER_PERMISSION_PRESETS = Object.freeze([
+    {
+        id: 'support',
+        label: 'Support',
+        description: 'View, console, activity and basic user support actions.',
+        permissions: [
+            'server.view',
+            'server.console',
+            'server.activity.view',
+            'server.users.view'
+        ]
+    },
+    {
+        id: 'moderator',
+        label: 'Moderator',
+        description: 'Support + Minecraft moderation actions (kick/ban).',
+        permissions: [
+            'server.view',
+            'server.console',
+            'server.minecraft',
+            'minecraft.kick',
+            'minecraft.ban',
+            'server.activity.view',
+            'server.users.view'
+        ]
+    },
+    {
+        id: 'developer',
+        label: 'Developer',
+        description: 'File/startup access for plugin or mod maintenance.',
+        permissions: [
+            'server.view',
+            'server.console',
+            'server.files',
+            'server.startup',
+            'server.minecraft',
+            'server.backups.view',
+            'server.activity.view'
+        ]
+    }
 ]);
 const SERVER_SCHEDULES_KEY_PREFIX = 'server_schedules_';
 const SERVER_API_KEY_PERMISSIONS = Array.isArray(SERVER_API_KEY_PERMISSION_CATALOG)
@@ -1994,6 +2133,76 @@ function normalizeRemoteDownloadUrl(rawUrl) {
     } catch {
         return '';
     }
+}
+
+function normalizeDependencyMirrorHost(rawValue) {
+    const value = String(rawValue || '').trim();
+    if (!value) return '';
+
+    let host = value;
+    try {
+        if (/^https?:\/\//i.test(value)) {
+            host = new URL(value).hostname || '';
+        }
+    } catch {
+        host = value;
+    }
+
+    host = String(host || '').trim().toLowerCase();
+    host = host.replace(/^\[|\]$/g, '');
+    host = host.replace(/:\d+$/, '');
+
+    if (!host || host.length > 255) return '';
+    if (!/^[a-z0-9.-]+$/.test(host)) return '';
+    if (!host.includes('.')) return '';
+    return host;
+}
+
+function extractDependencyMirrorHostsFromDebugLogs(logEntries = [], maxHosts = 16) {
+    const hosts = new Set();
+    const addHost = (candidate) => {
+        const normalized = normalizeDependencyMirrorHost(candidate);
+        if (!normalized || hosts.has(normalized)) return;
+        hosts.add(normalized);
+    };
+
+    const addFromText = (text) => {
+        const source = String(text || '');
+        if (!source) return;
+
+        const urlRegex = /https?:\/\/([a-z0-9.-]+\.[a-z]{2,})(?::\d+)?(?:\/|$)/ig;
+        let match;
+        while ((match = urlRegex.exec(source)) !== null) {
+            addHost(match[1]);
+            if (hosts.size >= maxHosts) return;
+        }
+
+        const unknownHostRegex = /UnknownHostException:\s*([A-Za-z0-9.-]+\.[A-Za-z]{2,})/g;
+        while ((match = unknownHostRegex.exec(source)) !== null) {
+            addHost(match[1]);
+            if (hosts.size >= maxHosts) return;
+        }
+
+        const fallbackHostRegex = /\b([a-z0-9.-]+\.[a-z]{2,})\b/ig;
+        while ((match = fallbackHostRegex.exec(source)) !== null) {
+            const token = String(match[1] || '').toLowerCase();
+            if (token.endsWith('.jar') || token.endsWith('.json') || token.endsWith('.yml')) continue;
+            addHost(token);
+            if (hosts.size >= maxHosts) return;
+        }
+    };
+
+    const entries = Array.isArray(logEntries) ? logEntries : [];
+    for (const entry of entries) {
+        if (hosts.size >= maxHosts) break;
+        const metadata = entry && entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {};
+        addFromText(metadata.message);
+        addFromText(metadata.error);
+        addFromText(metadata.logTail);
+        addFromText(entry && entry.action);
+    }
+
+    return Array.from(hosts);
 }
 
 function inferDownloadFileNameFromUrl(downloadUrl, fallback = 'download.zip') {
@@ -6491,12 +6700,23 @@ app.get('/server/:containerId', requireAuth, async (req, res) => {
             serverPerms: Array.from(access.permissions || [])
         }, SECRET_KEY, { expiresIn: '1h' });
 
+        const commandMacros = (typeof ServerCommandMacro !== 'undefined' && ServerCommandMacro && hasServerPermission(access, 'server.macros'))
+            ? await ServerCommandMacro.findAll({
+                where: { serverId: server.id },
+                attributes: ['id', 'name', 'command', 'description', 'position'],
+                order: [['position', 'ASC'], ['id', 'ASC']],
+                limit: 100
+            })
+            : [];
+
         res.render('server/console', {
             server,
             user: req.session.user,
             title: `Manage ${server.name}`,
             path: '/servers',
             wsToken,
+            commandMacros,
+            canUseMacros: hasServerPermission(access, 'server.macros'),
             showMinecraftEulaModal: isServerLikelyMinecraft(server)
         });
     } catch (err) {
@@ -6558,6 +6778,9 @@ app.get('/server/:containerId/overview', requireAuth, async (req, res) => {
             return res.redirect('/server/no-permissions');
         }
 
+        server.setDataValue('folder', normalizeServerFolderName(server.folder));
+        server.setDataValue('tags', normalizeServerTags(server.tags, 12));
+
         let resolvedStartup = server.image ? server.image.startup : '';
         try {
             if (server.image) {
@@ -6602,6 +6825,22 @@ app.get('/server/:containerId/overview', requireAuth, async (req, res) => {
             })
             : [];
         const healthScore = computeServerHealthScore(server, debugEvents, configDrift);
+        let minecraftProfileCard = null;
+        if (isServerLikelyMinecraft(server) && hasServerPermission(access, 'server.minecraft')) {
+            const bedrockMode = inferMinecraftBedrockMode(server);
+            const statusAddress = resolveMinecraftStatusAddress(server);
+            const statusPreview = await fetchMinecraftServerStatusPreview({
+                address: statusAddress,
+                bedrockMode,
+                settingsMap: res.locals.settings || {}
+            });
+            minecraftProfileCard = {
+                enabled: true,
+                bedrockMode,
+                statusAddress,
+                status: statusPreview
+            };
+        }
 
         res.render('server/overview', {
             server,
@@ -6613,6 +6852,8 @@ app.get('/server/:containerId/overview', requireAuth, async (req, res) => {
             serverCost,
             healthScore,
             configDrift,
+            minecraftProfileCard,
+            canManageServerTags: hasServerPermission(access, 'server.tags.manage') || access.isOwner || access.isAdmin,
             canManageConfigDrift: hasServerPermission(access, 'server.startup'),
             success: req.query.success || null,
             error: req.query.error || null
@@ -6634,9 +6875,10 @@ app.post('/server/:containerId/overview/meta', requireAuth, async (req, res) => 
         if (!hasServerPermission(access, 'server.view')) {
             return res.redirect('/server/no-permissions');
         }
-        if (!access.isOwner && !access.isAdmin) {
+        if (!access.isOwner && !access.isAdmin && !hasServerPermission(access, 'server.tags.manage')) {
             return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('You are not allowed to edit this server metadata.')}`);
         }
+        const canEditIdentity = access.isOwner || access.isAdmin;
 
         const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
         if (access.isOwner) {
@@ -6657,6 +6899,8 @@ app.post('/server/:containerId/overview/meta', requireAuth, async (req, res) => 
         const nextName = String(req.body.name || '').trim();
         const nextDescriptionRaw = String(req.body.description || '').trim();
         const nextDescription = nextDescriptionRaw.length > 0 ? nextDescriptionRaw : null;
+        const nextFolder = normalizeServerFolderName(req.body.folder);
+        const nextTags = normalizeServerTags(req.body.tags, 12);
 
         if (!nextName) {
             return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Server name is required.')}`);
@@ -6667,17 +6911,32 @@ app.post('/server/:containerId/overview/meta', requireAuth, async (req, res) => 
         if (nextDescriptionRaw.length > 50) {
             return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Description must be at most 50 characters.')}`);
         }
+        if (nextTags.some((tag) => String(tag).length > 24)) {
+            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Each tag must be at most 24 characters.')}`);
+        }
 
         const prevName = String(server.name || '').trim();
         const prevDescription = String(server.description || '').trim();
+        const prevFolder = normalizeServerFolderName(server.folder);
+        const prevTags = normalizeServerTags(server.tags, 12);
         const normalizedNextDescription = String(nextDescription || '').trim();
-        if (prevName === nextName && prevDescription === normalizedNextDescription) {
+        if (!canEditIdentity && (prevName !== nextName || prevDescription !== normalizedNextDescription)) {
+            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Missing permission: server identity edit is owner/admin only.')}`);
+        }
+        if (
+            prevName === nextName
+            && prevDescription === normalizedNextDescription
+            && String(prevFolder || '') === String(nextFolder || '')
+            && JSON.stringify(prevTags) === JSON.stringify(nextTags)
+        ) {
             return res.redirect(`/server/${server.containerId}/overview?success=${encodeURIComponent('No changes detected.')}`);
         }
 
         await server.update({
-            name: nextName,
-            description: nextDescription
+            name: canEditIdentity ? nextName : prevName,
+            description: canEditIdentity ? nextDescription : (prevDescription || null),
+            folder: nextFolder,
+            tags: nextTags
         });
 
         await createBillingAuditLog({
@@ -6691,6 +6950,10 @@ app.post('/server/:containerId/overview/meta', requireAuth, async (req, res) => 
                 newName: nextName,
                 previousDescription: prevDescription || null,
                 newDescription: normalizedNextDescription || null,
+                previousFolder: prevFolder || null,
+                newFolder: nextFolder || null,
+                previousTags: prevTags,
+                newTags: nextTags,
                 source: 'server.overview'
             }
         });
@@ -6781,6 +7044,7 @@ app.get('/server/:containerId/users', requireAuth, async (req, res) => {
             memberships,
             candidateUsers,
             permissionCatalog: SERVER_PERMISSIONS,
+            permissionPresets: SUBUSER_PERMISSION_PRESETS,
             canManageUsers: hasServerPermission(access, 'server.users.manage'),
             success: req.query.success || null,
             error: req.query.error || null
@@ -7187,6 +7451,536 @@ app.get('/server/:containerId/activity', requireAuth, async (req, res) => {
     }
 });
 
+app.get('/server/:containerId/audit-console', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.audit.read') && !hasServerPermission(access, 'server.activity.view')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const logs = await AuditLog.findAll({
+            where: {
+                targetType: 'server',
+                targetId: String(server.id),
+                action: {
+                    [Op.or]: [
+                        { [Op.like]: 'server:console.%' },
+                        { [Op.like]: 'server:power.%' },
+                        { [Op.like]: 'server:ack.%' },
+                        { [Op.like]: 'server:debug.%' },
+                        { [Op.like]: 'server:recovery.%' }
+                    ]
+                }
+            },
+            include: [{ model: User, as: 'actor', attributes: ['id', 'username'], required: false }],
+            order: [['id', 'DESC']],
+            limit: 350
+        });
+
+        return res.render('server/audit-console', {
+            server,
+            user: req.session.user,
+            title: `Audit Console ${server.name}`,
+            path: '/servers',
+            active: 'auditconsole',
+            logs
+        });
+    } catch (error) {
+        console.error('Error loading audit console:', error);
+        return res.redirect('/?error=' + encodeURIComponent('Failed to load audit console.'));
+    }
+});
+
+app.get('/server/:containerId/audit-console/feed', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.audit.read') && !hasServerPermission(access, 'server.activity.view')) {
+            return res.status(403).json({ success: false, error: 'Missing permission: server.audit.read' });
+        }
+
+        const afterId = Math.max(0, Number.parseInt(req.query.afterId, 10) || 0);
+        const logs = await AuditLog.findAll({
+            where: {
+                id: { [Op.gt]: afterId },
+                targetType: 'server',
+                targetId: String(server.id),
+                action: {
+                    [Op.or]: [
+                        { [Op.like]: 'server:console.%' },
+                        { [Op.like]: 'server:power.%' },
+                        { [Op.like]: 'server:ack.%' },
+                        { [Op.like]: 'server:debug.%' },
+                        { [Op.like]: 'server:recovery.%' }
+                    ]
+                }
+            },
+            include: [{ model: User, as: 'actor', attributes: ['id', 'username'], required: false }],
+            order: [['id', 'ASC']],
+            limit: 120
+        });
+
+        return res.json({
+            success: true,
+            logs: logs.map((entry) => ({
+                id: entry.id,
+                action: entry.action || '',
+                createdAt: entry.createdAt,
+                actor: entry.actor ? { id: entry.actor.id, username: entry.actor.username } : null,
+                metadata: entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {}
+            }))
+        });
+    } catch (error) {
+        console.error('Error loading audit feed:', error);
+        return res.status(500).json({ success: false, error: 'Failed to load audit feed.' });
+    }
+});
+
+app.get('/server/:containerId/timeline', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }]
+        });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.timeline.view')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const wsToken = jwt.sign({
+            serverId: server.id,
+            userId: req.session.user.id,
+            isAdmin: Boolean(req.session.user.isAdmin),
+            serverPerms: Array.from(access.permissions || [])
+        }, SECRET_KEY, { expiresIn: '1h' });
+
+        const samples = (typeof ServerResourceSample !== 'undefined' && ServerResourceSample)
+            ? await ServerResourceSample.findAll({
+                where: { serverId: server.id },
+                attributes: ['id', 'cpuPercent', 'memoryMb', 'diskMb', 'collectedAt'],
+                order: [['collectedAt', 'DESC']],
+                limit: 240
+            })
+            : [];
+
+        return res.render('server/timeline', {
+            server,
+            user: req.session.user,
+            title: `Resource Timeline ${server.name}`,
+            path: '/servers',
+            active: 'timeline',
+            wsToken,
+            samples: samples.reverse()
+        });
+    } catch (error) {
+        console.error('Error loading resource timeline:', error);
+        return res.redirect('/?error=' + encodeURIComponent('Failed to load timeline page.'));
+    }
+});
+
+app.get('/server/:containerId/macros', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.macros')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const macros = (typeof ServerCommandMacro !== 'undefined' && ServerCommandMacro)
+            ? await ServerCommandMacro.findAll({
+                where: { serverId: server.id },
+                include: [{ model: User, as: 'creator', attributes: ['id', 'username'], required: false }],
+                order: [['position', 'ASC'], ['id', 'ASC']]
+            })
+            : [];
+
+        return res.render('server/macros', {
+            server,
+            user: req.session.user,
+            title: `Command Macros ${server.name}`,
+            path: '/servers',
+            active: 'macros',
+            macros,
+            success: req.query.success || null,
+            error: req.query.error || null,
+            canRunCommands: hasServerPermission(access, 'server.console')
+        });
+    } catch (error) {
+        console.error('Error loading macros page:', error);
+        return res.redirect('/?error=' + encodeURIComponent('Failed to load macros page.'));
+    }
+});
+
+app.post('/server/:containerId/macros', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.macros')) {
+            return res.redirect('/server/no-permissions');
+        }
+        if (typeof ServerCommandMacro === 'undefined' || !ServerCommandMacro) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro storage is unavailable.')}`);
+        }
+
+        const name = String(req.body.name || '').trim().slice(0, 80);
+        const descriptionRaw = String(req.body.description || '').trim();
+        const description = descriptionRaw ? descriptionRaw.slice(0, 160) : null;
+        const command = String(req.body.command || '').trim().slice(0, 1024);
+
+        if (!name) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro name is required.')}`);
+        }
+        if (!command) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro command is required.')}`);
+        }
+
+        const maxPositionRow = await ServerCommandMacro.findOne({
+            where: { serverId: server.id },
+            attributes: [[sequelize.fn('MAX', sequelize.col('position')), 'maxPosition']],
+            raw: true
+        });
+        const nextPosition = Number.parseInt(maxPositionRow && maxPositionRow.maxPosition, 10);
+
+        await ServerCommandMacro.create({
+            serverId: server.id,
+            createdByUserId: req.session.user.id,
+            name,
+            description,
+            command,
+            position: Number.isInteger(nextPosition) ? nextPosition + 1 : 0
+        });
+
+        if (AuditLog) {
+            await AuditLog.create({
+                actorUserId: req.session.user.id,
+                action: 'server:macro.create',
+                targetType: 'server',
+                targetId: String(server.id),
+                method: req.method,
+                path: req.originalUrl,
+                ip: String(getRequestIp(req) || '').slice(0, 120) || null,
+                userAgent: req.headers && req.headers['user-agent'] ? String(req.headers['user-agent']).slice(0, 1000) : null,
+                metadata: { name, hasDescription: Boolean(description) }
+            }).catch(() => {});
+        }
+
+        return res.redirect(`/server/${server.containerId}/macros?success=${encodeURIComponent('Macro created.')}`);
+    } catch (error) {
+        console.error('Error creating macro:', error);
+        return res.redirect(`/server/${req.params.containerId}/macros?error=${encodeURIComponent('Failed to create macro.')}`);
+    }
+});
+
+app.post('/server/:containerId/macros/:macroId/update', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+        if (!server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.macros')) return res.redirect('/server/no-permissions');
+        if (typeof ServerCommandMacro === 'undefined' || !ServerCommandMacro) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro storage is unavailable.')}`);
+        }
+
+        const macroId = Number.parseInt(req.params.macroId, 10);
+        if (!Number.isInteger(macroId) || macroId <= 0) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Invalid macro ID.')}`);
+        }
+
+        const macro = await ServerCommandMacro.findOne({ where: { id: macroId, serverId: server.id } });
+        if (!macro) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro not found.')}`);
+        }
+
+        const name = String(req.body.name || '').trim().slice(0, 80);
+        const descriptionRaw = String(req.body.description || '').trim();
+        const description = descriptionRaw ? descriptionRaw.slice(0, 160) : null;
+        const command = String(req.body.command || '').trim().slice(0, 1024);
+        const requestedPosition = Number.parseInt(req.body.position, 10);
+
+        if (!name || !command) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro name and command are required.')}`);
+        }
+
+        await macro.update({
+            name,
+            description,
+            command,
+            position: Number.isInteger(requestedPosition) ? Math.max(0, requestedPosition) : macro.position
+        });
+
+        if (AuditLog) {
+            await AuditLog.create({
+                actorUserId: req.session.user.id,
+                action: 'server:macro.update',
+                targetType: 'server',
+                targetId: String(server.id),
+                method: req.method,
+                path: req.originalUrl,
+                ip: String(getRequestIp(req) || '').slice(0, 120) || null,
+                userAgent: req.headers && req.headers['user-agent'] ? String(req.headers['user-agent']).slice(0, 1000) : null,
+                metadata: { macroId: macro.id, name, position: macro.position }
+            }).catch(() => {});
+        }
+
+        return res.redirect(`/server/${server.containerId}/macros?success=${encodeURIComponent('Macro updated.')}`);
+    } catch (error) {
+        console.error('Error updating macro:', error);
+        return res.redirect(`/server/${req.params.containerId}/macros?error=${encodeURIComponent('Failed to update macro.')}`);
+    }
+});
+
+app.post('/server/:containerId/macros/:macroId/delete', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+        if (!server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.macros')) return res.redirect('/server/no-permissions');
+        if (typeof ServerCommandMacro === 'undefined' || !ServerCommandMacro) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro storage is unavailable.')}`);
+        }
+
+        const macroId = Number.parseInt(req.params.macroId, 10);
+        if (!Number.isInteger(macroId) || macroId <= 0) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Invalid macro ID.')}`);
+        }
+
+        const macro = await ServerCommandMacro.findOne({ where: { id: macroId, serverId: server.id } });
+        if (!macro) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro not found.')}`);
+        }
+
+        await macro.destroy();
+
+        if (AuditLog) {
+            await AuditLog.create({
+                actorUserId: req.session.user.id,
+                action: 'server:macro.delete',
+                targetType: 'server',
+                targetId: String(server.id),
+                method: req.method,
+                path: req.originalUrl,
+                ip: String(getRequestIp(req) || '').slice(0, 120) || null,
+                userAgent: req.headers && req.headers['user-agent'] ? String(req.headers['user-agent']).slice(0, 1000) : null,
+                metadata: { macroId: macro.id, name: macro.name }
+            }).catch(() => {});
+        }
+
+        return res.redirect(`/server/${server.containerId}/macros?success=${encodeURIComponent('Macro deleted.')}`);
+    } catch (error) {
+        console.error('Error deleting macro:', error);
+        return res.redirect(`/server/${req.params.containerId}/macros?error=${encodeURIComponent('Failed to delete macro.')}`);
+    }
+});
+
+app.post('/server/:containerId/macros/:macroId/run', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }]
+        });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.macros') || !hasServerPermission(access, 'server.console')) {
+            return res.redirect('/server/no-permissions');
+        }
+        if (typeof ServerCommandMacro === 'undefined' || !ServerCommandMacro) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro storage is unavailable.')}`);
+        }
+
+        const macroId = Number.parseInt(req.params.macroId, 10);
+        const macro = await ServerCommandMacro.findOne({
+            where: { id: macroId, serverId: server.id }
+        });
+        if (!macro) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro not found.')}`);
+        }
+        if (!server.allocation || !server.allocation.connectorId) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Server allocation is missing.')}`);
+        }
+
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Connector is offline.')}`);
+        }
+
+        const requestId = `macro_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`;
+        connectorWs.send(JSON.stringify({
+            type: 'server_command',
+            serverId: server.id,
+            command: macro.command,
+            requestId
+        }));
+
+        if (AuditLog) {
+            await AuditLog.create({
+                actorUserId: req.session.user.id,
+                action: 'server:macro.run',
+                targetType: 'server',
+                targetId: String(server.id),
+                method: req.method,
+                path: req.originalUrl,
+                ip: String(getRequestIp(req) || '').slice(0, 120) || null,
+                userAgent: req.headers && req.headers['user-agent'] ? String(req.headers['user-agent']).slice(0, 1000) : null,
+                metadata: { macroId: macro.id, name: macro.name, command: macro.command.slice(0, 512), requestId }
+            }).catch(() => {});
+        }
+
+        return res.redirect(`/server/${server.containerId}/macros?success=${encodeURIComponent(`Macro "${macro.name}" sent.`)}`);
+    } catch (error) {
+        console.error('Error executing macro:', error);
+        return res.redirect(`/server/${req.params.containerId}/macros?error=${encodeURIComponent('Failed to run macro.')}`);
+    }
+});
+
+app.get('/server/:containerId/recovery', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }]
+        });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.recovery')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const debugEvents = await AuditLog.findAll({
+            where: {
+                targetType: 'server',
+                targetId: String(server.id),
+                action: { [Op.like]: 'server:debug.%' }
+            },
+            order: [['createdAt', 'DESC']],
+            limit: 30
+        });
+        const latestDebug = debugEvents.length > 0 ? debugEvents[0] : null;
+        const latestAction = String(latestDebug && latestDebug.action || '').toLowerCase();
+        const latestMeta = latestDebug && latestDebug.metadata && typeof latestDebug.metadata === 'object'
+            ? latestDebug.metadata
+            : {};
+
+        let issueHint = 'No recent debug issue detected. You can still run recovery actions.';
+        if (latestAction.includes('install_fail')) issueHint = 'Latest issue suggests install/startup failure.';
+        else if (latestAction.includes('.crash')) issueHint = 'Latest issue suggests an unexpected crash.';
+        else if (latestAction.includes('connector_error')) issueHint = 'Latest issue indicates connector communication errors.';
+        else if (latestAction.includes('event.kill') || latestAction.includes('event.die')) issueHint = 'Latest issue indicates process termination.';
+
+        const connectorOnline = Boolean(server.allocation && connectorConnections.has(server.allocation.connectorId));
+
+        return res.render('server/recovery', {
+            server,
+            user: req.session.user,
+            title: `Recovery Assistant ${server.name}`,
+            path: '/servers',
+            active: 'recovery',
+            debugEvents,
+            latestDebug,
+            latestMeta,
+            issueHint,
+            connectorOnline,
+            success: req.query.success || null,
+            error: req.query.error || null,
+            canPower: hasServerPermission(access, 'server.power'),
+            canConsole: hasServerPermission(access, 'server.console')
+        });
+    } catch (error) {
+        console.error('Error loading recovery assistant:', error);
+        return res.redirect('/?error=' + encodeURIComponent('Failed to load recovery assistant.'));
+    }
+});
+
+app.post('/server/:containerId/recovery/action', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }, { model: Image, as: 'image' }]
+        });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.recovery')) {
+            return res.redirect('/server/no-permissions');
+        }
+        if (!server.allocation || !server.allocation.connectorId) {
+            return res.redirect(`/server/${server.containerId}/recovery?error=${encodeURIComponent('Server allocation is missing.')}`);
+        }
+
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return res.redirect(`/server/${server.containerId}/recovery?error=${encodeURIComponent('Connector is offline.')}`);
+        }
+
+        const action = String(req.body.action || '').trim().toLowerCase();
+        const requestId = `recovery_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`;
+        let successMessage = 'Recovery action sent.';
+
+        if (['start', 'stop', 'restart', 'kill'].includes(action)) {
+            if (!hasServerPermission(access, 'server.power')) {
+                return res.redirect(`/server/${server.containerId}/recovery?error=${encodeURIComponent('Missing permission: server.power')}`);
+            }
+            if (action === 'stop' || action === 'restart' || action === 'kill') {
+                rememberServerPowerIntent(server.id, action);
+            }
+            if (action === 'start') {
+                consumeServerPowerIntent(server.id);
+            }
+            connectorWs.send(JSON.stringify({
+                type: 'server_power',
+                serverId: server.id,
+                action,
+                stopCommand: server.image && server.image.eggConfig ? server.image.eggConfig.stop : null,
+                requestId
+            }));
+            successMessage = `Recovery power action "${action}" sent.`;
+        } else if (action === 'save-all') {
+            if (!hasServerPermission(access, 'server.console')) {
+                return res.redirect(`/server/${server.containerId}/recovery?error=${encodeURIComponent('Missing permission: server.console')}`);
+            }
+            connectorWs.send(JSON.stringify({
+                type: 'server_command',
+                serverId: server.id,
+                command: 'save-all',
+                requestId
+            }));
+            successMessage = 'Recovery command "save-all" sent.';
+        } else {
+            return res.redirect(`/server/${server.containerId}/recovery?error=${encodeURIComponent('Unknown recovery action.')}`);
+        }
+
+        if (AuditLog) {
+            await AuditLog.create({
+                actorUserId: req.session.user.id,
+                action: 'server:recovery.action',
+                targetType: 'server',
+                targetId: String(server.id),
+                method: req.method,
+                path: req.originalUrl,
+                ip: String(getRequestIp(req) || '').slice(0, 120) || null,
+                userAgent: req.headers && req.headers['user-agent'] ? String(req.headers['user-agent']).slice(0, 1000) : null,
+                metadata: { action, requestId }
+            }).catch(() => {});
+        }
+
+        return res.redirect(`/server/${server.containerId}/recovery?success=${encodeURIComponent(successMessage)}`);
+    } catch (error) {
+        console.error('Error running recovery action:', error);
+        return res.redirect(`/server/${req.params.containerId}/recovery?error=${encodeURIComponent('Failed to run recovery action.')}`);
+    }
+});
+
 app.get('/server/:containerId/debug-logs', requireAuth, async (req, res) => {
     try {
         const server = await Server.findOne({ where: { containerId: req.params.containerId } });
@@ -7245,6 +8039,122 @@ app.get('/server/:containerId/debug-logs', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error loading debug logs page:', error);
         return res.redirect('/?error=' + encodeURIComponent('Failed to load server debug logs.'));
+    }
+});
+
+app.post('/server/:containerId/debug-logs/dependency-mirror-check', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{
+                model: Allocation,
+                as: 'allocation',
+                include: [{ model: Connector, as: 'connector' }]
+            }]
+        });
+        if (!server) {
+            return res.status(404).json({ success: false, error: 'Server not found.' });
+        }
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.console') && !hasServerPermission(access, 'server.activity.view')) {
+            return res.status(403).json({ success: false, error: 'Missing permission to run dependency mirror checks.' });
+        }
+
+        if (!server.allocation || !server.allocation.connectorId) {
+            return res.status(400).json({ success: false, error: 'Server allocation is missing.' });
+        }
+
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return res.status(503).json({ success: false, error: 'Connector is offline.' });
+        }
+
+        const serverCreatedAt = (server.createdAt instanceof Date && !Number.isNaN(server.createdAt.getTime()))
+            ? server.createdAt
+            : new Date(0);
+        const recentDebugLogs = await AuditLog.findAll({
+            where: {
+                targetType: 'server',
+                targetId: String(server.id),
+                action: { [Op.like]: 'server:debug.%' },
+                createdAt: { [Op.gte]: serverCreatedAt }
+            },
+            attributes: ['action', 'metadata'],
+            order: [['createdAt', 'DESC']],
+            limit: 40
+        });
+
+        const extractedHosts = extractDependencyMirrorHostsFromDebugLogs(recentDebugLogs, 16);
+        const hostCandidates = Array.from(new Set([
+            ...extractedHosts,
+            ...DEFAULT_DEPENDENCY_MIRROR_HOSTS
+        ].map((entry) => normalizeDependencyMirrorHost(entry)).filter(Boolean))).slice(0, 16);
+
+        const requestId = `dep_mirror_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`;
+        connectorWs.send(JSON.stringify({
+            type: 'dependency_mirror_check',
+            serverId: server.id,
+            requestId,
+            hosts: hostCandidates
+        }));
+
+        const result = await waitForConnectorMessage(connectorWs, (message) => {
+            if (!message || String(message.type || '') !== 'dependency_mirror_check_result') return false;
+            if (Number.parseInt(message.serverId, 10) !== Number.parseInt(server.id, 10)) return false;
+            if (String(message.requestId || '').trim() !== requestId) return false;
+            return message;
+        }, 35000);
+
+        const summary = result && result.summary && typeof result.summary === 'object'
+            ? result.summary
+            : {};
+
+        await AuditLog.create({
+            actorUserId: req.session.user.id,
+            action: 'server:debug.dependency_mirror_check',
+            targetType: 'server',
+            targetId: String(server.id),
+            method: req.method,
+            path: req.originalUrl || req.url,
+            ip: req.headers['x-forwarded-for'] || req.ip || null,
+            userAgent: req.headers['user-agent'] || null,
+            metadata: {
+                containerId: server.containerId,
+                requestId,
+                connectorId: server.allocation.connectorId,
+                hosts: hostCandidates,
+                success: Boolean(result && result.success),
+                likelyRootCause: String(summary.likelyRootCause || '').slice(0, 500),
+                reachableMirrors: Number.parseInt(summary.reachableMirrors, 10) || 0,
+                totalMirrors: Number.parseInt(summary.totalMirrors, 10) || 0
+            }
+        }).catch(() => {});
+
+        if (!result || result.success === false) {
+            const errorText = String((result && result.error) || 'Dependency mirror check failed.');
+            return res.status(502).json({
+                success: false,
+                error: errorText,
+                requestId,
+                hosts: hostCandidates
+            });
+        }
+
+        return res.json({
+            success: true,
+            requestId,
+            hosts: hostCandidates,
+            container: result.container || null,
+            mirrors: Array.isArray(result.mirrors) ? result.mirrors : [],
+            summary: summary
+        });
+    } catch (error) {
+        console.error('Dependency mirror check failed:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to run dependency mirror check.'
+        });
     }
 });
 
@@ -10607,6 +11517,9 @@ app.post('/server/:containerId/minecraft-configs', requireAuth, async (req, res)
         }
 
         const reason = normalizeMinecraftCommandReason(req.body.reason, 96);
+        if (!reason || reason.length < 3) {
+            return res.redirect(`${redirectBase}&error=${encodeURIComponent('Action reason is required (min 3 characters).')}`);
+        }
         const command = (selectedAction.command === 'kick' || selectedAction.command === 'ban')
             ? `${selectedAction.command} ${target}${reason ? ` ${reason}` : ''}`
             : `${selectedAction.command} ${target}`;
@@ -10630,6 +11543,7 @@ app.post('/server/:containerId/minecraft-configs', requireAuth, async (req, res)
                     requestId,
                     minecraftAction: action,
                     target: String(targetRaw || '').trim().slice(0, 64),
+                    reason: reason.slice(0, 96),
                     command: command.slice(0, 140)
                 }
             }).catch(() => {});
@@ -11665,6 +12579,7 @@ app.get('/server/:containerId/policy', requireAuth, async (req, res) => {
             title: `Policy Engine ${server.name}`,
             path: '/servers',
             policyConfig,
+            playbooksFeatureEnabled: Boolean(featureFlags.playbooksAutomationEnabled),
             success: req.query.success || null,
             error: req.query.error || null
         });
@@ -11693,6 +12608,10 @@ app.post('/server/:containerId/policy', requireAuth, async (req, res) => {
 
         const anomalyActionRaw = String(req.body.anomalyAction || 'none').trim().toLowerCase();
         const anomalyAction = ['none', 'restart', 'stop'].includes(anomalyActionRaw) ? anomalyActionRaw : 'none';
+        const crashLoopActionRaw = String(req.body.playbookCrashLoopAction || 'stop').trim().toLowerCase();
+        const crashLoopAction = ['none', 'start', 'restart', 'stop'].includes(crashLoopActionRaw) ? crashLoopActionRaw : 'stop';
+        const oomRecoveryActionRaw = String(req.body.playbookOomRecoveryAction || 'start').trim().toLowerCase();
+        const oomRecoveryAction = ['none', 'start', 'restart'].includes(oomRecoveryActionRaw) ? oomRecoveryActionRaw : 'start';
 
         await setServerPolicyEngineConfig(server.id, {
             enabled: parseBooleanInput(req.body.enabled, false),
@@ -11701,7 +12620,20 @@ app.post('/server/:containerId/policy', requireAuth, async (req, res) => {
             anomalyCpuThreshold: req.body.anomalyCpuThreshold,
             anomalyMemoryThreshold: req.body.anomalyMemoryThreshold,
             anomalyDurationSamples: req.body.anomalyDurationSamples,
-            maxRemediationsPerHour: req.body.maxRemediationsPerHour
+            maxRemediationsPerHour: req.body.maxRemediationsPerHour,
+            playbooks: {
+                enabled: featureFlags.playbooksAutomationEnabled && parseBooleanInput(req.body.playbooksEnabled, false),
+                crashLoop: {
+                    enabled: featureFlags.playbooksAutomationEnabled && parseBooleanInput(req.body.playbookCrashLoopEnabled, false),
+                    crashCount: req.body.playbookCrashLoopCrashCount,
+                    windowMinutes: req.body.playbookCrashLoopWindowMinutes,
+                    action: crashLoopAction
+                },
+                oomRecovery: {
+                    enabled: featureFlags.playbooksAutomationEnabled && parseBooleanInput(req.body.playbookOomRecoveryEnabled, true),
+                    action: oomRecoveryAction
+                }
+            }
         });
 
         return res.redirect(`/server/${server.containerId}/policy?success=${encodeURIComponent('Policy engine updated successfully.')}`);

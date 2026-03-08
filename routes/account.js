@@ -5,6 +5,7 @@ const {
     withThemeInPermissions
 } = require('../core/themes');
 const { getGoogleTokenSettingKey } = require('../core/backups/google-drive');
+const { formatLoginTypeLabel } = require('../core/helpers/login-history');
 
 function registerAccountRoutes({
     app,
@@ -12,6 +13,7 @@ function registerAccountRoutes({
     requireAdmin,
     User,
     LinkedAccount,
+    UserLoginEvent,
     Settings,
     Op,
     md5,
@@ -305,6 +307,42 @@ function registerAccountRoutes({
         } catch (err) {
             console.error("Failed to update password:", err);
             return res.redirect('/account?error=' + encodeURIComponent('Failed to update password.'));
+        }
+    });
+
+    app.get('/account/device-login', requireAuth, async (req, res) => {
+        try {
+            const userId = Number.parseInt(req.session.user.id, 10);
+            const user = await User.findByPk(userId);
+            if (!user) return res.redirect('/login');
+
+            const rows = await UserLoginEvent.findAll({
+                where: { userId },
+                order: [['createdAt', 'DESC']],
+                limit: 120
+            });
+
+            const events = rows.map((entry) => {
+                const data = entry.toJSON();
+                return {
+                    id: data.id,
+                    username: String(data.usernameSnapshot || user.username || '').trim(),
+                    operatingSystem: String(data.operatingSystem || 'Unknown OS').trim(),
+                    loginType: formatLoginTypeLabel(data.loginType),
+                    ipAddress: String(data.ipAddress || 'unknown').trim(),
+                    location: String(data.location || 'Unknown').trim(),
+                    createdAt: data.createdAt
+                };
+            });
+
+            return res.render('account-device-login', {
+                title: 'Device Login History',
+                user,
+                events
+            });
+        } catch (err) {
+            console.error('Error loading device login history:', err);
+            return res.redirect('/account?error=' + encodeURIComponent('Failed to load device login history.'));
         }
     });
 }

@@ -5,8 +5,9 @@ const GitHubStrategy = require('passport-github2').Strategy;
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const { getUserThemeId } = require('../core/themes');
+const { normalizeLoginType } = require('../core/helpers/login-history');
 
-function registerOAuthRoutes({ app, passport, User, LinkedAccount, Settings, md5 }) {
+function registerOAuthRoutes({ app, passport, User, LinkedAccount, Settings, md5, UserLoginEvent, axios, recordUserLoginEvent }) {
     const APP_OAUTH_URL = (process.env.APP_URL || '').replace(/\/$/, '');
     const OAUTH_DEBUG_ENABLED = ['1', 'true', 'yes', 'on'].includes(String(process.env.DEBUG || '').trim().toLowerCase());
     const GOOGLE_TOKEN_SETTINGS_PREFIX = 'oauth_google_tokens_user_';
@@ -236,7 +237,8 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, Settings, md5
     }
 
     // Helper: finalize session after successful OAuth authentication
-    async function finalizeOAuthLogin(user, req, res, next) {
+    async function finalizeOAuthLogin(user, req, res, next, loginType = 'email') {
+        const normalizedLoginType = normalizeLoginType(loginType);
         const returnToRaw = req.session && req.session.oauthReturnTo ? String(req.session.oauthReturnTo) : '';
         const returnTo = returnToRaw.startsWith('/') ? returnToRaw : '';
         if (req.session) {
@@ -266,7 +268,8 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, Settings, md5
                 gravatarHash: md5(user.email.trim().toLowerCase()),
                 avatarUrl: user.avatarUrl,
                 avatarProvider: user.avatarProvider,
-                uiTheme: getUserThemeId(user.toJSON ? user.toJSON() : user)
+                uiTheme: getUserThemeId(user.toJSON ? user.toJSON() : user),
+                loginMethod: normalizedLoginType
             };
 
             await new Promise((resolve, reject) => {
@@ -293,7 +296,18 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, Settings, md5
                 gravatarHash: md5(user.email.trim().toLowerCase()),
                 uiTheme: getUserThemeId(user.toJSON ? user.toJSON() : user)
             };
-            req.session.save(() => res.redirect(returnTo || '/'));
+            req.session.save(() => {
+                Promise.resolve(
+                    recordUserLoginEvent({
+                        req,
+                        user,
+                        loginType: normalizedLoginType,
+                        UserLoginEvent,
+                        axios
+                    })
+                ).catch(() => {});
+                res.redirect(returnTo || '/');
+            });
         });
     }
 
@@ -336,7 +350,7 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, Settings, md5
             passport.authenticate('discord', async (err, user, info) => {
                 if (err) return next(err);
                 if (!user) return res.redirect('/login?error=' + encodeURIComponent((info && info.message) || 'Discord authentication failed.'));
-                await finalizeOAuthLogin(user, req, res, next);
+                await finalizeOAuthLogin(user, req, res, next, 'discord');
             })(req, res, next);
         }
     );
@@ -406,7 +420,7 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, Settings, md5
             passport.authenticate('google', async (err, user, info) => {
                 if (err) return next(err);
                 if (!user) return res.redirect('/login?error=' + encodeURIComponent((info && info.message) || 'Google authentication failed.'));
-                await finalizeOAuthLogin(user, req, res, next);
+                await finalizeOAuthLogin(user, req, res, next, 'google');
             })(req, res, next);
         }
     );
@@ -442,7 +456,7 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, Settings, md5
             passport.authenticate('reddit', async (err, user, info) => {
                 if (err) return next(err);
                 if (!user) return res.redirect('/login?error=' + encodeURIComponent((info && info.message) || 'Reddit authentication failed.'));
-                await finalizeOAuthLogin(user, req, res, next);
+                await finalizeOAuthLogin(user, req, res, next, 'reddit');
             })(req, res, next);
         }
     );
@@ -480,7 +494,7 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, Settings, md5
             passport.authenticate('github', async (err, user, info) => {
                 if (err) return next(err);
                 if (!user) return res.redirect('/login?error=' + encodeURIComponent((info && info.message) || 'GitHub authentication failed.'));
-                await finalizeOAuthLogin(user, req, res, next);
+                await finalizeOAuthLogin(user, req, res, next, 'github');
             })(req, res, next);
         }
     );
