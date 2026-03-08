@@ -29,6 +29,8 @@
     </style>
 </head>
 <body>
+
+<%- include('../partials/error-modal') %>
 <%
     const drive = googleDriveState || {};
     const history = Array.isArray(backupHistory) ? backupHistory : [];

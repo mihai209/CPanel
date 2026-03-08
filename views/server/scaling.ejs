@@ -16,6 +16,8 @@
     </style>
 </head>
 <body>
+
+<%- include('../partials/error-modal') %>
 <%
 const config = scalingConfig || { enabled: false, timezone: 'UTC', rules: [] };
 const rules = Array.isArray(config.rules) ? config.rules : [];

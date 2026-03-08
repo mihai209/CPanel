@@ -10,7 +10,9 @@
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body class="bg-dark text-light">
-    <div class="container py-4">
+    
+    <%- include('partials/error-modal') %>
+<div class="container py-4">
         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
             <div>
                 <h1 class="h3 mb-1"><%= settings.brandName || 'CPanel' %> Status</h1>
