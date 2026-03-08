@@ -5606,6 +5606,12 @@ app.post('/user/server/:containerId/delete', requireAuth, async (req, res) => {
         if (ServerApiKey) {
             await ServerApiKey.destroy({ where: { serverId: server.id } }).catch(() => {});
         }
+        if (ServerBackupPolicy) {
+            await ServerBackupPolicy.destroy({ where: { serverId: server.id } }).catch(() => {});
+        }
+        if (ServerBackup) {
+            await ServerBackup.destroy({ where: { serverId: server.id } }).catch(() => {});
+        }
         if (typeof ServerDatabase !== 'undefined' && ServerDatabase) {
             const serverDatabases = await ServerDatabase.findAll({
                 where: { serverId: server.id },

@@ -2012,6 +2012,18 @@ app.post('/admin/servers/delete/:containerId', requireAuth, requireAdmin, async 
         if (ServerApiKey) {
             await ServerApiKey.destroy({ where: { serverId: server.id } }).catch(() => {});
         }
+        if (ServerSubuser) {
+            await ServerSubuser.destroy({ where: { serverId: server.id } }).catch(() => {});
+        }
+        if (ServerBackupPolicy) {
+            await ServerBackupPolicy.destroy({ where: { serverId: server.id } }).catch(() => {});
+        }
+        if (ServerBackup) {
+            await ServerBackup.destroy({ where: { serverId: server.id } }).catch(() => {});
+        }
+        if (typeof ServerDatabase !== 'undefined' && ServerDatabase) {
+            await ServerDatabase.destroy({ where: { serverId: server.id } }).catch(() => {});
+        }
         if (typeof removeServerMigrationTransferState === 'function') {
             await removeServerMigrationTransferState(server.id).catch(() => {});
         }
