@@ -580,18 +580,7 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                                     <th class="d-none d-lg-table-cell" style="width: 200px;">Last Modified</th>
                                 </tr>
                             </thead>
-                            <tbody id="fileList">
-                                <tr>
-                                    <td colspan="5" class="text-center py-4">
-                                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
-                                        </div>
-                                        Loading files...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                                         <input type="file" id="uploadInput" class="d-none" multiple>
+                                                        <input type="file" id="uploadInput" class="d-none" multiple>
                     <% if (fileUploadEnabled) { %>
                     <div id="uploadDropzone" class="upload-dropzone">
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -616,6 +605,18 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                     </div>
                 </div>
             </div>
+                            <tbody id="fileList">
+                                <tr>
+                                    <td colspan="5" class="text-center py-4">
+                                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                        </div>
+                                        Loading files...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+             
 
             <!-- Context Menu -->
             <div id="contextMenu" class="context-menu">
