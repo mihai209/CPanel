@@ -50,6 +50,33 @@ function registerServerPagesRoutes(ctx) {
     }
 // ========== PAGE ROUTES ==========
 
+const INLINE_MEDIA_MIME_TYPES = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.bmp': 'image/bmp',
+    '.svg': 'image/svg+xml',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+    '.ogg': 'video/ogg',
+    '.mov': 'video/quicktime',
+    '.m4v': 'video/x-m4v',
+    '.mkv': 'video/x-matroska',
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.m4a': 'audio/mp4',
+    '.aac': 'audio/aac',
+    '.flac': 'audio/flac',
+    '.opus': 'audio/opus'
+};
+
+function resolveInlineMediaMimeType(filePath) {
+    const ext = String(nodePath.extname(String(filePath || '')).toLowerCase());
+    return INLINE_MEDIA_MIME_TYPES[ext] || null;
+}
+
 // Login Page (GET)
 app.get('/ratelimited', (req, res) => {
     res.render('ratelimited');
@@ -12370,6 +12397,77 @@ app.get('/server/:containerId/status', requireAuth, async (req, res) => {
     } catch (err) {
         console.error("Error checking server status:", err);
         res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// File Inline Preview API (media only)
+app.get('/server/:containerId/files/preview', requireAuth, async (req, res) => {
+    try {
+        const filePathRaw = String(req.query.file || '').trim();
+        if (!filePathRaw) {
+            return res.status(400).send('File path is required');
+        }
+        const filePath = filePathRaw.startsWith('/') ? filePathRaw : `/${filePathRaw}`;
+        const mediaMimeType = resolveInlineMediaMimeType(filePath);
+        if (!mediaMimeType) {
+            return res.status(415).send('Unsupported media type for inline preview');
+        }
+
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation', include: [{ model: Connector, as: 'connector' }] }]
+        });
+
+        if (!server) {
+            return res.status(403).send('Forbidden');
+        }
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.files')) {
+            return res.status(403).send('Forbidden');
+        }
+
+        const connector = server.allocation ? server.allocation.connector : null;
+        if (!connector) return res.status(500).send('No connector error');
+
+        const protocol = connector.ssl ? 'https://' : 'http://';
+        const connectorUrl = `${protocol}${connector.fqdn}:${connector.port}/api/servers/${server.id}/files/read`;
+
+        const response = await fetch(connectorUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${connector.token}`
+            },
+            body: JSON.stringify({ path: filePath })
+        });
+
+        if (!response.ok) {
+            if (response.status === 404) return res.status(404).send('File not found');
+            return res.status(response.status).send('Connector error');
+        }
+
+        const fileName = nodePath.basename(filePath);
+        const safeFileName = String(fileName || 'media').replace(/["\\]/g, '_');
+        res.setHeader('Content-Disposition', `inline; filename="${safeFileName}"`);
+        res.setHeader('Content-Type', mediaMimeType);
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('Accept-Ranges', 'bytes');
+
+        if (response.body && typeof response.body.pipe === 'function') {
+            response.body.pipe(res);
+            return;
+        }
+        if (response.body && typeof response.body.getReader === 'function') {
+            Readable.fromWeb(response.body).pipe(res);
+            return;
+        }
+
+        const buffer = Buffer.from(await response.arrayBuffer());
+        return res.send(buffer);
+    } catch (err) {
+        console.error('Preview media error:', err);
+        return res.status(500).send('Internal server error during preview');
     }
 });
 

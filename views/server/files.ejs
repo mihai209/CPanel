@@ -332,6 +332,11 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 background: rgba(255, 255, 255, 0.04);
             }
 
+            .file-row.file-row-search-hit {
+                background: rgba(245, 158, 11, 0.16);
+                box-shadow: inset 3px 0 0 rgba(245, 158, 11, 0.9);
+            }
+
             .file-icon {
                 font-size: 1.25rem;
                 margin-right: 12px;
@@ -464,6 +469,139 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 color: var(--text-secondary);
             }
 
+            .file-list-container.drag-over {
+                border-color: rgba(59, 130, 246, 0.85);
+                box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) inset;
+            }
+
+            .btn-queue-badge {
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                justify-content: center;
+                padding: 0;
+                position: relative;
+            }
+
+            .queue-count-badge {
+                min-width: 20px;
+                height: 20px;
+                border-radius: 999px;
+                background: #3b82f6;
+                color: #fff;
+                font-size: 0.75rem;
+                line-height: 20px;
+                text-align: center;
+                font-weight: 700;
+                display: inline-block;
+                padding: 0 6px;
+            }
+
+            .search-results-list {
+                max-height: 48vh;
+                overflow: auto;
+                border: 1px solid var(--border-color);
+                border-radius: 10px;
+                background: rgba(0, 0, 0, 0.2);
+            }
+
+            .search-result-item {
+                padding: 0.75rem;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            }
+
+            .search-result-item:last-child {
+                border-bottom: 0;
+            }
+
+            .search-result-item.search-hit-root {
+                background: rgba(245, 158, 11, 0.12);
+            }
+
+            .search-result-link {
+                color: #93c5fd;
+                text-decoration: none;
+            }
+
+            .search-result-link:hover {
+                text-decoration: underline;
+            }
+
+            .search-toolbar {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.6rem;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 0.65rem;
+            }
+
+            .search-toolbar-left {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.55rem;
+                align-items: center;
+            }
+
+            .search-filter-select {
+                width: 170px;
+                background: #12151c;
+                border-color: #2f3541;
+                color: #fff;
+            }
+
+            .media-viewer-shell {
+                background: linear-gradient(180deg, rgba(13, 17, 24, 0.95), rgba(8, 10, 16, 0.95));
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 12px;
+                padding: 0.75rem;
+            }
+
+            .media-stage {
+                min-height: 56vh;
+                max-height: 64vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 10px;
+                background: radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.12), transparent 55%), rgba(0, 0, 0, 0.35);
+                overflow: hidden;
+            }
+
+            .media-stage img,
+            .media-stage video {
+                max-width: 100%;
+                max-height: 62vh;
+                border-radius: 8px;
+                box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+            }
+
+            .media-controls {
+                margin-top: 0.75rem;
+                display: flex;
+                align-items: center;
+                gap: 0.6rem;
+                flex-wrap: wrap;
+            }
+
+            .media-progress {
+                flex: 1 1 260px;
+                min-width: 220px;
+            }
+
+            .media-time {
+                font-size: 0.8rem;
+                color: var(--text-secondary);
+                min-width: 100px;
+                text-align: center;
+            }
+
+            .media-empty-note {
+                color: var(--text-secondary);
+                text-align: center;
+                padding: 2rem 1rem;
+            }
+
             .btn-danger-soft {
                 background: rgba(239, 68, 68, 0.1);
                 color: #ef4444;
@@ -541,6 +679,9 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                                 <i class="bi bi-cloud-upload"></i>
                                 <span>Upload</span>
                             </a>
+                            <a href="#" id="btnUploadQueue" class="btn-action btn-queue-badge me-2" title="Upload Queue">
+                                <span id="uploadQueueCount" class="queue-count-badge">0</span>
+                            </a>
                             <% } else { %>
                             <span class="btn-action me-2" style="opacity:0.65; pointer-events:none;">
                                 <i class="bi bi-cloud-upload"></i>
@@ -560,6 +701,10 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                             <a href="#" id="btnNewFolder" class="btn-action">
                                 <i class="bi bi-folder-plus"></i>
                                 <span>New Folder</span>
+                            </a>
+                            <a href="#" id="btnSearchFiles" class="btn-action">
+                                <i class="bi bi-search"></i>
+                                <span>Search</span>
                             </a>
                         </div>
                     </div>
@@ -604,13 +749,6 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                         <div class="small text-warning">Web upload is disabled by admin.</div>
                     </div>
                     <% } %>
-                    <div id="uploadQueue" class="upload-queue">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <strong class="small text-light">Upload Queue</strong>
-                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" id="btnClearUploads">Clear</button>
-                        </div>
-                        <div id="uploadQueueList"></div>
-                    </div>
                 </div>
             </div>
 
@@ -649,6 +787,106 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 <div class="context-menu-item" id="ctxRefreshPage">
                     <i class="bi bi-arrow-clockwise context-menu-icon"></i>
                     <span>Refresh Page</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Queue Modal -->
+        <div class="modal fade" id="uploadQueueModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content" style="background:#1a1a20;border:1px solid #2f3541;color:#fff;">
+                    <div class="modal-header border-secondary border-opacity-25">
+                        <h5 class="modal-title">Upload Queue</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="uploadQueue" class="upload-queue" style="display:block;margin-top:0;">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong class="small text-light">Files uploading now</strong>
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" id="btnClearUploads">Clear</button>
+                            </div>
+                            <div id="uploadQueueList"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Modal -->
+        <div class="modal fade" id="searchFilesModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content" style="background:#1a1a20;border:1px solid #2f3541;color:#fff;">
+                    <div class="modal-header border-secondary border-opacity-25">
+                        <h5 class="modal-title">Search Files</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="input-group mb-3">
+                            <input id="searchFilesInput" type="text" class="form-control" placeholder="Type file name..." style="background:#12151c;border-color:#2f3541;color:#fff;">
+                            <button id="btnRunFileSearch" class="btn btn-primary" type="button">
+                                <i class="bi bi-search me-1"></i>Search
+                            </button>
+                        </div>
+                        <div class="search-toolbar">
+                            <div class="search-toolbar-left">
+                                <select id="searchFilterMode" class="form-select form-select-sm search-filter-select">
+                                    <option value="all">All</option>
+                                    <option value="files">Files only</option>
+                                    <option value="folders">Folders only</option>
+                                </select>
+                                <div class="form-check m-0">
+                                    <input class="form-check-input" type="checkbox" id="searchRememberChoice">
+                                    <label class="form-check-label small text-secondary" for="searchRememberChoice">Remember after refresh</label>
+                                </div>
+                            </div>
+                            <button id="btnCancelFileSearch" class="btn btn-sm btn-outline-warning" type="button" style="display:none;">
+                                <i class="bi bi-x-circle me-1"></i>Cancel
+                            </button>
+                        </div>
+                        <div id="searchFilesStatus" class="small text-secondary mb-2"></div>
+                        <div id="searchResultsList" class="search-results-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Media Viewer Modal -->
+        <div class="modal fade" id="mediaViewerModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content" style="background:#161a22;border:1px solid #2f3541;color:#fff;">
+                    <div class="modal-header border-secondary border-opacity-25">
+                        <h5 class="modal-title" id="mediaViewerTitle">Media Viewer</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="media-viewer-shell">
+                            <div class="media-stage" id="mediaStage">
+                                <div class="media-empty-note" id="mediaEmptyNote">Loading media...</div>
+                                <img id="mediaViewerImage" alt="Preview" style="display:none;">
+                                <video id="mediaViewerVideo" preload="metadata" playsinline style="display:none;"></video>
+                                <audio id="mediaViewerAudio" preload="metadata" style="display:none; width:100%;"></audio>
+                            </div>
+                            <div class="media-controls" id="mediaControls" style="display:none;">
+                                <button type="button" class="btn btn-sm btn-primary" id="mediaBtnPlayPause">
+                                    <i class="bi bi-play-fill"></i>
+                                </button>
+                                <input type="range" id="mediaProgress" class="form-range media-progress" min="0" max="100" value="0">
+                                <span class="media-time" id="mediaTime">00:00 / 00:00</span>
+                                <button type="button" class="btn btn-sm btn-outline-light" id="mediaBtnMute">
+                                    <i class="bi bi-volume-up"></i>
+                                </button>
+                                <input type="range" id="mediaVolume" class="form-range" min="0" max="1" step="0.01" value="1" style="width:120px;">
+                                <select id="mediaSpeed" class="form-select form-select-sm" style="width:95px; background:#0f141f; border-color:#2f3541; color:#fff;">
+                                    <option value="0.5">0.5x</option>
+                                    <option value="0.75">0.75x</option>
+                                    <option value="1" selected>1x</option>
+                                    <option value="1.25">1.25x</option>
+                                    <option value="1.5">1.5x</option>
+                                    <option value="2">2x</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1154,6 +1392,7 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 const container = document.getElementById('fileList');
                 container.innerHTML = '';
                 currentEntriesByName.clear();
+                refreshSearchHitsForCurrentPath();
 
                 if (files.length === 0) {
                     container.innerHTML = `
@@ -1223,12 +1462,17 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                             navigateTo(newPath);
                         } else {
                             const filePath = currentPath === '/' ? `/${file.name}` : `${currentPath}/${file.name}`;
+                            const mediaKind = getMediaKindFromFileName(file.name);
+                            if (mediaKind && openMediaViewer(filePath, file.name, mediaKind)) {
+                                return;
+                            }
                             window.location.href = `/server/${serverId}/files/edit#file=${encodeURIComponent(filePath)}`;
                         }
                     });
 
                     container.appendChild(row);
                 });
+                applySearchHighlightsToTable();
             }
 
             function renderBreadcrumbs(path) {
@@ -1384,6 +1628,30 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
             if (newFolderModalEl) newFolderModal = new bootstrap.Modal(newFolderModalEl);
             const folderNameInput = document.getElementById('folderNameInput');
 
+            const uploadQueueModalEl = document.getElementById('uploadQueueModal');
+            let uploadQueueModal = null;
+            if (uploadQueueModalEl) uploadQueueModal = new bootstrap.Modal(uploadQueueModalEl);
+
+            const searchFilesModalEl = document.getElementById('searchFilesModal');
+            let searchFilesModal = null;
+            if (searchFilesModalEl) searchFilesModal = new bootstrap.Modal(searchFilesModalEl);
+
+            const mediaViewerModalEl = document.getElementById('mediaViewerModal');
+            let mediaViewerModal = null;
+            if (mediaViewerModalEl) mediaViewerModal = new bootstrap.Modal(mediaViewerModalEl);
+            const mediaViewerTitle = document.getElementById('mediaViewerTitle');
+            const mediaEmptyNote = document.getElementById('mediaEmptyNote');
+            const mediaViewerImage = document.getElementById('mediaViewerImage');
+            const mediaViewerVideo = document.getElementById('mediaViewerVideo');
+            const mediaViewerAudio = document.getElementById('mediaViewerAudio');
+            const mediaControls = document.getElementById('mediaControls');
+            const mediaBtnPlayPause = document.getElementById('mediaBtnPlayPause');
+            const mediaProgress = document.getElementById('mediaProgress');
+            const mediaTime = document.getElementById('mediaTime');
+            const mediaBtnMute = document.getElementById('mediaBtnMute');
+            const mediaVolume = document.getElementById('mediaVolume');
+            const mediaSpeed = document.getElementById('mediaSpeed');
+
             const renameModalEl = document.getElementById('renameModal');
             let renameModal = null;
             if (renameModalEl) renameModal = new bootstrap.Modal(renameModalEl);
@@ -1418,10 +1686,27 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
             const uploadQueue = document.getElementById('uploadQueue');
             const uploadQueueList = document.getElementById('uploadQueueList');
             const btnClearUploads = document.getElementById('btnClearUploads');
+            const btnUploadQueue = document.getElementById('btnUploadQueue');
+            const uploadQueueCount = document.getElementById('uploadQueueCount');
+            const btnSearchFiles = document.getElementById('btnSearchFiles');
+            const btnRunFileSearch = document.getElementById('btnRunFileSearch');
+            const searchFilesInput = document.getElementById('searchFilesInput');
+            const searchFilesStatus = document.getElementById('searchFilesStatus');
+            const searchResultsList = document.getElementById('searchResultsList');
+            const searchFilterMode = document.getElementById('searchFilterMode');
+            const searchRememberChoice = document.getElementById('searchRememberChoice');
+            const btnCancelFileSearch = document.getElementById('btnCancelFileSearch');
+            const fileListContainerEl = document.querySelector('.file-list-container');
 
             let selectedItems = new Set();
             let rightClickedItem = null; // { name, isDirectory }
             let currentEntriesByName = new Map();
+            let searchHitNamesInCurrentPath = new Set();
+            let searchInProgress = false;
+            let searchCancelRequested = false;
+            let searchAbortController = null;
+            let activeMediaElement = null;
+            let activeMediaKind = null;
 
             const btnSftp = document.getElementById('btnSftp');
             if (btnSftp) {
@@ -1444,6 +1729,14 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 });
             }
 
+            if (btnUploadQueue) {
+                btnUploadQueue.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (!uploadQueueModal) return;
+                    uploadQueueModal.show();
+                });
+            }
+
             if (btnClearUploads && uploadQueueList) {
                 btnClearUploads.addEventListener('click', () => {
                     uploadQueueList.innerHTML = '';
@@ -1458,6 +1751,7 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 }
                 const files = Array.from(fileList || []);
                 if (!files.length) return;
+                if (uploadQueueModal) uploadQueueModal.show();
 
                 let uploadedCount = 0;
                 let failedCount = 0;
@@ -1534,6 +1828,195 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 });
             }
 
+            if (fileListContainerEl) {
+                ['dragenter', 'dragover'].forEach((evtName) => {
+                    fileListContainerEl.addEventListener(evtName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!webUploadEnabled) return;
+                        fileListContainerEl.classList.add('drag-over');
+                    });
+                });
+                ['dragleave', 'drop'].forEach((evtName) => {
+                    fileListContainerEl.addEventListener(evtName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        fileListContainerEl.classList.remove('drag-over');
+                    });
+                });
+                fileListContainerEl.addEventListener('drop', async (e) => {
+                    if (!webUploadEnabled) {
+                        showError('Web upload is disabled by admin.');
+                        return;
+                    }
+                    const files = e.dataTransfer && e.dataTransfer.files ? e.dataTransfer.files : [];
+                    await processUploadFiles(files);
+                });
+            }
+
+            updateUploadQueueVisibility();
+            setSearchBusyState(false);
+
+            const savedSearchPreference = loadSearchPreference();
+            if (savedSearchPreference) {
+                if (searchRememberChoice) searchRememberChoice.checked = true;
+                if (searchFilesInput) searchFilesInput.value = savedSearchPreference.query;
+                if (searchFilterMode) searchFilterMode.value = savedSearchPreference.filterMode;
+                if (savedSearchPreference.query) {
+                    setTimeout(() => {
+                        runFileSearch(savedSearchPreference.query);
+                    }, 700);
+                }
+            }
+
+            if (searchRememberChoice) {
+                searchRememberChoice.addEventListener('change', () => {
+                    if (searchRememberChoice.checked) {
+                        persistSearchPreference(searchFilesInput ? searchFilesInput.value : '', getSearchFilterValue());
+                    } else {
+                        try {
+                            window.localStorage.removeItem(SEARCH_MEMORY_KEY);
+                        } catch {
+                            // Ignore storage issues.
+                        }
+                    }
+                });
+            }
+
+            if (searchFilterMode) {
+                searchFilterMode.addEventListener('change', () => {
+                    if (!shouldRememberSearch()) return;
+                    persistSearchPreference(searchFilesInput ? searchFilesInput.value : '', getSearchFilterValue());
+                });
+            }
+
+            if (btnSearchFiles) {
+                btnSearchFiles.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (!searchFilesModal) return;
+                    searchFilesModal.show();
+                    setTimeout(() => {
+                        if (searchFilesInput) searchFilesInput.focus();
+                    }, 120);
+                });
+            }
+
+            if (btnRunFileSearch) {
+                btnRunFileSearch.addEventListener('click', async () => {
+                    await runFileSearch(searchFilesInput ? searchFilesInput.value : '');
+                });
+            }
+
+            if (btnCancelFileSearch) {
+                btnCancelFileSearch.addEventListener('click', () => {
+                    if (!searchInProgress) return;
+                    searchCancelRequested = true;
+                    if (searchAbortController) {
+                        try {
+                            searchAbortController.abort();
+                        } catch {
+                            // Ignore abort edge cases.
+                        }
+                    }
+                    if (searchFilesStatus) {
+                        searchFilesStatus.textContent = 'Canceling search...';
+                    }
+                });
+            }
+
+            if (searchFilesInput) {
+                searchFilesInput.addEventListener('keypress', async (e) => {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    await runFileSearch(searchFilesInput.value);
+                });
+            }
+
+            if (searchResultsList) {
+                searchResultsList.addEventListener('click', (e) => {
+                    const openPathLink = e.target.closest('[data-open-path]');
+                    if (openPathLink) {
+                        e.preventDefault();
+                        const targetPath = normalizeServerPath(openPathLink.getAttribute('data-open-path'));
+                        if (searchFilesModal) searchFilesModal.hide();
+                        navigateTo(targetPath);
+                        return;
+                    }
+
+                    const openFileLink = e.target.closest('[data-open-file]');
+                    if (openFileLink) {
+                        e.preventDefault();
+                        const filePath = normalizeServerPath(openFileLink.getAttribute('data-open-file'));
+                        if (searchFilesModal) searchFilesModal.hide();
+                        const fileName = filePath.split('/').filter(Boolean).pop() || filePath;
+                        const mediaKind = getMediaKindFromFileName(fileName);
+                        if (mediaKind && openMediaViewer(filePath, fileName, mediaKind)) {
+                            return;
+                        }
+                        window.location.href = `/server/${serverId}/files/edit#file=${encodeURIComponent(filePath)}`;
+                    }
+                });
+            }
+
+            if (mediaBtnPlayPause) {
+                mediaBtnPlayPause.addEventListener('click', async () => {
+                    if (!activeMediaElement) return;
+                    try {
+                        if (activeMediaElement.paused) {
+                            await activeMediaElement.play();
+                        } else {
+                            activeMediaElement.pause();
+                        }
+                    } catch {
+                        showError('Unable to play media.');
+                    }
+                    updateMediaPlayPauseIcon();
+                });
+            }
+
+            if (mediaProgress) {
+                mediaProgress.addEventListener('input', () => {
+                    if (!activeMediaElement || !Number.isFinite(activeMediaElement.duration) || activeMediaElement.duration <= 0) return;
+                    const target = (Number(mediaProgress.value || '0') / 100) * activeMediaElement.duration;
+                    activeMediaElement.currentTime = target;
+                    updateMediaTimeline();
+                });
+            }
+
+            if (mediaBtnMute) {
+                mediaBtnMute.addEventListener('click', () => {
+                    if (!activeMediaElement) return;
+                    activeMediaElement.muted = !activeMediaElement.muted;
+                    updateMediaMuteIcon();
+                });
+            }
+
+            if (mediaVolume) {
+                mediaVolume.addEventListener('input', () => {
+                    if (!activeMediaElement) return;
+                    const value = Number(mediaVolume.value || '1');
+                    activeMediaElement.volume = Math.min(1, Math.max(0, value));
+                    if (activeMediaElement.volume > 0 && activeMediaElement.muted) {
+                        activeMediaElement.muted = false;
+                    }
+                    updateMediaMuteIcon();
+                });
+            }
+
+            if (mediaSpeed) {
+                mediaSpeed.addEventListener('change', () => {
+                    if (!activeMediaElement) return;
+                    const nextRate = Number(mediaSpeed.value || '1');
+                    activeMediaElement.playbackRate = Number.isFinite(nextRate) ? nextRate : 1;
+                });
+            }
+
+            if (mediaViewerModalEl) {
+                mediaViewerModalEl.addEventListener('hidden.bs.modal', () => {
+                    resetMediaViewer();
+                });
+            }
+
             document.querySelectorAll('[data-copy-target]').forEach((btn) => {
                 btn.addEventListener('click', async () => {
                     const targetId = btn.getAttribute('data-copy-target');
@@ -1569,6 +2052,230 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                     .replace(/'/g, '&#39;');
             }
 
+            function normalizeServerPath(pathValue) {
+                const raw = String(pathValue || '/').trim() || '/';
+                let normalized = raw.startsWith('/') ? raw : `/${raw}`;
+                normalized = normalized.replace(/\/+/g, '/');
+                if (normalized.length > 1 && normalized.endsWith('/')) {
+                    normalized = normalized.slice(0, -1);
+                }
+                return normalized || '/';
+            }
+
+            function joinServerPath(parentPath, entryName) {
+                const base = normalizeServerPath(parentPath);
+                return base === '/' ? `/${entryName}` : `${base}/${entryName}`;
+            }
+
+            const SEARCH_MEMORY_KEY = `cpanel.file.search.${serverId}`;
+            let lastSearchResults = [];
+
+            function getSearchFilterValue() {
+                if (!searchFilterMode) return 'all';
+                const selected = String(searchFilterMode.value || 'all').trim().toLowerCase();
+                if (selected === 'files' || selected === 'folders') return selected;
+                return 'all';
+            }
+
+            function shouldRememberSearch() {
+                return Boolean(searchRememberChoice && searchRememberChoice.checked);
+            }
+
+            function setSearchBusyState(busy) {
+                const isBusy = Boolean(busy);
+                if (btnRunFileSearch) btnRunFileSearch.disabled = isBusy;
+                if (searchFilesInput) searchFilesInput.disabled = isBusy;
+                if (searchFilterMode) searchFilterMode.disabled = isBusy;
+                if (btnCancelFileSearch) {
+                    btnCancelFileSearch.style.display = isBusy ? 'inline-block' : 'none';
+                    btnCancelFileSearch.disabled = !isBusy;
+                }
+            }
+
+            function persistSearchPreference(query, filterMode) {
+                try {
+                    if (!shouldRememberSearch()) {
+                        window.localStorage.removeItem(SEARCH_MEMORY_KEY);
+                        return;
+                    }
+                    const payload = {
+                        query: String(query || ''),
+                        filterMode: String(filterMode || 'all'),
+                        remember: true,
+                        updatedAt: Date.now()
+                    };
+                    window.localStorage.setItem(SEARCH_MEMORY_KEY, JSON.stringify(payload));
+                } catch {
+                    // Ignore storage issues (private mode or quota).
+                }
+            }
+
+            function loadSearchPreference() {
+                try {
+                    const raw = window.localStorage.getItem(SEARCH_MEMORY_KEY);
+                    if (!raw) return null;
+                    const parsed = JSON.parse(raw);
+                    if (!parsed || parsed.remember !== true) return null;
+                    const query = String(parsed.query || '');
+                    const filterModeRaw = String(parsed.filterMode || 'all').toLowerCase();
+                    const filterMode = (filterModeRaw === 'files' || filterModeRaw === 'folders') ? filterModeRaw : 'all';
+                    return { query, filterMode };
+                } catch {
+                    return null;
+                }
+            }
+
+            function refreshSearchHitsForCurrentPath() {
+                const normalizedPath = normalizeServerPath(currentPath);
+                searchHitNamesInCurrentPath = new Set(
+                    lastSearchResults
+                        .filter((entry) => normalizeServerPath(entry.parentPath) === normalizedPath)
+                        .map((entry) => entry.name)
+                );
+            }
+
+            function getMediaKindFromFileName(fileName) {
+                const lower = String(fileName || '').toLowerCase();
+                if (/\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(lower)) return 'image';
+                if (/\.(mp4|webm|ogg|mov|m4v|mkv)$/i.test(lower)) return 'video';
+                if (/\.(mp3|wav|ogg|m4a|aac|flac|opus)$/i.test(lower)) return 'audio';
+                return null;
+            }
+
+            function formatMediaTime(seconds) {
+                const safe = Number.isFinite(seconds) && seconds >= 0 ? Math.floor(seconds) : 0;
+                const hrs = Math.floor(safe / 3600);
+                const mins = Math.floor((safe % 3600) / 60);
+                const secs = safe % 60;
+                if (hrs > 0) return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+
+            function updateMediaPlayPauseIcon() {
+                if (!mediaBtnPlayPause) return;
+                const icon = mediaBtnPlayPause.querySelector('i');
+                if (!icon) return;
+                if (!activeMediaElement) {
+                    icon.className = 'bi bi-play-fill';
+                    return;
+                }
+                icon.className = activeMediaElement.paused ? 'bi bi-play-fill' : 'bi bi-pause-fill';
+            }
+
+            function updateMediaMuteIcon() {
+                if (!mediaBtnMute || !activeMediaElement) return;
+                const icon = mediaBtnMute.querySelector('i');
+                if (!icon) return;
+                if (activeMediaElement.muted || activeMediaElement.volume === 0) {
+                    icon.className = 'bi bi-volume-mute';
+                    return;
+                }
+                icon.className = 'bi bi-volume-up';
+            }
+
+            function updateMediaTimeline() {
+                if (!activeMediaElement || !mediaProgress || !mediaTime) return;
+                const duration = Number.isFinite(activeMediaElement.duration) ? activeMediaElement.duration : 0;
+                const current = Number.isFinite(activeMediaElement.currentTime) ? activeMediaElement.currentTime : 0;
+                const ratio = duration > 0 ? Math.min(100, Math.max(0, Math.round((current / duration) * 100))) : 0;
+                mediaProgress.value = String(ratio);
+                mediaTime.textContent = `${formatMediaTime(current)} / ${formatMediaTime(duration)}`;
+            }
+
+            function resetMediaViewer() {
+                [mediaViewerImage, mediaViewerVideo, mediaViewerAudio].forEach((el) => {
+                    if (!el) return;
+                    try { el.pause && el.pause(); } catch {}
+                    if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') {
+                        el.removeAttribute('src');
+                        el.load();
+                    } else {
+                        el.removeAttribute('src');
+                    }
+                    el.style.display = 'none';
+                });
+                activeMediaElement = null;
+                activeMediaKind = null;
+                if (mediaControls) mediaControls.style.display = 'none';
+                if (mediaEmptyNote) {
+                    mediaEmptyNote.textContent = 'Loading media...';
+                    mediaEmptyNote.style.display = 'block';
+                }
+                if (mediaTime) mediaTime.textContent = '00:00 / 00:00';
+                if (mediaProgress) mediaProgress.value = '0';
+                updateMediaPlayPauseIcon();
+            }
+
+            function bindActiveMediaEvents(mediaEl) {
+                if (!mediaEl) return;
+                mediaEl.onloadedmetadata = () => {
+                    if (mediaEmptyNote) mediaEmptyNote.style.display = 'none';
+                    updateMediaTimeline();
+                    updateMediaPlayPauseIcon();
+                    updateMediaMuteIcon();
+                };
+                mediaEl.ontimeupdate = () => updateMediaTimeline();
+                mediaEl.onplay = () => updateMediaPlayPauseIcon();
+                mediaEl.onpause = () => updateMediaPlayPauseIcon();
+                mediaEl.onvolumechange = () => {
+                    if (mediaVolume) mediaVolume.value = String(mediaEl.volume);
+                    updateMediaMuteIcon();
+                };
+                mediaEl.onended = () => updateMediaPlayPauseIcon();
+                mediaEl.onerror = () => {
+                    if (mediaEmptyNote) {
+                        mediaEmptyNote.textContent = 'Preview failed for this media file.';
+                        mediaEmptyNote.style.display = 'block';
+                    }
+                };
+            }
+
+            function openMediaViewer(filePath, fileName, mediaKind) {
+                if (!mediaViewerModal) return false;
+                resetMediaViewer();
+                const normalizedPath = normalizeServerPath(filePath);
+                const mediaSrc = `/server/${serverId}/files/preview?file=${encodeURIComponent(normalizedPath)}&t=${Date.now()}`;
+                if (mediaViewerTitle) mediaViewerTitle.textContent = String(fileName || 'Media Viewer');
+
+                if (mediaKind === 'image' && mediaViewerImage) {
+                    activeMediaKind = 'image';
+                    mediaViewerImage.style.display = 'block';
+                    mediaViewerImage.src = mediaSrc;
+                    mediaViewerImage.onload = () => {
+                        if (mediaEmptyNote) mediaEmptyNote.style.display = 'none';
+                    };
+                    mediaViewerImage.onerror = () => {
+                        if (mediaEmptyNote) {
+                            mediaEmptyNote.textContent = 'Preview failed for this image.';
+                            mediaEmptyNote.style.display = 'block';
+                        }
+                    };
+                } else if (mediaKind === 'video' && mediaViewerVideo) {
+                    activeMediaKind = 'video';
+                    activeMediaElement = mediaViewerVideo;
+                    mediaViewerVideo.style.display = 'block';
+                    mediaViewerVideo.controls = false;
+                    mediaViewerVideo.src = mediaSrc;
+                    mediaViewerVideo.playbackRate = mediaSpeed ? Number(mediaSpeed.value || '1') : 1;
+                    bindActiveMediaEvents(mediaViewerVideo);
+                    if (mediaControls) mediaControls.style.display = 'flex';
+                } else if (mediaKind === 'audio' && mediaViewerAudio) {
+                    activeMediaKind = 'audio';
+                    activeMediaElement = mediaViewerAudio;
+                    mediaViewerAudio.style.display = 'block';
+                    mediaViewerAudio.controls = false;
+                    mediaViewerAudio.src = mediaSrc;
+                    mediaViewerAudio.playbackRate = mediaSpeed ? Number(mediaSpeed.value || '1') : 1;
+                    bindActiveMediaEvents(mediaViewerAudio);
+                    if (mediaControls) mediaControls.style.display = 'flex';
+                } else {
+                    return false;
+                }
+
+                mediaViewerModal.show();
+                return true;
+            }
+
             function isArchiveFileName(fileName) {
                 const lower = String(fileName || '').trim().toLowerCase();
                 return (
@@ -1588,11 +2295,31 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
 
             function updateUploadQueueVisibility() {
                 if (!uploadQueue || !uploadQueueList) return;
-                uploadQueue.style.display = uploadQueueList.children.length > 0 ? 'block' : 'none';
+                const realItems = Array.from(uploadQueueList.children).filter((node) => !node.classList.contains('upload-empty'));
+                uploadQueue.style.display = 'block';
+                if (realItems.length === 0) {
+                    uploadQueueList.innerHTML = '<div class="small text-secondary upload-empty">No files in queue.</div>';
+                } else {
+                    const emptyNode = uploadQueueList.querySelector('.upload-empty');
+                    if (emptyNode) emptyNode.remove();
+                }
+                if (uploadQueueCount) {
+                    uploadQueueCount.textContent = String(realItems.length);
+                }
+            }
+
+            function applySearchHighlightsToTable() {
+                const fileRows = document.querySelectorAll('#fileList .file-row');
+                fileRows.forEach((row) => {
+                    const name = String(row.getAttribute('data-name') || '');
+                    row.classList.toggle('file-row-search-hit', searchHitNamesInCurrentPath.has(name));
+                });
             }
 
             function createUploadQueueItem(file) {
                 if (!uploadQueueList) return null;
+                const emptyNode = uploadQueueList.querySelector('.upload-empty');
+                if (emptyNode) emptyNode.remove();
                 const item = document.createElement('div');
                 item.className = 'upload-item';
                 item.innerHTML = `
@@ -1623,6 +2350,7 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                         if (!event.lengthComputable || !progressBar) return;
                         const pct = Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100)));
                         progressBar.style.width = `${pct}%`;
+                        if (statusEl) statusEl.textContent = `uploading ${pct}%`;
                     };
 
                     xhr.onreadystatechange = () => {
@@ -1637,6 +2365,14 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                             if (progressBar) progressBar.style.width = '100%';
                             if (statusEl) statusEl.textContent = 'done';
                             if (queueItem) queueItem.classList.add('border-success');
+                            if (queueItem) {
+                                setTimeout(() => {
+                                    if (queueItem.parentNode) {
+                                        queueItem.remove();
+                                        updateUploadQueueVisibility();
+                                    }
+                                }, 700);
+                            }
                             resolve(payload);
                             return;
                         }
@@ -1654,6 +2390,167 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
 
                     xhr.send(file);
                 });
+            }
+
+            async function fetchDirectoryForSearch(directory, signal) {
+                const normalizedDir = normalizeServerPath(directory);
+                const response = await fetch(`/server/${serverId}/files-fetch?path=${encodeURIComponent(normalizedDir)}`, { signal });
+                if (!response.ok) {
+                    throw new Error(`Search failed in ${normalizedDir}`);
+                }
+                const payload = await response.json();
+                if (!payload || payload.error) {
+                    throw new Error(payload && payload.error ? payload.error : 'Search request failed.');
+                }
+                return Array.isArray(payload.files) ? payload.files : [];
+            }
+
+            function renderSearchResults(results) {
+                if (!searchResultsList) return;
+                if (!Array.isArray(results) || results.length === 0) {
+                    searchResultsList.innerHTML = '<div class="search-result-item text-secondary">No files found.</div>';
+                    return;
+                }
+
+                searchResultsList.innerHTML = results.map((entry) => {
+                    const isRoot = normalizeServerPath(entry.parentPath) === '/';
+                    const rootLabel = isRoot ? '<span class="badge bg-warning text-dark ms-2">ROOT</span>' : '';
+                    const safePath = escapeHtml(entry.path);
+                    const safeParent = escapeHtml(entry.parentPath);
+                    const safeName = escapeHtml(entry.name);
+                    const typeLabel = entry.isDirectory ? 'Folder' : 'File';
+
+                    return `
+                        <div class="search-result-item ${isRoot ? 'search-hit-root' : ''}">
+                            <div class="d-flex justify-content-between align-items-start gap-3">
+                                <div>
+                                    <div class="fw-semibold text-light">${safeName}${rootLabel}</div>
+                                    <div class="small text-secondary">${typeLabel}</div>
+                                    <div class="small mt-1">
+                                        ${isRoot
+                                            ? '<span class="text-warning">Located in /root</span>'
+                                            : `Path: <a href="#" class="search-result-link" data-open-path="${safeParent}">${safeParent}</a>`}
+                                    </div>
+                                </div>
+                                <div class="text-end d-flex flex-column gap-1">
+                                    <a href="#" class="search-result-link" data-open-path="${safeParent}">Open folder</a>
+                                    ${entry.isDirectory
+                                        ? `<a href="#" class="search-result-link" data-open-path="${safePath}">Enter folder</a>`
+                                        : `<a href="#" class="search-result-link" data-open-file="${safePath}">Open file</a>`}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            async function runFileSearch(rawQuery) {
+                if (searchInProgress) return;
+                const query = String(rawQuery || '').trim().toLowerCase();
+                const filterMode = getSearchFilterValue();
+                if (!query) {
+                    if (searchFilesStatus) searchFilesStatus.textContent = 'Type a file name to search.';
+                    lastSearchResults = [];
+                    refreshSearchHitsForCurrentPath();
+                    applySearchHighlightsToTable();
+                    renderSearchResults([]);
+                    persistSearchPreference('', filterMode);
+                    return;
+                }
+
+                searchInProgress = true;
+                searchCancelRequested = false;
+                searchAbortController = new AbortController();
+                setSearchBusyState(true);
+                if (searchFilesStatus) searchFilesStatus.textContent = 'Starting recursive search...';
+                if (searchResultsList) searchResultsList.innerHTML = '';
+
+                const queue = ['/'];
+                const visited = new Set();
+                const found = [];
+                const maxDirectories = 600;
+                const maxResults = 300;
+                let canceled = false;
+
+                try {
+                    while (queue.length > 0 && visited.size < maxDirectories && found.length < maxResults) {
+                        if (searchCancelRequested) {
+                            canceled = true;
+                            break;
+                        }
+                        const directory = normalizeServerPath(queue.shift());
+                        if (visited.has(directory)) continue;
+                        visited.add(directory);
+                        if (searchFilesStatus) {
+                            searchFilesStatus.textContent = `Searching in ${directory} (${found.length} hits)...`;
+                        }
+
+                        let entries = [];
+                        try {
+                            entries = await fetchDirectoryForSearch(directory, searchAbortController.signal);
+                        } catch (dirError) {
+                            if (searchCancelRequested || (dirError && dirError.name === 'AbortError')) {
+                                canceled = true;
+                                break;
+                            }
+                            continue;
+                        }
+
+                        for (const entry of entries) {
+                            if (!entry) continue;
+                            const name = String(entry.name || '').trim();
+                            if (!name || name === '.' || name === '..') continue;
+                            const isDirectory = Boolean(entry.isDirectory);
+                            const path = joinServerPath(directory, name);
+                            const includeByFilter = filterMode === 'all'
+                                || (filterMode === 'files' && !isDirectory)
+                                || (filterMode === 'folders' && isDirectory);
+
+                            if (includeByFilter && name.toLowerCase().includes(query)) {
+                                found.push({
+                                    name,
+                                    path,
+                                    parentPath: directory,
+                                    isDirectory
+                                });
+                                if (found.length >= maxResults) break;
+                            }
+
+                            if (isDirectory) {
+                                queue.push(path);
+                            }
+                        }
+                    }
+
+                    lastSearchResults = found;
+                    refreshSearchHitsForCurrentPath();
+                    applySearchHighlightsToTable();
+                    renderSearchResults(found);
+                    persistSearchPreference(query, filterMode);
+
+                    const limitHit = found.length >= maxResults || visited.size >= maxDirectories;
+                    if (searchFilesStatus) {
+                        if (canceled) {
+                            searchFilesStatus.textContent = `Search canceled. ${found.length} result(s) collected.`;
+                        } else {
+                            searchFilesStatus.textContent = limitHit
+                                ? `Found ${found.length} result(s). Search stopped at safety limit.`
+                                : `Found ${found.length} result(s).`;
+                        }
+                    }
+                } catch (error) {
+                    if (searchCancelRequested || (error && error.name === 'AbortError')) {
+                        if (searchFilesStatus) searchFilesStatus.textContent = `Search canceled. ${found.length} result(s) collected.`;
+                    } else {
+                        if (searchFilesStatus) searchFilesStatus.textContent = 'Search failed.';
+                        showError(error.message || 'Search failed.');
+                    }
+                } finally {
+                    searchAbortController = null;
+                    searchCancelRequested = false;
+                    searchInProgress = false;
+                    setSearchBusyState(false);
+                }
             }
 
             function buildBulkRenameTarget(oldName, isDirectory, prefix, suffix, keepExtension, usedNames) {
