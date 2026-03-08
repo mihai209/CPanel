@@ -2066,6 +2066,8 @@ app.post('/admin/servers/delete/:containerId', requireAuth, requireAdmin, async 
         await Settings.destroy({ where: { key: getServerSmartAlertsSettingKey(server.id) } });
         await Settings.destroy({ where: { key: getServerStartupPresetSettingKey(server.id) } });
         await Settings.destroy({ where: { key: getServerPolicyEngineSettingKey(server.id) } });
+        await Settings.destroy({ where: { key: `server_proxy_mode_${server.id}` } });
+        await Settings.destroy({ where: { key: `server_proxy_network_${server.id}` } });
         consumeServerPowerIntent(server.id);
         RESOURCE_ANOMALY_STATE.delete(server.id);
         RESOURCE_ANOMALY_SAMPLE_TS.delete(server.id);

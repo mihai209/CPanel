@@ -929,6 +929,7 @@ const SERVER_PERMISSIONS = Object.freeze([
     'server.files',
     'server.startup',
     'server.minecraft',
+    'server.proxy.manage',
     'minecraft.kick',
     'minecraft.ban',
     'minecraft.op',
@@ -2433,6 +2434,533 @@ async function fetchMinecraftServerStatusPreview({
         };
     } finally {
         clearTimeout(timer);
+    }
+}
+
+const SERVER_PROXY_MODE_KEY_PREFIX = 'server_proxy_mode_';
+const SERVER_PROXY_NETWORK_KEY_PREFIX = 'server_proxy_network_';
+const SUPPORTED_PROXY_MODES = Object.freeze(['velocity', 'bungeecord', 'waterfall']);
+const DEFAULT_PROXY_GROUPS = Object.freeze([
+    { id: 'grp_lobby', name: 'Lobby servers' },
+    { id: 'grp_games', name: 'Game servers' },
+    { id: 'grp_modded', name: 'Modded servers' }
+]);
+
+function getServerProxyModeSettingKey(serverId) {
+    return `${SERVER_PROXY_MODE_KEY_PREFIX}${Number.parseInt(serverId, 10) || 0}`;
+}
+
+function getServerProxyNetworkSettingKey(serverId) {
+    return `${SERVER_PROXY_NETWORK_KEY_PREFIX}${Number.parseInt(serverId, 10) || 0}`;
+}
+
+function normalizeProxyMode(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    return SUPPORTED_PROXY_MODES.includes(normalized) ? normalized : '';
+}
+
+function sanitizeProxyBackendName(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    return raw
+        .replace(/[^A-Za-z0-9_\-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 48);
+}
+
+function normalizeProxyHost(value) {
+    const host = String(value || '').trim().toLowerCase();
+    if (!host || host.length > 255) return '';
+    if (!/^[a-z0-9._:-]+$/i.test(host)) return '';
+    if (host.includes('..')) return '';
+    return host;
+}
+
+function normalizeProxyGroupName(value) {
+    return String(value || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+}
+
+function normalizeProxyGroupId(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    if (!/^[A-Za-z0-9_\-]{3,48}$/.test(raw)) return '';
+    return raw;
+}
+
+function ensureProxyGroups(groupsRaw) {
+    const source = Array.isArray(groupsRaw) ? groupsRaw : [];
+    const seen = new Set();
+    const groups = [];
+    for (const entry of source) {
+        const id = normalizeProxyGroupId(entry && entry.id) || `grp_${nodeCrypto.randomBytes(3).toString('hex')}`;
+        const name = normalizeProxyGroupName(entry && entry.name);
+        if (!name || seen.has(id)) continue;
+        seen.add(id);
+        groups.push({ id, name });
+        if (groups.length >= 20) break;
+    }
+    if (groups.length === 0) {
+        return DEFAULT_PROXY_GROUPS.map((entry) => ({ ...entry }));
+    }
+    return groups;
+}
+
+function normalizeProxyBackendEntry(entry, validGroupIds = new Set()) {
+    const name = sanitizeProxyBackendName(entry && entry.name);
+    const ip = normalizeProxyHost(entry && entry.ip);
+    const port = Number.parseInt(entry && entry.port, 10);
+    if (!name || !ip || !Number.isInteger(port) || port < 1 || port > 65535) {
+        return null;
+    }
+    const backendId = normalizeProxyGroupId(entry && entry.id) || `be_${nodeCrypto.randomBytes(4).toString('hex')}`;
+    const groupIdRaw = normalizeProxyGroupId(entry && entry.groupId);
+    const groupId = groupIdRaw && validGroupIds.has(groupIdRaw) ? groupIdRaw : '';
+    const linkedContainerId = String(entry && entry.linkedContainerId || '').trim().slice(0, 120);
+    return {
+        id: backendId,
+        name,
+        ip,
+        port,
+        groupId: groupId || null,
+        linkedContainerId: linkedContainerId || null,
+        createdAtMs: Number.parseInt(entry && entry.createdAtMs, 10) || Date.now()
+    };
+}
+
+function normalizeProxyNetworkConfig(rawConfig) {
+    let parsed = rawConfig;
+    if (typeof parsed === 'string') {
+        try {
+            parsed = JSON.parse(parsed);
+        } catch {
+            parsed = {};
+        }
+    }
+    if (!parsed || typeof parsed !== 'object') parsed = {};
+
+    const groups = ensureProxyGroups(parsed.groups);
+    const validGroupIds = new Set(groups.map((entry) => entry.id));
+    const sourceBackends = Array.isArray(parsed.backends) ? parsed.backends : [];
+    const seenBackendIds = new Set();
+    const backends = [];
+    for (const source of sourceBackends) {
+        const normalized = normalizeProxyBackendEntry(source, validGroupIds);
+        if (!normalized) continue;
+        if (seenBackendIds.has(normalized.id)) continue;
+        seenBackendIds.add(normalized.id);
+        backends.push(normalized);
+        if (backends.length >= 150) break;
+    }
+
+    return {
+        version: 1,
+        groups,
+        backends,
+        updatedAtMs: Number.parseInt(parsed.updatedAtMs, 10) || Date.now()
+    };
+}
+
+async function getServerProxyMode(serverId) {
+    const row = await Settings.findByPk(getServerProxyModeSettingKey(serverId));
+    return normalizeProxyMode(row && row.value);
+}
+
+async function setServerProxyMode(serverId, mode) {
+    const normalized = normalizeProxyMode(mode);
+    const key = getServerProxyModeSettingKey(serverId);
+    if (!normalized) {
+        await Settings.destroy({ where: { key } });
+        return '';
+    }
+    await Settings.upsert({ key, value: normalized });
+    return normalized;
+}
+
+async function getServerProxyNetworkConfig(serverId) {
+    const row = await Settings.findByPk(getServerProxyNetworkSettingKey(serverId));
+    return normalizeProxyNetworkConfig(row && row.value);
+}
+
+async function setServerProxyNetworkConfig(serverId, config) {
+    const normalized = normalizeProxyNetworkConfig(config);
+    normalized.updatedAtMs = Date.now();
+    await Settings.upsert({
+        key: getServerProxyNetworkSettingKey(serverId),
+        value: JSON.stringify(normalized)
+    });
+    return normalized;
+}
+
+function resolveProxyConfigFilePath(proxyMode) {
+    if (proxyMode === 'velocity') return '/velocity.toml';
+    return '/config.yml';
+}
+
+function buildVelocityServersSection(networkConfig) {
+    const lines = ['[servers]'];
+    const backends = Array.isArray(networkConfig && networkConfig.backends) ? networkConfig.backends : [];
+    if (backends.length === 0) {
+        lines.push('# managed by CPanel');
+    } else {
+        backends.forEach((entry) => {
+            const safeName = sanitizeProxyBackendName(entry && entry.name);
+            const host = normalizeProxyHost(entry && entry.ip);
+            const port = Number.parseInt(entry && entry.port, 10);
+            if (!safeName || !host || !Number.isInteger(port)) return;
+            lines.push(`${safeName} = "${host}:${port}"`);
+        });
+    }
+    lines.push('');
+    return lines.join('\n');
+}
+
+function upsertVelocityServersBlock(currentContent, networkConfig) {
+    const text = String(currentContent || '');
+    const replacement = buildVelocityServersSection(networkConfig);
+    const sectionRegex = /^\[servers\][\s\S]*?(?=^\[[^\]]+\]|\s*$)/m;
+    if (sectionRegex.test(text)) {
+        return text.replace(sectionRegex, replacement.trimEnd());
+    }
+    const base = text.trimEnd();
+    if (!base) return replacement;
+    return `${base}\n\n${replacement}`;
+}
+
+function buildBungeeServersYamlBlock(networkConfig) {
+    const lines = ['servers:'];
+    const backends = Array.isArray(networkConfig && networkConfig.backends) ? networkConfig.backends : [];
+    if (backends.length === 0) {
+        lines.push('  {}');
+    } else {
+        backends.forEach((entry) => {
+            const safeName = sanitizeProxyBackendName(entry && entry.name);
+            const host = normalizeProxyHost(entry && entry.ip);
+            const port = Number.parseInt(entry && entry.port, 10);
+            if (!safeName || !host || !Number.isInteger(port)) return;
+            lines.push(`  ${safeName}:`);
+            lines.push('    motd: "&1Managed by CPanel"');
+            lines.push(`    address: "${host}:${port}"`);
+            lines.push('    restricted: false');
+        });
+    }
+    lines.push('');
+    return lines.join('\n');
+}
+
+function upsertBungeeServersYamlBlock(currentContent, networkConfig) {
+    const text = String(currentContent || '');
+    const replacement = buildBungeeServersYamlBlock(networkConfig);
+    const lines = text.split(/\r?\n/);
+    let start = -1;
+    for (let index = 0; index < lines.length; index += 1) {
+        if (/^\s*servers:\s*$/.test(lines[index])) {
+            start = index;
+            break;
+        }
+    }
+    if (start === -1) {
+        const base = text.trimEnd();
+        return base ? `${base}\n\n${replacement}` : replacement;
+    }
+
+    let end = lines.length;
+    for (let index = start + 1; index < lines.length; index += 1) {
+        const line = lines[index];
+        if (!line.trim()) continue;
+        if (/^\S/.test(line)) {
+            end = index;
+            break;
+        }
+    }
+
+    const before = lines.slice(0, start).join('\n');
+    const after = lines.slice(end).join('\n');
+    const middle = replacement.trimEnd();
+    if (before && after) return `${before}\n${middle}\n${after}`;
+    if (before) return `${before}\n${middle}\n`;
+    if (after) return `${middle}\n${after}`;
+    return `${middle}\n`;
+}
+
+function renderProxyConfigWithNetwork(proxyMode, currentContent, networkConfig) {
+    if (proxyMode === 'velocity') {
+        return upsertVelocityServersBlock(currentContent, networkConfig);
+    }
+    return upsertBungeeServersYamlBlock(currentContent, networkConfig);
+}
+
+async function syncProxyNetworkToConfig(server, proxyMode, networkConfig) {
+    if (!server || !server.allocation || !server.allocation.connectorId) {
+        return { success: false, error: 'Server allocation is missing.' };
+    }
+    const connectorWs = connectorConnections.get(server.allocation.connectorId);
+    if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+        return { success: false, error: 'Connector is offline.' };
+    }
+
+    const filePath = resolveProxyConfigFilePath(proxyMode);
+    const readResult = await readConnectorTextFile(connectorWs, server.id, filePath, 12000);
+    if (!readResult.success) {
+        return { success: false, error: readResult.error || 'Failed to read proxy config file.' };
+    }
+
+    const currentContent = readResult.missing ? '' : String(readResult.content || '');
+    const nextContent = renderProxyConfigWithNetwork(proxyMode, currentContent, networkConfig);
+    if (nextContent === currentContent) {
+        return { success: true, filePath, changed: false };
+    }
+
+    const writeResult = await writeConnectorTextFile(connectorWs, server.id, filePath, nextContent, 15000);
+    if (!writeResult.success) {
+        return { success: false, error: writeResult.error || 'Failed to write proxy config file.' };
+    }
+
+    return { success: true, filePath, changed: true };
+}
+
+async function buildProxyNetworkStatusSnapshot(proxyServer, proxyMode, networkConfig, settingsMap = {}) {
+    const safeConfig = normalizeProxyNetworkConfig(networkConfig);
+    const proxyAddress = resolveMinecraftStatusAddress(proxyServer);
+    const proxyStatus = await fetchMinecraftServerStatusPreview({
+        address: proxyAddress,
+        bedrockMode: false,
+        settingsMap,
+        timeoutMs: 4500
+    });
+
+    const linkedIds = Array.from(new Set(safeConfig.backends
+        .map((entry) => String(entry && entry.linkedContainerId || '').trim())
+        .filter(Boolean)));
+    let linkedMap = new Map();
+    if (linkedIds.length > 0) {
+        const linkedServers = await Server.findAll({
+            where: { containerId: { [Op.in]: linkedIds } },
+            attributes: ['id', 'containerId', 'name', 'status']
+        }).catch(() => []);
+        linkedMap = new Map((Array.isArray(linkedServers) ? linkedServers : []).map((entry) => [entry.containerId, entry]));
+    }
+
+    const backendStatuses = await Promise.all(safeConfig.backends.map(async (entry) => {
+        const address = `${entry.ip}:${entry.port}`;
+        const status = await fetchMinecraftServerStatusPreview({
+            address,
+            bedrockMode: false,
+            settingsMap,
+            timeoutMs: 3500
+        });
+        const linkedServer = entry.linkedContainerId ? linkedMap.get(entry.linkedContainerId) : null;
+        return {
+            id: entry.id,
+            name: entry.name,
+            ip: entry.ip,
+            port: entry.port,
+            address,
+            groupId: entry.groupId || null,
+            linkedContainerId: entry.linkedContainerId || null,
+            linkedServer: linkedServer
+                ? {
+                    id: linkedServer.id,
+                    containerId: linkedServer.containerId,
+                    name: linkedServer.name,
+                    status: linkedServer.status
+                }
+                : null,
+            status: {
+                ok: Boolean(status && status.ok),
+                online: Boolean(status && status.online),
+                playersOnline: Number.parseInt(status && status.playersOnline, 10) || 0,
+                playersMax: Number.parseInt(status && status.playersMax, 10) || 0,
+                version: String(status && status.version || '').trim(),
+                motd: Array.isArray(status && status.motdClean) ? status.motdClean : [],
+                error: String(status && status.error || '').trim()
+            }
+        };
+    }));
+
+    const onlineBackends = backendStatuses.filter((entry) => entry.status.online).length;
+    const backendPlayersOnline = backendStatuses.reduce((acc, entry) => acc + (Number.parseInt(entry.status.playersOnline, 10) || 0), 0);
+
+    return {
+        proxyMode: normalizeProxyMode(proxyMode),
+        proxyAddress,
+        proxyStatus: {
+            ok: Boolean(proxyStatus && proxyStatus.ok),
+            online: Boolean(proxyStatus && proxyStatus.online),
+            playersOnline: Number.parseInt(proxyStatus && proxyStatus.playersOnline, 10) || 0,
+            playersMax: Number.parseInt(proxyStatus && proxyStatus.playersMax, 10) || 0,
+            version: String(proxyStatus && proxyStatus.version || '').trim(),
+            error: String(proxyStatus && proxyStatus.error || '').trim()
+        },
+        groups: safeConfig.groups,
+        backends: backendStatuses,
+        summary: {
+            backendTotal: backendStatuses.length,
+            backendOnline: onlineBackends,
+            backendOffline: Math.max(0, backendStatuses.length - onlineBackends),
+            backendPlayersOnline,
+            proxyPlayersOnline: Number.parseInt(proxyStatus && proxyStatus.playersOnline, 10) || 0
+        }
+    };
+}
+
+async function dispatchServerPowerSignal(serverRecord, action) {
+    if (!serverRecord || !serverRecord.allocation || !serverRecord.allocation.connectorId) {
+        return { success: false, error: 'Server allocation is missing.' };
+    }
+    const connectorWs = connectorConnections.get(serverRecord.allocation.connectorId);
+    if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+        return { success: false, error: 'Connector is offline.' };
+    }
+
+    const normalized = String(action || '').trim().toLowerCase();
+    if (!['start', 'stop', 'restart', 'kill'].includes(normalized)) {
+        return { success: false, error: 'Invalid power action.' };
+    }
+
+    if (normalized === 'stop' || normalized === 'restart' || normalized === 'kill') {
+        rememberServerPowerIntent(serverRecord.id, normalized);
+    }
+    if (normalized === 'start') {
+        consumeServerPowerIntent(serverRecord.id);
+    }
+
+    const requestId = `proxy_power_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`;
+    connectorWs.send(JSON.stringify({
+        type: 'server_power',
+        serverId: serverRecord.id,
+        action: normalized,
+        stopCommand: serverRecord.image && serverRecord.image.eggConfig ? serverRecord.image.eggConfig.stop : null,
+        requestId
+    }));
+    return { success: true, requestId, action: normalized };
+}
+
+function waitMilliseconds(ms) {
+    return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number.parseInt(ms, 10) || 0)));
+}
+
+async function waitForServerRunningState(serverId, timeoutMs = 120000, intervalMs = 4000) {
+    const deadline = Date.now() + Math.max(5000, Number.parseInt(timeoutMs, 10) || 120000);
+    while (Date.now() <= deadline) {
+        const row = await Server.findByPk(serverId, { attributes: ['status'] });
+        const status = String(row && row.status || '').trim().toLowerCase();
+        if (status === 'running') return true;
+        await waitMilliseconds(intervalMs);
+    }
+    return false;
+}
+
+async function writeServerAuditSafe(payload) {
+    try {
+        if (typeof writeServerAuditLog === 'function') {
+            await writeServerAuditLog(payload);
+            return;
+        }
+        if (!AuditLog) return;
+        await AuditLog.create({
+            actorUserId: payload && payload.actorUserId ? payload.actorUserId : null,
+            action: String(payload && payload.action || 'server:proxy.event').slice(0, 120),
+            targetType: 'server',
+            targetId: payload && payload.serverId ? String(payload.serverId) : null,
+            method: null,
+            path: null,
+            ip: payload && payload.ip ? String(payload.ip).slice(0, 120) : null,
+            userAgent: payload && payload.userAgent ? String(payload.userAgent).slice(0, 1000) : null,
+            metadata: payload && payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {}
+        });
+    } catch {
+        // Ignore audit failures for proxy panel actions.
+    }
+}
+
+async function runProxyRestartSequenceBackground({ proxyServerId, backendContainerId, actorUserId }) {
+    try {
+        const proxyServer = await Server.findByPk(proxyServerId, {
+            include: [{ model: Allocation, as: 'allocation' }, { model: Image, as: 'image' }]
+        });
+        if (!proxyServer) return;
+        const backendServer = await Server.findOne({
+            where: { containerId: backendContainerId },
+            include: [{ model: Allocation, as: 'allocation' }, { model: Image, as: 'image' }]
+        });
+        if (!backendServer) return;
+
+        await writeServerAuditSafe({
+            actorUserId: actorUserId || null,
+            serverId: proxyServer.id,
+            action: 'server:proxy.restart_sequence.start',
+            metadata: {
+                backendContainerId: backendServer.containerId,
+                backendServerId: backendServer.id
+            }
+        });
+
+        const backendRestart = await dispatchServerPowerSignal(backendServer, 'restart');
+        if (!backendRestart.success) {
+            await writeServerAuditSafe({
+                actorUserId: actorUserId || null,
+                serverId: proxyServer.id,
+                action: 'server:proxy.restart_sequence.failed',
+                metadata: {
+                    stage: 'backend_restart',
+                    backendContainerId: backendServer.containerId,
+                    error: backendRestart.error || 'Unknown backend restart failure.'
+                }
+            });
+            return;
+        }
+
+        const backendRunning = await waitForServerRunningState(backendServer.id, 120000, 4000);
+        if (!backendRunning) {
+            await writeServerAuditSafe({
+                actorUserId: actorUserId || null,
+                serverId: proxyServer.id,
+                action: 'server:proxy.restart_sequence.failed',
+                metadata: {
+                    stage: 'backend_wait_running',
+                    backendContainerId: backendServer.containerId,
+                    error: 'Timeout waiting for backend server to return to running state.'
+                }
+            });
+            return;
+        }
+
+        const proxyRestart = await dispatchServerPowerSignal(proxyServer, 'restart');
+        if (!proxyRestart.success) {
+            await writeServerAuditSafe({
+                actorUserId: actorUserId || null,
+                serverId: proxyServer.id,
+                action: 'server:proxy.restart_sequence.failed',
+                metadata: {
+                    stage: 'proxy_restart',
+                    backendContainerId: backendServer.containerId,
+                    error: proxyRestart.error || 'Unknown proxy restart failure.'
+                }
+            });
+            return;
+        }
+
+        await writeServerAuditSafe({
+            actorUserId: actorUserId || null,
+            serverId: proxyServer.id,
+            action: 'server:proxy.restart_sequence.complete',
+            metadata: {
+                backendContainerId: backendServer.containerId,
+                backendServerId: backendServer.id,
+                proxyRequestId: proxyRestart.requestId || null
+            }
+        });
+    } catch (error) {
+        await writeServerAuditSafe({
+            actorUserId: actorUserId || null,
+            serverId: proxyServerId,
+            action: 'server:proxy.restart_sequence.failed',
+            metadata: {
+                stage: 'unexpected',
+                error: String(error && error.message || error || 'Unknown error')
+            }
+        });
     }
 }
 
@@ -5826,6 +6354,8 @@ app.post('/user/server/:containerId/delete', requireAuth, async (req, res) => {
             getServerInventoryProvisioningSettingKey(server.id),
             getServerSchedulesSettingKey(server.id),
             getServerConfigBaselineSettingKey(server.id),
+            getServerProxyModeSettingKey(server.id),
+            getServerProxyNetworkSettingKey(server.id),
             typeof getServerScheduledScalingSettingKey === 'function' ? getServerScheduledScalingSettingKey(server.id) : null,
             typeof getServerSmartAlertsSettingKey === 'function' ? getServerSmartAlertsSettingKey(server.id) : null,
             typeof getServerStartupPresetSettingKey === 'function' ? getServerStartupPresetSettingKey(server.id) : null,
@@ -11441,6 +11971,7 @@ app.get('/server/:containerId/minecraft-configs', requireAuth, async (req, res) 
             canOp: hasServerPermission(access, 'minecraft.op'),
             canDeop: hasServerPermission(access, 'minecraft.deop')
         };
+        const proxyMode = await getServerProxyMode(server.id);
 
         return res.render('server/minecraft-configs', {
             server,
@@ -11451,6 +11982,7 @@ app.get('/server/:containerId/minecraft-configs', requireAuth, async (req, res) 
             minecraftStatusPreview: statusPreview,
             minecraftBedrockMode: bedrockMode,
             minecraftActionPermissions: actionPermissions,
+            minecraftProxyMode: proxyMode,
             connectorOnline,
             success: req.query.success || null,
             error: req.query.error || null
@@ -11458,6 +11990,567 @@ app.get('/server/:containerId/minecraft-configs', requireAuth, async (req, res) 
     } catch (err) {
         console.error('Error loading minecraft control center:', err);
         return res.redirect('/?error=' + encodeURIComponent('Error loading Minecraft control center.'));
+    }
+});
+
+app.post('/server/:containerId/minecraft-configs/proxy-mode', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [
+                { model: Allocation, as: 'allocation', include: [{ model: Connector, as: 'connector' }] },
+                { model: Image, as: 'image' }
+            ]
+        });
+
+        if (!server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft')) {
+            return res.redirect('/server/no-permissions');
+        }
+        const canManageProxy = access.isOwner || access.isAdmin || hasServerPermission(access, 'server.proxy.manage');
+        if (!canManageProxy) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Missing permission: server.proxy.manage')}`);
+        }
+        if (!isServerLikelyMinecraft(server)) {
+            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Minecraft controls are available only for Minecraft servers.')}`);
+        }
+
+        const mode = normalizeProxyMode(req.body.proxyMode);
+        await setServerProxyMode(server.id, mode);
+
+        await writeServerAuditSafe({
+            actorUserId: req.session && req.session.user ? req.session.user.id : null,
+            serverId: server.id,
+            action: 'server:proxy.mode.update',
+            ip: req.headers['x-forwarded-for'] || req.ip || null,
+            userAgent: req.headers['user-agent'] || null,
+            metadata: {
+                proxyMode: mode || 'disabled'
+            }
+        });
+
+        if (!mode) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?success=${encodeURIComponent('Proxy mode disabled.')}`);
+        }
+        return res.redirect(`/server/${server.containerId}/minecraft-configs?success=${encodeURIComponent(`Proxy mode set to ${mode}.`)}`);
+    } catch (err) {
+        console.error('Error updating proxy mode:', err);
+        return res.redirect(`/server/${req.params.containerId}/minecraft-configs?error=${encodeURIComponent('Failed to update proxy mode.')}`);
+    }
+});
+
+app.get('/server/:containerId/proxy-network', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [
+                { model: Allocation, as: 'allocation', include: [{ model: Connector, as: 'connector' }] },
+                { model: Image, as: 'image' }
+            ]
+        });
+
+        if (!server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft')) {
+            return res.redirect('/server/no-permissions');
+        }
+        const canManageProxy = access.isOwner || access.isAdmin || hasServerPermission(access, 'server.proxy.manage');
+        if (!canManageProxy) {
+            return res.redirect('/server/no-permissions');
+        }
+        if (!isServerLikelyMinecraft(server)) {
+            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Proxy panel is available only for Minecraft servers.')}`);
+        }
+
+        const proxyMode = await getServerProxyMode(server.id);
+        if (!proxyMode) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Proxy mode is not enabled for this server. Enable it first in Minecraft Control.')}`);
+        }
+
+        const networkConfig = await getServerProxyNetworkConfig(server.id);
+        const snapshot = await buildProxyNetworkStatusSnapshot(server, proxyMode, networkConfig, res.locals.settings || {});
+        const groupMap = new Map((Array.isArray(snapshot.groups) ? snapshot.groups : []).map((entry) => [entry.id, entry.name]));
+        const groupedBackends = Array.from(groupMap.entries()).map(([groupId, groupName]) => ({
+            id: groupId,
+            name: groupName,
+            backends: snapshot.backends.filter((entry) => String(entry.groupId || '') === String(groupId))
+        }));
+        const ungroupedBackends = snapshot.backends.filter((entry) => !entry.groupId);
+
+        const linkWhere = access.isAdmin ? { id: { [Op.ne]: server.id } } : { ownerId: req.session.user.id, id: { [Op.ne]: server.id } };
+        const linkableServers = await Server.findAll({
+            where: linkWhere,
+            attributes: ['id', 'containerId', 'name', 'status'],
+            include: [{ model: Allocation, as: 'allocation', attributes: ['ip', 'port', 'alias'], required: false }],
+            order: [['name', 'ASC']],
+            limit: 250
+        }).catch(() => []);
+
+        return res.render('server/proxy-network', {
+            server,
+            user: req.session.user,
+            title: `Proxy Network ${server.name}`,
+            path: '/servers',
+            active: 'proxy-network',
+            proxyMode,
+            proxySnapshot: snapshot,
+            proxyGroupedBackends: groupedBackends,
+            proxyUngroupedBackends: ungroupedBackends,
+            proxyLinkableServers: Array.isArray(linkableServers) ? linkableServers : [],
+            success: req.query.success || null,
+            error: req.query.error || null
+        });
+    } catch (error) {
+        console.error('Error loading proxy network panel:', error);
+        return res.redirect('/?error=' + encodeURIComponent('Failed to load proxy network panel.'));
+    }
+});
+
+app.get('/server/:containerId/proxy-network/status', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }, { model: Image, as: 'image' }]
+        });
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
+
+        const access = await resolveServerAccess(server, req.session.user);
+        const canManageProxy = access.isOwner || access.isAdmin || hasServerPermission(access, 'server.proxy.manage');
+        if (!hasServerPermission(access, 'server.minecraft') || !canManageProxy) {
+            return res.status(403).json({ success: false, error: 'Forbidden.' });
+        }
+
+        const proxyMode = await getServerProxyMode(server.id);
+        if (!proxyMode) {
+            return res.status(409).json({ success: false, error: 'Proxy mode is not enabled for this server.' });
+        }
+        const networkConfig = await getServerProxyNetworkConfig(server.id);
+        const snapshot = await buildProxyNetworkStatusSnapshot(server, proxyMode, networkConfig, res.locals.settings || {});
+        return res.json({ success: true, snapshot });
+    } catch (error) {
+        console.error('Error fetching proxy network status:', error);
+        return res.status(500).json({ success: false, error: 'Failed to fetch proxy status.' });
+    }
+});
+
+app.post('/server/:containerId/proxy-network/backends/add', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }, { model: Image, as: 'image' }]
+        });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        const canManageProxy = access.isOwner || access.isAdmin || hasServerPermission(access, 'server.proxy.manage');
+        if (!hasServerPermission(access, 'server.minecraft') || !canManageProxy) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const proxyMode = await getServerProxyMode(server.id);
+        if (!proxyMode) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Enable proxy mode first.')}`);
+        }
+
+        const name = sanitizeProxyBackendName(req.body.name);
+        const ip = normalizeProxyHost(req.body.ip);
+        const port = Number.parseInt(req.body.port, 10);
+        const groupIdInput = normalizeProxyGroupId(req.body.groupId);
+        const linkedContainerId = String(req.body.linkedContainerId || '').trim().slice(0, 120) || null;
+
+        if (!name || !ip || !Number.isInteger(port) || port < 1 || port > 65535) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Invalid backend data. Name/IP/port are required.')}`);
+        }
+
+        const networkConfig = await getServerProxyNetworkConfig(server.id);
+        if (networkConfig.backends.some((entry) => String(entry.name || '').toLowerCase() === String(name).toLowerCase())) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Backend name already exists.')}`);
+        }
+        if (networkConfig.backends.length >= 150) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Backend limit reached (150).')}`);
+        }
+
+        if (linkedContainerId) {
+            const linkedWhere = access.isAdmin
+                ? { containerId: linkedContainerId }
+                : { containerId: linkedContainerId, ownerId: req.session.user.id };
+            const linkedServer = await Server.findOne({ where: linkedWhere, attributes: ['id', 'containerId'] });
+            if (!linkedServer) {
+                return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Linked server was not found or is not accessible.')}`);
+            }
+        }
+
+        const groupIds = new Set((networkConfig.groups || []).map((entry) => entry.id));
+        const nextBackend = normalizeProxyBackendEntry({
+            id: `be_${nodeCrypto.randomBytes(4).toString('hex')}`,
+            name,
+            ip,
+            port,
+            groupId: groupIdInput && groupIds.has(groupIdInput) ? groupIdInput : null,
+            linkedContainerId
+        }, groupIds);
+
+        if (!nextBackend) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Invalid backend payload.')}`);
+        }
+
+        networkConfig.backends.push(nextBackend);
+        const savedConfig = await setServerProxyNetworkConfig(server.id, networkConfig);
+        const syncResult = await syncProxyNetworkToConfig(server, proxyMode, savedConfig);
+
+        await writeServerAuditSafe({
+            actorUserId: req.session && req.session.user ? req.session.user.id : null,
+            serverId: server.id,
+            action: 'server:proxy.backend.add',
+            ip: req.headers['x-forwarded-for'] || req.ip || null,
+            userAgent: req.headers['user-agent'] || null,
+            metadata: {
+                backendId: nextBackend.id,
+                name: nextBackend.name,
+                address: `${nextBackend.ip}:${nextBackend.port}`,
+                groupId: nextBackend.groupId || null,
+                linkedContainerId: nextBackend.linkedContainerId || null,
+                syncSuccess: Boolean(syncResult && syncResult.success)
+            }
+        });
+
+        if (!syncResult.success) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent(`Backend saved, but config sync failed: ${syncResult.error || 'unknown error'}`)}`);
+        }
+        return res.redirect(`/server/${server.containerId}/proxy-network?success=${encodeURIComponent('Backend added and proxy config updated.')}`);
+    } catch (error) {
+        console.error('Error adding proxy backend:', error);
+        return res.redirect(`/server/${req.params.containerId}/proxy-network?error=${encodeURIComponent('Failed to add backend.')}`);
+    }
+});
+
+app.post('/server/:containerId/proxy-network/backends/:backendId/delete', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }, { model: Image, as: 'image' }]
+        });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        const canManageProxy = access.isOwner || access.isAdmin || hasServerPermission(access, 'server.proxy.manage');
+        if (!hasServerPermission(access, 'server.minecraft') || !canManageProxy) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const proxyMode = await getServerProxyMode(server.id);
+        if (!proxyMode) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Enable proxy mode first.')}`);
+        }
+
+        const backendId = normalizeProxyGroupId(req.params.backendId);
+        if (!backendId) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Invalid backend id.')}`);
+        }
+
+        const networkConfig = await getServerProxyNetworkConfig(server.id);
+        const before = networkConfig.backends.length;
+        const removed = networkConfig.backends.find((entry) => entry.id === backendId);
+        networkConfig.backends = networkConfig.backends.filter((entry) => entry.id !== backendId);
+        if (networkConfig.backends.length === before) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Backend not found.')}`);
+        }
+
+        const savedConfig = await setServerProxyNetworkConfig(server.id, networkConfig);
+        const syncResult = await syncProxyNetworkToConfig(server, proxyMode, savedConfig);
+
+        await writeServerAuditSafe({
+            actorUserId: req.session && req.session.user ? req.session.user.id : null,
+            serverId: server.id,
+            action: 'server:proxy.backend.delete',
+            ip: req.headers['x-forwarded-for'] || req.ip || null,
+            userAgent: req.headers['user-agent'] || null,
+            metadata: {
+                backendId,
+                name: removed && removed.name ? removed.name : null,
+                syncSuccess: Boolean(syncResult && syncResult.success)
+            }
+        });
+
+        if (!syncResult.success) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent(`Backend removed, but config sync failed: ${syncResult.error || 'unknown error'}`)}`);
+        }
+        return res.redirect(`/server/${server.containerId}/proxy-network?success=${encodeURIComponent('Backend removed.')}`);
+    } catch (error) {
+        console.error('Error removing proxy backend:', error);
+        return res.redirect(`/server/${req.params.containerId}/proxy-network?error=${encodeURIComponent('Failed to remove backend.')}`);
+    }
+});
+
+app.post('/server/:containerId/proxy-network/backends/:backendId/group', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        const canManageProxy = access.isOwner || access.isAdmin || hasServerPermission(access, 'server.proxy.manage');
+        if (!hasServerPermission(access, 'server.minecraft') || !canManageProxy) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const proxyMode = await getServerProxyMode(server.id);
+        if (!proxyMode) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Enable proxy mode first.')}`);
+        }
+
+        const backendId = normalizeProxyGroupId(req.params.backendId);
+        const groupId = normalizeProxyGroupId(req.body.groupId);
+        if (!backendId) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Invalid backend id.')}`);
+        }
+
+        const networkConfig = await getServerProxyNetworkConfig(server.id);
+        const backend = networkConfig.backends.find((entry) => entry.id === backendId);
+        if (!backend) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Backend not found.')}`);
+        }
+
+        const groupIds = new Set((networkConfig.groups || []).map((entry) => entry.id));
+        backend.groupId = groupId && groupIds.has(groupId) ? groupId : null;
+        await setServerProxyNetworkConfig(server.id, networkConfig);
+
+        return res.redirect(`/server/${server.containerId}/proxy-network?success=${encodeURIComponent('Backend group updated.')}`);
+    } catch (error) {
+        console.error('Error assigning backend group:', error);
+        return res.redirect(`/server/${req.params.containerId}/proxy-network?error=${encodeURIComponent('Failed to update backend group.')}`);
+    }
+});
+
+app.post('/server/:containerId/proxy-network/groups/add', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        const canManageProxy = access.isOwner || access.isAdmin || hasServerPermission(access, 'server.proxy.manage');
+        if (!hasServerPermission(access, 'server.minecraft') || !canManageProxy) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const proxyMode = await getServerProxyMode(server.id);
+        if (!proxyMode) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Enable proxy mode first.')}`);
+        }
+
+        const name = normalizeProxyGroupName(req.body.name);
+        if (!name) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Group name is required.')}`);
+        }
+
+        const networkConfig = await getServerProxyNetworkConfig(server.id);
+        if (networkConfig.groups.length >= 20) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Group limit reached (20).')}`);
+        }
+        if (networkConfig.groups.some((entry) => String(entry.name || '').toLowerCase() === name.toLowerCase())) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Group name already exists.')}`);
+        }
+        networkConfig.groups.push({
+            id: `grp_${nodeCrypto.randomBytes(3).toString('hex')}`,
+            name
+        });
+        await setServerProxyNetworkConfig(server.id, networkConfig);
+
+        return res.redirect(`/server/${server.containerId}/proxy-network?success=${encodeURIComponent('Group created.')}`);
+    } catch (error) {
+        console.error('Error creating proxy group:', error);
+        return res.redirect(`/server/${req.params.containerId}/proxy-network?error=${encodeURIComponent('Failed to create group.')}`);
+    }
+});
+
+app.post('/server/:containerId/proxy-network/groups/:groupId/delete', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        const canManageProxy = access.isOwner || access.isAdmin || hasServerPermission(access, 'server.proxy.manage');
+        if (!hasServerPermission(access, 'server.minecraft') || !canManageProxy) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const proxyMode = await getServerProxyMode(server.id);
+        if (!proxyMode) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Enable proxy mode first.')}`);
+        }
+
+        const groupId = normalizeProxyGroupId(req.params.groupId);
+        if (!groupId) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Invalid group id.')}`);
+        }
+
+        const networkConfig = await getServerProxyNetworkConfig(server.id);
+        const beforeGroups = networkConfig.groups.length;
+        networkConfig.groups = networkConfig.groups.filter((entry) => entry.id !== groupId);
+        if (networkConfig.groups.length === beforeGroups) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Group not found.')}`);
+        }
+        networkConfig.backends = networkConfig.backends.map((entry) => ({
+            ...entry,
+            groupId: String(entry.groupId || '') === groupId ? null : entry.groupId
+        }));
+        await setServerProxyNetworkConfig(server.id, networkConfig);
+
+        return res.redirect(`/server/${server.containerId}/proxy-network?success=${encodeURIComponent('Group deleted.')}`);
+    } catch (error) {
+        console.error('Error deleting proxy group:', error);
+        return res.redirect(`/server/${req.params.containerId}/proxy-network?error=${encodeURIComponent('Failed to delete group.')}`);
+    }
+});
+
+app.post('/server/:containerId/proxy-network/groups/:groupId/power', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        const canManageProxy = access.isOwner || access.isAdmin || hasServerPermission(access, 'server.proxy.manage');
+        if (!hasServerPermission(access, 'server.minecraft') || !canManageProxy) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const proxyMode = await getServerProxyMode(server.id);
+        if (!proxyMode) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Enable proxy mode first.')}`);
+        }
+
+        const groupId = normalizeProxyGroupId(req.params.groupId);
+        const action = String(req.body.action || '').trim().toLowerCase();
+        if (!groupId || !['start', 'stop', 'restart', 'kill'].includes(action)) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Invalid group action payload.')}`);
+        }
+
+        const networkConfig = await getServerProxyNetworkConfig(server.id);
+        const targets = networkConfig.backends.filter((entry) => String(entry.groupId || '') === groupId && entry.linkedContainerId);
+        if (targets.length === 0) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('No linked servers found in this group.')}`);
+        }
+
+        const targetContainerIds = Array.from(new Set(targets.map((entry) => String(entry.linkedContainerId).trim()).filter(Boolean)));
+        const where = access.isAdmin
+            ? { containerId: { [Op.in]: targetContainerIds } }
+            : { ownerId: req.session.user.id, containerId: { [Op.in]: targetContainerIds } };
+        const targetServers = await Server.findAll({
+            where,
+            include: [{ model: Allocation, as: 'allocation' }, { model: Image, as: 'image' }]
+        });
+        if (!Array.isArray(targetServers) || targetServers.length === 0) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('No controllable servers found for this group.')}`);
+        }
+
+        let dispatched = 0;
+        for (const target of targetServers) {
+            const result = await dispatchServerPowerSignal(target, action);
+            if (result.success) dispatched += 1;
+        }
+
+        await writeServerAuditSafe({
+            actorUserId: req.session && req.session.user ? req.session.user.id : null,
+            serverId: server.id,
+            action: 'server:proxy.group.power',
+            ip: req.headers['x-forwarded-for'] || req.ip || null,
+            userAgent: req.headers['user-agent'] || null,
+            metadata: {
+                groupId,
+                action,
+                targetCount: targetServers.length,
+                dispatched
+            }
+        });
+
+        return res.redirect(`/server/${server.containerId}/proxy-network?success=${encodeURIComponent(`Dispatched ${action} to ${dispatched}/${targetServers.length} linked server(s).`)}`);
+    } catch (error) {
+        console.error('Error applying proxy group power action:', error);
+        return res.redirect(`/server/${req.params.containerId}/proxy-network?error=${encodeURIComponent('Failed to dispatch group power action.')}`);
+    }
+});
+
+app.post('/server/:containerId/proxy-network/restart-sequence', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }, { model: Image, as: 'image' }]
+        });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        const canManageProxy = access.isOwner || access.isAdmin || hasServerPermission(access, 'server.proxy.manage');
+        if (!hasServerPermission(access, 'server.minecraft') || !canManageProxy) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const proxyMode = await getServerProxyMode(server.id);
+        if (!proxyMode) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Enable proxy mode first.')}`);
+        }
+
+        const backendId = normalizeProxyGroupId(req.body.backendId);
+        if (!backendId) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Select a valid backend for restart sequence.')}`);
+        }
+
+        const networkConfig = await getServerProxyNetworkConfig(server.id);
+        const backend = networkConfig.backends.find((entry) => entry.id === backendId);
+        if (!backend || !backend.linkedContainerId) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Selected backend must be linked to a panel server.')}`);
+        }
+
+        const linkedWhere = access.isAdmin
+            ? { containerId: backend.linkedContainerId }
+            : { containerId: backend.linkedContainerId, ownerId: req.session.user.id };
+        const linkedServer = await Server.findOne({ where: linkedWhere, attributes: ['id', 'containerId'] });
+        if (!linkedServer) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Linked backend server is not accessible.')}`);
+        }
+
+        setTimeout(() => {
+            runProxyRestartSequenceBackground({
+                proxyServerId: server.id,
+                backendContainerId: linkedServer.containerId,
+                actorUserId: req.session && req.session.user ? req.session.user.id : null
+            }).catch(() => {});
+        }, 50);
+
+        return res.redirect(`/server/${server.containerId}/proxy-network?success=${encodeURIComponent(`Restart sequence queued for backend ${backend.name}.`)}`);
+    } catch (error) {
+        console.error('Error queuing proxy restart sequence:', error);
+        return res.redirect(`/server/${req.params.containerId}/proxy-network?error=${encodeURIComponent('Failed to queue restart sequence.')}`);
+    }
+});
+
+app.post('/server/:containerId/proxy-network/sync-config', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }, { model: Image, as: 'image' }]
+        });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        const canManageProxy = access.isOwner || access.isAdmin || hasServerPermission(access, 'server.proxy.manage');
+        if (!hasServerPermission(access, 'server.minecraft') || !canManageProxy) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const proxyMode = await getServerProxyMode(server.id);
+        if (!proxyMode) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Enable proxy mode first.')}`);
+        }
+
+        const networkConfig = await getServerProxyNetworkConfig(server.id);
+        const syncResult = await syncProxyNetworkToConfig(server, proxyMode, networkConfig);
+        if (!syncResult.success) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent(syncResult.error || 'Proxy config sync failed.')}`);
+        }
+        return res.redirect(`/server/${server.containerId}/proxy-network?success=${encodeURIComponent('Proxy config synchronized successfully.')}`);
+    } catch (error) {
+        console.error('Error syncing proxy config:', error);
+        return res.redirect(`/server/${req.params.containerId}/proxy-network?error=${encodeURIComponent('Failed to sync proxy config.')}`);
     }
 });
 

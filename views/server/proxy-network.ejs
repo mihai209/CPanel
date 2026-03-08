@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proxy Network <%= server.name %> | <%= settings.brandName.toUpperCase() %></title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body { background:#0f0f12; color:#e1e1e6; margin:0; font-family:Inter,system-ui,-apple-system,sans-serif; height:100vh; overflow:hidden; }
+        .wrapper{display:flex;height:100vh}.sidebar{width:260px;background:#121216;border-right:1px solid #2d2d35;overflow-y:auto}.sidebar.collapsed{margin-left:-260px}
+        .content{flex:1;display:flex;flex-direction:column;min-width:0}.top{background:#121216;border-bottom:1px solid #2d2d35;padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem}
+        .scroll{flex:1;overflow:auto;padding:1rem}.cardx{background:#121216;border:1px solid #2d2d35;border-radius:.8rem}
+        .btn-icon{background:transparent;border:0;color:#8b8b9a;font-size:1.2rem}
+        .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+        .small-muted{font-size:.82rem;color:#9ca3af}
+    </style>
+</head>
+<body>
+<%
+const snapshot = proxySnapshot || {};
+const summary = snapshot.summary || {};
+const backends = Array.isArray(snapshot.backends) ? snapshot.backends : [];
+const groups = Array.isArray(snapshot.groups) ? snapshot.groups : [];
+const linkableServers = Array.isArray(proxyLinkableServers) ? proxyLinkableServers : [];
+const groupNameById = new Map(groups.map((group) => [group.id, group.name]));
+const proxyStatus = snapshot.proxyStatus || {};
+const proxyStatusLabel = proxyStatus.online
+    ? 'Online'
+    : `Offline${proxyStatus.error ? ` - ${proxyStatus.error}` : ''}`;
+%>
+<div class="wrapper">
+    <nav class="sidebar" id="sidebar"><div class="p-3"><%- include('../partials/server-sidebar', { server, active: 'proxy-network' }) %></div></nav>
+    <main class="content">
+        <header class="top">
+            <button class="btn-icon" id="sidebarToggle"><i class="bi bi-list"></i></button>
+            <h1 class="h5 mb-0">Proxy Network / <span class="text-secondary"><%= server.name %></span></h1>
+            <span class="badge bg-info text-dark"><%= proxyMode %></span>
+        </header>
+        <section class="scroll">
+            <% if (success) { %><div class="alert alert-success py-2"><%= success %></div><% } %>
+            <% if (error) { %><div class="alert alert-danger py-2"><%= error %></div><% } %>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-3">
+                    <div class="cardx p-3">
+                        <div class="small-muted">Proxy Players</div>
+                        <div class="h4 mb-0" id="proxyPlayers"><%= Number(summary.proxyPlayersOnline || 0) %></div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="cardx p-3">
+                        <div class="small-muted">Backend Players</div>
+                        <div class="h4 mb-0" id="backendPlayers"><%= Number(summary.backendPlayersOnline || 0) %></div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="cardx p-3">
+                        <div class="small-muted">Online Backends</div>
+                        <div class="h4 mb-0 text-success" id="backendOnline"><%= Number(summary.backendOnline || 0) %></div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="cardx p-3">
+                        <div class="small-muted">Offline Backends</div>
+                        <div class="h4 mb-0 text-danger" id="backendOffline"><%= Number(summary.backendOffline || 0) %></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cardx p-3 mb-3">
+                <div class="d-flex flex-wrap gap-2 align-items-end justify-content-between">
+                    <div>
+                        <div class="small-muted">Proxy endpoint</div>
+                        <div class="mono"><%= snapshot.proxyAddress || 'unknown' %></div>
+                        <div class="small-muted" id="proxyStatusText"><%= proxyStatusLabel %></div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <form method="POST" action="/server/<%= server.containerId %>/proxy-network/sync-config" class="mb-0">
+                            <button type="submit" class="btn btn-outline-light btn-sm"><i class="bi bi-arrow-repeat me-1"></i>Sync Config Now</button>
+                        </form>
+                        <a href="/server/<%= server.containerId %>/proxy-network" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-12 col-xl-8">
+                    <div class="cardx p-3 mb-3">
+                        <h2 class="h6 mb-3">Add Server To Network</h2>
+                        <form method="POST" action="/server/<%= server.containerId %>/proxy-network/backends/add" class="row g-2 align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label small text-uppercase text-secondary">Name</label>
+                                <input class="form-control form-control-sm" name="name" placeholder="survival" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small text-uppercase text-secondary">IP/Host</label>
+                                <input class="form-control form-control-sm" name="ip" placeholder="127.0.0.1" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small text-uppercase text-secondary">Port</label>
+                                <input class="form-control form-control-sm" type="number" min="1" max="65535" name="port" placeholder="25565" required>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small text-uppercase text-secondary">Group</label>
+                                <select class="form-select form-select-sm" name="groupId">
+                                    <option value="">No group</option>
+                                    <% groups.forEach((group) => { %>
+                                        <option value="<%= group.id %>"><%= group.name %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small text-uppercase text-secondary">Linked Server</label>
+                                <select class="form-select form-select-sm" name="linkedContainerId">
+                                    <option value="">Not linked</option>
+                                    <% linkableServers.forEach((entry) => { %>
+                                        <option value="<%= entry.containerId %>"><%= entry.name %> (<%= entry.containerId %>)</option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                            <div class="col-12 d-flex justify-content-end">
+                                <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-circle me-1"></i>Add Backend</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="cardx p-3 mb-3">
+                        <h2 class="h6 mb-3">Backends</h2>
+                        <div class="table-responsive">
+                            <table class="table table-dark table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Address</th>
+                                        <th>Group</th>
+                                        <th>Players</th>
+                                        <th>Status</th>
+                                        <th>Linked</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% if (backends.length === 0) { %>
+                                        <tr><td colspan="7" class="text-secondary">No backends configured.</td></tr>
+                                    <% } %>
+                                    <% backends.forEach((backend) => { %>
+                                        <tr data-backend-id="<%= backend.id %>">
+                                            <td class="mono"><%= backend.name %></td>
+                                            <td class="mono"><%= backend.address %></td>
+                                            <td>
+                                                <form method="POST" action="/server/<%= server.containerId %>/proxy-network/backends/<%= backend.id %>/group" class="d-flex gap-1">
+                                                    <select class="form-select form-select-sm" name="groupId">
+                                                        <option value="">No group</option>
+                                                        <% groups.forEach((group) => { %>
+                                                            <option value="<%= group.id %>" <%= String(backend.groupId || '') === String(group.id) ? 'selected' : '' %>><%= group.name %></option>
+                                                        <% }) %>
+                                                    </select>
+                                                    <button class="btn btn-outline-info btn-sm" type="submit"><i class="bi bi-check2"></i></button>
+                                                </form>
+                                            </td>
+                                            <td class="backend-players"><%= Number(backend.status && backend.status.playersOnline || 0) %> / <%= Number(backend.status && backend.status.playersMax || 0) %></td>
+                                            <td class="backend-status">
+                                                <% if (backend.status && backend.status.online) { %>
+                                                    <span class="badge bg-success">ONLINE</span>
+                                                <% } else { %>
+                                                    <span class="badge bg-danger">OFFLINE</span>
+                                                <% } %>
+                                            </td>
+                                            <td>
+                                                <% if (backend.linkedServer) { %>
+                                                    <a href="/server/<%= backend.linkedServer.containerId %>/overview" class="text-decoration-none"><%= backend.linkedServer.name %></a>
+                                                    <div class="small-muted"><%= backend.linkedServer.status %></div>
+                                                <% } else if (backend.linkedContainerId) { %>
+                                                    <span class="small-muted"><%= backend.linkedContainerId %></span>
+                                                <% } else { %>
+                                                    <span class="text-secondary">-</span>
+                                                <% } %>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex gap-1">
+                                                    <% if (backend.linkedContainerId) { %>
+                                                        <form method="POST" action="/server/<%= server.containerId %>/proxy-network/restart-sequence" class="d-inline">
+                                                            <input type="hidden" name="backendId" value="<%= backend.id %>">
+                                                            <button class="btn btn-outline-warning btn-sm" type="submit" title="Smart restart sequence"><i class="bi bi-arrow-repeat"></i></button>
+                                                        </form>
+                                                    <% } %>
+                                                    <form method="POST" action="/server/<%= server.containerId %>/proxy-network/backends/<%= backend.id %>/delete" class="d-inline" onsubmit="return confirm('Remove backend from proxy network?');">
+                                                        <button class="btn btn-outline-danger btn-sm" type="submit" title="Delete backend"><i class="bi bi-trash"></i></button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-4">
+                    <div class="cardx p-3 mb-3">
+                        <h2 class="h6 mb-3">Groups</h2>
+                        <form method="POST" action="/server/<%= server.containerId %>/proxy-network/groups/add" class="d-flex gap-2 mb-3">
+                            <input class="form-control form-control-sm" name="name" maxlength="60" placeholder="New group name" required>
+                            <button class="btn btn-outline-success btn-sm" type="submit"><i class="bi bi-plus-lg"></i></button>
+                        </form>
+
+                        <div class="d-grid gap-2">
+                            <% groups.forEach((group) => { %>
+                                <div class="border rounded p-2" style="border-color:#2d2d35 !important;">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <div class="fw-semibold"><%= group.name %></div>
+                                        <form method="POST" action="/server/<%= server.containerId %>/proxy-network/groups/<%= group.id %>/delete" class="d-inline" onsubmit="return confirm('Delete this group?');">
+                                            <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-trash"></i></button>
+                                        </form>
+                                    </div>
+                                    <div class="small-muted mb-2">
+                                        Backends: <%= backends.filter((entry) => String(entry.groupId || '') === String(group.id)).length %>
+                                    </div>
+                                    <div class="d-flex gap-1 flex-wrap">
+                                        <form method="POST" action="/server/<%= server.containerId %>/proxy-network/groups/<%= group.id %>/power" class="d-inline">
+                                            <input type="hidden" name="action" value="start">
+                                            <button class="btn btn-outline-success btn-sm" type="submit">Start</button>
+                                        </form>
+                                        <form method="POST" action="/server/<%= server.containerId %>/proxy-network/groups/<%= group.id %>/power" class="d-inline">
+                                            <input type="hidden" name="action" value="restart">
+                                            <button class="btn btn-outline-warning btn-sm" type="submit">Restart</button>
+                                        </form>
+                                        <form method="POST" action="/server/<%= server.containerId %>/proxy-network/groups/<%= group.id %>/power" class="d-inline">
+                                            <input type="hidden" name="action" value="stop">
+                                            <button class="btn btn-outline-danger btn-sm" type="submit">Stop</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            <% }) %>
+                        </div>
+                    </div>
+
+                    <div class="cardx p-3">
+                        <h2 class="h6 mb-2">Smart Restart Flow</h2>
+                        <div class="small-muted mb-2">Flow: restart backend -> wait for running -> restart proxy.</div>
+                        <form method="POST" action="/server/<%= server.containerId %>/proxy-network/restart-sequence" class="d-flex gap-2">
+                            <select class="form-select form-select-sm" name="backendId" required>
+                                <option value="">Select linked backend...</option>
+                                <% backends.filter((entry) => entry.linkedContainerId).forEach((backend) => { %>
+                                    <option value="<%= backend.id %>"><%= backend.name %> (<%= backend.linkedContainerId %>)</option>
+                                <% }) %>
+                            </select>
+                            <button class="btn btn-warning btn-sm" type="submit">Run</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script>
+    document.getElementById('sidebarToggle')?.addEventListener('click', () => document.getElementById('sidebar')?.classList.toggle('collapsed'));
+    (() => {
+        const proxyPlayers = document.getElementById('proxyPlayers');
+        const backendPlayers = document.getElementById('backendPlayers');
+        const backendOnline = document.getElementById('backendOnline');
+        const backendOffline = document.getElementById('backendOffline');
+        const proxyStatusText = document.getElementById('proxyStatusText');
+
+        const applySnapshot = (snapshot) => {
+            if (!snapshot || typeof snapshot !== 'object') return;
+            const summary = snapshot.summary || {};
+            if (proxyPlayers) proxyPlayers.textContent = String(Number(summary.proxyPlayersOnline || 0));
+            if (backendPlayers) backendPlayers.textContent = String(Number(summary.backendPlayersOnline || 0));
+            if (backendOnline) backendOnline.textContent = String(Number(summary.backendOnline || 0));
+            if (backendOffline) backendOffline.textContent = String(Number(summary.backendOffline || 0));
+            if (proxyStatusText) {
+                const proxyState = snapshot.proxyStatus || {};
+                proxyStatusText.textContent = proxyState.online ? 'Online' : `Offline${proxyState.error ? ` - ${proxyState.error}` : ''}`;
+            }
+
+            const backends = Array.isArray(snapshot.backends) ? snapshot.backends : [];
+            const map = new Map(backends.map((entry) => [String(entry.id || ''), entry]));
+            document.querySelectorAll('tr[data-backend-id]').forEach((row) => {
+                const backendId = String(row.getAttribute('data-backend-id') || '');
+                const data = map.get(backendId);
+                if (!data) return;
+                const playersCell = row.querySelector('.backend-players');
+                const statusCell = row.querySelector('.backend-status');
+                if (playersCell) {
+                    const playersOnline = Number(data.status && data.status.playersOnline || 0);
+                    const playersMax = Number(data.status && data.status.playersMax || 0);
+                    playersCell.textContent = `${playersOnline} / ${playersMax}`;
+                }
+                if (statusCell) {
+                    statusCell.innerHTML = data.status && data.status.online
+                        ? '<span class="badge bg-success">ONLINE</span>'
+                        : '<span class="badge bg-danger">OFFLINE</span>';
+                }
+            });
+        };
+
+        const poll = async () => {
+            try {
+                const response = await fetch('/server/<%= server.containerId %>/proxy-network/status', {
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-store'
+                });
+                if (!response.ok) return;
+                const payload = await response.json();
+                if (!payload || !payload.success) return;
+                applySnapshot(payload.snapshot || {});
+            } catch (_error) {
+                // keep silent; next poll will retry
+            }
+        };
+
+        setInterval(poll, 12000);
+    })();
+</script>
+</body>
+</html>
