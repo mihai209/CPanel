@@ -2469,6 +2469,23 @@ function sanitizeProxyBackendName(value) {
         .slice(0, 48);
 }
 
+function buildUniqueProxyBackendName(backends, preferredName) {
+    const safeBase = sanitizeProxyBackendName(preferredName) || 'backend';
+    const existing = new Set(
+        (Array.isArray(backends) ? backends : [])
+            .map((entry) => String(entry && entry.name || '').trim().toLowerCase())
+            .filter(Boolean)
+    );
+    if (!existing.has(safeBase.toLowerCase())) return safeBase;
+    for (let index = 2; index <= 999; index += 1) {
+        const candidate = sanitizeProxyBackendName(`${safeBase}-${index}`);
+        if (candidate && !existing.has(candidate.toLowerCase())) {
+            return candidate;
+        }
+    }
+    return `${safeBase}-${Date.now()}`;
+}
+
 function normalizeProxyHost(value) {
     const host = String(value || '').trim().toLowerCase();
     if (!host || host.length > 255) return '';
@@ -2688,6 +2705,176 @@ function renderProxyConfigWithNetwork(proxyMode, currentContent, networkConfig) 
         return upsertVelocityServersBlock(currentContent, networkConfig);
     }
     return upsertBungeeServersYamlBlock(currentContent, networkConfig);
+}
+
+function parseVelocityServersBlock(configContent) {
+    const text = String(configContent || '');
+    const sectionRegex = /^\[servers\][\s\S]*?(?=^\[[^\]]+\]|\s*$)/m;
+    const match = text.match(sectionRegex);
+    if (!match) return [];
+    const lines = String(match[0] || '').split(/\r?\n/);
+    const out = [];
+    for (const line of lines) {
+        const trimmed = String(line || '').trim();
+        if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('[')) continue;
+        const row = trimmed.match(/^([A-Za-z0-9_\-]+)\s*=\s*"([^"]+)"\s*$/);
+        if (!row) continue;
+        const name = sanitizeProxyBackendName(row[1]);
+        const target = String(row[2] || '').trim();
+        const splitIdx = target.lastIndexOf(':');
+        if (!name || splitIdx <= 0 || splitIdx >= target.length - 1) continue;
+        const host = normalizeProxyHost(target.slice(0, splitIdx));
+        const port = Number.parseInt(target.slice(splitIdx + 1), 10);
+        if (!host || !Number.isInteger(port) || port < 1 || port > 65535) continue;
+        out.push({ name, ip: host, port });
+    }
+    return out;
+}
+
+function parseBungeeServersSection(configContent) {
+    const text = String(configContent || '');
+    const lines = text.split(/\r?\n/);
+    let inServers = false;
+    let currentName = '';
+    const out = [];
+    for (const line of lines) {
+        const raw = String(line || '');
+        const trimmed = raw.trim();
+        if (!inServers) {
+            if (/^servers:\s*$/.test(trimmed)) {
+                inServers = true;
+            }
+            continue;
+        }
+        if (!trimmed) continue;
+        if (/^\S/.test(raw) && !/^servers:\s*$/.test(trimmed)) {
+            break;
+        }
+
+        const serverDecl = raw.match(/^\s{2}([A-Za-z0-9_\-]+):\s*$/);
+        if (serverDecl) {
+            currentName = sanitizeProxyBackendName(serverDecl[1]);
+            continue;
+        }
+
+        if (!currentName) continue;
+        const addrMatch = raw.match(/^\s{4}address:\s*"?([^"\s]+)"?\s*$/);
+        if (!addrMatch) continue;
+        const target = String(addrMatch[1] || '').trim();
+        const splitIdx = target.lastIndexOf(':');
+        if (splitIdx <= 0 || splitIdx >= target.length - 1) continue;
+        const host = normalizeProxyHost(target.slice(0, splitIdx));
+        const port = Number.parseInt(target.slice(splitIdx + 1), 10);
+        if (!host || !Number.isInteger(port) || port < 1 || port > 65535) continue;
+        out.push({ name: currentName, ip: host, port });
+    }
+    return out;
+}
+
+function parseProxyBackendsFromConfigContent(proxyMode, content) {
+    const mode = normalizeProxyMode(proxyMode);
+    if (!mode) return [];
+    if (mode === 'velocity') return parseVelocityServersBlock(content);
+    return parseBungeeServersSection(content);
+}
+
+async function mergeProxyBackendsFromConfigFile(server, proxyMode, networkConfig) {
+    const safeConfig = normalizeProxyNetworkConfig(networkConfig);
+    if (!server || !server.allocation || !server.allocation.connectorId) {
+        return { changed: false, config: safeConfig, importedCount: 0 };
+    }
+    const connectorWs = connectorConnections.get(server.allocation.connectorId);
+    if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+        return { changed: false, config: safeConfig, importedCount: 0 };
+    }
+
+    const readResult = await readConnectorTextFile(
+        connectorWs,
+        server.id,
+        resolveProxyConfigFilePath(proxyMode),
+        10000
+    );
+    if (!readResult.success || readResult.missing) {
+        return { changed: false, config: safeConfig, importedCount: 0 };
+    }
+
+    const parsedBackends = parseProxyBackendsFromConfigContent(proxyMode, readResult.content);
+    if (!Array.isArray(parsedBackends) || parsedBackends.length === 0) {
+        return { changed: false, config: safeConfig, importedCount: 0 };
+    }
+
+    const dedupeExisting = new Set();
+    safeConfig.backends.forEach((entry) => {
+        const nameKey = `name:${String(entry && entry.name || '').toLowerCase()}`;
+        const addrKey = `addr:${String(entry && entry.ip || '').toLowerCase()}:${Number.parseInt(entry && entry.port, 10) || 0}`;
+        dedupeExisting.add(nameKey);
+        dedupeExisting.add(addrKey);
+    });
+
+    const uniquePorts = Array.from(new Set(parsedBackends.map((entry) => Number.parseInt(entry.port, 10)).filter((port) => Number.isInteger(port))));
+    let candidates = [];
+    if (uniquePorts.length > 0) {
+        candidates = await Server.findAll({
+            where: { id: { [Op.ne]: server.id } },
+            attributes: ['id', 'containerId'],
+            include: [{
+                model: Allocation,
+                as: 'allocation',
+                required: true,
+                attributes: ['ip', 'port', 'connectorId'],
+                where: {
+                    connectorId: server.allocation.connectorId,
+                    port: { [Op.in]: uniquePorts }
+                }
+            }],
+            limit: 600
+        }).catch(() => []);
+    }
+
+    const byExactAddress = new Map();
+    const byPort = new Map();
+    (Array.isArray(candidates) ? candidates : []).forEach((entry) => {
+        const allocation = entry && entry.allocation;
+        if (!allocation) return;
+        const host = String(allocation.ip || '').trim().toLowerCase();
+        const port = Number.parseInt(allocation.port, 10);
+        if (!host || !Number.isInteger(port)) return;
+        byExactAddress.set(`${host}:${port}`, entry.containerId);
+        if (!byPort.has(port)) byPort.set(port, []);
+        byPort.get(port).push(entry.containerId);
+    });
+
+    let importedCount = 0;
+    for (const parsed of parsedBackends) {
+        if (safeConfig.backends.length >= 150) break;
+        const nameKey = `name:${String(parsed.name || '').toLowerCase()}`;
+        const addrKey = `addr:${String(parsed.ip || '').toLowerCase()}:${Number.parseInt(parsed.port, 10) || 0}`;
+        if (dedupeExisting.has(nameKey) || dedupeExisting.has(addrKey)) continue;
+
+        const linkedExact = byExactAddress.get(`${String(parsed.ip || '').toLowerCase()}:${Number.parseInt(parsed.port, 10) || 0}`) || null;
+        const portCandidates = byPort.get(Number.parseInt(parsed.port, 10)) || [];
+        const linkedByPort = !linkedExact && portCandidates.length === 1 ? portCandidates[0] : null;
+        const linkedContainerId = linkedExact || linkedByPort || null;
+
+        safeConfig.backends.push({
+            id: `be_${nodeCrypto.randomBytes(4).toString('hex')}`,
+            name: buildUniqueProxyBackendName(safeConfig.backends, parsed.name),
+            ip: parsed.ip,
+            port: Number.parseInt(parsed.port, 10),
+            groupId: null,
+            linkedContainerId,
+            createdAtMs: Date.now()
+        });
+        dedupeExisting.add(nameKey);
+        dedupeExisting.add(addrKey);
+        importedCount += 1;
+    }
+
+    if (importedCount <= 0) {
+        return { changed: false, config: safeConfig, importedCount: 0 };
+    }
+    const savedConfig = await setServerProxyNetworkConfig(server.id, safeConfig);
+    return { changed: true, config: savedConfig, importedCount };
 }
 
 async function syncProxyNetworkToConfig(server, proxyMode, networkConfig) {
@@ -12062,13 +12249,21 @@ app.get('/server/:containerId/proxy-network', requireAuth, async (req, res) => {
         if (!isServerLikelyMinecraft(server)) {
             return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Proxy panel is available only for Minecraft servers.')}`);
         }
+        if (!server.allocation || !server.allocation.connectorId) {
+            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Server allocation is missing.')}`);
+        }
 
         const proxyMode = await getServerProxyMode(server.id);
         if (!proxyMode) {
             return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Proxy mode is not enabled for this server. Enable it first in Minecraft Control.')}`);
         }
 
-        const networkConfig = await getServerProxyNetworkConfig(server.id);
+        let networkConfig = await getServerProxyNetworkConfig(server.id);
+        const importedFromConfig = await mergeProxyBackendsFromConfigFile(server, proxyMode, networkConfig).catch(() => ({ changed: false, config: networkConfig, importedCount: 0 }));
+        if (importedFromConfig && importedFromConfig.changed && importedFromConfig.config) {
+            networkConfig = importedFromConfig.config;
+        }
+
         const snapshot = await buildProxyNetworkStatusSnapshot(server, proxyMode, networkConfig, res.locals.settings || {});
         const groupMap = new Map((Array.isArray(snapshot.groups) ? snapshot.groups : []).map((entry) => [entry.id, entry.name]));
         const groupedBackends = Array.from(groupMap.entries()).map(([groupId, groupName]) => ({
@@ -12082,7 +12277,13 @@ app.get('/server/:containerId/proxy-network', requireAuth, async (req, res) => {
         const linkableServers = await Server.findAll({
             where: linkWhere,
             attributes: ['id', 'containerId', 'name', 'status'],
-            include: [{ model: Allocation, as: 'allocation', attributes: ['ip', 'port', 'alias'], required: false }],
+            include: [{
+                model: Allocation,
+                as: 'allocation',
+                attributes: ['ip', 'port', 'alias', 'connectorId'],
+                required: true,
+                where: { connectorId: server.allocation && server.allocation.connectorId ? server.allocation.connectorId : null }
+            }],
             order: [['name', 'ASC']],
             limit: 250
         }).catch(() => []);
@@ -12098,7 +12299,9 @@ app.get('/server/:containerId/proxy-network', requireAuth, async (req, res) => {
             proxyGroupedBackends: groupedBackends,
             proxyUngroupedBackends: ungroupedBackends,
             proxyLinkableServers: Array.isArray(linkableServers) ? linkableServers : [],
-            success: req.query.success || null,
+            success: req.query.success || (importedFromConfig && importedFromConfig.importedCount > 0
+                ? `Imported ${importedFromConfig.importedCount} backend(s) from proxy config file.`
+                : null),
             error: req.query.error || null
         });
     } catch (error) {
@@ -12153,42 +12356,70 @@ app.post('/server/:containerId/proxy-network/backends/add', requireAuth, async (
             return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Enable proxy mode first.')}`);
         }
 
-        const name = sanitizeProxyBackendName(req.body.name);
-        const ip = normalizeProxyHost(req.body.ip);
-        const port = Number.parseInt(req.body.port, 10);
+        const inputName = sanitizeProxyBackendName(req.body.name);
+        const inputIp = normalizeProxyHost(req.body.ip);
+        const inputPort = Number.parseInt(req.body.port, 10);
         const groupIdInput = normalizeProxyGroupId(req.body.groupId);
         const linkedContainerId = String(req.body.linkedContainerId || '').trim().slice(0, 120) || null;
 
-        if (!name || !ip || !Number.isInteger(port) || port < 1 || port > 65535) {
-            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Invalid backend data. Name/IP/port are required.')}`);
-        }
-
         const networkConfig = await getServerProxyNetworkConfig(server.id);
-        if (networkConfig.backends.some((entry) => String(entry.name || '').toLowerCase() === String(name).toLowerCase())) {
-            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Backend name already exists.')}`);
-        }
         if (networkConfig.backends.length >= 150) {
             return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Backend limit reached (150).')}`);
         }
+
+        let resolvedName = '';
+        let resolvedIp = '';
+        let resolvedPort = 0;
+        let resolvedLinkedContainerId = linkedContainerId;
 
         if (linkedContainerId) {
             const linkedWhere = access.isAdmin
                 ? { containerId: linkedContainerId }
                 : { containerId: linkedContainerId, ownerId: req.session.user.id };
-            const linkedServer = await Server.findOne({ where: linkedWhere, attributes: ['id', 'containerId'] });
+            const linkedServer = await Server.findOne({
+                where: linkedWhere,
+                attributes: ['id', 'containerId', 'name'],
+                include: [{
+                    model: Allocation,
+                    as: 'allocation',
+                    attributes: ['ip', 'port', 'alias'],
+                    required: true
+                }]
+            });
             if (!linkedServer) {
                 return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Linked server was not found or is not accessible.')}`);
             }
+            resolvedName = buildUniqueProxyBackendName(networkConfig.backends, inputName || linkedServer.name);
+            resolvedIp = normalizeProxyHost(linkedServer.allocation.alias || linkedServer.allocation.ip);
+            resolvedPort = Number.parseInt(linkedServer.allocation.port, 10);
+            resolvedLinkedContainerId = linkedServer.containerId;
+        } else {
+            resolvedName = buildUniqueProxyBackendName(networkConfig.backends, inputName);
+            resolvedIp = inputIp;
+            resolvedPort = inputPort;
+            resolvedLinkedContainerId = null;
+        }
+
+        if (!resolvedName || !resolvedIp || !Number.isInteger(resolvedPort) || resolvedPort < 1 || resolvedPort > 65535) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Invalid backend data. Select a valid linked server or provide valid address data.')}`);
+        }
+
+        if (resolvedLinkedContainerId && networkConfig.backends.some((entry) => String(entry.linkedContainerId || '') === String(resolvedLinkedContainerId))) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('This linked server is already in the proxy network list.')}`);
+        }
+
+        if (networkConfig.backends.some((entry) => String(entry.name || '').toLowerCase() === String(resolvedName).toLowerCase())) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Backend name already exists.')}`);
         }
 
         const groupIds = new Set((networkConfig.groups || []).map((entry) => entry.id));
         const nextBackend = normalizeProxyBackendEntry({
             id: `be_${nodeCrypto.randomBytes(4).toString('hex')}`,
-            name,
-            ip,
-            port,
+            name: resolvedName,
+            ip: resolvedIp,
+            port: resolvedPort,
             groupId: groupIdInput && groupIds.has(groupIdInput) ? groupIdInput : null,
-            linkedContainerId
+            linkedContainerId: resolvedLinkedContainerId
         }, groupIds);
 
         if (!nextBackend) {
@@ -12280,6 +12511,72 @@ app.post('/server/:containerId/proxy-network/backends/:backendId/delete', requir
     } catch (error) {
         console.error('Error removing proxy backend:', error);
         return res.redirect(`/server/${req.params.containerId}/proxy-network?error=${encodeURIComponent('Failed to remove backend.')}`);
+    }
+});
+
+app.post('/server/:containerId/proxy-network/backends/:backendId/power', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        const canManageProxy = access.isOwner || access.isAdmin || hasServerPermission(access, 'server.proxy.manage');
+        if (!hasServerPermission(access, 'server.minecraft') || !canManageProxy) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const proxyMode = await getServerProxyMode(server.id);
+        if (!proxyMode) {
+            return res.redirect(`/server/${server.containerId}/minecraft-configs?error=${encodeURIComponent('Enable proxy mode first.')}`);
+        }
+
+        const backendId = normalizeProxyGroupId(req.params.backendId);
+        const action = String(req.body.action || '').trim().toLowerCase();
+        if (!backendId || !['start', 'stop', 'restart', 'kill'].includes(action)) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Invalid backend power request.')}`);
+        }
+
+        const networkConfig = await getServerProxyNetworkConfig(server.id);
+        const backend = networkConfig.backends.find((entry) => entry.id === backendId);
+        if (!backend || !backend.linkedContainerId) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Backend is not linked to a panel server.')}`);
+        }
+
+        const targetWhere = access.isAdmin
+            ? { containerId: backend.linkedContainerId }
+            : { containerId: backend.linkedContainerId, ownerId: req.session.user.id };
+        const targetServer = await Server.findOne({
+            where: targetWhere,
+            include: [{ model: Allocation, as: 'allocation' }, { model: Image, as: 'image' }]
+        });
+        if (!targetServer) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent('Linked backend server is not accessible.')}`);
+        }
+
+        const dispatchResult = await dispatchServerPowerSignal(targetServer, action);
+        if (!dispatchResult.success) {
+            return res.redirect(`/server/${server.containerId}/proxy-network?error=${encodeURIComponent(dispatchResult.error || 'Failed to dispatch power action.')}`);
+        }
+
+        await writeServerAuditSafe({
+            actorUserId: req.session && req.session.user ? req.session.user.id : null,
+            serverId: server.id,
+            action: 'server:proxy.backend.power',
+            ip: req.headers['x-forwarded-for'] || req.ip || null,
+            userAgent: req.headers['user-agent'] || null,
+            metadata: {
+                backendId,
+                backendName: backend.name || null,
+                linkedContainerId: backend.linkedContainerId || null,
+                action,
+                requestId: dispatchResult.requestId || null
+            }
+        });
+
+        return res.redirect(`/server/${server.containerId}/proxy-network?success=${encodeURIComponent(`Dispatched ${action} to ${backend.name || backend.linkedContainerId}.`)}`);
+    } catch (error) {
+        console.error('Error applying backend power action:', error);
+        return res.redirect(`/server/${req.params.containerId}/proxy-network?error=${encodeURIComponent('Failed to apply backend power action.')}`);
     }
 });
 

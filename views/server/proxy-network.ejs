@@ -26,6 +26,7 @@ const summary = snapshot.summary || {};
 const backends = Array.isArray(snapshot.backends) ? snapshot.backends : [];
 const groups = Array.isArray(snapshot.groups) ? snapshot.groups : [];
 const linkableServers = Array.isArray(proxyLinkableServers) ? proxyLinkableServers : [];
+const canAddFromPanel = linkableServers.length > 0;
 const groupNameById = new Map(groups.map((group) => [group.id, group.name]));
 const proxyStatus = snapshot.proxyStatus || {};
 const proxyStatusLabel = proxyStatus.online
@@ -91,20 +92,28 @@ const proxyStatusLabel = proxyStatus.online
                 <div class="col-12 col-xl-8">
                     <div class="cardx p-3 mb-3">
                         <h2 class="h6 mb-3">Add Server To Network</h2>
+                        <div class="small-muted mb-2">Existing entries from <%= proxyMode === 'velocity' ? 'velocity.toml' : 'config.yml' %> are imported automatically when this page loads.</div>
                         <form method="POST" action="/server/<%= server.containerId %>/proxy-network/backends/add" class="row g-2 align-items-end">
-                            <div class="col-md-3">
-                                <label class="form-label small text-uppercase text-secondary">Name</label>
-                                <input class="form-control form-control-sm" name="name" placeholder="survival" required>
+                            <div class="col-md-7">
+                                <label class="form-label small text-uppercase text-secondary">Server (from panel)</label>
+                                <select class="form-select form-select-sm" name="linkedContainerId" required>
+                                    <% if (!canAddFromPanel) { %>
+                                        <option value="">No compatible servers found on this connector</option>
+                                    <% } else { %>
+                                        <option value="">Select server...</option>
+                                        <% linkableServers.forEach((entry) => { %>
+                                            <% const alloc = entry.allocation || {}; %>
+                                            <% const host = alloc.alias || alloc.ip || 'unknown-host'; %>
+                                            <% const port = alloc.port || 'N/A'; %>
+                                            <option value="<%= entry.containerId %>">
+                                                <%= entry.name %> - <%= host %>:<%= port %>
+                                            </option>
+                                        <% }) %>
+                                    <% } %>
+                                </select>
+                                <div class="small-muted mt-1">IP/port/name are taken automatically from the selected server allocation.</div>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small text-uppercase text-secondary">IP/Host</label>
-                                <input class="form-control form-control-sm" name="ip" placeholder="127.0.0.1" required>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label small text-uppercase text-secondary">Port</label>
-                                <input class="form-control form-control-sm" type="number" min="1" max="65535" name="port" placeholder="25565" required>
-                            </div>
-                            <div class="col-md-2">
                                 <label class="form-label small text-uppercase text-secondary">Group</label>
                                 <select class="form-select form-select-sm" name="groupId">
                                     <option value="">No group</option>
@@ -113,17 +122,8 @@ const proxyStatusLabel = proxyStatus.online
                                     <% }) %>
                                 </select>
                             </div>
-                            <div class="col-md-2">
-                                <label class="form-label small text-uppercase text-secondary">Linked Server</label>
-                                <select class="form-select form-select-sm" name="linkedContainerId">
-                                    <option value="">Not linked</option>
-                                    <% linkableServers.forEach((entry) => { %>
-                                        <option value="<%= entry.containerId %>"><%= entry.name %> (<%= entry.containerId %>)</option>
-                                    <% }) %>
-                                </select>
-                            </div>
-                            <div class="col-12 d-flex justify-content-end">
-                                <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-circle me-1"></i>Add Backend</button>
+                            <div class="col-md-2 d-flex justify-content-end">
+                                <button class="btn btn-primary btn-sm" type="submit" <%= canAddFromPanel ? '' : 'disabled' %>><i class="bi bi-plus-circle me-1"></i>Add Backend</button>
                             </div>
                         </form>
                     </div>
@@ -183,9 +183,25 @@ const proxyStatusLabel = proxyStatus.online
                                             <td>
                                                 <div class="d-flex gap-1">
                                                     <% if (backend.linkedContainerId) { %>
+                                                        <form method="POST" action="/server/<%= server.containerId %>/proxy-network/backends/<%= backend.id %>/power" class="d-inline">
+                                                            <input type="hidden" name="action" value="start">
+                                                            <button class="btn btn-outline-success btn-sm" type="submit" title="Start"><i class="bi bi-play-fill"></i></button>
+                                                        </form>
+                                                        <form method="POST" action="/server/<%= server.containerId %>/proxy-network/backends/<%= backend.id %>/power" class="d-inline">
+                                                            <input type="hidden" name="action" value="stop">
+                                                            <button class="btn btn-outline-danger btn-sm" type="submit" title="Stop"><i class="bi bi-stop-fill"></i></button>
+                                                        </form>
+                                                        <form method="POST" action="/server/<%= server.containerId %>/proxy-network/backends/<%= backend.id %>/power" class="d-inline">
+                                                            <input type="hidden" name="action" value="restart">
+                                                            <button class="btn btn-outline-warning btn-sm" type="submit" title="Restart"><i class="bi bi-arrow-repeat"></i></button>
+                                                        </form>
+                                                        <form method="POST" action="/server/<%= server.containerId %>/proxy-network/backends/<%= backend.id %>/power" class="d-inline" onsubmit="return confirm('Kill this backend process?');">
+                                                            <input type="hidden" name="action" value="kill">
+                                                            <button class="btn btn-outline-secondary btn-sm" type="submit" title="Kill"><i class="bi bi-x-octagon"></i></button>
+                                                        </form>
                                                         <form method="POST" action="/server/<%= server.containerId %>/proxy-network/restart-sequence" class="d-inline">
                                                             <input type="hidden" name="backendId" value="<%= backend.id %>">
-                                                            <button class="btn btn-outline-warning btn-sm" type="submit" title="Smart restart sequence"><i class="bi bi-arrow-repeat"></i></button>
+                                                            <button class="btn btn-outline-info btn-sm" type="submit" title="Smart restart sequence"><i class="bi bi-diagram-2"></i></button>
                                                         </form>
                                                     <% } %>
                                                     <form method="POST" action="/server/<%= server.containerId %>/proxy-network/backends/<%= backend.id %>/delete" class="d-inline" onsubmit="return confirm('Remove backend from proxy network?');">
