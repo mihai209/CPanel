@@ -569,17 +569,6 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                     <div class="file-list-container">
                         
                         <table class="file-table">
-                            <thead>
-                                <tr>
-                                    <th class="file-checkbox-col">
-                                        <input type="checkbox" id="selectAll" class="file-checkbox">
-                                    </th>
-                                    <th>Name</th>
-                                    <th class="d-none d-xl-table-cell" style="width: 130px;">Permissions</th>
-                                    <th class="d-none d-md-table-cell" style="width: 150px;">Size</th>
-                                    <th class="d-none d-lg-table-cell" style="width: 200px;">Last Modified</th>
-                                </tr>
-                            </thead>
                                                         <input type="file" id="uploadInput" class="d-none" multiple>
                     <% if (fileUploadEnabled) { %>
                     <div id="uploadDropzone" class="upload-dropzone">
@@ -605,6 +594,18 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                     </div>
                 </div>
             </div>
+                            <thead>
+                                <tr>
+                                    <th class="file-checkbox-col">
+                                        <input type="checkbox" id="selectAll" class="file-checkbox">
+                                    </th>
+                                    <th>Name</th>
+                                    <th class="d-none d-xl-table-cell" style="width: 130px;">Permissions</th>
+                                    <th class="d-none d-md-table-cell" style="width: 150px;">Size</th>
+                                    <th class="d-none d-lg-table-cell" style="width: 200px;">Last Modified</th>
+                                </tr>
+                            </thead>
+                            
                             <tbody id="fileList">
                                 <tr>
                                     <td colspan="5" class="text-center py-4">
