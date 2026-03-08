@@ -518,7 +518,6 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 <!-- Scroll Area -->
                 <div class="scroll-area">
                     <div class="file-manager-header">
-
                         <div id="breadcrumb" class="breadcrumb-container mb-0">
                             <!-- Dynamic breadcrumbs will be rendered here -->
                         </div>
@@ -565,11 +564,31 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                         </div>
                     </div>
                     <!-- File List -->
-
                     <div class="file-list-container">
-                        
                         <table class="file-table">
-                            <div>                            <input type="file" id="uploadInput" class="d-none" multiple>
+                            <thead>
+                                <tr>
+                                    <th class="file-checkbox-col">
+                                        <input type="checkbox" id="selectAll" class="file-checkbox">
+                                    </th>
+                                    <th>Name</th>
+                                    <th class="d-none d-xl-table-cell" style="width: 130px;">Permissions</th>
+                                    <th class="d-none d-md-table-cell" style="width: 150px;">Size</th>
+                                    <th class="d-none d-lg-table-cell" style="width: 200px;">Last Modified</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fileList">
+                                <tr>
+                                    <td colspan="5" class="text-center py-4">
+                                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                        </div>
+                                        Loading files...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <input type="file" id="uploadInput" class="d-none" multiple>
                     <% if (fileUploadEnabled) { %>
                     <div id="uploadDropzone" class="upload-dropzone">
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
@@ -594,30 +613,6 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                     </div>
                 </div>
             </div>
-                            <thead>
-                                <tr>
-                                    <th class="file-checkbox-col">
-                                        <input type="checkbox" id="selectAll" class="file-checkbox">
-                                    </th>
-                                    <th>Name</th>
-                                    <th class="d-none d-xl-table-cell" style="width: 130px;">Permissions</th>
-                                    <th class="d-none d-md-table-cell" style="width: 150px;">Size</th>
-                                    <th class="d-none d-lg-table-cell" style="width: 200px;">Last Modified</th>
-                                </tr>
-                            </thead>
-                            
-                            <tbody id="fileList">
-                                <tr>
-                                    <td colspan="5" class="text-center py-4">
-                                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
-                                        </div>
-                                        Loading files...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-             
 
             <!-- Context Menu -->
             <div id="contextMenu" class="context-menu">
