@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title class="text-uppercase">
-        <%= (settings.brandName || 'CPanel' ).toUpperCase() %>
-            <%= locals.title ? ' - ' + title.toUpperCase() : '' %>
+        <%= ((typeof settings !== 'undefined' && settings && settings.brandName) ? settings.brandName : 'CPanel').toUpperCase() %>
+            <%= (typeof locals !== 'undefined' && locals && locals.title) ? ' - ' + String(locals.title).toUpperCase() : '' %>
     </title>
 
     <%- include('favicon') %>
@@ -37,11 +37,21 @@
         </style>
 </head>
 
-<body data-user-custom-theme="<%= activeUserCustomThemeEnabled ? 'on' : 'off' %>">
+<%
+    const __activeUserCustomThemeEnabled =
+        (typeof activeUserCustomThemeEnabled !== 'undefined')
+            ? Boolean(activeUserCustomThemeEnabled)
+            : false;
+    const __activeUserCustomTheme =
+        (typeof activeUserCustomTheme !== 'undefined')
+            ? activeUserCustomTheme
+            : null;
+%>
+<body data-user-custom-theme="<%= __activeUserCustomThemeEnabled ? 'on' : 'off' %>">
     <script>
     (() => {
-        const customTheme = <%- JSON.stringify(activeUserCustomTheme || null) %>;
-        const isEnabled = <%= activeUserCustomThemeEnabled ? 'true' : 'false' %>;
+        const customTheme = <%- JSON.stringify(__activeUserCustomTheme || null) %>;
+        const isEnabled = <%= __activeUserCustomThemeEnabled ? 'true' : 'false' %>;
         const root = document.documentElement;
         const body = document.body;
         const state = isEnabled ? 'on' : 'off';
