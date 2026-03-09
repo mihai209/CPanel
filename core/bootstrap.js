@@ -12,6 +12,7 @@ function bootstrapApp(deps) {
         settingsCache,
         settingsModel,
         userModel,
+        SecurityEvent,
         secretKey,
         passport,
         registerSecurityMiddleware,
@@ -20,7 +21,40 @@ function bootstrapApp(deps) {
 
     global.connectorStatus = {};
 
-    registerSecurityMiddleware(app);
+    const extractIp = (req) => {
+        const forwarded = req && req.headers ? req.headers['x-forwarded-for'] : '';
+        const raw = Array.isArray(forwarded)
+            ? forwarded[0]
+            : String(forwarded || '').split(',')[0];
+        const value = String(raw || (req && req.ip) || (req && req.socket && req.socket.remoteAddress) || '').trim();
+        return value.replace(/^::ffff:/, '') || null;
+    };
+    const truncate = (value, max = 255) => {
+        const text = String(value === undefined || value === null ? '' : value);
+        return text.length <= max ? text : `${text.slice(0, max - 3)}...`;
+    };
+    const logSecurityEvent = (req, payload) => {
+        if (!SecurityEvent || typeof SecurityEvent.create !== 'function') return;
+        const userId = req && req.session && req.session.user ? Number.parseInt(req.session.user.id, 10) || null : null;
+        SecurityEvent.create({
+            userId,
+            severity: truncate(payload && payload.severity ? payload.severity : 'medium', 16),
+            category: truncate(payload && payload.category ? payload.category : 'rate_limit', 40),
+            eventType: truncate(payload && payload.eventType ? payload.eventType : 'rate_limit.hit', 120),
+            message: truncate(payload && payload.message ? payload.message : 'Rate limit reached.', 255),
+            source: 'panel',
+            method: truncate(req && req.method ? req.method : '', 10) || null,
+            path: truncate((req && (req.originalUrl || req.url)) || '', 255) || null,
+            ip: truncate(extractIp(req) || '', 120) || null,
+            userAgent: truncate((req && req.headers && req.headers['user-agent']) || '', 2000) || null,
+            requestId: truncate((req && req.requestId) || '', 64) || null,
+            metadata: payload && payload.metadata ? payload.metadata : {}
+        }).catch(() => {});
+    };
+
+    registerSecurityMiddleware(app, {
+        SecurityEvent
+    });
 
     let sessionStore = null;
     let usingRedisSessionStore = false;
@@ -93,6 +127,14 @@ function bootstrapApp(deps) {
         max: 500,
         skip: (req) => req.path === '/ratelimited' || req.path.startsWith('/assets/'),
         handler: (req, res) => {
+            req.__securityRateLimitedLogged = true;
+            logSecurityEvent(req, {
+                severity: 'medium',
+                category: 'rate_limit',
+                eventType: 'rate_limit.global',
+                message: 'Global rate limiter triggered.',
+                metadata: { scope: 'global' }
+            });
             res.redirect('/ratelimited');
         }
     });
@@ -102,7 +144,17 @@ function bootstrapApp(deps) {
         windowMs: 15 * 60 * 1000,
         max: 5,
         skipSuccessfulRequests: true,
-        message: 'Too many login attempts from this IP, please try again after 15 minutes.'
+        handler: (req, res) => {
+            req.__securityRateLimitedLogged = true;
+            logSecurityEvent(req, {
+                severity: 'high',
+                category: 'rate_limit',
+                eventType: 'rate_limit.login',
+                message: 'Login rate limiter triggered.',
+                metadata: { scope: 'login' }
+            });
+            return res.status(429).send('Too many login attempts from this IP, please try again after 15 minutes.');
+        }
     });
 
     registerLocalsMiddleware(app, settingsModel, userModel, settingsCache);

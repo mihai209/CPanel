@@ -349,6 +349,31 @@ const AuditLog = sequelize.define('AuditLog', {
     metadata: { type: DataTypes.JSON, allowNull: true }
 });
 
+const SecurityEvent = sequelize.define('SecurityEvent', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    userId: { type: DataTypes.INTEGER, allowNull: true },
+    severity: { type: DataTypes.STRING(16), allowNull: false, defaultValue: 'medium' },
+    category: { type: DataTypes.STRING(40), allowNull: false, defaultValue: 'request' },
+    eventType: { type: DataTypes.STRING(120), allowNull: false },
+    message: { type: DataTypes.STRING(255), allowNull: false },
+    source: { type: DataTypes.STRING(40), allowNull: false, defaultValue: 'panel' },
+    method: { type: DataTypes.STRING(10), allowNull: true },
+    path: { type: DataTypes.STRING(255), allowNull: true },
+    ip: { type: DataTypes.STRING(120), allowNull: true },
+    userAgent: { type: DataTypes.TEXT, allowNull: true },
+    requestId: { type: DataTypes.STRING(64), allowNull: true },
+    metadata: { type: DataTypes.JSON, allowNull: true }
+}, {
+    indexes: [
+        { fields: ['createdAt'] },
+        { fields: ['severity'] },
+        { fields: ['category'] },
+        { fields: ['eventType'] },
+        { fields: ['ip'] },
+        { fields: ['userId'] }
+    ]
+});
+
 const ServerBackupPolicy = sequelize.define('ServerBackupPolicy', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     serverId: { type: DataTypes.INTEGER, allowNull: false, unique: true },
@@ -458,6 +483,18 @@ Package.hasMany(Image, { foreignKey: 'packageId', as: 'images' });
 
 User.hasMany(AuditLog, { foreignKey: 'actorUserId', as: 'auditEntries' });
 AuditLog.belongsTo(User, { foreignKey: 'actorUserId', as: 'actor' });
+User.hasMany(SecurityEvent, {
+    foreignKey: 'userId',
+    as: 'securityEvents',
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+});
+SecurityEvent.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+});
 
 Server.hasOne(ServerBackupPolicy, { foreignKey: 'serverId', as: 'backupPolicy' });
 ServerBackupPolicy.belongsTo(Server, { foreignKey: 'serverId', as: 'server' });
@@ -604,6 +641,7 @@ module.exports = {
     Allocation,
     Job,
     AuditLog,
+    SecurityEvent,
     ServerBackupPolicy,
     ServerBackup,
     Mount,

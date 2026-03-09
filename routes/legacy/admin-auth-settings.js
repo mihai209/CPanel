@@ -1428,10 +1428,10 @@ app.get('/admin/auth-providers', requireAuth, requireAdmin, (req, res) => {
 app.post('/admin/auth-providers', requireAuth, requireAdmin, async (req, res) => {
     const keys = [
         'authStandardEnabled',
-        'authDiscordEnabled', 'authDiscordClientId', 'authDiscordClientSecret',
-        'authGoogleEnabled', 'authGoogleClientId', 'authGoogleClientSecret',
-        'authRedditEnabled', 'authRedditClientId', 'authRedditClientSecret',
-        'authGithubEnabled', 'authGithubClientId', 'authGithubClientSecret'
+        'authDiscordEnabled', 'authDiscordRegisterEnabled', 'authDiscordClientId', 'authDiscordClientSecret',
+        'authGoogleEnabled', 'authGoogleRegisterEnabled', 'authGoogleClientId', 'authGoogleClientSecret',
+        'authRedditEnabled', 'authRedditRegisterEnabled', 'authRedditClientId', 'authRedditClientSecret',
+        'authGithubEnabled', 'authGithubRegisterEnabled', 'authGithubClientId', 'authGithubClientSecret'
     ];
 
     try {

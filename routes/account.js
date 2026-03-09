@@ -1,8 +1,13 @@
 const {
+    DEFAULT_USER_CUSTOM_THEME,
     getThemeCatalog,
     normalizeThemeId,
+    normalizeUserCustomThemeConfig,
     getUserThemeId,
-    withThemeInPermissions
+    getUserCustomTheme,
+    withThemeInPermissions,
+    withUserCustomThemeInPermissions,
+    withUserCustomThemeEnabled
 } = require('../core/themes');
 const { getGoogleTokenSettingKey } = require('../core/backups/google-drive');
 const { formatLoginTypeLabel } = require('../core/helpers/login-history');
@@ -22,6 +27,49 @@ function registerAccountRoutes({
     QRCode,
     bcrypt
 }) {
+    const allowedThemeIds = new Set(getThemeCatalog().map((entry) => entry.id));
+    const defaultCustomTheme = normalizeUserCustomThemeConfig(DEFAULT_USER_CUSTOM_THEME);
+
+    const parseToggle = (value) => {
+        if (value === true || value === 'true' || value === 1 || value === '1' || value === 'on' || value === 'yes') return true;
+        return false;
+    };
+
+    const updateSessionThemeState = (req, themeId, customTheme) => {
+        if (!req || !req.session || !req.session.user) return;
+        if (themeId) req.session.user.uiTheme = normalizeThemeId(themeId);
+        if (customTheme) req.session.user.uiCustomTheme = normalizeUserCustomThemeConfig(customTheme);
+    };
+
+    const applyPresetThemeForUser = async (user, rawTheme) => {
+        const nextTheme = normalizeThemeId(rawTheme);
+        if (rawTheme && !allowedThemeIds.has(String(rawTheme).trim().toLowerCase())) {
+            throw new Error('INVALID_THEME');
+        }
+        let nextPermissions = withThemeInPermissions(user.permissions, nextTheme);
+        // Preset apply turns off custom override so the selected preset is visible immediately.
+        nextPermissions = withUserCustomThemeEnabled(nextPermissions, false);
+        user.permissions = nextPermissions;
+        await user.save();
+        return {
+            nextTheme,
+            customTheme: getUserCustomTheme({ permissions: nextPermissions })
+        };
+    };
+
+    const getThemeViewData = async (userId) => {
+        const user = await User.findByPk(userId);
+        if (!user) return null;
+        const userData = user.toJSON();
+        return {
+            user,
+            userData,
+            activeTheme: getUserThemeId(userData),
+            customTheme: getUserCustomTheme(userData),
+            themeCatalog: getThemeCatalog()
+        };
+    };
+
     // Account Page (GET)
     app.get('/account', requireAuth, async (req, res) => {
         try {
@@ -66,16 +114,16 @@ function registerAccountRoutes({
             console.log(`[Account Debug] Rendering for user: ${userData.username} (ID: ${userData.id})`);
             console.log(`[Account Debug] Linked Accounts:`, JSON.stringify(normalizedLinkedAccounts, null, 2));
 
-            const themeCatalog = getThemeCatalog();
             const activeTheme = getUserThemeId(userData);
+            const activeCustomTheme = getUserCustomTheme(userData);
             if (req.session && req.session.user) {
                 req.session.user.uiTheme = activeTheme;
+                req.session.user.uiCustomTheme = activeCustomTheme;
             }
 
             res.render('account', {
                 user: userData,
                 linkedAccounts: normalizedLinkedAccounts,
-                themeCatalog,
                 activeTheme,
                 title: 'Account Settings',
                 appUrl: APP_URL,
@@ -85,6 +133,113 @@ function registerAccountRoutes({
         } catch (err) {
             console.error('Error fetching account:', err);
             res.redirect('/?error=Failed to load account settings.');
+        }
+    });
+
+    app.get('/themes', requireAuth, async (req, res) => {
+        try {
+            const data = await getThemeViewData(req.session.user.id);
+            if (!data) return res.redirect('/login');
+            updateSessionThemeState(req, data.activeTheme, data.customTheme);
+            return res.render('themes', {
+                user: data.userData,
+                title: 'Themes',
+                appUrl: APP_URL,
+                themeCatalog: data.themeCatalog,
+                activeTheme: data.activeTheme,
+                customTheme: data.customTheme,
+                success: req.query.success || null,
+                error: req.query.error || null
+            });
+        } catch (err) {
+            console.error('Failed to load themes page:', err);
+            return res.redirect('/account?error=' + encodeURIComponent('Failed to load themes.'));
+        }
+    });
+
+    app.post('/themes/apply', requireAuth, async (req, res) => {
+        const rawTheme = String((req.body && req.body.theme) || '').trim().toLowerCase();
+        try {
+            const user = await User.findByPk(req.session.user.id);
+            if (!user) return res.redirect('/login');
+            const nextState = await applyPresetThemeForUser(user, rawTheme);
+            updateSessionThemeState(req, nextState.nextTheme, nextState.customTheme);
+            return res.redirect('/themes?success=' + encodeURIComponent('Theme updated successfully.'));
+        } catch (err) {
+            if (err && err.message === 'INVALID_THEME') {
+                return res.redirect('/themes?error=' + encodeURIComponent('Invalid theme selected.'));
+            }
+            console.error('Failed to apply preset theme:', err);
+            return res.redirect('/themes?error=' + encodeURIComponent('Failed to update theme.'));
+        }
+    });
+
+    app.post('/themes/custom-mode', requireAuth, async (req, res) => {
+        try {
+            const enabled = parseToggle(req.body && req.body.enabled);
+            const user = await User.findByPk(req.session.user.id);
+            if (!user) return res.redirect('/login');
+            const nextPermissions = withUserCustomThemeEnabled(user.permissions, enabled);
+            user.permissions = nextPermissions;
+            await user.save();
+            const customTheme = getUserCustomTheme({ permissions: nextPermissions });
+            updateSessionThemeState(req, null, customTheme);
+            return res.redirect('/themes?success=' + encodeURIComponent(enabled ? 'Custom theme enabled.' : 'Custom theme disabled.'));
+        } catch (err) {
+            console.error('Failed to toggle custom theme mode:', err);
+            return res.redirect('/themes?error=' + encodeURIComponent('Failed to update custom theme mode.'));
+        }
+    });
+
+    app.get('/themes/builder', requireAuth, async (req, res) => {
+        try {
+            const data = await getThemeViewData(req.session.user.id);
+            if (!data) return res.redirect('/login');
+            updateSessionThemeState(req, data.activeTheme, data.customTheme);
+            return res.render('themes-builder', {
+                user: data.userData,
+                title: 'Theme Builder',
+                appUrl: APP_URL,
+                activeTheme: data.activeTheme,
+                customTheme: data.customTheme,
+                defaultCustomTheme,
+                success: req.query.success || null,
+                error: req.query.error || null
+            });
+        } catch (err) {
+            console.error('Failed to load theme builder:', err);
+            return res.redirect('/themes?error=' + encodeURIComponent('Failed to load theme builder.'));
+        }
+    });
+
+    app.post('/themes/builder', requireAuth, async (req, res) => {
+        try {
+            const user = await User.findByPk(req.session.user.id);
+            if (!user) return res.redirect('/login');
+            const draftTheme = normalizeUserCustomThemeConfig({
+                enabled: parseToggle(req.body && req.body.enabled),
+                backgroundImageUrl: String((req.body && req.body.backgroundImageUrl) || '').trim(),
+                backgroundColor: String((req.body && req.body.backgroundColor) || '').trim(),
+                panelSurface: String((req.body && req.body.panelSurface) || '').trim(),
+                cardBackground: String((req.body && req.body.cardBackground) || '').trim(),
+                cardBorder: String((req.body && req.body.cardBorder) || '').trim(),
+                accentColor: String((req.body && req.body.accentColor) || '').trim(),
+                textColor: String((req.body && req.body.textColor) || '').trim(),
+                mutedTextColor: String((req.body && req.body.mutedTextColor) || '').trim(),
+                serverCardBackground: String((req.body && req.body.serverCardBackground) || '').trim(),
+                serverCardBorder: String((req.body && req.body.serverCardBorder) || '').trim(),
+                serverCardRadius: String((req.body && req.body.serverCardRadius) || '').trim()
+            });
+
+            const nextPermissions = withUserCustomThemeInPermissions(user.permissions, draftTheme);
+            user.permissions = nextPermissions;
+            await user.save();
+            const savedCustomTheme = getUserCustomTheme({ permissions: nextPermissions });
+            updateSessionThemeState(req, null, savedCustomTheme);
+            return res.redirect('/themes/builder?success=' + encodeURIComponent('Custom theme saved successfully.'));
+        } catch (err) {
+            console.error('Failed to save custom theme:', err);
+            return res.redirect('/themes/builder?error=' + encodeURIComponent('Failed to save custom theme.'));
         }
     });
 
@@ -168,28 +323,20 @@ function registerAccountRoutes({
     // Update Theme Preference (POST)
     app.post('/account/theme', requireAuth, async (req, res) => {
         const rawTheme = String((req.body && req.body.theme) || '').trim().toLowerCase();
-        const allowedThemeIds = new Set(getThemeCatalog().map((entry) => entry.id));
-        if (rawTheme && !allowedThemeIds.has(rawTheme)) {
-            return res.redirect('/account?error=' + encodeURIComponent('Invalid theme selected.'));
-        }
-
-        const nextTheme = normalizeThemeId(rawTheme);
 
         try {
             const user = await User.findByPk(req.session.user.id);
             if (!user) return res.redirect('/login');
 
-            user.permissions = withThemeInPermissions(user.permissions, nextTheme);
-            await user.save();
-
-            if (req.session && req.session.user) {
-                req.session.user.uiTheme = nextTheme;
-            }
-
-            return res.redirect('/account?success=' + encodeURIComponent('Theme updated successfully.'));
+            const nextState = await applyPresetThemeForUser(user, rawTheme);
+            updateSessionThemeState(req, nextState.nextTheme, nextState.customTheme);
+            return res.redirect('/themes?success=' + encodeURIComponent('Theme updated successfully.'));
         } catch (err) {
+            if (err && err.message === 'INVALID_THEME') {
+                return res.redirect('/themes?error=' + encodeURIComponent('Invalid theme selected.'));
+            }
             console.error('Failed to update theme:', err);
-            return res.redirect('/account?error=' + encodeURIComponent('Failed to update theme.'));
+            return res.redirect('/themes?error=' + encodeURIComponent('Failed to update theme.'));
         }
     });
 

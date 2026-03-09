@@ -334,6 +334,31 @@ const AuditLog = sequelize.define('AuditLog', {
     metadata: { type: DataTypes.JSON, allowNull: true }
 });
 
+const SecurityEvent = sequelize.define('SecurityEvent', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    userId: { type: DataTypes.INTEGER, allowNull: true },
+    severity: { type: DataTypes.STRING(16), allowNull: false, defaultValue: 'medium' },
+    category: { type: DataTypes.STRING(40), allowNull: false, defaultValue: 'request' },
+    eventType: { type: DataTypes.STRING(120), allowNull: false },
+    message: { type: DataTypes.STRING(255), allowNull: false },
+    source: { type: DataTypes.STRING(40), allowNull: false, defaultValue: 'panel' },
+    method: { type: DataTypes.STRING(10), allowNull: true },
+    path: { type: DataTypes.STRING(255), allowNull: true },
+    ip: { type: DataTypes.STRING(120), allowNull: true },
+    userAgent: { type: DataTypes.TEXT, allowNull: true },
+    requestId: { type: DataTypes.STRING(64), allowNull: true },
+    metadata: { type: DataTypes.JSON, allowNull: true }
+}, {
+    indexes: [
+        { fields: ['createdAt'] },
+        { fields: ['severity'] },
+        { fields: ['category'] },
+        { fields: ['eventType'] },
+        { fields: ['ip'] },
+        { fields: ['userId'] }
+    ]
+});
+
 const ServerBackupPolicy = sequelize.define('ServerBackupPolicy', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     serverId: { type: DataTypes.INTEGER, allowNull: false, unique: true },
@@ -443,6 +468,18 @@ Package.hasMany(Image, { foreignKey: 'packageId', as: 'images' });
 
 User.hasMany(AuditLog, { foreignKey: 'actorUserId', as: 'auditEntries' });
 AuditLog.belongsTo(User, { foreignKey: 'actorUserId', as: 'actor' });
+User.hasMany(SecurityEvent, {
+    foreignKey: 'userId',
+    as: 'securityEvents',
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+});
+SecurityEvent.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+});
 
 Server.hasOne(ServerBackupPolicy, { foreignKey: 'serverId', as: 'backupPolicy' });
 ServerBackupPolicy.belongsTo(Server, { foreignKey: 'serverId', as: 'server' });
@@ -753,6 +790,10 @@ async function upgrade() {
         await AuditLog.sync({ alter: true });
         console.log('AuditLog table synced.');
 
+        // Sync the SecurityEvent model
+        await SecurityEvent.sync({ alter: true });
+        console.log('SecurityEvent table synced.');
+
         // Sync the ServerBackupPolicy model
         await ServerBackupPolicy.sync({ alter: true });
         console.log('ServerBackupPolicy table synced.');
@@ -946,6 +987,7 @@ async function upgrade() {
         const adminApiKeyAuditTable = resolveTableName(AdminApiKeyAudit);
         const jobTable = resolveTableName(Job);
         const auditLogTable = resolveTableName(AuditLog);
+        const securityEventTable = resolveTableName(SecurityEvent);
         const backupPolicyTable = resolveTableName(ServerBackupPolicy);
         const backupTable = resolveTableName(ServerBackup);
         const serverDatabaseTable = resolveTableName(ServerDatabase);
@@ -999,6 +1041,12 @@ async function upgrade() {
         await addIndexIfMissing(auditLogTable, ['actorUserId'], { name: 'audit_logs_actor_user_id_idx' });
         await addIndexIfMissing(auditLogTable, ['targetType', 'targetId'], { name: 'audit_logs_target_idx' });
         await addIndexIfMissing(auditLogTable, ['createdAt'], { name: 'audit_logs_created_at_idx' });
+        await addIndexIfMissing(securityEventTable, ['createdAt'], { name: 'security_events_created_at_idx' });
+        await addIndexIfMissing(securityEventTable, ['severity'], { name: 'security_events_severity_idx' });
+        await addIndexIfMissing(securityEventTable, ['category'], { name: 'security_events_category_idx' });
+        await addIndexIfMissing(securityEventTable, ['eventType'], { name: 'security_events_event_type_idx' });
+        await addIndexIfMissing(securityEventTable, ['ip'], { name: 'security_events_ip_idx' });
+        await addIndexIfMissing(securityEventTable, ['userId'], { name: 'security_events_user_id_idx' });
 
         await addIndexIfMissing(backupPolicyTable, ['serverId'], { name: 'server_backup_policies_server_id_idx' });
         await addIndexIfMissing(backupTable, ['serverId'], { name: 'server_backups_server_id_idx' });
@@ -1022,15 +1070,19 @@ async function upgrade() {
             { key: 'captchastatus', value: 'off' },
             { key: 'authStandardEnabled', value: 'true' },
             { key: 'authDiscordEnabled', value: 'false' },
+            { key: 'authDiscordRegisterEnabled', value: 'true' },
             { key: 'authDiscordClientId', value: '' },
             { key: 'authDiscordClientSecret', value: '' },
             { key: 'authGoogleEnabled', value: 'false' },
+            { key: 'authGoogleRegisterEnabled', value: 'true' },
             { key: 'authGoogleClientId', value: '' },
             { key: 'authGoogleClientSecret', value: '' },
             { key: 'authRedditEnabled', value: 'false' },
+            { key: 'authRedditRegisterEnabled', value: 'true' },
             { key: 'authRedditClientId', value: '' },
             { key: 'authRedditClientSecret', value: '' },
             { key: 'authGithubEnabled', value: 'false' },
+            { key: 'authGithubRegisterEnabled', value: 'true' },
             { key: 'authGithubClientId', value: '' },
             { key: 'authGithubClientSecret', value: '' },
             { key: 'featureCostPerServerEnabled', value: 'false' },
@@ -1048,6 +1100,9 @@ async function upgrade() {
             { key: 'abuseScoreAlertThreshold', value: '80' },
             { key: 'featureServiceHealthChecksEnabled', value: 'false' },
             { key: 'serviceHealthCheckIntervalSeconds', value: '300' },
+            { key: 'featureSentrySeekerEnabled', value: 'true' },
+            { key: 'sentrySeekerRetentionDays', value: '30' },
+            { key: 'securityMaxBodyMb', value: '2' },
             { key: 'featurePolicyEngineEnabled', value: 'false' },
             { key: 'featurePlaybooksAutomationEnabled', value: 'false' },
             { key: 'featureSftpEnabled', value: 'true' },

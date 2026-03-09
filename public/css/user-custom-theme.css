@@ -1,0 +1,71 @@
+html[data-user-custom-theme='on'] body {
+    background-color: var(--cp-user-bg-color, #0d0d0f) !important;
+    background-image: var(--cp-user-bg-image, none) !important;
+    background-size: cover !important;
+    background-repeat: no-repeat !important;
+    background-position: center center !important;
+    color: var(--cp-user-text-color, #ffffff) !important;
+}
+
+html[data-user-custom-theme='on'] .navbar,
+html[data-user-custom-theme='on'] .admin-header,
+html[data-user-custom-theme='on'] .card-header {
+    background-color: var(--cp-user-panel-surface, #141419) !important;
+}
+
+html[data-user-custom-theme='on'] .card,
+html[data-user-custom-theme='on'] .admin-content .card,
+html[data-user-custom-theme='on'] .server-card,
+html[data-user-custom-theme='on'] .metric-card,
+html[data-user-custom-theme='on'] .resource-pill,
+html[data-user-custom-theme='on'] .ops-feed-card,
+html[data-user-custom-theme='on'] .ops-feed-item,
+html[data-user-custom-theme='on'] .empty-state-card,
+html[data-user-custom-theme='on'] .dashboard-hero {
+    background-color: var(--cp-user-card-bg, #1f2023) !important;
+    border-color: var(--cp-user-card-border, #2e3036) !important;
+}
+
+html[data-user-custom-theme='on'] .server-card {
+    border-radius: var(--cp-user-server-card-radius, 12px) !important;
+    background-color: var(--cp-user-server-card-bg, #1f2023) !important;
+    border-color: var(--cp-user-server-card-border, #2e3036) !important;
+}
+
+html[data-user-custom-theme='on'] .btn-primary,
+html[data-user-custom-theme='on'] .bg-primary {
+    background-color: var(--cp-user-accent-color, #3b82f6) !important;
+    border-color: var(--cp-user-accent-color, #3b82f6) !important;
+}
+
+html[data-user-custom-theme='on'] .text-primary {
+    color: var(--cp-user-accent-color, #3b82f6) !important;
+}
+
+html[data-user-custom-theme='on'] .form-control:focus,
+html[data-user-custom-theme='on'] .form-select:focus,
+html[data-user-custom-theme='on'] .btn:focus {
+    box-shadow: 0 0 0 0.15rem var(--cp-user-accent-color, #3b82f6) !important;
+    border-color: var(--cp-user-accent-color, #3b82f6) !important;
+}
+
+html[data-user-custom-theme='on'] .text-muted,
+html[data-user-custom-theme='on'] .server-subtext,
+html[data-user-custom-theme='on'] .metric-label,
+html[data-user-custom-theme='on'] .resource-pill-label {
+    color: var(--cp-user-muted-text-color, #a1a1aa) !important;
+}
+
+html[data-user-custom-theme='on'] h1,
+html[data-user-custom-theme='on'] h2,
+html[data-user-custom-theme='on'] h3,
+html[data-user-custom-theme='on'] h4,
+html[data-user-custom-theme='on'] h5,
+html[data-user-custom-theme='on'] h6,
+html[data-user-custom-theme='on'] .card-title,
+html[data-user-custom-theme='on'] .card-body,
+html[data-user-custom-theme='on'] .form-label,
+html[data-user-custom-theme='on'] label,
+html[data-user-custom-theme='on'] .server-name {
+    color: var(--cp-user-text-color, #ffffff) !important;
+}

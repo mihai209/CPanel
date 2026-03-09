@@ -3,7 +3,8 @@ const {
     normalizeThemeId,
     getThemeCssPath,
     getThemeCatalog,
-    getUserThemeId
+    getUserThemeId,
+    getUserCustomTheme
 } = require('../themes');
 
 function registerLocalsMiddleware(app, Settings, User, settingsCache = null) {
@@ -35,15 +36,21 @@ function registerLocalsMiddleware(app, Settings, User, settingsCache = null) {
         res.locals.themeCatalog = getThemeCatalog();
 
         let activeThemeId = DEFAULT_THEME_ID;
+        let activeUserCustomTheme = getUserCustomTheme(null);
         try {
             if (req.session && req.session.user) {
-                if (!req.session.user.uiTheme && User && req.session.user.id) {
+                const sessionMissingTheme = !req.session.user.uiTheme;
+                const sessionMissingCustomTheme = !req.session.user.uiCustomTheme;
+                if ((sessionMissingTheme || sessionMissingCustomTheme) && User && req.session.user.id) {
                     const account = await User.findByPk(req.session.user.id, { attributes: ['id', 'permissions'] });
                     if (account) {
-                        req.session.user.uiTheme = getUserThemeId(account.toJSON());
+                        const accountData = account.toJSON();
+                        req.session.user.uiTheme = getUserThemeId(accountData);
+                        req.session.user.uiCustomTheme = getUserCustomTheme(accountData);
                     }
                 }
                 activeThemeId = normalizeThemeId(req.session.user.uiTheme);
+                activeUserCustomTheme = getUserCustomTheme(req.session.user);
             }
         } catch (error) {
             console.warn('Failed to resolve user theme from session/db:', error.message || error);
@@ -51,6 +58,8 @@ function registerLocalsMiddleware(app, Settings, User, settingsCache = null) {
 
         res.locals.activeTheme = activeThemeId;
         res.locals.activeThemeCssPath = getThemeCssPath(activeThemeId);
+        res.locals.activeUserCustomTheme = activeUserCustomTheme;
+        res.locals.activeUserCustomThemeEnabled = Boolean(activeUserCustomTheme && activeUserCustomTheme.enabled);
         next();
     });
 }

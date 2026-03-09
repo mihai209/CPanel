@@ -78,6 +78,24 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, Settings, md5
         return candidate;
     }
 
+    function getProviderSettingPrefix(provider) {
+        const normalized = String(provider || '').trim().toLowerCase();
+        if (!normalized) return 'auth';
+        return `auth${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
+    }
+
+    function isProviderRegisterEnabled(req, provider) {
+        const settings = req && req.res && req.res.locals && req.res.locals.settings ? req.res.locals.settings : {};
+        const prefix = getProviderSettingPrefix(provider);
+        return String(settings[`${prefix}RegisterEnabled`] || 'true') !== 'false';
+    }
+
+    function buildProviderLoginOnlyMessage(provider) {
+        const providerName = String(provider || 'OAuth').trim();
+        const prettyName = providerName ? `${providerName.charAt(0).toUpperCase()}${providerName.slice(1)}` : 'OAuth';
+        return `${prettyName} login is restricted to already linked accounts. Sign in with email/password first and link ${prettyName} from your account page.`;
+    }
+
     // Helper: finish OAuth login — upsert user, set session, redirect
     async function handleOAuthCallback(profile, provider, done, req, tokenPayload = {}) {
         try {
@@ -88,8 +106,10 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, Settings, md5
             ) ? String((profile.emails && profile.emails[0] && profile.emails[0].value) || profile.email || (profile._json && profile._json.email)).toLowerCase().trim() : null;
             const oauthId = String(profile.id || '');
             const oauthUsername = profile.username || profile.displayName || profile.id;
+            const allowRegister = isProviderRegisterEnabled(req, provider);
 
             oauthDebug(`[OAuth Debug] Provider: ${provider}, ID: ${oauthId}, Email: ${oauthEmail}, Username: ${oauthUsername}`);
+            oauthDebug(`[OAuth Debug] Provider ${provider} register-enabled: ${allowRegister}`);
             oauthDebug(`[OAuth Debug] Profile:`, JSON.stringify(profile, null, 2));
 
             // 1. Check if user is already logged in (Linking flow)
@@ -146,17 +166,21 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, Settings, md5
             // 3. Fallback: legacy mapping or email
             if (!user) {
                 user = await User.findOne({ where: { oauthProvider: provider, oauthId } });
+            }
 
-                if (!user && oauthEmail) {
-                    user = await User.findOne({ where: { email: oauthEmail } });
+            if (!user && allowRegister && oauthEmail) {
+                user = await User.findOne({ where: { email: oauthEmail } });
 
-                    if (user) {
-                        oauthDebug(`[OAuth] Linking existing user ${user.username} (ID: ${user.id}) with provider ${provider}.`);
-                        if (req && req.session) {
-                            req.session.oauthAutoLinked = true;
-                        }
+                if (user) {
+                    oauthDebug(`[OAuth] Linking existing user ${user.username} (ID: ${user.id}) with provider ${provider}.`);
+                    if (req && req.session) {
+                        req.session.oauthAutoLinked = true;
                     }
                 }
+            }
+
+            if (!user && !allowRegister) {
+                return done(null, false, { message: buildProviderLoginOnlyMessage(provider) });
             }
 
             if (!user) {

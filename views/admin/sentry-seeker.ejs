@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= (settings.brandName || 'CPanel').toUpperCase() %> - Sentry Seeker</title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<%- include('../partials/error-modal') %>
+<div class="admin-wrapper">
+    <%- include('../partials/admin-sidebar') %>
+    <div class="admin-content">
+        <div class="admin-header">
+            <div>
+                <h4 class="mb-0 text-light fw-normal">Sentry Seeker</h4>
+                <small class="text-muted">Security telemetry, blocked requests and suspicious activity.</small>
+            </div>
+            <div class="breadcrumb-admin">
+                <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span class="text-light">Sentry Seeker</span>
+            </div>
+        </div>
+
+        <div class="container-fluid py-4 px-lg-4">
+            <% if (success) { %><div class="alert alert-success border-0 bg-success bg-opacity-10 text-success"><%= success %></div><% } %>
+            <% if (error) { %><div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger"><%= error %></div><% } %>
+
+            <div class="row g-3 mb-3">
+                <div class="col-6 col-xl-3">
+                    <div class="card border-0 shadow-sm" style="background-color:#141419;">
+                        <div class="card-body">
+                            <div class="text-muted small">Total (filtered)</div>
+                            <div class="h4 mb-0 text-light"><%= summary.total %></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-xl-3">
+                    <div class="card border-0 shadow-sm" style="background-color:#141419;">
+                        <div class="card-body">
+                            <div class="text-muted small">Last 24h</div>
+                            <div class="h4 mb-0 text-light"><%= summary.last24h %></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-xl-3">
+                    <div class="card border-0 shadow-sm" style="background-color:#141419;">
+                        <div class="card-body">
+                            <div class="text-muted small">High/Critical 24h</div>
+                            <div class="h4 mb-0 text-warning"><%= summary.high24h %></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-xl-3">
+                    <div class="card border-0 shadow-sm" style="background-color:#141419;">
+                        <div class="card-body">
+                            <div class="text-muted small">Blocked 24h</div>
+                            <div class="h4 mb-0 text-danger"><%= summary.blocked24h %></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-3" style="background-color:#141419;">
+                <div class="card-body">
+                    <form method="GET" action="/admin/sentry-seeker" class="row g-2">
+                        <div class="col-6 col-md-2">
+                            <label class="form-label text-muted small">Severity</label>
+                            <select class="form-select form-select-sm" name="severity">
+                                <option value="all" <%= filters.severity === 'all' ? 'selected' : '' %>>All</option>
+                                <option value="low" <%= filters.severity === 'low' ? 'selected' : '' %>>Low</option>
+                                <option value="medium" <%= filters.severity === 'medium' ? 'selected' : '' %>>Medium</option>
+                                <option value="high" <%= filters.severity === 'high' ? 'selected' : '' %>>High</option>
+                                <option value="critical" <%= filters.severity === 'critical' ? 'selected' : '' %>>Critical</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label text-muted small">Category</label>
+                            <select class="form-select form-select-sm" name="category">
+                                <option value="all" <%= filters.category === 'all' ? 'selected' : '' %>>All</option>
+                                <option value="request" <%= filters.category === 'request' ? 'selected' : '' %>>Request</option>
+                                <option value="csrf" <%= filters.category === 'csrf' ? 'selected' : '' %>>CSRF</option>
+                                <option value="rate_limit" <%= filters.category === 'rate_limit' ? 'selected' : '' %>>Rate limit</option>
+                                <option value="authz" <%= filters.category === 'authz' ? 'selected' : '' %>>AuthZ</option>
+                                <option value="response" <%= filters.category === 'response' ? 'selected' : '' %>>Response</option>
+                                <option value="runtime" <%= filters.category === 'runtime' ? 'selected' : '' %>>Runtime</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label text-muted small">Source</label>
+                            <input type="text" class="form-control form-control-sm" name="source" value="<%= filters.source %>" placeholder="panel">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label text-muted small">IP</label>
+                            <input type="text" class="form-control form-control-sm" name="ip" value="<%= filters.ip %>" placeholder="212.227...">
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label text-muted small">Search</label>
+                            <input type="text" class="form-control form-control-sm" name="search" value="<%= filters.search %>" placeholder="event/message/path">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label text-muted small">From</label>
+                            <input type="date" class="form-control form-control-sm" name="from" value="<%= filters.from %>">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label text-muted small">To</label>
+                            <input type="date" class="form-control form-control-sm" name="to" value="<%= filters.to %>">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label text-muted small">Rows</label>
+                            <select class="form-select form-select-sm" name="limit">
+                                <option value="20" <%= String(filters.limit) === '20' ? 'selected' : '' %>>20</option>
+                                <option value="50" <%= String(filters.limit) === '50' ? 'selected' : '' %>>50</option>
+                                <option value="100" <%= String(filters.limit) === '100' ? 'selected' : '' %>>100</option>
+                                <option value="200" <%= String(filters.limit) === '200' ? 'selected' : '' %>>200</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6 d-flex align-items-end gap-2">
+                            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1"></i>Apply</button>
+                            <a href="/admin/sentry-seeker" class="btn btn-sm btn-outline-light">Reset</a>
+                        </div>
+                    </form>
+                    <div class="d-flex flex-wrap gap-2 mt-3">
+                        <form method="POST" action="/admin/sentry-seeker/purge" class="d-flex gap-2 align-items-center">
+                            <input type="hidden" name="mode" value="older">
+                            <input type="number" min="1" max="365" step="1" name="days" value="30" class="form-control form-control-sm" style="width: 96px;">
+                            <button type="submit" class="btn btn-sm btn-outline-warning">Purge Older</button>
+                        </form>
+                        <form method="POST" action="/admin/sentry-seeker/purge" onsubmit="return confirm('Delete all security events?');">
+                            <input type="hidden" name="mode" value="all">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Purge All</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm" style="background-color:#141419;">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Severity</th>
+                                    <th>Category</th>
+                                    <th>Event</th>
+                                    <th>Context</th>
+                                    <th>User</th>
+                                    <th>Metadata</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% (events || []).forEach((event) => { %>
+                                    <% const severity = String(event.severity || 'medium').toLowerCase(); %>
+                                    <tr>
+                                        <td class="text-nowrap"><%= new Date(event.createdAt).toLocaleString() %></td>
+                                        <td>
+                                            <span class="badge <%= severity === 'critical' ? 'bg-danger' : (severity === 'high' ? 'bg-warning text-dark' : (severity === 'medium' ? 'bg-info text-dark' : 'bg-secondary')) %>">
+                                                <%= String(event.severity || '').toUpperCase() %>
+                                            </span>
+                                        </td>
+                                        <td><span class="text-muted"><%= event.category %></span></td>
+                                        <td>
+                                            <div class="fw-semibold"><%= event.eventType %></div>
+                                            <div class="text-muted small"><%= event.message %></div>
+                                        </td>
+                                        <td>
+                                            <div class="text-muted small"><%= event.method || '-' %> <%= event.path || '-' %></div>
+                                            <div class="text-muted small">IP: <%= event.ip || '-' %></div>
+                                            <div class="text-muted small">RID: <%= event.requestId || '-' %></div>
+                                        </td>
+                                        <td>
+                                            <% if (event.user) { %>
+                                                <div class="fw-semibold"><%= event.user.username %></div>
+                                                <div class="text-muted small">#<%= event.user.id %> <%= event.user.email || '' %></div>
+                                            <% } else { %>
+                                                <span class="text-muted">-</span>
+                                            <% } %>
+                                        </td>
+                                        <td style="max-width:320px;">
+                                            <pre class="small text-muted mb-0" style="white-space:pre-wrap;"><%= JSON.stringify(event.metadata || {}, null, 0) %></pre>
+                                        </td>
+                                    </tr>
+                                <% }) %>
+                                <% if (!(events || []).length) { %>
+                                    <tr><td colspan="7" class="text-muted">No security events found.</td></tr>
+                                <% } %>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <div class="text-muted small">Page <%= filters.page %> / <%= filters.totalPages %> (total: <%= filters.totalCount %>)</div>
+                        <div class="d-flex gap-2">
+                            <% const prevPage = Math.max(1, Number(filters.page) - 1); %>
+                            <% const nextPage = Math.min(Number(filters.totalPages), Number(filters.page) + 1); %>
+                            <% const q = `severity=${encodeURIComponent(filters.severity)}&category=${encodeURIComponent(filters.category)}&source=${encodeURIComponent(filters.source)}&ip=${encodeURIComponent(filters.ip)}&search=${encodeURIComponent(filters.search)}&from=${encodeURIComponent(filters.from)}&to=${encodeURIComponent(filters.to)}&limit=${encodeURIComponent(filters.limit)}`; %>
+                            <a class="btn btn-sm btn-outline-light <%= Number(filters.page) <= 1 ? 'disabled' : '' %>" href="/admin/sentry-seeker?<%= q %>&page=<%= prevPage %>">Prev</a>
+                            <a class="btn btn-sm btn-outline-light <%= Number(filters.page) >= Number(filters.totalPages) ? 'disabled' : '' %>" href="/admin/sentry-seeker?<%= q %>&page=<%= nextPage %>">Next</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <%- include('../partials/footer') %>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
+</body>
+</html>

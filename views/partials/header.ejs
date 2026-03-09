@@ -37,4 +37,36 @@
         </style>
 </head>
 
-<body>
+<body data-user-custom-theme="<%= activeUserCustomThemeEnabled ? 'on' : 'off' %>">
+    <script>
+    (() => {
+        const customTheme = <%- JSON.stringify(activeUserCustomTheme || null) %>;
+        const isEnabled = <%= activeUserCustomThemeEnabled ? 'true' : 'false' %>;
+        const root = document.documentElement;
+        const body = document.body;
+        const state = isEnabled ? 'on' : 'off';
+        root.setAttribute('data-user-custom-theme', state);
+        if (body) body.setAttribute('data-user-custom-theme', state);
+        if (!isEnabled || !customTheme || typeof customTheme !== 'object') return;
+
+        const cssVars = {
+            '--cp-user-bg-color': String(customTheme.backgroundColor || '#0d0d0f'),
+            '--cp-user-panel-surface': String(customTheme.panelSurface || '#141419'),
+            '--cp-user-card-bg': String(customTheme.cardBackground || '#1f2023'),
+            '--cp-user-card-border': String(customTheme.cardBorder || '#2e3036'),
+            '--cp-user-accent-color': String(customTheme.accentColor || '#3b82f6'),
+            '--cp-user-text-color': String(customTheme.textColor || '#ffffff'),
+            '--cp-user-muted-text-color': String(customTheme.mutedTextColor || '#a1a1aa'),
+            '--cp-user-server-card-bg': String(customTheme.serverCardBackground || '#1f2023'),
+            '--cp-user-server-card-border': String(customTheme.serverCardBorder || '#2e3036'),
+            '--cp-user-server-card-radius': String(Number.parseInt(customTheme.serverCardRadius, 10) || 12) + 'px'
+        };
+
+        Object.keys(cssVars).forEach((key) => {
+            root.style.setProperty(key, cssVars[key]);
+        });
+
+        const bgImage = String(customTheme.backgroundImageUrl || '').trim();
+        root.style.setProperty('--cp-user-bg-image', bgImage ? 'url("' + bgImage.replace(/"/g, '\\"') + '")' : 'none');
+    })();
+    </script>

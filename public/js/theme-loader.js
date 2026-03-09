@@ -1,5 +1,6 @@
 (function themeLoader() {
     let lifecycleBound = false;
+    let initialThemeSnapshot = null;
     const THEME_PALETTES = {
         'default': {
             '--bg-dark': '#0f0f12',
@@ -200,13 +201,46 @@
         if (!document.head) return;
         const themeLink = document.getElementById('cpanel-theme-css');
         const bridgeLink = document.getElementById('cpanel-theme-bridge-css');
+        const customLink = document.getElementById('cpanel-user-custom-theme-css');
         if (themeLink) document.head.appendChild(themeLink);
         if (bridgeLink) document.head.appendChild(bridgeLink);
+        if (customLink) document.head.appendChild(customLink);
     }
 
     function applyThemeEverywhere() {
         reorderThemeStylesheets();
         applyThemePalette(getActiveThemeId());
+    }
+
+    function ensureInitialThemeSnapshot() {
+        if (initialThemeSnapshot) return initialThemeSnapshot;
+        const themeLink = document.getElementById('cpanel-theme-css');
+        if (!themeLink) {
+            initialThemeSnapshot = { themeId: 'default', href: '/themes/default/index.css' };
+            return initialThemeSnapshot;
+        }
+        initialThemeSnapshot = {
+            themeId: String((themeLink.dataset && themeLink.dataset.theme) || 'default').trim().toLowerCase() || 'default',
+            href: themeLink.getAttribute('href') || '/themes/default/index.css'
+        };
+        return initialThemeSnapshot;
+    }
+
+    function applyTheme(themeId, cssPath) {
+        const themeLink = document.getElementById('cpanel-theme-css');
+        if (!themeLink) return;
+        const nextThemeId = String(themeId || 'default').trim().toLowerCase() || 'default';
+        const nextCssPath = String(cssPath || '').trim();
+        if (nextCssPath) {
+            themeLink.setAttribute('href', nextCssPath);
+        }
+        themeLink.dataset.theme = nextThemeId;
+        applyThemeEverywhere();
+    }
+
+    function restoreInitialTheme() {
+        const snapshot = ensureInitialThemeSnapshot();
+        applyTheme(snapshot.themeId, snapshot.href);
     }
 
     function bindLifecycleEvents() {
@@ -221,4 +255,10 @@
     } else {
         applyThemeEverywhere();
     }
+
+    ensureInitialThemeSnapshot();
+    window.CPanelThemeLoader = Object.assign({}, window.CPanelThemeLoader || {}, {
+        applyTheme,
+        restoreInitialTheme
+    });
 })();

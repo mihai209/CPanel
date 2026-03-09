@@ -161,6 +161,22 @@
                                                                             value="<%= appUrl %>/auth/discord/callback"
                                                                             readonly>
                                                                     </div>
+                                                                    <div class="form-check form-switch mt-3 mb-3">
+                                                                        <input class="form-check-input" type="checkbox"
+                                                                            role="switch"
+                                                                            name="authDiscordRegisterEnabled"
+                                                                            id="authDiscordRegisterEnabled"
+                                                                            <%=settings.authDiscordRegisterEnabled !==
+                                                                            'false' ? 'checked' : '' %>>
+                                                                        <label class="form-check-label text-light small"
+                                                                            for="authDiscordRegisterEnabled">
+                                                                            Allow new account registration with Discord
+                                                                        </label>
+                                                                        <div class="text-muted small mt-1">
+                                                                            If disabled, Discord login works only for
+                                                                            already linked accounts.
+                                                                        </div>
+                                                                    </div>
                                                                     <div class="mb-2">
                                                                         <label
                                                                             class="form-label text-muted small text-uppercase fw-bold">Client
@@ -226,6 +242,22 @@
                                                                             class="form-control form-control-sm callback-url-box"
                                                                             value="<%= appUrl %>/auth/google/callback"
                                                                             readonly>
+                                                                    </div>
+                                                                    <div class="form-check form-switch mt-3 mb-3">
+                                                                        <input class="form-check-input" type="checkbox"
+                                                                            role="switch"
+                                                                            name="authGoogleRegisterEnabled"
+                                                                            id="authGoogleRegisterEnabled"
+                                                                            <%=settings.authGoogleRegisterEnabled !==
+                                                                            'false' ? 'checked' : '' %>>
+                                                                        <label class="form-check-label text-light small"
+                                                                            for="authGoogleRegisterEnabled">
+                                                                            Allow new account registration with Google
+                                                                        </label>
+                                                                        <div class="text-muted small mt-1">
+                                                                            If disabled, Google login works only for
+                                                                            already linked accounts.
+                                                                        </div>
                                                                     </div>
                                                                     <div class="mb-2">
                                                                         <label
@@ -293,6 +325,22 @@
                                                                             value="<%= appUrl %>/auth/reddit/callback"
                                                                             readonly>
                                                                     </div>
+                                                                    <div class="form-check form-switch mt-3 mb-3">
+                                                                        <input class="form-check-input" type="checkbox"
+                                                                            role="switch"
+                                                                            name="authRedditRegisterEnabled"
+                                                                            id="authRedditRegisterEnabled"
+                                                                            <%=settings.authRedditRegisterEnabled !==
+                                                                            'false' ? 'checked' : '' %>>
+                                                                        <label class="form-check-label text-light small"
+                                                                            for="authRedditRegisterEnabled">
+                                                                            Allow new account registration with Reddit
+                                                                        </label>
+                                                                        <div class="text-muted small mt-1">
+                                                                            If disabled, Reddit login works only for
+                                                                            already linked accounts.
+                                                                        </div>
+                                                                    </div>
                                                                     <div class="mb-2">
                                                                         <label
                                                                             class="form-label text-muted small text-uppercase fw-bold">Client
@@ -356,6 +404,22 @@
                                                                             class="form-control form-control-sm callback-url-box"
                                                                             value="<%= appUrl %>/auth/github/callback"
                                                                             readonly>
+                                                                    </div>
+                                                                    <div class="form-check form-switch mt-3 mb-3">
+                                                                        <input class="form-check-input" type="checkbox"
+                                                                            role="switch"
+                                                                            name="authGithubRegisterEnabled"
+                                                                            id="authGithubRegisterEnabled"
+                                                                            <%=settings.authGithubRegisterEnabled !==
+                                                                            'false' ? 'checked' : '' %>>
+                                                                        <label class="form-check-label text-light small"
+                                                                            for="authGithubRegisterEnabled">
+                                                                            Allow new account registration with GitHub
+                                                                        </label>
+                                                                        <div class="text-muted small mt-1">
+                                                                            If disabled, GitHub login works only for
+                                                                            already linked accounts.
+                                                                        </div>
                                                                     </div>
                                                                     <div class="mb-2">
                                                                         <label

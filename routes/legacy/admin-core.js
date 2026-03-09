@@ -271,6 +271,35 @@ const parseJsonSafe = (raw, fallback) => {
     }
 };
 
+const DB_OP = (typeof globalThis.Op === 'object' && globalThis.Op) ? globalThis.Op : require('sequelize').Op;
+const SENTRY_SEVERITIES = new Set(['low', 'medium', 'high', 'critical']);
+const SENTRY_CATEGORIES = new Set(['request', 'csrf', 'rate_limit', 'authz', 'response', 'runtime']);
+
+const normalizeSentrySeverity = (value) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!normalized || normalized === 'all') return 'all';
+    return SENTRY_SEVERITIES.has(normalized) ? normalized : 'all';
+};
+
+const normalizeSentryCategory = (value) => {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!normalized || normalized === 'all') return 'all';
+    return SENTRY_CATEGORIES.has(normalized) ? normalized : 'all';
+};
+
+const parseSentryDate = (value, endOfDay = false) => {
+    const text = String(value || '').trim();
+    if (!text) return null;
+    const date = new Date(text);
+    if (Number.isNaN(date.getTime())) return null;
+    if (endOfDay) {
+        date.setHours(23, 59, 59, 999);
+    } else {
+        date.setHours(0, 0, 0, 0);
+    }
+    return date;
+};
+
 const resolveHealthStatus = (checks) => {
     if (!Array.isArray(checks) || checks.length === 0) return 'unknown';
     if (checks.some((item) => item.status === 'fail')) return 'fail';
@@ -770,6 +799,173 @@ app.get('/admin/abuse-scores.json', requireAuth, requireAdmin, async (req, res) 
         return res.json({ success: true, report });
     } catch (error) {
         return res.status(500).json({ success: false, error: 'Failed to build abuse report.' });
+    }
+});
+
+app.get('/admin/sentry-seeker', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        if (!SecurityEvent || typeof SecurityEvent.findAndCountAll !== 'function') {
+            return res.render('admin/sentry-seeker', {
+                user: req.session.user,
+                path: '/admin/sentry-seeker',
+                title: 'Sentry Seeker',
+                success: null,
+                error: 'Security event storage is not available.',
+                events: [],
+                summary: { total: 0, last24h: 0, high24h: 0, blocked24h: 0 },
+                filters: {
+                    severity: 'all',
+                    category: 'all',
+                    source: '',
+                    ip: '',
+                    search: '',
+                    from: '',
+                    to: '',
+                    page: 1,
+                    limit: 50,
+                    totalPages: 1,
+                    totalCount: 0
+                }
+            });
+        }
+
+        const severity = normalizeSentrySeverity(req.query.severity);
+        const category = normalizeSentryCategory(req.query.category);
+        const source = String(req.query.source || '').trim().slice(0, 40);
+        const ip = String(req.query.ip || '').trim().slice(0, 120);
+        const search = String(req.query.search || '').trim().slice(0, 120);
+        const fromRaw = String(req.query.from || '').trim();
+        const toRaw = String(req.query.to || '').trim();
+        const fromDate = parseSentryDate(fromRaw, false);
+        const toDate = parseSentryDate(toRaw, true);
+        const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+        const limit = Math.max(20, Math.min(200, Number.parseInt(req.query.limit, 10) || 50));
+        const offset = (page - 1) * limit;
+
+        const where = {};
+        if (severity !== 'all') where.severity = severity;
+        if (category !== 'all') where.category = category;
+        if (source) where.source = source;
+        if (ip) where.ip = { [DB_OP.like]: `%${ip}%` };
+        if (fromDate || toDate) {
+            where.createdAt = {};
+            if (fromDate) where.createdAt[DB_OP.gte] = fromDate;
+            if (toDate) where.createdAt[DB_OP.lte] = toDate;
+        }
+        if (search) {
+            where[DB_OP.or] = [
+                { eventType: { [DB_OP.like]: `%${search}%` } },
+                { message: { [DB_OP.like]: `%${search}%` } },
+                { path: { [DB_OP.like]: `%${search}%` } },
+                { ip: { [DB_OP.like]: `%${search}%` } }
+            ];
+        }
+
+        const [{ count: totalCount, rows }, last24h, high24h, blocked24h] = await Promise.all([
+            SecurityEvent.findAndCountAll({
+                where,
+                include: [{ model: User, as: 'user', attributes: ['id', 'username', 'email'], required: false }],
+                order: [['createdAt', 'DESC']],
+                limit,
+                offset,
+                distinct: true
+            }),
+            SecurityEvent.count({
+                where: {
+                    createdAt: { [DB_OP.gte]: new Date(Date.now() - (24 * 60 * 60 * 1000)) }
+                }
+            }),
+            SecurityEvent.count({
+                where: {
+                    severity: { [DB_OP.in]: ['high', 'critical'] },
+                    createdAt: { [DB_OP.gte]: new Date(Date.now() - (24 * 60 * 60 * 1000)) }
+                }
+            }),
+            SecurityEvent.count({
+                where: {
+                    eventType: { [DB_OP.like]: '%blocked%' },
+                    createdAt: { [DB_OP.gte]: new Date(Date.now() - (24 * 60 * 60 * 1000)) }
+                }
+            })
+        ]);
+
+        const totalPages = Math.max(1, Math.ceil((Number(totalCount) || 0) / limit));
+
+        return res.render('admin/sentry-seeker', {
+            user: req.session.user,
+            path: '/admin/sentry-seeker',
+            title: 'Sentry Seeker',
+            success: req.query.success || null,
+            error: req.query.error || null,
+            events: rows || [],
+            summary: {
+                total: Number(totalCount) || 0,
+                last24h: Number(last24h) || 0,
+                high24h: Number(high24h) || 0,
+                blocked24h: Number(blocked24h) || 0
+            },
+            filters: {
+                severity,
+                category,
+                source,
+                ip,
+                search,
+                from: fromRaw,
+                to: toRaw,
+                page,
+                limit,
+                totalPages,
+                totalCount: Number(totalCount) || 0
+            }
+        });
+    } catch (error) {
+        console.error('Error loading sentry seeker page:', error);
+        return res.render('admin/sentry-seeker', {
+            user: req.session.user,
+            path: '/admin/sentry-seeker',
+            title: 'Sentry Seeker',
+            success: null,
+            error: 'Failed to load security events.',
+            events: [],
+            summary: { total: 0, last24h: 0, high24h: 0, blocked24h: 0 },
+            filters: {
+                severity: 'all',
+                category: 'all',
+                source: '',
+                ip: '',
+                search: '',
+                from: '',
+                to: '',
+                page: 1,
+                limit: 50,
+                totalPages: 1,
+                totalCount: 0
+            }
+        });
+    }
+});
+
+app.post('/admin/sentry-seeker/purge', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        if (!SecurityEvent || typeof SecurityEvent.destroy !== 'function') {
+            return res.redirect('/admin/sentry-seeker?error=' + encodeURIComponent('Security event storage is not available.'));
+        }
+        const mode = String(req.body.mode || 'older').trim().toLowerCase();
+        if (mode === 'all') {
+            const deleted = await SecurityEvent.destroy({ where: {} });
+            return res.redirect('/admin/sentry-seeker?success=' + encodeURIComponent(`Purged ${deleted} security events.`));
+        }
+        const days = Math.max(1, Math.min(365, Number.parseInt(req.body.days, 10) || 30));
+        const cutoff = new Date(Date.now() - (days * 24 * 60 * 60 * 1000));
+        const deleted = await SecurityEvent.destroy({
+            where: {
+                createdAt: { [DB_OP.lt]: cutoff }
+            }
+        });
+        return res.redirect('/admin/sentry-seeker?success=' + encodeURIComponent(`Purged ${deleted} events older than ${days} days.`));
+    } catch (error) {
+        console.error('Error purging sentry seeker events:', error);
+        return res.redirect('/admin/sentry-seeker?error=' + encodeURIComponent('Failed to purge security events.'));
     }
 });
 
