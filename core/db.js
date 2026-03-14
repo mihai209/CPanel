@@ -183,7 +183,8 @@ const ServerCommandMacro = sequelize.define('ServerCommandMacro', {
     name: { type: DataTypes.STRING(80), allowNull: false },
     description: { type: DataTypes.STRING(160), allowNull: true },
     command: { type: DataTypes.STRING(1024), allowNull: false },
-    position: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 }
+    position: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    visibility: { type: DataTypes.STRING(16), allowNull: false, defaultValue: 'all' }
 }, {
     indexes: [
         { fields: ['serverId'] },

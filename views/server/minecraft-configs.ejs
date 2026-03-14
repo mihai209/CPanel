@@ -311,6 +311,17 @@
                             </div>
 
                             <div class="mt-3 border-top border-secondary border-opacity-25 pt-3">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <div class="fw-semibold">MOTD Preset Library</div>
+                                    <button class="btn btn-sm btn-outline-light" type="button" id="saveMotdPresetBtn" <%= !connectorOnline ? 'disabled' : '' %>>
+                                        <i class="bi bi-bookmark-plus me-1"></i>Save Preset
+                                    </button>
+                                </div>
+                                <div class="small text-muted-2 mb-2">Save reusable MOTDs and apply them instantly.</div>
+                                <div id="motdPresetList" class="d-grid gap-2"></div>
+                            </div>
+
+                            <div class="mt-3 border-top border-secondary border-opacity-25 pt-3">
                                 <div class="fw-semibold mb-2">Server Icon</div>
                                 <div class="d-flex align-items-center gap-2 flex-wrap">
                                     <input class="form-control" type="file" id="iconInput" accept="image/png" <%= !connectorOnline ? 'disabled' : '' %>>
@@ -813,7 +824,7 @@
 
         const saveMotdBtn = document.getElementById('saveMotdBtn');
         const motdInput = document.getElementById('motdInput');
-        saveMotdBtn?.addEventListener('click', async () => {
+        async function saveMotd() {
             if (!motdInput) return;
             saveMotdBtn.disabled = true;
             try {
@@ -832,6 +843,109 @@
                 showStatus(error.message || 'Failed to save MOTD.', 'error');
             } finally {
                 saveMotdBtn.disabled = false;
+            }
+        }
+
+        saveMotdBtn?.addEventListener('click', saveMotd);
+
+        const motdPresetList = document.getElementById('motdPresetList');
+        let motdPresets = <%- JSON.stringify(motdPresets || []) %>;
+
+        const renderMotdPresets = () => {
+            if (!motdPresetList) return;
+            if (!Array.isArray(motdPresets) || motdPresets.length === 0) {
+                motdPresetList.innerHTML = '<div class="text-muted-2 small">No presets saved yet.</div>';
+                return;
+            }
+            motdPresetList.innerHTML = motdPresets.map((preset) => {
+                const safeName = escapeHtml(preset.name || '');
+                const preview = escapeHtml(String(preset.content || '').split('\\n').slice(0, 2).join(' / '));
+                return `
+                    <div class="cardx p-2 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                        <div>
+                            <div class="fw-semibold">${safeName}</div>
+                            <div class="small text-muted-2">${preview || 'Empty MOTD'}</div>
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-sm btn-outline-light" type="button" data-action="load" data-id="${preset.id}">Load</button>
+                            <button class="btn btn-sm btn-outline-info" type="button" data-action="apply" data-id="${preset.id}">Apply</button>
+                            <button class="btn btn-sm btn-outline-danger" type="button" data-action="delete" data-id="${preset.id}">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        renderMotdPresets();
+
+        const saveMotdPresetBtn = document.getElementById('saveMotdPresetBtn');
+        saveMotdPresetBtn?.addEventListener('click', async () => {
+            if (!motdInput) return;
+            const name = window.prompt('Preset name:', '');
+            if (name === null) return;
+            const trimmed = String(name || '').trim();
+            if (!trimmed) {
+                showStatus('Preset name is required.', 'error');
+                return;
+            }
+            saveMotdPresetBtn.disabled = true;
+            try {
+                const response = await fetch(`/server/${serverId}/minecraft-configs/motd-presets`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'create', name: trimmed, content: motdInput.value || '' })
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.error || 'Failed to save preset.');
+                }
+                motdPresets = payload.presets || [];
+                renderMotdPresets();
+                showStatus('Preset saved.', 'success');
+            } catch (error) {
+                showStatus(error.message || 'Failed to save preset.', 'error');
+            } finally {
+                saveMotdPresetBtn.disabled = false;
+            }
+        });
+
+        motdPresetList?.addEventListener('click', async (event) => {
+            const target = event.target;
+            if (!target || !target.dataset) return;
+            const action = target.dataset.action;
+            const id = target.dataset.id;
+            if (!action || !id) return;
+            const preset = (motdPresets || []).find((entry) => entry.id === id);
+            if (!preset) return;
+
+            if (action === 'load') {
+                if (motdInput) motdInput.value = preset.content || '';
+                showStatus('Preset loaded into editor.', 'info');
+                return;
+            }
+            if (action === 'apply') {
+                if (motdInput) motdInput.value = preset.content || '';
+                await saveMotd();
+                return;
+            }
+            if (action === 'delete') {
+                if (!confirm(`Delete preset "${preset.name}"?`)) return;
+                try {
+                    const response = await fetch(`/server/${serverId}/minecraft-configs/motd-presets`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'delete', id })
+                    });
+                    const payload = await response.json();
+                    if (!response.ok || !payload.success) {
+                        throw new Error(payload.error || 'Failed to delete preset.');
+                    }
+                    motdPresets = payload.presets || [];
+                    renderMotdPresets();
+                    showStatus('Preset deleted.', 'success');
+                } catch (error) {
+                    showStatus(error.message || 'Failed to delete preset.', 'error');
+                }
             }
         });
 

@@ -1069,9 +1069,80 @@ const SUBUSER_PERMISSION_PRESETS = Object.freeze([
 ]);
 const SERVER_SCHEDULES_KEY_PREFIX = 'server_schedules_';
 const SERVER_PERFORMANCE_REPORT_KEY_PREFIX = 'server_performance_report_';
+const USER_MOTD_PRESETS_KEY_PREFIX = 'user_motd_presets_';
+const MACRO_VISIBILITY_VALUES = new Set(['all', 'owner', 'admin', 'subuser']);
 
 function getServerPerformanceReportSettingKey(serverId) {
     return `${SERVER_PERFORMANCE_REPORT_KEY_PREFIX}${serverId}`;
+}
+
+function getUserMotdPresetsSettingKey(userId) {
+    return `${USER_MOTD_PRESETS_KEY_PREFIX}${userId}`;
+}
+
+function normalizeMotdPresets(rawValue) {
+    let parsed = rawValue;
+    if (typeof parsed === 'string') {
+        try {
+            parsed = JSON.parse(parsed);
+        } catch {
+            parsed = [];
+        }
+    }
+    if (!Array.isArray(parsed)) return [];
+
+    const seen = new Set();
+    const output = [];
+    for (const entry of parsed) {
+        if (!entry || typeof entry !== 'object') continue;
+        const id = String(entry.id || '').trim().slice(0, 40);
+        const name = String(entry.name || '').trim().slice(0, 60);
+        const content = String(entry.content || '').replace(/\r\n/g, '\n').slice(0, 200);
+        if (!id || !name || seen.has(id)) continue;
+        seen.add(id);
+        output.push({ id, name, content });
+    }
+    return output.slice(0, 40);
+}
+
+async function getUserMotdPresets(userId) {
+    if (!Settings || !userId) return [];
+    const row = await Settings.findByPk(getUserMotdPresetsSettingKey(userId));
+    if (!row || !row.value) return [];
+    return normalizeMotdPresets(row.value);
+}
+
+async function setUserMotdPresets(userId, presets) {
+    if (!Settings || !userId) return [];
+    const normalized = normalizeMotdPresets(presets);
+    await Settings.upsert({
+        key: getUserMotdPresetsSettingKey(userId),
+        value: JSON.stringify(normalized)
+    });
+    return normalized;
+}
+
+function normalizeMacroVisibility(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (MACRO_VISIBILITY_VALUES.has(normalized)) return normalized;
+    return 'all';
+}
+
+function resolveMacroVisibilityForAccess(value, access) {
+    const normalized = normalizeMacroVisibility(value);
+    if (access && access.isAdmin) return normalized;
+    if (access && access.isOwner) {
+        if (normalized === 'admin') return 'owner';
+        return normalized;
+    }
+    if (normalized === 'subuser' || normalized === 'all') return normalized;
+    return 'subuser';
+}
+
+function canAccessMacroByVisibility(macro, access) {
+    const visibility = normalizeMacroVisibility(macro && macro.visibility);
+    if (access && (access.isAdmin || access.isOwner)) return true;
+    return visibility === 'all' || visibility === 'subuser';
 }
 const SERVER_API_KEY_PERMISSIONS = Array.isArray(SERVER_API_KEY_PERMISSION_CATALOG)
     ? SERVER_API_KEY_PERMISSION_CATALOG
@@ -7535,14 +7606,15 @@ app.get('/server/:containerId', requireAuth, async (req, res) => {
             serverPerms: Array.from(access.permissions || [])
         }, SECRET_KEY, { expiresIn: '1h' });
 
-        const commandMacros = (typeof ServerCommandMacro !== 'undefined' && ServerCommandMacro && hasServerPermission(access, 'server.macros'))
+        const commandMacrosRaw = (typeof ServerCommandMacro !== 'undefined' && ServerCommandMacro && hasServerPermission(access, 'server.macros'))
             ? await ServerCommandMacro.findAll({
                 where: { serverId: server.id },
-                attributes: ['id', 'name', 'command', 'description', 'position'],
+                attributes: ['id', 'name', 'command', 'description', 'position', 'visibility'],
                 order: [['position', 'ASC'], ['id', 'ASC']],
                 limit: 100
             })
             : [];
+        const commandMacros = (commandMacrosRaw || []).filter((macro) => canAccessMacroByVisibility(macro, access));
 
         res.render('server/console', {
             server,
@@ -7552,7 +7624,19 @@ app.get('/server/:containerId', requireAuth, async (req, res) => {
             wsToken,
             commandMacros,
             canUseMacros: hasServerPermission(access, 'server.macros'),
-            showMinecraftEulaModal: isServerLikelyMinecraft(server)
+            showMinecraftEulaModal: isServerLikelyMinecraft(server),
+            isMinecraftServer: isServerLikelyMinecraft(server),
+            minecraftStatusAddress: resolveMinecraftStatusAddress(server),
+            minecraftBedrockMode: normalizeMinecraftBooleanString(req.query.bedrock, inferMinecraftBedrockMode(server) ? 'true' : 'false') === 'true',
+            canViewMinecraft: hasServerPermission(access, 'server.minecraft'),
+            minecraftActionPermissions: {
+                canKick: hasServerPermission(access, 'minecraft.kick'),
+                canBan: hasServerPermission(access, 'minecraft.ban'),
+                canOp: hasServerPermission(access, 'minecraft.op'),
+                canDeop: hasServerPermission(access, 'minecraft.deop'),
+                canTempban: hasServerPermission(access, 'minecraft.tempban'),
+                canTeleport: hasServerPermission(access, 'minecraft.teleport')
+            }
         });
     } catch (err) {
         console.error("Error fetching console:", err);
@@ -8593,13 +8677,14 @@ app.get('/server/:containerId/macros', requireAuth, async (req, res) => {
             return res.redirect('/server/no-permissions');
         }
 
-        const macros = (typeof ServerCommandMacro !== 'undefined' && ServerCommandMacro)
+        const macrosRaw = (typeof ServerCommandMacro !== 'undefined' && ServerCommandMacro)
             ? await ServerCommandMacro.findAll({
                 where: { serverId: server.id },
                 include: [{ model: User, as: 'creator', attributes: ['id', 'username'], required: false }],
                 order: [['position', 'ASC'], ['id', 'ASC']]
             })
             : [];
+        const macros = (macrosRaw || []).filter((macro) => canAccessMacroByVisibility(macro, access));
 
         return res.render('server/macros', {
             server,
@@ -8610,7 +8695,10 @@ app.get('/server/:containerId/macros', requireAuth, async (req, res) => {
             macros,
             success: req.query.success || null,
             error: req.query.error || null,
-            canRunCommands: hasServerPermission(access, 'server.console')
+            canRunCommands: hasServerPermission(access, 'server.console'),
+            canManageVisibility: Boolean(access.isAdmin || access.isOwner),
+            isServerOwner: Boolean(access.isOwner),
+            isServerAdmin: Boolean(access.isAdmin)
         });
     } catch (error) {
         console.error('Error loading macros page:', error);
@@ -8635,6 +8723,7 @@ app.post('/server/:containerId/macros', requireAuth, async (req, res) => {
         const descriptionRaw = String(req.body.description || '').trim();
         const description = descriptionRaw ? descriptionRaw.slice(0, 160) : null;
         const command = String(req.body.command || '').trim().slice(0, 1024);
+        const visibility = resolveMacroVisibilityForAccess(req.body.visibility, access);
 
         if (!name) {
             return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro name is required.')}`);
@@ -8656,7 +8745,8 @@ app.post('/server/:containerId/macros', requireAuth, async (req, res) => {
             name,
             description,
             command,
-            position: Number.isInteger(nextPosition) ? nextPosition + 1 : 0
+            position: Number.isInteger(nextPosition) ? nextPosition + 1 : 0,
+            visibility
         });
 
         if (AuditLog) {
@@ -8669,7 +8759,7 @@ app.post('/server/:containerId/macros', requireAuth, async (req, res) => {
                 path: req.originalUrl,
                 ip: String(getRequestIp(req) || '').slice(0, 120) || null,
                 userAgent: req.headers && req.headers['user-agent'] ? String(req.headers['user-agent']).slice(0, 1000) : null,
-                metadata: { name, hasDescription: Boolean(description) }
+                metadata: { name, hasDescription: Boolean(description), visibility }
             }).catch(() => {});
         }
 
@@ -8699,12 +8789,21 @@ app.post('/server/:containerId/macros/:macroId/update', requireAuth, async (req,
         if (!macro) {
             return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro not found.')}`);
         }
+        const canManageMacro = Boolean(access.isAdmin || access.isOwner || Number(macro.createdByUserId) === Number(req.session.user.id));
+        if (!canManageMacro) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('You can only delete macros you created.')}`);
+        }
+        const canManageMacro = Boolean(access.isAdmin || access.isOwner || Number(macro.createdByUserId) === Number(req.session.user.id));
+        if (!canManageMacro) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('You can only edit macros you created.')}`);
+        }
 
         const name = String(req.body.name || '').trim().slice(0, 80);
         const descriptionRaw = String(req.body.description || '').trim();
         const description = descriptionRaw ? descriptionRaw.slice(0, 160) : null;
         const command = String(req.body.command || '').trim().slice(0, 1024);
         const requestedPosition = Number.parseInt(req.body.position, 10);
+        const visibility = resolveMacroVisibilityForAccess(req.body.visibility, access);
 
         if (!name || !command) {
             return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro name and command are required.')}`);
@@ -8714,7 +8813,8 @@ app.post('/server/:containerId/macros/:macroId/update', requireAuth, async (req,
             name,
             description,
             command,
-            position: Number.isInteger(requestedPosition) ? Math.max(0, requestedPosition) : macro.position
+            position: Number.isInteger(requestedPosition) ? Math.max(0, requestedPosition) : macro.position,
+            visibility
         });
 
         if (AuditLog) {
@@ -8727,7 +8827,7 @@ app.post('/server/:containerId/macros/:macroId/update', requireAuth, async (req,
                 path: req.originalUrl,
                 ip: String(getRequestIp(req) || '').slice(0, 120) || null,
                 userAgent: req.headers && req.headers['user-agent'] ? String(req.headers['user-agent']).slice(0, 1000) : null,
-                metadata: { macroId: macro.id, name, position: macro.position }
+                metadata: { macroId: macro.id, name, position: macro.position, visibility }
             }).catch(() => {});
         }
 
@@ -8803,6 +8903,9 @@ app.post('/server/:containerId/macros/:macroId/run', requireAuth, async (req, re
         });
         if (!macro) {
             return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro not found.')}`);
+        }
+        if (!canAccessMacroByVisibility(macro, access)) {
+            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro is not accessible for your role.')}`);
         }
         if (!server.allocation || !server.allocation.connectorId) {
             return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Server allocation is missing.')}`);
@@ -12481,19 +12584,21 @@ app.get('/server/:containerId/minecraft-configs', requireAuth, async (req, res) 
             canTeleport: hasServerPermission(access, 'minecraft.teleport')
         };
         const proxyMode = await getServerProxyMode(server.id);
-        const commandMacros = (typeof ServerCommandMacro !== 'undefined' && ServerCommandMacro && hasServerPermission(access, 'server.macros'))
+        const commandMacrosRaw = (typeof ServerCommandMacro !== 'undefined' && ServerCommandMacro && hasServerPermission(access, 'server.macros'))
             ? await ServerCommandMacro.findAll({
                 where: { serverId: server.id },
-                attributes: ['id', 'name', 'command', 'description', 'position'],
+                attributes: ['id', 'name', 'command', 'description', 'position', 'visibility'],
                 order: [['position', 'ASC'], ['id', 'ASC']],
                 limit: 12
             })
             : [];
+        const commandMacros = (commandMacrosRaw || []).filter((macro) => canAccessMacroByVisibility(macro, access));
         const motdRaw = minecraftProperties.motd ? String(minecraftProperties.motd).replace(/\\n/g, '\n') : '';
         const resourcePackUrl = minecraftProperties['resource-pack'] || '';
         const resourcePackSha1 = minecraftProperties['resource-pack-sha1'] || '';
         const resourcePackRequired = normalizeMinecraftBooleanString(minecraftProperties['resource-pack-required'], 'false') === 'true';
         const resourcePackPrompt = minecraftProperties['resource-pack-prompt'] || '';
+        const motdPresets = await getUserMotdPresets(req.session.user && req.session.user.id);
 
         return res.render('server/minecraft-configs', {
             server,
@@ -12513,6 +12618,7 @@ app.get('/server/:containerId/minecraft-configs', requireAuth, async (req, res) 
                 required: resourcePackRequired,
                 prompt: resourcePackPrompt
             },
+            motdPresets,
             minecraftPropertiesError,
             commandMacros,
             canUseMacros: hasServerPermission(access, 'server.macros'),
@@ -13508,6 +13614,61 @@ app.post('/server/:containerId/minecraft-configs/motd', requireAuth, async (req,
     } catch (error) {
         console.error('Error updating minecraft MOTD:', error);
         return res.status(500).json({ success: false, error: 'Failed to update MOTD.' });
+    }
+});
+
+app.post('/server/:containerId/minecraft-configs/motd-presets', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }, { model: Image, as: 'image' }]
+        });
+
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft')) {
+            return res.status(403).json({ success: false, error: 'Missing permission: server.minecraft.' });
+        }
+        if (!isServerLikelyMinecraft(server)) {
+            return res.status(400).json({ success: false, error: 'Minecraft tools are available only for Minecraft servers.' });
+        }
+        if (server.isSuspended) {
+            return res.status(423).json({ success: false, error: 'Server is suspended.' });
+        }
+
+        const userId = req.session.user && req.session.user.id;
+        if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized.' });
+
+        const action = String(req.body.action || '').trim().toLowerCase();
+        const presets = await getUserMotdPresets(userId);
+
+        if (action === 'create') {
+            const name = String(req.body.name || '').trim().slice(0, 60);
+            const content = String(req.body.content || '').replace(/\r\n/g, '\n').slice(0, 200);
+            if (!name) {
+                return res.status(400).json({ success: false, error: 'Preset name is required.' });
+            }
+            if (presets.length >= 40) {
+                return res.status(400).json({ success: false, error: 'Preset limit reached (40).' });
+            }
+            const id = nodeCrypto.randomBytes(6).toString('hex');
+            presets.push({ id, name, content });
+            const updated = await setUserMotdPresets(userId, presets);
+            return res.json({ success: true, presets: updated });
+        }
+
+        if (action === 'delete') {
+            const id = String(req.body.id || '').trim();
+            if (!id) return res.status(400).json({ success: false, error: 'Preset ID is required.' });
+            const updated = presets.filter((entry) => entry.id !== id);
+            await setUserMotdPresets(userId, updated);
+            return res.json({ success: true, presets: updated });
+        }
+
+        return res.status(400).json({ success: false, error: 'Unknown preset action.' });
+    } catch (error) {
+        console.error('Error updating MOTD presets:', error);
+        return res.status(500).json({ success: false, error: 'Failed to update presets.' });
     }
 });
 

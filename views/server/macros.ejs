@@ -38,11 +38,23 @@
                     <div class="col-md-3">
                         <input class="form-control" name="name" maxlength="80" placeholder="Macro name" required>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-5">
                         <input class="form-control mono" name="command" maxlength="1024" placeholder="say Hello world" required>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <input class="form-control" name="description" maxlength="160" placeholder="Optional description">
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="visibility">
+                            <option value="all">All with macros</option>
+                            <% if (canManageVisibility) { %>
+                                <option value="owner">Owner only</option>
+                                <option value="admin">Admin only</option>
+                                <option value="subuser">Subusers only</option>
+                            <% } else { %>
+                                <option value="subuser">Subusers only</option>
+                            <% } %>
+                        </select>
                     </div>
                     <div class="col-12 d-flex justify-content-end">
                         <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-circle me-1"></i>Create Macro</button>
@@ -62,11 +74,23 @@
                                     <div class="col-md-2">
                                         <input class="form-control form-control-sm" name="name" maxlength="80" value="<%= macro.name || '' %>" required>
                                     </div>
-                                    <div class="col-md-5">
+                                    <div class="col-md-3">
                                         <input class="form-control form-control-sm mono" name="command" maxlength="1024" value="<%= macro.command || '' %>" required>
                                     </div>
                                     <div class="col-md-3">
                                         <input class="form-control form-control-sm" name="description" maxlength="160" value="<%= macro.description || '' %>">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <select class="form-select form-select-sm" name="visibility">
+                                            <option value="all" <%= macro.visibility === 'all' ? 'selected' : '' %>>All with macros</option>
+                                            <% if (canManageVisibility) { %>
+                                                <option value="owner" <%= macro.visibility === 'owner' ? 'selected' : '' %>>Owner only</option>
+                                                <option value="admin" <%= macro.visibility === 'admin' ? 'selected' : '' %>>Admin only</option>
+                                                <option value="subuser" <%= macro.visibility === 'subuser' ? 'selected' : '' %>>Subusers only</option>
+                                            <% } else { %>
+                                                <option value="subuser" <%= macro.visibility === 'subuser' ? 'selected' : '' %>>Subusers only</option>
+                                            <% } %>
+                                        </select>
                                     </div>
                                     <div class="col-md-1">
                                         <input class="form-control form-control-sm" type="number" min="0" name="position" value="<%= Number.parseInt(macro.position, 10) || 0 %>" title="Order">
