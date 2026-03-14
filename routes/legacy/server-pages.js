@@ -2249,6 +2249,39 @@ function waitForConnectorMessage(connectorWs, predicate, timeoutMs = 12000) {
     });
 }
 
+async function readConnectorFileContent(connectorWs, serverId, filePath, timeoutMs = 12000) {
+    if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+        return { success: false, error: 'Connector is offline.' };
+    }
+    const normalizedPath = String(filePath || '').trim();
+    if (!normalizedPath) {
+        return { success: false, error: 'Missing file path.' };
+    }
+
+    try {
+        connectorWs.send(JSON.stringify({
+            type: 'read_file',
+            serverId,
+            filePath: normalizedPath
+        }));
+    } catch (error) {
+        return { success: false, error: String(error && error.message || 'Failed to request file.') };
+    }
+
+    const response = await waitForConnectorMessage(connectorWs, (message) => {
+        if (!message || Number.parseInt(message.serverId, 10) !== Number.parseInt(serverId, 10)) return false;
+        if (String(message.type || '') === 'file_content' && String(message.filePath || '') === normalizedPath) {
+            return { success: true, content: String(message.content || '') };
+        }
+        if (String(message.type || '') === 'error') {
+            return { success: false, error: String(message.message || 'Connector returned an error.') };
+        }
+        return false;
+    }, timeoutMs);
+
+    return response || { success: false, error: 'No response from connector.' };
+}
+
 function resolveModrinthProjectType(kind) {
     if (kind === 'plugin') return 'plugin';
     if (kind === 'mod') return 'mod';
@@ -3416,6 +3449,9 @@ const MINECRAFT_CONFIG_PATHS = Object.freeze({
     permissions: '/permissions.yml'
 });
 
+const MINECRAFT_PLAYTIME_CACHE_TTL_MS = 2 * 60 * 1000;
+const minecraftPlaytimeCache = new Map();
+
 function normalizeMinecraftBooleanString(value, fallback = 'false') {
     const normalized = String(value || '').trim().toLowerCase();
     if (['true', '1', 'yes', 'on'].includes(normalized)) return 'true';
@@ -3438,6 +3474,78 @@ function parseMinecraftProperties(content) {
         parsed[key] = value;
     });
     return parsed;
+}
+
+function normalizeMinecraftUuid(uuidValue) {
+    return String(uuidValue || '').trim().toLowerCase().replace(/-/g, '');
+}
+
+function buildMinecraftUserCacheMap(content) {
+    const map = new Map();
+    if (!content) return map;
+    try {
+        const parsed = JSON.parse(content);
+        if (!Array.isArray(parsed)) return map;
+        parsed.forEach((entry) => {
+            const uuidRaw = String(entry && entry.uuid || '').trim();
+            const name = String(entry && entry.name || '').trim();
+            if (!uuidRaw || !name) return;
+            map.set(uuidRaw.toLowerCase(), name);
+            const compact = normalizeMinecraftUuid(uuidRaw);
+            if (compact) map.set(compact, name);
+        });
+    } catch (error) {
+        return map;
+    }
+    return map;
+}
+
+function extractMinecraftPlaytimeTicks(payload) {
+    if (!payload || typeof payload !== 'object') return 0;
+    const statsRoot = payload.stats && typeof payload.stats === 'object' ? payload.stats : payload;
+    const custom = statsRoot['minecraft:custom'] && typeof statsRoot['minecraft:custom'] === 'object'
+        ? statsRoot['minecraft:custom']
+        : {};
+    const playTime = Number.parseInt(custom['minecraft:play_time'], 10);
+    if (Number.isFinite(playTime) && playTime > 0) return playTime;
+    const legacy = Number.parseInt(custom['minecraft:play_one_minute'], 10);
+    return Number.isFinite(legacy) && legacy > 0 ? legacy : 0;
+}
+
+function formatMinecraftPlaytimeLabel(ticks) {
+    const totalSeconds = Math.max(0, Math.floor((Number(ticks) || 0) / 20));
+    if (!totalSeconds) return '0m';
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const totalHours = Math.floor(totalMinutes / 60);
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+    const minutes = totalMinutes % 60;
+    if (days > 0) return `${days}d ${hours}h`;
+    if (totalHours > 0) return `${totalHours}h ${minutes}m`;
+    if (totalMinutes > 0) return `${totalMinutes}m`;
+    return `${totalSeconds}s`;
+}
+
+function getMinecraftPlaytimeCacheKey(serverId, worldName) {
+    return `${Number.parseInt(serverId, 10) || 0}:${String(worldName || '').trim().toLowerCase() || 'world'}`;
+}
+
+function getMinecraftPlaytimeCacheEntry(cacheKey) {
+    const entry = minecraftPlaytimeCache.get(cacheKey);
+    if (!entry) return null;
+    if (!entry.expiresAt || entry.expiresAt <= Date.now()) {
+        minecraftPlaytimeCache.delete(cacheKey);
+        return null;
+    }
+    return entry;
+}
+
+function setMinecraftPlaytimeCacheEntry(cacheKey, payload) {
+    if (!cacheKey) return;
+    minecraftPlaytimeCache.set(cacheKey, {
+        expiresAt: Date.now() + MINECRAFT_PLAYTIME_CACHE_TTL_MS,
+        payload
+    });
 }
 
 function upsertMinecraftPropertiesContent(existingContent, updates) {
@@ -12662,6 +12770,148 @@ app.get('/server/:containerId/minecraft-configs/status', requireAuth, async (req
     } catch (error) {
         console.error('Error refreshing minecraft status:', error);
         return res.status(500).json({ success: false, error: 'Failed to refresh Minecraft status.' });
+    }
+});
+
+app.get('/server/:containerId/minecraft-configs/playtime', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }, { model: Image, as: 'image' }]
+        });
+
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft')) {
+            return res.status(403).json({ success: false, error: 'Missing permission: server.minecraft' });
+        }
+        if (!isServerLikelyMinecraft(server)) {
+            return res.status(400).json({ success: false, error: 'Minecraft playtime is available only for Minecraft servers.' });
+        }
+        if (!server.allocation || !server.allocation.connectorId) {
+            return res.status(409).json({ success: false, error: 'Server allocation is missing.' });
+        }
+
+        const bedrockFallback = inferMinecraftBedrockMode(server) ? 'true' : 'false';
+        const bedrockMode = normalizeMinecraftBooleanString(req.query.bedrock, bedrockFallback) === 'true';
+        if (bedrockMode) {
+            return res.status(400).json({ success: false, error: 'Playtime viewer is not available for Bedrock servers.' });
+        }
+
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return res.status(503).json({ success: false, error: 'Connector is offline.' });
+        }
+
+        let levelName = 'world';
+        const propertiesResult = await readConnectorFileContent(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.serverProperties, 8000);
+        if (propertiesResult && propertiesResult.success) {
+            const parsed = parseMinecraftProperties(propertiesResult.content || '');
+            const configured = String(parsed['level-name'] || '').trim();
+            if (configured) levelName = configured;
+        }
+
+        const cacheKey = getMinecraftPlaytimeCacheKey(server.id, levelName);
+        const cached = getMinecraftPlaytimeCacheEntry(cacheKey);
+        if (cached && !req.query.refresh) {
+            return res.json({
+                success: true,
+                cached: true,
+                ...cached.payload
+            });
+        }
+
+        const statsDirectory = `/${levelName}/stats`;
+        const listResult = await runConnectorFileAction(connectorWs, {
+            type: 'list_files',
+            serverId: server.id,
+            directory: statsDirectory
+        }, statsDirectory, server.id, 12000);
+
+        if (!listResult || !listResult.success) {
+            return res.status(502).json({
+                success: false,
+                error: listResult && listResult.error ? listResult.error : 'Failed to list stats directory.'
+            });
+        }
+
+        const rawFiles = Array.isArray(listResult.files) ? listResult.files : [];
+        const jsonFiles = rawFiles.filter((file) => file && !file.isDirectory && String(file.name || '').toLowerCase().endsWith('.json'));
+
+        if (jsonFiles.length === 0) {
+            const payload = {
+                worldName: levelName,
+                totalPlayers: 0,
+                top: [],
+                generatedAt: new Date().toISOString(),
+                truncated: false
+            };
+            setMinecraftPlaytimeCacheEntry(cacheKey, payload);
+            return res.json({ success: true, cached: false, ...payload });
+        }
+
+        const maxFiles = 600;
+        const truncated = jsonFiles.length > maxFiles;
+        const files = truncated ? jsonFiles.slice(0, maxFiles) : jsonFiles;
+
+        const userCacheResult = await readConnectorFileContent(connectorWs, server.id, '/usercache.json', 6000);
+        const userCacheMap = userCacheResult && userCacheResult.success
+            ? buildMinecraftUserCacheMap(userCacheResult.content)
+            : new Map();
+
+        const entries = [];
+        const batchSize = 12;
+        for (let i = 0; i < files.length; i += batchSize) {
+            const batch = files.slice(i, i + batchSize);
+            const reads = await Promise.all(batch.map(async (file) => {
+                const fileName = String(file.name || '');
+                const filePath = `${statsDirectory}/${fileName}`;
+                const readResult = await readConnectorFileContent(connectorWs, server.id, filePath, 12000);
+                return { fileName, readResult };
+            }));
+
+            reads.forEach(({ fileName, readResult }) => {
+                if (!readResult || !readResult.success || !readResult.content) return;
+                let payload;
+                try {
+                    payload = JSON.parse(readResult.content);
+                } catch (error) {
+                    return;
+                }
+                const ticks = extractMinecraftPlaytimeTicks(payload);
+                const uuidRaw = fileName.replace(/\\.json$/i, '');
+                const uuidCompact = normalizeMinecraftUuid(uuidRaw);
+                const name = userCacheMap.get(uuidRaw.toLowerCase())
+                    || userCacheMap.get(uuidCompact)
+                    || uuidRaw;
+                const headUrl = buildMinecraftPlayerHeadUrl(name, uuidRaw);
+                entries.push({
+                    name,
+                    uuid: uuidRaw,
+                    ticks,
+                    seconds: Math.floor(ticks / 20),
+                    label: formatMinecraftPlaytimeLabel(ticks),
+                    headUrl
+                });
+            });
+        }
+
+        entries.sort((a, b) => (b.ticks || 0) - (a.ticks || 0));
+        const top = entries.slice(0, 10);
+        const payload = {
+            worldName: levelName,
+            totalPlayers: entries.length,
+            top,
+            generatedAt: new Date().toISOString(),
+            truncated
+        };
+
+        setMinecraftPlaytimeCacheEntry(cacheKey, payload);
+        return res.json({ success: true, cached: false, ...payload });
+    } catch (error) {
+        console.error('Error loading playtime info:', error);
+        return res.status(500).json({ success: false, error: 'Failed to load playtime data.' });
     }
 });
 
