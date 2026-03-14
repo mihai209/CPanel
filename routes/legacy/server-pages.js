@@ -3451,6 +3451,9 @@ const MINECRAFT_CONFIG_PATHS = Object.freeze({
 
 const MINECRAFT_PLAYTIME_CACHE_TTL_MS = 2 * 60 * 1000;
 const minecraftPlaytimeCache = new Map();
+const MINECRAFT_HEAVY_ADDON_MB = 15;
+const MINECRAFT_VERY_HEAVY_ADDON_MB = 35;
+const MINECRAFT_STAGING_SUFFIX = '.staging';
 
 function normalizeMinecraftBooleanString(value, fallback = 'false') {
     const normalized = String(value || '').trim().toLowerCase();
@@ -3546,6 +3549,68 @@ function setMinecraftPlaytimeCacheEntry(cacheKey, payload) {
         expiresAt: Date.now() + MINECRAFT_PLAYTIME_CACHE_TTL_MS,
         payload
     });
+}
+
+function buildMinecraftRollbackFileName(fileName) {
+    const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+    const safeName = sanitizeDownloadFileName(fileName || '', 'addon.jar');
+    return `${safeName}.rollback-${stamp}`;
+}
+
+async function renameConnectorFile(connectorWs, serverId, directory, name, newName, timeoutMs = 12000) {
+    if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+        return { success: false, error: 'Connector is offline.' };
+    }
+    if (!directory || !name || !newName) {
+        return { success: false, error: 'Invalid rename request.' };
+    }
+    try {
+        connectorWs.send(JSON.stringify({
+            type: 'rename_file',
+            serverId,
+            directory,
+            name,
+            newName
+        }));
+    } catch (error) {
+        return { success: false, error: String(error && error.message || 'Failed to send rename request.') };
+    }
+
+    const result = await waitForConnectorMessage(connectorWs, (message) => {
+        if (!message || Number.parseInt(message.serverId, 10) !== Number.parseInt(serverId, 10)) return null;
+        if (String(message.type || '') === 'file_list' && String(message.directory || '') === directory) {
+            return { success: true, files: Array.isArray(message.files) ? message.files : [] };
+        }
+        if (String(message.type || '') === 'error') {
+            return { success: false, error: String(message.message || 'Connector returned an error.') };
+        }
+        return null;
+    }, timeoutMs);
+
+    return result || { success: false, error: 'Rename timed out.' };
+}
+
+function buildMinecraftHeavyTag(sizeBytes) {
+    const sizeMb = Math.max(0, Number(sizeBytes || 0) / (1024 * 1024));
+    if (sizeMb >= MINECRAFT_VERY_HEAVY_ADDON_MB) return 'very-heavy';
+    if (sizeMb >= MINECRAFT_HEAVY_ADDON_MB) return 'heavy';
+    return '';
+}
+
+function detectMinecraftVersionDrift(sizeBytes, recordedSize) {
+    const current = Number(sizeBytes || 0);
+    const recorded = Number(recordedSize || 0);
+    if (!current || !recorded) return false;
+    const delta = Math.abs(current - recorded);
+    const threshold = Math.max(1024, recorded * 0.05);
+    return delta > threshold;
+}
+
+function findFileSizeInListing(listingFiles, fileName) {
+    if (!Array.isArray(listingFiles) || !fileName) return 0;
+    const entry = listingFiles.find((file) => String(file && file.name || '') === String(fileName));
+    if (!entry) return 0;
+    return Number.parseInt(entry.size, 10) || 0;
 }
 
 function upsertMinecraftPropertiesContent(existingContent, updates) {
@@ -14234,12 +14299,19 @@ app.get('/server/:containerId/minecraft/installed', requireAuth, async (req, res
                 if (!fileName) return null;
                 const filePath = directory === '/' ? `/${fileName}` : `${directory}/${fileName}`;
                 const tracked = trackedByPath.get(filePath) || null;
+                const fileSize = Number.parseInt(entry.size, 10) || 0;
+                const recordedSize = tracked && Number.isFinite(Number(tracked.fileSize)) ? Number(tracked.fileSize) : 0;
+                const drifted = Boolean(tracked && recordedSize && detectMinecraftVersionDrift(fileSize, recordedSize));
+                const driftReason = drifted ? 'File size differs from tracked install.' : '';
+                const heavyTag = buildMinecraftHeavyTag(fileSize);
+                const stagedAvailable = Boolean(tracked && tracked.stagedPath && tracked.stagedFileName);
+                const rollbackAvailable = Boolean(tracked && tracked.rollbackPath && tracked.rollbackFileName);
 
                 return {
                     name: fileName,
                     path: filePath,
                     directory,
-                    size: Number.parseInt(entry.size, 10) || 0,
+                    size: fileSize,
                     mtime: entry.mtime || null,
                     permissions: String(entry.permissions || ''),
                     isDirectory: Boolean(entry.isDirectory),
@@ -14254,6 +14326,14 @@ app.get('/server/:containerId/minecraft/installed', requireAuth, async (req, res
                     versionId: tracked ? tracked.versionId : '',
                     versionNumber: tracked ? tracked.versionNumber : '',
                     installedAt: tracked ? tracked.installedAt : null,
+                    recordedSize,
+                    drifted,
+                    driftReason,
+                    heavyTag,
+                    stagedAvailable,
+                    rollbackAvailable,
+                    stagedVersionNumber: tracked ? tracked.stagedVersionNumber : '',
+                    rollbackVersionNumber: tracked ? tracked.rollbackVersionNumber : '',
                     updateAvailable: false,
                     updateChecked: false,
                     latestVersion: '',
@@ -14410,6 +14490,21 @@ app.post('/server/:containerId/minecraft/update', requireAuth, async (req, res) 
             userAgent: buildModrinthUserAgent(res.locals.settings)
         });
 
+        const rollbackFileName = buildMinecraftRollbackFileName(pathInfo.fileName);
+        const rollbackPath = pathInfo.directory === '/' ? `/${rollbackFileName}` : `${pathInfo.directory}/${rollbackFileName}`;
+        let rollbackPrepared = false;
+
+        if (versionData.fileName === pathInfo.fileName) {
+            const renameOldResult = await renameConnectorFile(connectorWs, server.id, pathInfo.directory, pathInfo.fileName, rollbackFileName);
+            if (!renameOldResult.success) {
+                return res.status(500).json({
+                    success: false,
+                    error: renameOldResult.error || 'Failed to prepare rollback file.'
+                });
+            }
+            rollbackPrepared = true;
+        }
+
         const requestId = createWsRequestId();
         connectorWs.send(JSON.stringify({
             type: 'download_file',
@@ -14422,6 +14517,9 @@ app.post('/server/:containerId/minecraft/update', requireAuth, async (req, res) 
 
         const installResult = await waitForConnectorDownloadResult(connectorWs, server.id, requestId, 45000);
         if (!installResult.success) {
+            if (rollbackPrepared) {
+                await renameConnectorFile(connectorWs, server.id, pathInfo.directory, rollbackFileName, pathInfo.fileName);
+            }
             return res.status(500).json({
                 success: false,
                 error: installResult.error || 'Connector failed to update addon.'
@@ -14435,17 +14533,22 @@ app.post('/server/:containerId/minecraft/update', requireAuth, async (req, res) 
         };
 
         let warning = '';
-        if (nextPathInfo.path !== pathInfo.path) {
-            const deleteOldResult = await runConnectorFileAction(connectorWs, {
+        if (!rollbackPrepared) {
+            const renameOldResult = await renameConnectorFile(connectorWs, server.id, pathInfo.directory, pathInfo.fileName, rollbackFileName);
+            if (!renameOldResult.success) {
+                warning = 'New version installed, but rollback file could not be created.';
+            } else {
+                rollbackPrepared = true;
+            }
+        }
+
+        if (existingRecord.stagedFileName) {
+            await runConnectorFileAction(connectorWs, {
                 type: 'delete_files',
                 serverId: server.id,
                 directory: pathInfo.directory,
-                files: [pathInfo.fileName]
+                files: [existingRecord.stagedFileName]
             }, pathInfo.directory, server.id, 12000);
-
-            if (!deleteOldResult.success) {
-                warning = 'New version installed, but old file could not be removed automatically.';
-            }
         }
 
         await removeServerMinecraftInstallRecord(server.id, pathInfo.path);
@@ -14460,7 +14563,18 @@ app.post('/server/:containerId/minecraft/update', requireAuth, async (req, res) 
             projectTitle: existingRecord.projectTitle,
             versionId: versionData.versionId,
             versionNumber: versionData.versionNumber,
-            installedAt: new Date().toISOString()
+            installedAt: new Date().toISOString(),
+            fileSize: Number.isFinite(installResult.size) ? installResult.size : 0,
+            rollbackPath: rollbackPrepared ? rollbackPath : '',
+            rollbackFileName: rollbackPrepared ? rollbackFileName : '',
+            rollbackVersionId: rollbackPrepared ? existingRecord.versionId : '',
+            rollbackVersionNumber: rollbackPrepared ? existingRecord.versionNumber : '',
+            rollbackAt: rollbackPrepared ? new Date().toISOString() : '',
+            stagedPath: '',
+            stagedFileName: '',
+            stagedVersionId: '',
+            stagedVersionNumber: '',
+            stagedAt: ''
         });
 
         return res.json({
@@ -14481,6 +14595,430 @@ app.post('/server/:containerId/minecraft/update', requireAuth, async (req, res) 
             success: false,
             error: err && err.message ? String(err.message) : 'Failed to update addon.'
         });
+    }
+});
+
+app.post('/server/:containerId/minecraft/stage-update', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }],
+            attributes: ['id', 'containerId', 'ownerId', 'isSuspended']
+        });
+
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft')) {
+            return res.status(403).json({ success: false, error: 'Forbidden.' });
+        }
+        if (server.isSuspended) {
+            return res.status(423).json({ success: false, error: 'Server is suspended.' });
+        }
+        if (!server.allocation || !server.allocation.connectorId) {
+            return res.status(400).json({ success: false, error: 'Server allocation is missing.' });
+        }
+
+        const pathInfo = parseServerAddonPath(req.body.path);
+        if (!pathInfo) {
+            return res.status(400).json({ success: false, error: 'Invalid addon path.' });
+        }
+
+        const records = await getServerMinecraftInstallRecords(server.id);
+        const existingRecord = records.find((record) => record.path === pathInfo.path);
+        if (!existingRecord || !existingRecord.projectId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Staging is only available for addons installed from this panel.'
+            });
+        }
+
+        const kind = normalizeMinecraftProjectKind(req.body.kind || existingRecord.kind);
+        const loader = normalizeMinecraftLoader(req.body.loader || existingRecord.loader, kind);
+        const gameVersion = normalizeMinecraftVersion(req.body.version || existingRecord.gameVersion);
+
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return res.status(503).json({ success: false, error: 'Connector is offline.' });
+        }
+
+        if (existingRecord.stagedPath && existingRecord.stagedFileName) {
+            await runConnectorFileAction(connectorWs, {
+                type: 'delete_files',
+                serverId: server.id,
+                directory: pathInfo.directory,
+                files: [existingRecord.stagedFileName]
+            }, pathInfo.directory, server.id, 12000);
+        }
+
+        const versionData = await resolveModrinthVersionForInstall({
+            projectId: existingRecord.projectId,
+            versionId: '',
+            loader,
+            gameVersion,
+            userAgent: buildModrinthUserAgent(res.locals.settings)
+        });
+
+        let stagedFileName = `${versionData.fileName}${MINECRAFT_STAGING_SUFFIX}`;
+        stagedFileName = sanitizeDownloadFileName(stagedFileName, `${versionData.fileName}${MINECRAFT_STAGING_SUFFIX}`);
+
+        const requestId = createWsRequestId();
+        connectorWs.send(JSON.stringify({
+            type: 'download_file',
+            serverId: server.id,
+            requestId,
+            directory: pathInfo.directory,
+            url: versionData.fileUrl,
+            fileName: stagedFileName
+        }));
+
+        const installResult = await waitForConnectorDownloadResult(connectorWs, server.id, requestId, 45000);
+        if (!installResult.success) {
+            return res.status(500).json({
+                success: false,
+                error: installResult.error || 'Connector failed to stage addon.'
+            });
+        }
+
+        const stagedPath = pathInfo.directory === '/' ? `/${stagedFileName}` : `${pathInfo.directory}/${stagedFileName}`;
+        await upsertServerMinecraftInstallRecord(server.id, {
+            ...existingRecord,
+            stagedPath,
+            stagedFileName,
+            stagedVersionId: versionData.versionId,
+            stagedVersionNumber: versionData.versionNumber,
+            stagedAt: new Date().toISOString()
+        });
+
+        return res.json({
+            success: true,
+            message: 'Update staged. Apply on next restart.',
+            staged: {
+                path: stagedPath,
+                fileName: stagedFileName,
+                versionId: versionData.versionId,
+                versionNumber: versionData.versionNumber
+            }
+        });
+    } catch (err) {
+        console.error('Error staging minecraft addon update:', err);
+        return res.status(500).json({
+            success: false,
+            error: err && err.message ? String(err.message) : 'Failed to stage addon update.'
+        });
+    }
+});
+
+app.post('/server/:containerId/minecraft/apply-staged', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }],
+            attributes: ['id', 'containerId', 'ownerId', 'isSuspended']
+        });
+
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft')) {
+            return res.status(403).json({ success: false, error: 'Forbidden.' });
+        }
+        if (server.isSuspended) {
+            return res.status(423).json({ success: false, error: 'Server is suspended.' });
+        }
+        if (!server.allocation || !server.allocation.connectorId) {
+            return res.status(400).json({ success: false, error: 'Server allocation is missing.' });
+        }
+
+        const pathInfo = parseServerAddonPath(req.body.path);
+        if (!pathInfo) {
+            return res.status(400).json({ success: false, error: 'Invalid addon path.' });
+        }
+
+        const records = await getServerMinecraftInstallRecords(server.id);
+        const existingRecord = records.find((record) => record.path === pathInfo.path);
+        if (!existingRecord || !existingRecord.stagedPath || !existingRecord.stagedFileName) {
+            return res.status(400).json({ success: false, error: 'No staged update available.' });
+        }
+
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return res.status(503).json({ success: false, error: 'Connector is offline.' });
+        }
+
+        const rollbackFileName = buildMinecraftRollbackFileName(pathInfo.fileName);
+        const rollbackPath = pathInfo.directory === '/' ? `/${rollbackFileName}` : `${pathInfo.directory}/${rollbackFileName}`;
+        const renameCurrent = await renameConnectorFile(connectorWs, server.id, pathInfo.directory, pathInfo.fileName, rollbackFileName);
+        if (!renameCurrent.success) {
+            return res.status(500).json({ success: false, error: renameCurrent.error || 'Failed to prepare rollback file.' });
+        }
+
+        const stagedFileName = existingRecord.stagedFileName;
+        const renameStaged = await renameConnectorFile(connectorWs, server.id, pathInfo.directory, stagedFileName, pathInfo.fileName);
+        if (!renameStaged.success) {
+            await renameConnectorFile(connectorWs, server.id, pathInfo.directory, rollbackFileName, pathInfo.fileName);
+            return res.status(500).json({ success: false, error: renameStaged.error || 'Failed to apply staged update.' });
+        }
+
+        const listing = await runConnectorFileAction(connectorWs, {
+            type: 'list_files',
+            serverId: server.id,
+            directory: pathInfo.directory
+        }, pathInfo.directory, server.id, 12000);
+
+        const currentSize = listing && listing.success
+            ? findFileSizeInListing(listing.files, pathInfo.fileName)
+            : 0;
+
+        await upsertServerMinecraftInstallRecord(server.id, {
+            ...existingRecord,
+            versionId: existingRecord.stagedVersionId || existingRecord.versionId,
+            versionNumber: existingRecord.stagedVersionNumber || existingRecord.versionNumber,
+            installedAt: new Date().toISOString(),
+            fileSize: currentSize,
+            rollbackPath,
+            rollbackFileName,
+            rollbackVersionId: existingRecord.versionId,
+            rollbackVersionNumber: existingRecord.versionNumber,
+            rollbackAt: new Date().toISOString(),
+            stagedPath: '',
+            stagedFileName: '',
+            stagedVersionId: '',
+            stagedVersionNumber: '',
+            stagedAt: ''
+        });
+
+        return res.json({
+            success: true,
+            message: 'Staged update applied.',
+            updated: {
+                path: pathInfo.path,
+                versionId: existingRecord.stagedVersionId || '',
+                versionNumber: existingRecord.stagedVersionNumber || ''
+            }
+        });
+    } catch (err) {
+        console.error('Error applying staged update:', err);
+        return res.status(500).json({
+            success: false,
+            error: err && err.message ? String(err.message) : 'Failed to apply staged update.'
+        });
+    }
+});
+
+app.post('/server/:containerId/minecraft/rollback', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }],
+            attributes: ['id', 'containerId', 'ownerId', 'isSuspended']
+        });
+
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft')) {
+            return res.status(403).json({ success: false, error: 'Forbidden.' });
+        }
+        if (server.isSuspended) {
+            return res.status(423).json({ success: false, error: 'Server is suspended.' });
+        }
+        if (!server.allocation || !server.allocation.connectorId) {
+            return res.status(400).json({ success: false, error: 'Server allocation is missing.' });
+        }
+
+        const pathInfo = parseServerAddonPath(req.body.path);
+        if (!pathInfo) {
+            return res.status(400).json({ success: false, error: 'Invalid addon path.' });
+        }
+
+        const records = await getServerMinecraftInstallRecords(server.id);
+        const existingRecord = records.find((record) => record.path === pathInfo.path);
+        if (!existingRecord || !existingRecord.rollbackPath || !existingRecord.rollbackFileName) {
+            return res.status(400).json({ success: false, error: 'No rollback available.' });
+        }
+
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return res.status(503).json({ success: false, error: 'Connector is offline.' });
+        }
+
+        const discardName = buildMinecraftRollbackFileName(pathInfo.fileName);
+        const discardRename = await renameConnectorFile(connectorWs, server.id, pathInfo.directory, pathInfo.fileName, discardName);
+        if (!discardRename.success) {
+            return res.status(500).json({ success: false, error: discardRename.error || 'Failed to rotate current file.' });
+        }
+
+        const rollbackRename = await renameConnectorFile(connectorWs, server.id, pathInfo.directory, existingRecord.rollbackFileName, pathInfo.fileName);
+        if (!rollbackRename.success) {
+            await renameConnectorFile(connectorWs, server.id, pathInfo.directory, discardName, pathInfo.fileName);
+            return res.status(500).json({ success: false, error: rollbackRename.error || 'Failed to apply rollback.' });
+        }
+
+        const listing = await runConnectorFileAction(connectorWs, {
+            type: 'list_files',
+            serverId: server.id,
+            directory: pathInfo.directory
+        }, pathInfo.directory, server.id, 12000);
+
+        const currentSize = listing && listing.success
+            ? findFileSizeInListing(listing.files, pathInfo.fileName)
+            : 0;
+
+        await upsertServerMinecraftInstallRecord(server.id, {
+            ...existingRecord,
+            versionId: existingRecord.rollbackVersionId || existingRecord.versionId,
+            versionNumber: existingRecord.rollbackVersionNumber || existingRecord.versionNumber,
+            installedAt: new Date().toISOString(),
+            fileSize: currentSize,
+            rollbackPath: '',
+            rollbackFileName: '',
+            rollbackVersionId: '',
+            rollbackVersionNumber: '',
+            rollbackAt: ''
+        });
+
+        return res.json({
+            success: true,
+            message: 'Rollback applied successfully.'
+        });
+    } catch (err) {
+        console.error('Error rolling back addon:', err);
+        return res.status(500).json({
+            success: false,
+            error: err && err.message ? String(err.message) : 'Failed to rollback addon.'
+        });
+    }
+});
+
+app.get('/server/:containerId/minecraft/dependencies', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            attributes: ['id', 'containerId', 'ownerId', 'isSuspended']
+        });
+
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft')) {
+            return res.status(403).json({ success: false, error: 'Forbidden.' });
+        }
+        if (server.isSuspended) {
+            return res.status(423).json({ success: false, error: 'Server is suspended.' });
+        }
+
+        const records = await getServerMinecraftInstallRecords(server.id);
+        const tracked = records.filter((record) => record.projectId && record.versionId);
+        const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 25, 1), 60);
+        const selected = tracked.slice(0, limit);
+
+        const installedByProject = new Map();
+        tracked.forEach((record) => {
+            if (record.projectId) installedByProject.set(record.projectId, record);
+        });
+
+        const nodeMap = new Map();
+        selected.forEach((record) => {
+            nodeMap.set(record.projectId, {
+                projectId: record.projectId,
+                title: record.projectTitle || record.projectId,
+                installed: true,
+                versionId: record.versionId,
+                versionNumber: record.versionNumber
+            });
+        });
+
+        const edges = [];
+        const missingMap = new Map();
+        const incompatibleConflicts = [];
+        const versionRequirements = new Map();
+
+        for (const record of selected) {
+            try {
+                const response = await axios.get(`${MODRINTH_API_BASE_URL}/version/${encodeURIComponent(record.versionId)}`, {
+                    timeout: MODRINTH_REQUEST_TIMEOUT_MS,
+                    headers: { 'User-Agent': buildModrinthUserAgent(res.locals.settings) }
+                });
+                const versionPayload = response.data || {};
+                const dependencies = Array.isArray(versionPayload.dependencies) ? versionPayload.dependencies : [];
+
+                dependencies.forEach((dep) => {
+                    const depProjectId = String(dep.project_id || '').trim();
+                    if (!depProjectId) return;
+                    const depType = String(dep.dependency_type || '').trim();
+                    edges.push({
+                        from: record.projectId,
+                        to: depProjectId,
+                        type: depType
+                    });
+
+                    if (!nodeMap.has(depProjectId)) {
+                        const installedRecord = installedByProject.get(depProjectId);
+                        nodeMap.set(depProjectId, {
+                            projectId: depProjectId,
+                            title: installedRecord ? installedRecord.projectTitle || depProjectId : depProjectId,
+                            installed: Boolean(installedRecord),
+                            versionId: installedRecord ? installedRecord.versionId : '',
+                            versionNumber: installedRecord ? installedRecord.versionNumber : ''
+                        });
+                    }
+
+                    if (depType === 'required') {
+                        if (!installedByProject.has(depProjectId)) {
+                            const entry = missingMap.get(depProjectId) || { projectId: depProjectId, requiredBy: [] };
+                            entry.requiredBy.push(record.projectTitle || record.projectId);
+                            missingMap.set(depProjectId, entry);
+                        }
+                        const depVersion = String(dep.version_id || '').trim();
+                        if (depVersion) {
+                            const existing = versionRequirements.get(depProjectId) || new Map();
+                            const by = existing.get(depVersion) || [];
+                            by.push(record.projectTitle || record.projectId);
+                            existing.set(depVersion, by);
+                            versionRequirements.set(depProjectId, existing);
+                        }
+                    }
+
+                    if (depType === 'incompatible' && installedByProject.has(depProjectId)) {
+                        incompatibleConflicts.push({
+                            projectId: depProjectId,
+                            conflictWith: record.projectTitle || record.projectId
+                        });
+                    }
+                });
+            } catch (error) {
+                // Ignore dependency errors for a single addon.
+            }
+        }
+
+        const conflicts = [];
+        versionRequirements.forEach((versionMap, projectId) => {
+            if (versionMap.size > 1) {
+                const versions = [];
+                versionMap.forEach((requiredBy, versionId) => {
+                    versions.push({ versionId, requiredBy });
+                });
+                conflicts.push({ projectId, type: 'version', versions });
+            }
+        });
+
+        incompatibleConflicts.forEach((entry) => {
+            conflicts.push({
+                projectId: entry.projectId,
+                type: 'incompatible',
+                versions: [{ versionId: '', requiredBy: [entry.conflictWith] }]
+            });
+        });
+
+        return res.json({
+            success: true,
+            graph: {
+                nodes: Array.from(nodeMap.values()),
+                edges
+            },
+            missing: Array.from(missingMap.values()),
+            conflicts
+        });
+    } catch (err) {
+        console.error('Error loading dependency graph:', err);
+        return res.status(500).json({ success: false, error: 'Failed to load dependency graph.' });
     }
 });
 

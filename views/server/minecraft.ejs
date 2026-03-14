@@ -303,6 +303,25 @@
             font-size: 0.78rem;
         }
 
+        .dependency-card {
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 0.85rem;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .dependency-list {
+            display: grid;
+            gap: 0.6rem;
+        }
+
+        .dependency-item {
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 0.65rem 0.75rem;
+            background: rgba(255, 255, 255, 0.03);
+        }
+
         @media (max-width: 768px) {
             .sidebar {
                 margin-left: -260px;
@@ -490,12 +509,23 @@
                             <button type="button" class="btn btn-sm btn-outline-info" id="checkUpdatesBtn">
                                 <i class="bi bi-shield-check me-1"></i> Check Updates
                             </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="loadDependenciesBtn">
+                                <i class="bi bi-diagram-3 me-1"></i> Dependencies
+                            </button>
                             <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshInstalledBtn">
                                 <i class="bi bi-arrow-clockwise me-1"></i> Refresh
                             </button>
                         </div>
                     </div>
                     <div id="installedList" class="installed-list"></div>
+                    <div class="dependency-card mt-3" id="dependencyCard">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0 fw-semibold">Dependency Graph</h6>
+                            <span class="small text-secondary" id="dependencyMeta">Not loaded yet.</span>
+                        </div>
+                        <div id="dependencyStatus" class="small text-secondary mb-2">Click “Dependencies” to analyze required mods/plugins.</div>
+                        <div class="dependency-list" id="dependencyList"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -539,6 +569,10 @@
         const refreshInstalledBtn = document.getElementById('refreshInstalledBtn');
         const checkUpdatesBtn = document.getElementById('checkUpdatesBtn');
         const installedModalElement = document.getElementById('installedModal');
+        const loadDependenciesBtn = document.getElementById('loadDependenciesBtn');
+        const dependencyList = document.getElementById('dependencyList');
+        const dependencyStatus = document.getElementById('dependencyStatus');
+        const dependencyMeta = document.getElementById('dependencyMeta');
 
         const state = {
             offset: 0,
@@ -661,6 +695,18 @@
                 const trackedBadge = item.tracked
                     ? '<span class="badge text-bg-success">Tracked</span>'
                     : '<span class="badge text-bg-secondary">Manual</span>';
+                const driftBadge = item.drifted
+                    ? `<span class="badge text-bg-danger" title="${escapeHtml(item.driftReason || 'File differs from tracked install.')}">Drift</span>`
+                    : '';
+                const heavyBadge = item.heavyTag === 'very-heavy'
+                    ? '<span class="badge text-bg-warning text-dark">Very Heavy</span>'
+                    : (item.heavyTag === 'heavy' ? '<span class="badge text-bg-warning text-dark">Heavy</span>' : '');
+                const stagedBadge = item.stagedAvailable
+                    ? `<span class="badge text-bg-info">Staged${item.stagedVersionNumber ? ` ${escapeHtml(item.stagedVersionNumber)}` : ''}</span>`
+                    : '';
+                const rollbackBadge = item.rollbackAvailable
+                    ? `<span class="badge text-bg-secondary">Rollback${item.rollbackVersionNumber ? ` ${escapeHtml(item.rollbackVersionNumber)}` : ''}</span>`
+                    : '';
                 let updateBadge = '';
                 if (item.updateChecked) {
                     if (item.updateError) {
@@ -677,6 +723,9 @@
                     : (isDirectory ? 'Folders cannot be auto-updated' : 'Only tracked addons can be auto-updated');
                 const modrinthHint = item.projectTitle ? ` · ${escapeHtml(item.projectTitle)}` : '';
                 const typeLabel = isDirectory ? 'Folder' : 'File';
+                const stageDisabled = item.canUpdate && !isDirectory ? '' : 'disabled';
+                const applyDisabled = item.stagedAvailable ? '' : 'disabled';
+                const rollbackDisabled = item.rollbackAvailable ? '' : 'disabled';
                 return `
                     <div class="installed-item">
                         <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
@@ -689,6 +738,10 @@
                             <div class="d-flex flex-column align-items-end gap-1">
                                 ${trackedBadge}
                                 ${updateBadge}
+                                ${stagedBadge}
+                                ${rollbackBadge}
+                                ${driftBadge}
+                                ${heavyBadge}
                             </div>
                         </div>
                         <div class="installed-item-meta mb-3">
@@ -703,6 +756,24 @@
                                 data-version="${escapeHtml(item.gameVersion || '')}">
                                 <i class="bi bi-arrow-repeat"></i> Update
                             </button>
+                            <button class="btn btn-sm btn-outline-info stage-installed-btn" ${stageDisabled}
+                                title="Download update without swapping files"
+                                data-path="${escapeHtml(item.path)}"
+                                data-kind="${escapeHtml(item.kind || '')}"
+                                data-loader="${escapeHtml(item.loader || '')}"
+                                data-version="${escapeHtml(item.gameVersion || '')}">
+                                <i class="bi bi-cloud-download"></i> Stage
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary apply-staged-btn" ${applyDisabled}
+                                title="Apply staged update"
+                                data-path="${escapeHtml(item.path)}">
+                                <i class="bi bi-play-circle"></i> Apply
+                            </button>
+                            <button class="btn btn-sm btn-outline-warning rollback-installed-btn" ${rollbackDisabled}
+                                title="Rollback to previous version"
+                                data-path="${escapeHtml(item.path)}">
+                                <i class="bi bi-arrow-counterclockwise"></i> Rollback
+                            </button>
                             <button class="btn btn-sm btn-outline-danger delete-installed-btn" data-path="${escapeHtml(item.path)}">
                                 <i class="bi bi-trash3"></i> Delete
                             </button>
@@ -716,6 +787,15 @@
             });
             document.querySelectorAll('.update-installed-btn').forEach((button) => {
                 button.addEventListener('click', () => updateInstalledAddon(button));
+            });
+            document.querySelectorAll('.stage-installed-btn').forEach((button) => {
+                button.addEventListener('click', () => stageInstalledAddon(button));
+            });
+            document.querySelectorAll('.apply-staged-btn').forEach((button) => {
+                button.addEventListener('click', () => applyStagedAddon(button));
+            });
+            document.querySelectorAll('.rollback-installed-btn').forEach((button) => {
+                button.addEventListener('click', () => rollbackInstalledAddon(button));
             });
         }
 
@@ -836,6 +916,103 @@
             }
         }
 
+        function renderDependencies(payload) {
+            if (!dependencyList) return;
+            if (!payload || !payload.graph) {
+                dependencyList.innerHTML = '<div class="empty-state">No dependency data.</div>';
+                return;
+            }
+            const nodes = Array.isArray(payload.graph.nodes) ? payload.graph.nodes : [];
+            const edges = Array.isArray(payload.graph.edges) ? payload.graph.edges : [];
+            const missing = Array.isArray(payload.missing) ? payload.missing : [];
+            const conflicts = Array.isArray(payload.conflicts) ? payload.conflicts : [];
+
+            const nodeMap = new Map(nodes.map((node) => [node.projectId, node]));
+            const edgesByFrom = new Map();
+            edges.forEach((edge) => {
+                if (!edgesByFrom.has(edge.from)) edgesByFrom.set(edge.from, []);
+                edgesByFrom.get(edge.from).push(edge);
+            });
+
+            const conflictHtml = conflicts.length > 0
+                ? `<div class="dependency-item border-danger">
+                        <div class="fw-semibold mb-1">Conflicts detected (${conflicts.length})</div>
+                        ${conflicts.map((conflict) => {
+                            const projectTitle = escapeHtml((nodeMap.get(conflict.projectId) || {}).title || conflict.projectId);
+                            if (conflict.type === 'incompatible') {
+                                const by = (conflict.versions[0] && conflict.versions[0].requiredBy || []).join(', ');
+                                return `<div class="small text-secondary">Incompatible with ${projectTitle} (required by ${escapeHtml(by || 'unknown')}).</div>`;
+                            }
+                            const versions = Array.isArray(conflict.versions) ? conflict.versions : [];
+                            return `<div class="small text-secondary">Version conflict for ${projectTitle}: ${versions.map((entry) => `${escapeHtml(entry.versionId)} (by ${escapeHtml((entry.requiredBy || []).join(', '))})`).join(' · ')}</div>`;
+                        }).join('')}
+                    </div>`
+                : '';
+
+            const missingHtml = missing.length > 0
+                ? `<div class="dependency-item border-warning">
+                        <div class="fw-semibold mb-1">Missing required dependencies (${missing.length})</div>
+                        ${missing.map((entry) => {
+                            const title = escapeHtml((nodeMap.get(entry.projectId) || {}).title || entry.projectId);
+                            const by = escapeHtml((entry.requiredBy || []).join(', '));
+                            return `<div class="small text-secondary">${title} required by ${by || 'unknown'}</div>`;
+                        }).join('')}
+                    </div>`
+                : '';
+
+            const installedNodes = nodes.filter((node) => node.installed);
+            const graphHtml = installedNodes.map((node) => {
+                const deps = edgesByFrom.get(node.projectId) || [];
+                if (deps.length === 0) {
+                    return `<div class="dependency-item">
+                        <div class="fw-semibold">${escapeHtml(node.title || node.projectId)}</div>
+                        <div class="small text-secondary">No dependencies detected.</div>
+                    </div>`;
+                }
+                const depList = deps.map((edge) => {
+                    const depNode = nodeMap.get(edge.to);
+                    const depTitle = escapeHtml((depNode && depNode.title) || edge.to);
+                    const tag = escapeHtml(edge.type || 'required');
+                    return `<span class="badge text-bg-secondary me-1">${depTitle} · ${tag}</span>`;
+                }).join(' ');
+                return `<div class="dependency-item">
+                    <div class="fw-semibold">${escapeHtml(node.title || node.projectId)}</div>
+                    <div class="mt-1">${depList}</div>
+                </div>`;
+            }).join('');
+
+            dependencyList.innerHTML = [
+                conflictHtml,
+                missingHtml,
+                graphHtml || '<div class="empty-state">No dependency data available.</div>'
+            ].filter(Boolean).join('');
+        }
+
+        async function loadDependencies() {
+            if (!loadDependenciesBtn) return;
+            loadDependenciesBtn.disabled = true;
+            if (dependencyStatus) dependencyStatus.textContent = 'Analyzing dependencies...';
+            try {
+                const response = await fetch(`/server/${serverId}/minecraft/dependencies`);
+                const payload = await response.json();
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.error || 'Failed to load dependencies.');
+                }
+                renderDependencies(payload);
+                if (dependencyMeta) {
+                    const nodes = payload.graph && payload.graph.nodes ? payload.graph.nodes.length : 0;
+                    const edges = payload.graph && payload.graph.edges ? payload.graph.edges.length : 0;
+                    dependencyMeta.textContent = `${nodes} nodes · ${edges} edges`;
+                }
+                if (dependencyStatus) dependencyStatus.textContent = 'Dependency analysis complete.';
+            } catch (error) {
+                if (dependencyStatus) dependencyStatus.textContent = error.message || 'Failed to load dependencies.';
+                dependencyList.innerHTML = '';
+            } finally {
+                loadDependenciesBtn.disabled = false;
+            }
+        }
+
         async function deleteInstalledAddon(button) {
             const addonPath = button.getAttribute('data-path');
             if (!addonPath) return;
@@ -896,6 +1073,102 @@
                 loadInstalled();
             } catch (error) {
                 setAlert('error', error.message || 'Update failed.');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = oldHtml;
+            }
+        }
+
+        async function stageInstalledAddon(button) {
+            if (button.disabled) return;
+            const addonPath = button.getAttribute('data-path');
+            if (!addonPath) return;
+
+            button.disabled = true;
+            const oldHtml = button.innerHTML;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+            try {
+                const response = await fetch(`/server/${serverId}/minecraft/stage-update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        path: addonPath,
+                        kind: button.getAttribute('data-kind') || '',
+                        loader: button.getAttribute('data-loader') || '',
+                        version: button.getAttribute('data-version') || ''
+                    })
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.error || 'Stage update failed.');
+                }
+                setAlert('success', payload.message || 'Update staged.');
+                loadInstalled();
+            } catch (error) {
+                setAlert('error', error.message || 'Stage update failed.');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = oldHtml;
+            }
+        }
+
+        async function applyStagedAddon(button) {
+            if (button.disabled) return;
+            const addonPath = button.getAttribute('data-path');
+            if (!addonPath) return;
+
+            if (!confirm('Apply staged update now?')) return;
+
+            button.disabled = true;
+            const oldHtml = button.innerHTML;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+            try {
+                const response = await fetch(`/server/${serverId}/minecraft/apply-staged`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: addonPath })
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.error || 'Apply staged update failed.');
+                }
+                setAlert('success', payload.message || 'Staged update applied.');
+                loadInstalled();
+            } catch (error) {
+                setAlert('error', error.message || 'Apply staged update failed.');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = oldHtml;
+            }
+        }
+
+        async function rollbackInstalledAddon(button) {
+            if (button.disabled) return;
+            const addonPath = button.getAttribute('data-path');
+            if (!addonPath) return;
+
+            if (!confirm('Rollback to the previous version?')) return;
+
+            button.disabled = true;
+            const oldHtml = button.innerHTML;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+            try {
+                const response = await fetch(`/server/${serverId}/minecraft/rollback`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: addonPath })
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.error || 'Rollback failed.');
+                }
+                setAlert('success', payload.message || 'Rollback applied.');
+                loadInstalled();
+            } catch (error) {
+                setAlert('error', error.message || 'Rollback failed.');
             } finally {
                 button.disabled = false;
                 button.innerHTML = oldHtml;
@@ -1022,10 +1295,14 @@
             state.checkUpdates = true;
             loadInstalled();
         });
+        loadDependenciesBtn?.addEventListener('click', () => loadDependencies());
         if (installedModalElement) {
             installedModalElement.addEventListener('shown.bs.modal', () => {
                 state.checkUpdates = false;
                 loadInstalled();
+                if (dependencyStatus) dependencyStatus.textContent = 'Click “Dependencies” to analyze required mods/plugins.';
+                if (dependencyMeta) dependencyMeta.textContent = 'Not loaded yet.';
+                if (dependencyList) dependencyList.innerHTML = '';
             });
         }
 

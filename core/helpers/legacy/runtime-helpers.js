@@ -1609,6 +1609,11 @@ function normalizeMinecraftInstallRecord(rawRecord) {
     const projectIdRaw = String(rawRecord.projectId || '').trim();
     const projectId = /^[A-Za-z0-9_-]{2,64}$/.test(projectIdRaw) ? projectIdRaw : '';
 
+    const fileSizeRaw = Number.parseInt(rawRecord.fileSize, 10);
+    const fileSize = Number.isFinite(fileSizeRaw) && fileSizeRaw >= 0 ? fileSizeRaw : 0;
+    const rollbackPathParts = parseServerAddonPath(rawRecord.rollbackPath || rawRecord.rollbackFilePath || '');
+    const stagedPathParts = parseServerAddonPath(rawRecord.stagedPath || rawRecord.stagedFilePath || '');
+
     return {
         path: pathParts.path,
         directory: pathParts.directory,
@@ -1620,7 +1625,18 @@ function normalizeMinecraftInstallRecord(rawRecord) {
         projectTitle: String(rawRecord.projectTitle || '').trim().slice(0, 120),
         versionId: String(rawRecord.versionId || '').trim().slice(0, 64),
         versionNumber: String(rawRecord.versionNumber || '').trim().slice(0, 64),
-        installedAt: rawRecord.installedAt ? new Date(rawRecord.installedAt).toISOString() : new Date().toISOString()
+        installedAt: rawRecord.installedAt ? new Date(rawRecord.installedAt).toISOString() : new Date().toISOString(),
+        fileSize,
+        rollbackPath: rollbackPathParts ? rollbackPathParts.path : '',
+        rollbackFileName: rollbackPathParts ? rollbackPathParts.fileName : '',
+        rollbackVersionId: String(rawRecord.rollbackVersionId || '').trim().slice(0, 64),
+        rollbackVersionNumber: String(rawRecord.rollbackVersionNumber || '').trim().slice(0, 64),
+        rollbackAt: rawRecord.rollbackAt ? new Date(rawRecord.rollbackAt).toISOString() : '',
+        stagedPath: stagedPathParts ? stagedPathParts.path : '',
+        stagedFileName: stagedPathParts ? stagedPathParts.fileName : '',
+        stagedVersionId: String(rawRecord.stagedVersionId || '').trim().slice(0, 64),
+        stagedVersionNumber: String(rawRecord.stagedVersionNumber || '').trim().slice(0, 64),
+        stagedAt: rawRecord.stagedAt ? new Date(rawRecord.stagedAt).toISOString() : ''
     };
 }
 

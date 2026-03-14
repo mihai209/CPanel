@@ -363,7 +363,8 @@ function registerDefaultJobHandlers(jobQueue, deps) {
             projectTitle: String(payload.projectTitle || '').trim().slice(0, 120),
             versionId: versionData.versionId,
             versionNumber: versionData.versionNumber,
-            installedAt: new Date().toISOString()
+            installedAt: new Date().toISOString(),
+            fileSize: Number.isFinite(installResult.size) ? installResult.size : 0
         });
 
         return {
