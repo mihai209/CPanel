@@ -1,148 +1,259 @@
 <%
-const navItems = [
+const coreItems = [
     { id: 'overview', label: 'Overview', icon: 'bi-speedometer2', link: `/server/${server.containerId}/overview` },
     { id: 'console', label: 'Console', icon: 'bi-terminal', link: `/server/${server.containerId}`, turbo: false },
     { id: 'files', label: 'File Manager', icon: 'bi-folder2-open', link: `/server/${server.containerId}/files`, turbo: false },
     { id: 'dbs', label: 'Databases', icon: 'bi-database', link: `/server/${server.containerId}/databases` },
-    { id: 'schedules', label: 'Schedules', icon: 'bi-calendar-event', link: `/server/${server.containerId}/schedules` },
     { id: 'users', label: 'Users', icon: 'bi-people', link: `/server/${server.containerId}/users` },
     { id: 'api', label: 'API Keys', icon: 'bi-key', link: `/server/${server.containerId}/api` },
-    { id: 'backups', label: 'Backups', icon: 'bi-archive', link: `/server/${server.containerId}/backups` },
+    { id: 'backups', label: 'Backups', icon: 'bi-archive', link: `/server/${server.containerId}/backups` }
+];
+
+const automationItems = [
+    { id: 'schedules', label: 'Schedules', icon: 'bi-calendar-event', link: `/server/${server.containerId}/schedules` },
     { id: 'macros', label: 'Command Macros', icon: 'bi-lightning-charge', link: `/server/${server.containerId}/macros` },
+    { id: 'smartalerts', label: 'Smart Alerts', icon: 'bi-bell', link: `/server/${server.containerId}/smartalerts` }
+];
+
+if (String(settings.featureScheduledScalingEnabled || 'false') === 'true') {
+    automationItems.push({ id: 'scaling', label: 'Scheduled Scaling', icon: 'bi-sliders2-vertical', link: `/server/${server.containerId}/scaling` });
+}
+if (String(settings.featurePolicyEngineEnabled || 'false') === 'true') {
+    automationItems.push({ id: 'policy', label: 'Policy Engine', icon: 'bi-shield-check', link: `/server/${server.containerId}/policy` });
+}
+
+const networkItems = [
     { id: 'network', label: 'Network', icon: 'bi-hdd-network', link: `/server/${server.containerId}/network` },
-    { id: 'mounts', label: 'Mounts', icon: 'bi-link-45deg', link: `/server/${server.containerId}/mounts` },
-    { id: 'startup', label: 'Startup', icon: 'bi-play-circle', link: `/server/${server.containerId}/startup` },
-    { id: 'smartalerts', label: 'Smart Alerts', icon: 'bi-bell', link: `/server/${server.containerId}/smartalerts` },
+    { id: 'mounts', label: 'Mounts', icon: 'bi-link-45deg', link: `/server/${server.containerId}/mounts` }
+];
+
+const insightItems = [
     { id: 'activity', label: 'Activity', icon: 'bi-activity', link: `/server/${server.containerId}/activity` },
     { id: 'auditconsole', label: 'Audit Console', icon: 'bi-journal-text', link: `/server/${server.containerId}/audit-console` },
     { id: 'timeline', label: 'Resource Timeline', icon: 'bi-graph-up-arrow', link: `/server/${server.containerId}/timeline` },
     { id: 'performance', label: 'Performance', icon: 'bi-speedometer2', link: `/server/${server.containerId}/performance` },
-    { id: 'recovery', label: 'Recovery Assistant', icon: 'bi-life-preserver', link: `/server/${server.containerId}/recovery` },
-    { id: 'debuglogs', label: 'Debug Logs', icon: 'bi-bug', link: `/server/${server.containerId}/debug-logs` },
+    { id: 'debuglogs', label: 'Debug Logs', icon: 'bi-bug', link: `/server/${server.containerId}/debug-logs` }
+];
+
+const minecraftItems = [
     { id: 'minecraft', label: 'Minecraft', icon: 'bi-magic', link: `/server/${server.containerId}/minecraft` },
     { id: 'mcconfigs', label: 'Minecraft Control', icon: 'bi-controller', link: `/server/${server.containerId}/minecraft-configs` },
     { id: 'proxy-network', label: 'Proxy Network', icon: 'bi-diagram-3', link: `/server/${server.containerId}/proxy-network` }
 ];
-if (String(settings.featureScheduledScalingEnabled || 'false') === 'true') {
-    navItems.push({ id: 'scaling', label: 'Scheduled Scaling', icon: 'bi-sliders2-vertical', link: `/server/${server.containerId}/scaling` });
-}
-if (String(settings.featurePolicyEngineEnabled || 'false') === 'true') {
-    navItems.push({ id: 'policy', label: 'Policy Engine', icon: 'bi-shield-check', link: `/server/${server.containerId}/policy` });
-}
+
+const systemItems = [
+    { id: 'startup', label: 'Startup', icon: 'bi-play-circle', link: `/server/${server.containerId}/startup` },
+    { id: 'recovery', label: 'Recovery Assistant', icon: 'bi-life-preserver', link: `/server/${server.containerId}/recovery` }
+];
+
+const navSections = [
+    { title: 'Core', items: coreItems },
+    { title: 'Automation', items: automationItems },
+    { title: 'Network', items: networkItems },
+    { title: 'Insights', items: insightItems },
+    { title: 'Minecraft', items: minecraftItems },
+    { title: 'System', items: systemItems }
+].filter((section) => Array.isArray(section.items) && section.items.length > 0);
 %>
 
-    <!-- Sidebar Header (Brand) -->
-    <div class="sidebar-header py-2" style="border-bottom: 1px solid #2d2d35;">
-        <a href="/" class="d-flex align-items-center text-decoration-none text-light">
-            <img src="<%= settings.faviconUrl %>" alt="Logo" width="32" height="32" class="me-3 rounded">
-            <span class="fw-bold tracking-wide" style="letter-spacing: 0.5px;">
-                <%= settings.brandName.toUpperCase() %>
-            </span>
-        </a>
-    </div>
+<button type="button" class="server-menu-toggle" data-bs-toggle="modal" data-bs-target="#serverNavModal" aria-label="Open server menu">
+    <i class="bi bi-grid"></i>
+    <span>Server Menu</span>
+</button>
 
-    <!-- Navigation Items -->
-    <% navItems.forEach(item=> { %>
-        <a href="<%= item.link %>" class="sidebar-item <%= active === item.id ? 'active' : '' %>" data-turbo="false"
-            data-bs-toggle="tooltip" data-bs-placement="right" title="<%= item.label %>">
-            <div class="sidebar-icon">
-                <i class="bi <%= item.icon %>"></i>
+<div class="modal fade" id="serverNavModal" tabindex="-1" aria-labelledby="serverNavModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content server-menu-modal">
+            <div class="modal-header">
+                <div class="d-flex align-items-center gap-2">
+                    <img src="<%= settings.faviconUrl %>" alt="Logo" width="32" height="32" class="rounded">
+                    <div>
+                        <div class="server-menu-title" id="serverNavModalLabel"><%= server.name %></div>
+                        <div class="server-menu-subtitle"><%= settings.brandName %> server tools</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <span class="sidebar-label">
-                <%= item.label %>
-            </span>
-        </a>
-        <% }); %>
-
-            <div class="sidebar-support">
-                <a href="https://ko-fi.com/S6S11A22SE" target="_blank" rel="noopener noreferrer" class="sidebar-support-link" aria-label="Support the developer on Ko-fi">
-                    <i class="bi bi-cup-hot me-1"></i>
-                    <span class="sidebar-label">Support The Dev</span>
+            <div class="modal-body">
+                <% navSections.forEach((section) => { %>
+                    <div class="server-menu-section">
+                        <div class="server-menu-section-title"><%= section.title %></div>
+                        <div class="server-menu-grid">
+                            <% section.items.forEach((item) => { %>
+                                <a href="<%= item.link %>" class="server-menu-link <%= active === item.id ? 'active' : '' %>" data-turbo="false">
+                                    <div class="server-menu-icon"><i class="bi <%= item.icon %>"></i></div>
+                                    <div>
+                                        <div class="server-menu-label"><%= item.label %></div>
+                                        <div class="server-menu-desc">Go to <%= item.label.toLowerCase() %></div>
+                                    </div>
+                                </a>
+                            <% }) %>
+                        </div>
+                    </div>
+                <% }) %>
+            </div>
+            <div class="modal-footer server-menu-footer">
+                <a href="https://ko-fi.com/S6S11A22SE" target="_blank" rel="noopener noreferrer" class="server-menu-support">
+                    <i class="bi bi-cup-hot"></i>
+                    Support The Dev
                 </a>
+                <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Close</button>
             </div>
+        </div>
+    </div>
+</div>
 
-            <!-- Sidebar styles (fallback if parent page doesn't define them) -->
-            <style>
-                .sidebar-item {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    padding: 0.72rem 0.85rem;
-                    margin-bottom: 0.3rem;
-                    border-radius: 0.6rem;
-                    color: #8b8b9a;
-                    text-decoration: none;
-                    transition: all 0.2s ease;
-                    font-size: 0.92rem;
-                    line-height: 1.2;
-                    border: 1px solid transparent;
-                }
+<style>
+    .sidebar {
+        width: 0 !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        overflow: visible !important;
+    }
 
-                .sidebar-item:hover {
-                    color: #e1e1e6;
-                    background: rgba(255, 255, 255, 0.03);
-                    border-color: #2d2d35;
-                }
+    .server-menu-toggle {
+        position: fixed;
+        bottom: 1.5rem;
+        left: 1.5rem;
+        z-index: 1050;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.65rem 1rem;
+        border-radius: 999px;
+        background: rgba(15, 15, 18, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #e1e1e6;
+        font-weight: 600;
+        font-size: 0.9rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(10px);
+    }
 
-                .sidebar-item.active {
-                    color: #3b82f6;
-                    background: rgba(59, 130, 246, 0.12);
-                    border-color: rgba(59, 130, 246, 0.28);
-                }
+    .server-menu-toggle:hover {
+        border-color: rgba(59, 130, 246, 0.6);
+        color: #fff;
+    }
 
-                .sidebar-icon {
-                    width: 1.2rem;
-                    min-width: 1.2rem;
-                    text-align: center;
-                    font-size: 1rem;
-                }
+    .server-menu-toggle i {
+        font-size: 1.1rem;
+    }
 
-                .sidebar-label {
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                }
+    .server-menu-modal {
+        background: #121216;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: #e1e1e6;
+    }
 
-                .sidebar-header {
-                    color: #e1e1e6;
-                }
+    .server-menu-title {
+        font-weight: 700;
+        font-size: 1.1rem;
+    }
 
-                .sidebar-header a {
-                    color: inherit;
-                }
+    .server-menu-subtitle {
+        color: #8b8b9a;
+        font-size: 0.82rem;
+    }
 
-                .sidebar-header img {
-                    object-fit: contain;
-                }
+    .server-menu-section {
+        margin-bottom: 1.5rem;
+    }
 
-                .sidebar-support {
-                    margin-top: 0.6rem;
-                    padding-top: 0.75rem;
-                    border-top: 1px solid #2d2d35;
-                }
+    .server-menu-section-title {
+        font-size: 0.7rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.4);
+        margin-bottom: 0.75rem;
+        font-weight: 700;
+    }
 
-                .sidebar-support-link {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: #8b8b9a;
-                    text-decoration: none;
-                    font-size: 0.86rem;
-                    padding: 0.6rem 0.5rem;
-                    border: 1px dashed #2d2d35;
-                    border-radius: 0.5rem;
-                    transition: all 0.2s ease;
-                }
+    .server-menu-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 0.75rem;
+    }
 
-                .sidebar-support-link:hover {
-                    color: #e1e1e6;
-                    border-color: rgba(59, 130, 246, 0.4);
-                    background: rgba(59, 130, 246, 0.08);
-                }
+    .server-menu-link {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 0.9rem;
+        border-radius: 0.75rem;
+        text-decoration: none;
+        color: #d4d4dc;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        transition: all 0.2s ease;
+    }
 
-                @media (max-width: 992px) {
-                    .sidebar-label {
-                        font-size: 0.88rem;
-                    }
-                }
-            </style>
+    .server-menu-link:hover {
+        color: #fff;
+        border-color: rgba(59, 130, 246, 0.35);
+        background: rgba(59, 130, 246, 0.08);
+        transform: translateY(-1px);
+    }
+
+    .server-menu-link.active {
+        border-color: rgba(59, 130, 246, 0.6);
+        background: rgba(59, 130, 246, 0.16);
+        color: #fff;
+    }
+
+    .server-menu-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: rgba(59, 130, 246, 0.1);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #60a5fa;
+        font-size: 1.05rem;
+    }
+
+    .server-menu-label {
+        font-weight: 600;
+        font-size: 0.92rem;
+    }
+
+    .server-menu-desc {
+        font-size: 0.75rem;
+        color: #8b8b9a;
+    }
+
+    .server-menu-footer {
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .server-menu-support {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #8b8b9a;
+        text-decoration: none;
+        padding: 0.4rem 0.75rem;
+        border-radius: 999px;
+        border: 1px dashed rgba(255, 255, 255, 0.18);
+    }
+
+    .server-menu-support:hover {
+        color: #fff;
+        border-color: rgba(59, 130, 246, 0.5);
+    }
+
+    @media (max-width: 768px) {
+        .server-menu-toggle {
+            left: 1rem;
+            bottom: 1rem;
+            padding: 0.6rem 0.85rem;
+            font-size: 0.85rem;
+        }
+    }
+</style>

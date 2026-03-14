@@ -1,177 +1,280 @@
-<style>
-    /* Custom Scrollbar for Sidebar */
-    .sidebar-nav-container::-webkit-scrollbar {
-        width: 4px;
+<%
+const currentAdminPath = String(path || '');
+const adminNavSections = [
+    {
+        title: 'Core',
+        items: [
+            { href: '/admin/overview', icon: 'bi-house-door', label: 'Overview' },
+            { href: '/admin/settings', icon: 'bi-gear', label: 'Settings' },
+            { href: '/admin/platform', icon: 'bi-command', label: 'Platform Ops' },
+            { href: '/admin/incidents', icon: 'bi-exclamation-triangle', label: 'Incident Center' },
+            { href: '/admin/logs', icon: 'bi-file-text', label: 'Logs' }
+        ]
+    },
+    {
+        title: 'Commerce',
+        items: [
+            { href: '/admin/let-user-create', icon: 'bi-shop', label: 'Let User Create' },
+            { href: '/admin/revenue-plans', icon: 'bi-cash-stack', label: 'Revenue Plans' },
+            { href: '/admin/store/deals', icon: 'bi-stars', label: 'Store Deals' },
+            { href: '/admin/store/redeem-codes', icon: 'bi-ticket-perforated', label: 'Redeem Codes' },
+            { href: '/admin/forecasting', icon: 'bi-graph-up-arrow', label: 'Forecasting' }
+        ]
+    },
+    {
+        title: 'Infrastructure',
+        items: [
+            { href: '/admin/connectors', icon: 'bi-diagram-3', label: 'Connectors' },
+            { href: '/admin/allocations/drift', icon: 'bi-wrench-adjustable', label: 'Allocation Drift' },
+            { href: '/admin/connect-info', icon: 'bi-activity', label: 'Connector(s) Health' },
+            { href: '/admin/locations', icon: 'bi-geo-alt', label: 'Locations' },
+            { href: '/admin/users', icon: 'bi-people', label: 'Users' },
+            { href: '/admin/servers', icon: 'bi-hdd-stack', label: 'Servers' },
+            { href: '/admin/databases', icon: 'bi-database', label: 'Databases' },
+            { href: '/admin/mounts', icon: 'bi-link-45deg', label: 'Mounts' },
+            { href: '/admin/redis', icon: 'bi-hdd-network', label: 'Redis' }
+        ]
+    },
+    {
+        title: 'Security',
+        items: [
+            { href: '/admin/abuse-scores', icon: 'bi-shield-exclamation', label: 'Abuse Scores' },
+            { href: '/admin/sentry-seeker', icon: 'bi-shield-lock-fill', label: 'Sentry Seeker' },
+            { href: '/admin/service-health-checks', icon: 'bi-heart-pulse', label: 'Health Checks' },
+            { href: '/admin/auth-providers', icon: 'bi-shield-lock', label: 'Auth Providers' },
+            { href: '/admin/captcha', icon: 'bi-robot', label: 'Captcha' },
+            { href: '/admin/api', icon: 'bi-code-square', label: 'CPanel API' }
+        ]
+    },
+    {
+        title: 'Content',
+        items: [
+            { href: '/admin/images', icon: 'bi-grid-3x3-gap', label: 'Images' },
+            { href: '/admin/packages', icon: 'bi-box', label: 'Packages' },
+            { href: '/admin/migrations/pterodactyl', icon: 'bi-arrow-left-right', label: 'Migrations' },
+            { href: '/admin/extensions', icon: 'bi-puzzle', label: 'Extensions' },
+            { href: '/admin/themes', icon: 'bi-palette', label: 'Themes' },
+            { href: '/admin/lang', icon: 'bi-translate', label: 'Languages' }
+        ]
     }
+];
 
-    .sidebar-nav-container::-webkit-scrollbar-track {
-        background: transparent;
-    }
+const isAdminNavActive = (item) => {
+    const matches = Array.isArray(item && item.match) && item.match.length ? item.match : [item && item.href];
+    return matches.some((entry) => {
+        const value = String(entry || '').trim();
+        if (!value) return false;
+        return currentAdminPath === value || currentAdminPath.startsWith(`${value}/`);
+    });
+};
+%>
 
-    .sidebar-nav-container::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 10px;
-    }
+<div id="adminSidebar" class="admin-sidebar-modal-host" aria-hidden="true">
+    <button type="button" class="admin-menu-toggle" data-bs-toggle="modal" data-bs-target="#adminNavModal" aria-label="Open admin menu">
+        <i class="bi bi-shield"></i>
+        <span>Admin Menu</span>
+    </button>
+</div>
 
-    .sidebar-nav-container::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.2);
-    }
-
-    .sidebar-category-header {
-        font-size: 0.65rem;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        color: rgba(255, 255, 255, 0.2);
-        padding: 1.5rem 1.5rem 0.5rem;
-        margin: 0;
-    }
-
-    .sidebar.collapsed .sidebar-category-header {
-        display: none;
-    }
-</style>
-
-<div class="sidebar d-flex flex-column flex-shrink-0" id="adminSidebar">
-    <!-- Header/Logo Area -->
-    <div class="sidebar-header">
-        <a href="/" class="d-flex align-items-center text-decoration-none text-light fade-in">
-            <img src="<%= settings.faviconUrl %>" alt="Favicon" width="32" height="32">
-            <span class="sidebar-brand sidebar-text text-uppercase">
-                <%= settings.brandName %>
-            </span>
-        </a>
-        <button class="btn btn-link text-muted p-0 ms-auto d-none d-lg-block" id="sidebarToggle">
-            <i class="bi bi-list fs-4"></i>
-        </button>
-    </div>
-
-    <!-- Navigation -->
-    <div class="flex-grow-1 overflow-auto sidebar-nav-container">
-        <%
-        const currentAdminPath = String(path || '');
-        const adminNavSections = [
-            {
-                title: 'Core',
-                items: [
-                    { href: '/admin/overview', icon: 'bi-house-door', label: 'Overview' },
-                    { href: '/admin/settings', icon: 'bi-gear', label: 'Settings' },
-                    { href: '/admin/platform', icon: 'bi-command', label: 'Platform Ops' },
-                    { href: '/admin/incidents', icon: 'bi-exclamation-triangle', label: 'Incident Center' },
-                    { href: '/admin/logs', icon: 'bi-file-text', label: 'Logs' }
-                ]
-            },
-            {
-                title: 'Commerce',
-                items: [
-                    { href: '/admin/let-user-create', icon: 'bi-shop', label: 'Let User Create' },
-                    { href: '/admin/revenue-plans', icon: 'bi-cash-stack', label: 'Revenue Plans' },
-                    { href: '/admin/store/deals', icon: 'bi-stars', label: 'Store Deals' },
-                    { href: '/admin/store/redeem-codes', icon: 'bi-ticket-perforated', label: 'Redeem Codes' },
-                    { href: '/admin/forecasting', icon: 'bi-graph-up-arrow', label: 'Forecasting' }
-                ]
-            },
-            {
-                title: 'Infrastructure',
-                items: [
-                    { href: '/admin/connectors', icon: 'bi-diagram-3', label: 'Connectors' },
-                    { href: '/admin/allocations/drift', icon: 'bi-wrench-adjustable', label: 'Allocation Drift' },
-                    { href: '/admin/connect-info', icon: 'bi-activity', label: 'Connector(s) Health' },
-                    { href: '/admin/locations', icon: 'bi-geo-alt', label: 'Locations' },
-                    { href: '/admin/users', icon: 'bi-people', label: 'Users' },
-                    { href: '/admin/servers', icon: 'bi-hdd-stack', label: 'Servers' },
-                    { href: '/admin/databases', icon: 'bi-database', label: 'Databases' },
-                    { href: '/admin/mounts', icon: 'bi-link-45deg', label: 'Mounts' },
-                    { href: '/admin/redis', icon: 'bi-hdd-network', label: 'Redis' }
-                ]
-            },
-            {
-                title: 'Security',
-                items: [
-                    { href: '/admin/abuse-scores', icon: 'bi-shield-exclamation', label: 'Abuse Scores' },
-                    { href: '/admin/sentry-seeker', icon: 'bi-shield-lock-fill', label: 'Sentry Seeker' },
-                    { href: '/admin/service-health-checks', icon: 'bi-heart-pulse', label: 'Health Checks' },
-                    { href: '/admin/auth-providers', icon: 'bi-shield-lock', label: 'Auth Providers' },
-                    { href: '/admin/captcha', icon: 'bi-robot', label: 'Captcha' },
-                    { href: '/admin/api', icon: 'bi-code-square', label: 'CPanel API' }
-                ]
-            },
-            {
-                title: 'Content',
-                items: [
-                    { href: '/admin/images', icon: 'bi-grid-3x3-gap', label: 'Images' },
-                    { href: '/admin/packages', icon: 'bi-box', label: 'Packages' },
-                    { href: '/admin/migrations/pterodactyl', icon: 'bi-arrow-left-right', label: 'Migrations' },
-                    { href: '/admin/extensions', icon: 'bi-puzzle', label: 'Extensions' },
-                    { href: '/admin/themes', icon: 'bi-palette', label: 'Themes' },
-                    { href: '/admin/lang', icon: 'bi-translate', label: 'Languages' }
-                ]
-            }
-        ];
-        const isAdminNavActive = (item) => {
-            const matches = Array.isArray(item && item.match) && item.match.length ? item.match : [item && item.href];
-            return matches.some((entry) => {
-                const value = String(entry || '').trim();
-                if (!value) return false;
-                return currentAdminPath === value || currentAdminPath.startsWith(`${value}/`);
-            });
-        };
-        %>
-        <ul class="nav flex-column mb-auto">
-            <% adminNavSections.forEach((section) => { %>
-                <li class="sidebar-category-header"><%= section.title %></li>
-                <% section.items.forEach((item) => { %>
-                    <li class="nav-item">
-                        <a href="<%= item.href %>" class="nav-link <%= isAdminNavActive(item) ? 'active' : '' %>">
-                            <i class="bi <%= item.icon %>"></i>
-                            <span class="sidebar-text"><%= item.label %></span>
-                        </a>
-                    </li>
+<div class="modal fade" id="adminNavModal" tabindex="-1" aria-labelledby="adminNavModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content admin-menu-modal">
+            <div class="modal-header">
+                <div class="d-flex align-items-center gap-2">
+                    <img src="<%= settings.faviconUrl %>" alt="Favicon" width="32" height="32" class="rounded">
+                    <div>
+                        <div class="admin-menu-title" id="adminNavModalLabel">Admin Control</div>
+                        <div class="admin-menu-subtitle"><%= settings.brandName %> operations</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <% adminNavSections.forEach((section) => { %>
+                    <div class="admin-menu-section">
+                        <div class="admin-menu-section-title"><%= section.title %></div>
+                        <div class="admin-menu-grid">
+                            <% section.items.forEach((item) => { %>
+                                <a href="<%= item.href %>" class="admin-menu-link <%= isAdminNavActive(item) ? 'active' : '' %>">
+                                    <div class="admin-menu-icon"><i class="bi <%= item.icon %>"></i></div>
+                                    <div>
+                                        <div class="admin-menu-label"><%= item.label %></div>
+                                        <div class="admin-menu-desc">Open <%= item.label.toLowerCase() %></div>
+                                    </div>
+                                </a>
+                            <% }) %>
+                        </div>
+                    </div>
                 <% }) %>
-            <% }) %>
-        </ul>
-    </div>
-
-    <!-- User Footer (Mini) -->
-    <div class="sidebar-footer border-top border-secondary border-opacity-10 p-3">
-        <div class="d-flex align-items-center">
-            <img src="<%= user.avatarUrl || `https://www.gravatar.com/avatar/${user.gravatarHash}?d=retro` %>" alt=""
-                width="34" height="34" class="rounded-circle me-2">
-            <span class="sidebar-text small text-muted">
-                <%= user.username %>
-            </span>
-            <a href="/logout" class="btn btn-link text-muted p-0 ms-auto d-none d-lg-block">
-                <i class="bi bi-box-arrow-right"></i>
-            </a>
+            </div>
+            <div class="modal-footer admin-menu-footer">
+                <div class="d-flex align-items-center gap-2">
+                    <img src="<%= user.avatarUrl || `https://www.gravatar.com/avatar/${user.gravatarHash}?d=retro` %>" alt="" width="32" height="32" class="rounded-circle">
+                    <span class="text-muted small"><%= user.username %></span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <a href="https://ko-fi.com/S6S11A22SE" target="_blank" rel="noopener noreferrer" class="admin-menu-support">
+                        <i class="bi bi-cup-hot"></i>
+                        Support The Dev
+                    </a>
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
         </div>
-        <a href="https://ko-fi.com/S6S11A22SE" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-info w-100 mt-3 d-flex align-items-center justify-content-center gap-2" aria-label="Support the developer on Ko-fi">
-            <i class="bi bi-cup-hot"></i>
-            <span class="sidebar-text">Support The Dev</span>
-        </a>
     </div>
 </div>
 
-<button type="button" class="admin-mobile-toggle" id="adminSidebarMobileToggle" aria-label="Toggle admin sidebar">
-    <i class="bi bi-list fs-5"></i>
-</button>
-<div class="admin-mobile-backdrop" id="adminSidebarBackdrop" aria-hidden="true"></div>
+<style>
+    #adminSidebar.admin-sidebar-modal-host {
+        width: 0 !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+    }
 
-<script>
-    (function () {
-        const sidebar = document.getElementById('adminSidebar');
-        const toggleBtn = document.getElementById('sidebarToggle');
-        if (!sidebar) return;
+    .admin-menu-toggle {
+        position: fixed;
+        bottom: 1.5rem;
+        left: 1.5rem;
+        z-index: 1050;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.65rem 1rem;
+        border-radius: 999px;
+        background: rgba(15, 15, 18, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #e1e1e6;
+        font-weight: 600;
+        font-size: 0.9rem;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(10px);
+    }
 
-        const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-        if (isCollapsed) {
-            sidebar.classList.add('collapsed');
+    .admin-menu-toggle:hover {
+        border-color: rgba(99, 102, 241, 0.6);
+        color: #fff;
+    }
+
+    .admin-menu-toggle i {
+        font-size: 1.1rem;
+    }
+
+    .admin-menu-modal {
+        background: #121216;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: #e1e1e6;
+    }
+
+    .admin-menu-title {
+        font-weight: 700;
+        font-size: 1.1rem;
+    }
+
+    .admin-menu-subtitle {
+        color: #8b8b9a;
+        font-size: 0.82rem;
+    }
+
+    .admin-menu-section {
+        margin-bottom: 1.5rem;
+    }
+
+    .admin-menu-section-title {
+        font-size: 0.7rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.4);
+        margin-bottom: 0.75rem;
+        font-weight: 700;
+    }
+
+    .admin-menu-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .admin-menu-link {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 0.9rem;
+        border-radius: 0.75rem;
+        text-decoration: none;
+        color: #d4d4dc;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        transition: all 0.2s ease;
+    }
+
+    .admin-menu-link:hover {
+        color: #fff;
+        border-color: rgba(99, 102, 241, 0.35);
+        background: rgba(99, 102, 241, 0.08);
+        transform: translateY(-1px);
+    }
+
+    .admin-menu-link.active {
+        border-color: rgba(99, 102, 241, 0.6);
+        background: rgba(99, 102, 241, 0.16);
+        color: #fff;
+    }
+
+    .admin-menu-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: rgba(99, 102, 241, 0.1);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #a5b4fc;
+        font-size: 1.05rem;
+    }
+
+    .admin-menu-label {
+        font-weight: 600;
+        font-size: 0.92rem;
+    }
+
+    .admin-menu-desc {
+        font-size: 0.75rem;
+        color: #8b8b9a;
+    }
+
+    .admin-menu-footer {
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .admin-menu-support {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #8b8b9a;
+        text-decoration: none;
+        padding: 0.4rem 0.75rem;
+        border-radius: 999px;
+        border: 1px dashed rgba(255, 255, 255, 0.18);
+    }
+
+    .admin-menu-support:hover {
+        color: #fff;
+        border-color: rgba(99, 102, 241, 0.5);
+    }
+
+    @media (max-width: 768px) {
+        .admin-menu-toggle {
+            left: 1rem;
+            bottom: 1rem;
+            padding: 0.6rem 0.85rem;
+            font-size: 0.85rem;
         }
-
-        if (toggleBtn) {
-            toggleBtn.addEventListener('click', () => {
-                sidebar.classList.toggle('collapsed');
-                localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
-            });
-        }
-    })();
-</script>
+    }
+</style>
