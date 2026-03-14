@@ -630,6 +630,15 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
 
 <body data-turbo="false">
     <%- include ('../partials/error-modal') %>
+    <%
+    const fileManagerShortcuts = [
+        { action: 'Open search', keys: 'Ctrl + F' },
+        { action: 'Refresh current folder', keys: 'Ctrl + R' },
+        { action: 'New file', keys: 'Ctrl + N' },
+        { action: 'New folder', keys: 'Ctrl + Shift + N' },
+        { action: 'Upload files', keys: 'Ctrl + U' }
+    ];
+    %>
         <div class="wrapper">
             <!-- Sidebar -->
             <nav id="sidebar" class="sidebar">
@@ -706,6 +715,10 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                             <a href="#" id="btnSearchFiles" class="btn-action">
                                 <i class="bi bi-search"></i>
                                 <span>Search</span>
+                            </a>
+                            <a href="#" class="btn-action" data-shortcuts-modal="filesShortcutsModal" title="Keyboard shortcuts">
+                                <i class="bi bi-keyboard"></i>
+                                <span>Shortcuts</span>
                             </a>
                         </div>
                     </div>
@@ -1260,6 +1273,7 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
 
             // File Manager Logic
             let currentPath = '<%= initialPath %>';
+            let lastListRequestId = null;
             const serverId = '<%= server.containerId %>';
             const webUploadEnabled = <%= fileUploadEnabled ? 'true' : 'false' %>;
             const webUploadMaxMb = <%= fileUploadMaxMbValue %>;
@@ -1331,6 +1345,15 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                     try {
                         const data = JSON.parse(event.data);
                         if (data.type === 'file_list') {
+                            const incomingRequestId = String(data.requestId || '').trim();
+                            if (incomingRequestId && lastListRequestId && incomingRequestId !== lastListRequestId) {
+                                return;
+                            }
+                            const incomingPath = normalizeServerPath(data.directory || '/');
+                            const expectedPath = normalizeServerPath(currentPath || '/');
+                            if (incomingPath !== expectedPath) {
+                                return;
+                            }
                             renderFiles(data.files);
                             renderBreadcrumbs(data.directory);
                         } else if (data.type === 'extract_started') {
@@ -1369,9 +1392,12 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
 
             function listFiles(path) {
                 if (ws && ws.readyState === WebSocket.OPEN) {
+                    const requestId = `fl_${Date.now()}_${Math.random().toString(16).slice(2, 10)}`;
+                    lastListRequestId = requestId;
                     ws.send(JSON.stringify({
                         type: 'list_files',
-                        directory: path
+                        directory: path,
+                        requestId
                     }));
                 }
             }
@@ -1901,6 +1927,36 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                     }, 120);
                 });
             }
+
+            document.addEventListener('keydown', (e) => {
+                const key = String(e.key || '').toLowerCase();
+                const isInput = document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
+
+                if ((e.ctrlKey || e.metaKey) && key === 'f') {
+                    e.preventDefault();
+                    btnSearchFiles?.click();
+                    return;
+                }
+                if ((e.ctrlKey || e.metaKey) && key === 'r') {
+                    e.preventDefault();
+                    listFiles(currentPath);
+                    return;
+                }
+                if ((e.ctrlKey || e.metaKey) && key === 'n' && !e.shiftKey) {
+                    e.preventDefault();
+                    document.getElementById('btnNewFile')?.click();
+                    return;
+                }
+                if ((e.ctrlKey || e.metaKey) && key === 'n' && e.shiftKey) {
+                    e.preventDefault();
+                    document.getElementById('btnNewFolder')?.click();
+                    return;
+                }
+                if ((e.ctrlKey || e.metaKey) && key === 'u') {
+                    e.preventDefault();
+                    document.getElementById('btnUploadFiles')?.click();
+                }
+            });
 
             if (btnRunFileSearch) {
                 btnRunFileSearch.addEventListener('click', async () => {
@@ -3006,6 +3062,7 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
             startAutoRefresh();
             connect();
         </script>
+        <%- include('../partials/shortcuts-modal', { shortcutsId: 'filesShortcutsModal', shortcutsTitle: 'File Manager Shortcuts', shortcutsList: fileManagerShortcuts }) %>
 </body>
 
 </html>

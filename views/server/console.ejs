@@ -474,6 +474,15 @@
 </head>
 
 <body data-turbo="false"> <%- include ('../partials/error-modal') %>
+<%
+const consoleShortcuts = [
+    { action: 'Focus command input', keys: 'Ctrl + K' },
+    { action: 'Send command', keys: 'Ctrl + Enter' },
+    { action: 'Clear console output', keys: 'Ctrl + L' },
+    { action: 'Restart server', keys: 'Ctrl + Shift + R' },
+    { action: 'Start/Stop server', keys: 'Ctrl + Shift + S' }
+];
+%>
         <div class="wrapper">
             <!-- Sidebar -->
             <nav id="sidebar" class="sidebar">
@@ -557,6 +566,9 @@
                                     </button>
                                     <button id="btnClear" class="btn btn-outline-secondary btn-sm" title="Clear console">
                                         <i class="bi bi-trash3"></i>
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm" title="Keyboard shortcuts" data-shortcuts-modal="consoleShortcutsModal">
+                                        <i class="bi bi-keyboard"></i>
                                     </button>
                                 </div>
                                 <div id="powerActions" class="d-flex gap-2">
@@ -1180,6 +1192,56 @@
                 }
             });
 
+            const btnStart = document.getElementById('btnStart');
+            const btnStop = document.getElementById('btnStop');
+            const btnRestart = document.getElementById('btnRestart');
+            const btnClear = document.getElementById('btnClear');
+
+            document.addEventListener('keydown', (e) => {
+                const isInput = document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
+                const key = String(e.key || '').toLowerCase();
+
+                if ((e.ctrlKey || e.metaKey) && key === 'k') {
+                    e.preventDefault();
+                    consoleInput?.focus();
+                    return;
+                }
+                if ((e.ctrlKey || e.metaKey) && key === 'l') {
+                    if (btnClear) {
+                        e.preventDefault();
+                        btnClear.click();
+                    }
+                    return;
+                }
+                if ((e.ctrlKey || e.metaKey) && key === 'enter') {
+                    e.preventDefault();
+                    if (!connectorOnline) return;
+                    const command = consoleInput ? consoleInput.value : '';
+                    if (command) {
+                        client.send('console_input', { command });
+                        if (consoleInput) consoleInput.value = '';
+                    }
+                    return;
+                }
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 'r') {
+                    if (btnRestart && !btnRestart.disabled) {
+                        e.preventDefault();
+                        btnRestart.click();
+                    }
+                    return;
+                }
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 's') {
+                    e.preventDefault();
+                    const startVisible = btnStart && !btnStart.classList.contains('d-none');
+                    const stopVisible = btnStop && !btnStop.classList.contains('d-none');
+                    if (startVisible && btnStart && !btnStart.disabled) {
+                        btnStart.click();
+                    } else if (stopVisible && btnStop && !btnStop.disabled) {
+                        btnStop.click();
+                    }
+                }
+            });
+
             if (btnRunMacro && macroSelect) {
                 btnRunMacro.addEventListener('click', () => {
                     if (!connectorOnline) {
@@ -1203,7 +1265,6 @@
 
             const btnFontMinus = document.getElementById('btnFontMinus');
             const btnFontPlus = document.getElementById('btnFontPlus');
-            const btnClear = document.getElementById('btnClear');
 
             function applyConsoleFontSize(nextSize) {
                 const size = Math.max(10, Math.min(18, nextSize));
@@ -1356,6 +1417,7 @@
             window.addEventListener('beforeunload', cleanupConsoleRuntime);
             document.addEventListener('turbo:before-cache', cleanupConsoleRuntime);
         </script>
+        <%- include('../partials/shortcuts-modal', { shortcutsId: 'consoleShortcutsModal', shortcutsTitle: 'Console Shortcuts', shortcutsList: consoleShortcuts }) %>
 </body>
 
 </html>

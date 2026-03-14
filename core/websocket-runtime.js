@@ -206,6 +206,10 @@ const webhooksConfigCache = {
     moduleEnabled: false,
     brandName: 'CPanel'
 };
+const auditStrictCache = {
+    ts: 0,
+    enabled: false
+};
 const serverMinecraftEligibilityCache = new Map(); // serverId -> boolean
 const connectorServerOwnershipCache = new Map(); // serverId -> { connectorId: number|null, ts: number }
 const CONNECTOR_SERVER_OWNERSHIP_CACHE_TTL_MS = Math.max(
@@ -779,6 +783,23 @@ function clearServerConsoleBuffer(serverId) {
     RESOURCE_TIMELINE_LAST_WRITE_TS.delete(serverId);
 }
 
+async function getAuditStrictState(forceRefresh = false) {
+    if (!Settings) return { enabled: false };
+    const now = Date.now();
+    if (!forceRefresh && (now - auditStrictCache.ts) < 15_000) {
+        return { enabled: Boolean(auditStrictCache.enabled) };
+    }
+    try {
+        const row = await Settings.findByPk('featureStrictAuditEnabled');
+        const enabled = ['1', 'true', 'yes', 'on'].includes(String(row && row.value || '').trim().toLowerCase());
+        auditStrictCache.ts = now;
+        auditStrictCache.enabled = enabled;
+        return { enabled };
+    } catch {
+        return { enabled: false };
+    }
+}
+
 async function writeServerAuditLog(payload) {
     try {
         if (!AuditLog) return;
@@ -793,8 +814,12 @@ async function writeServerAuditLog(payload) {
             userAgent: payload.userAgent || null,
             metadata: payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {}
         });
-    } catch {
-        // Ignore audit write errors inside websocket runtime.
+    } catch (error) {
+        const strictState = await getAuditStrictState();
+        if (strictState.enabled) {
+            throw error;
+        }
+        // Ignore audit write errors when strict audit is disabled.
     }
 }
 
@@ -1352,7 +1377,8 @@ wss.on('connection', (ws, request) => {
                         connectorWs.send(JSON.stringify({
                             type: 'list_files',
                             serverId: serverId,
-                            directory: data.directory
+                            directory: data.directory,
+                            requestId: data.requestId || null
                         }));
                     } else if (data.type === 'create_folder') {
                         if (!hasConsolePermission('server.files')) {
@@ -1966,7 +1992,7 @@ wss.on('connection', (ws, request) => {
                     disk: data.disk || '0'
                 });
                 await persistResourceTimelineSample(data.serverId, data.cpu, data.memory, data.disk || '0');
-                await handleResourceAnomalyAlert(data.serverId, data.cpu, data.memory);
+                await handleResourceAnomalyAlert(data.serverId, data.cpu, data.memory, data.disk);
                 await handleAntiMinerFromStats(data.serverId, data.cpu);
                 if (typeof handlePolicyAnomalyRemediation === 'function') {
                     const remediation = await handlePolicyAnomalyRemediation(data.serverId, data.cpu, data.memory);
@@ -1984,7 +2010,8 @@ wss.on('connection', (ws, request) => {
                 sendToServerConsole(data.serverId, {
                     type: 'file_list',
                     directory: data.directory,
-                    files: data.files
+                    files: data.files,
+                    requestId: data.requestId || null
                 });
             }
 

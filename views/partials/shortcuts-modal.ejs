@@ -1,0 +1,78 @@
+<% if (Array.isArray(shortcutsList) && shortcutsList.length > 0) { %>
+<div class="modal fade" id="<%= shortcutsId %>" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-dark text-light border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title"><%= shortcutsTitle || 'Keyboard Shortcuts' %></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="small text-muted mb-3">Press <span class="shortcut-key">?</span> or <span class="shortcut-key">Ctrl</span> + <span class="shortcut-key">/</span> to open this panel.</div>
+                <div class="list-group list-group-flush">
+                    <% shortcutsList.forEach((item) => { %>
+                        <div class="list-group-item bg-transparent text-light d-flex align-items-center justify-content-between gap-3 border-secondary border-opacity-25">
+                            <div class="fw-semibold"><%= item.action %></div>
+                            <div class="d-flex flex-wrap gap-1">
+                                <% String(item.keys || '').split('+').forEach((keyPart) => { %>
+                                    <span class="shortcut-key"><%= keyPart.trim() %></span>
+                                <% }); %>
+                            </div>
+                        </div>
+                    <% }) %>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .shortcut-key {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        padding: 0.15rem 0.45rem;
+        border-radius: 6px;
+        border: 1px solid #2e3036;
+        background: rgba(255, 255, 255, 0.06);
+        font-weight: 700;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+</style>
+
+<script>
+    (function () {
+        const modalId = '<%= shortcutsId %>';
+        const modalEl = document.getElementById(modalId);
+        if (!modalEl || typeof bootstrap === 'undefined') return;
+        const modal = new bootstrap.Modal(modalEl);
+
+        const openModal = () => modal.show();
+        document.querySelectorAll(`[data-shortcuts-modal="${modalId}"]`).forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                openModal();
+            });
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+                e.preventDefault();
+                openModal();
+                return;
+            }
+            if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                const tag = document.activeElement && document.activeElement.tagName;
+                if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+                e.preventDefault();
+                openModal();
+            }
+        });
+    })();
+</script>
+<% } %>

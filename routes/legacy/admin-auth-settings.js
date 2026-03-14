@@ -609,6 +609,7 @@ app.post('/admin/settings', requireAuth, requireAdmin, [
         featureAutoRemediationEnabled: toBooleanString(req.body.featureAutoRemediationEnabled),
         featurePolicyEngineEnabled: toBooleanString(req.body.featurePolicyEngineEnabled),
         featurePlaybooksAutomationEnabled: toBooleanString(req.body.featurePlaybooksAutomationEnabled),
+        featureStrictAuditEnabled: toBooleanString(req.body.featureStrictAuditEnabled),
         featureAntiMinerEnabled: toBooleanString(req.body.featureAntiMinerEnabled),
         featureAbuseScoreEnabled: toBooleanString(req.body.featureAbuseScoreEnabled),
         abuseScoreWindowHours: toNumberString(req.body.abuseScoreWindowHours, 72, 1, 720),

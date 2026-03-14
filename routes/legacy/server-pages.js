@@ -609,6 +609,28 @@ function getDashboardServerOrderPreference(rawPermissions) {
     };
 }
 
+function defaultDashboardLayout() {
+    return {
+        metrics: true,
+        announcements: true,
+        opsFeed: true,
+        filters: true,
+        resourcePills: true
+    };
+}
+
+function normalizeDashboardLayout(rawLayout) {
+    const base = defaultDashboardLayout();
+    const layout = rawLayout && typeof rawLayout === 'object' && !Array.isArray(rawLayout) ? rawLayout : {};
+    return {
+        metrics: parseBooleanInput(layout.metrics, base.metrics),
+        announcements: parseBooleanInput(layout.announcements, base.announcements),
+        opsFeed: parseBooleanInput(layout.opsFeed, base.opsFeed),
+        filters: parseBooleanInput(layout.filters, base.filters),
+        resourcePills: parseBooleanInput(layout.resourcePills, base.resourcePills)
+    };
+}
+
 function orderDashboardServers(servers, preference) {
     const list = Array.isArray(servers) ? servers.slice() : [];
     const mode = normalizeDashboardSortMode(preference && preference.mode);
@@ -650,7 +672,9 @@ app.get('/', requireAuth, async (req, res) => {
             return res.redirect('/login?error=' + encodeURIComponent('Session expired. Please login again.'));
         }
 
-        const dashboardServerOrderPreference = getDashboardServerOrderPreference(account.permissions);
+        const dashboardPermissionState = parseDashboardUserPermissions(account.permissions);
+        const dashboardServerOrderPreference = getDashboardServerOrderPreference(dashboardPermissionState);
+        const dashboardLayout = normalizeDashboardLayout(dashboardPermissionState.dashboardLayout);
         const isAdminDashboard = Boolean(req.session.user && req.session.user.isAdmin);
         const showOthersServers = isAdminDashboard && ['1', 'true', 'yes', 'on'].includes(String(req.query.others || '').trim().toLowerCase());
 
@@ -726,6 +750,7 @@ app.get('/', requireAuth, async (req, res) => {
             dashboardLatestOrderIds,
             dashboardFolders,
             dashboardTags,
+            dashboardLayout,
             dashboardNowMs: Date.now()
         });
     } catch (err) {
@@ -795,6 +820,36 @@ app.post('/dashboard/server-order', requireAuth, async (req, res) => {
             success: false,
             error: 'Failed to save dashboard order.'
         });
+    }
+});
+
+app.post('/dashboard/layout', requireAuth, async (req, res) => {
+    try {
+        const account = await User.findByPk(req.session.user.id, {
+            attributes: ['id', 'permissions']
+        });
+        if (!account) {
+            return res.status(401).json({ success: false, error: 'Session expired.' });
+        }
+
+        const permissions = parseDashboardUserPermissions(account.permissions);
+        const nextLayout = normalizeDashboardLayout({
+            metrics: req.body && req.body.metrics,
+            announcements: req.body && req.body.announcements,
+            opsFeed: req.body && req.body.opsFeed,
+            filters: req.body && req.body.filters,
+            resourcePills: req.body && req.body.resourcePills
+        });
+
+        permissions.dashboardLayout = nextLayout;
+        account.set('permissions', permissions);
+        account.changed('permissions', true);
+        await account.save();
+
+        return res.json({ success: true, layout: nextLayout });
+    } catch (error) {
+        console.error('Failed to save dashboard layout:', error);
+        return res.status(500).json({ success: false, error: 'Failed to save dashboard layout.' });
     }
 });
 
@@ -934,6 +989,8 @@ const SERVER_PERMISSIONS = Object.freeze([
     'minecraft.ban',
     'minecraft.op',
     'minecraft.deop',
+    'minecraft.tempban',
+    'minecraft.teleport',
     'server.backups.view',
     'server.backups.manage',
     'server.gdrive',
@@ -949,6 +1006,7 @@ const SERVER_PERMISSIONS = Object.freeze([
     'server.activity.view',
     'server.audit.read',
     'server.timeline.view',
+    'server.performance.view',
     'server.macros',
     'server.recovery',
     'server.smartalerts',
@@ -987,6 +1045,8 @@ const SUBUSER_PERMISSION_PRESETS = Object.freeze([
             'server.minecraft',
             'minecraft.kick',
             'minecraft.ban',
+            'minecraft.tempban',
+            'minecraft.teleport',
             'server.activity.view',
             'server.users.view'
         ]
@@ -1002,11 +1062,17 @@ const SUBUSER_PERMISSION_PRESETS = Object.freeze([
             'server.startup',
             'server.minecraft',
             'server.backups.view',
-            'server.activity.view'
+            'server.activity.view',
+            'server.performance.view'
         ]
     }
 ]);
 const SERVER_SCHEDULES_KEY_PREFIX = 'server_schedules_';
+const SERVER_PERFORMANCE_REPORT_KEY_PREFIX = 'server_performance_report_';
+
+function getServerPerformanceReportSettingKey(serverId) {
+    return `${SERVER_PERFORMANCE_REPORT_KEY_PREFIX}${serverId}`;
+}
 const SERVER_API_KEY_PERMISSIONS = Array.isArray(SERVER_API_KEY_PERMISSION_CATALOG)
     ? SERVER_API_KEY_PERMISSION_CATALOG
     : [
@@ -1026,7 +1092,8 @@ const SERVER_API_KEY_PERMISSIONS = Array.isArray(SERVER_API_KEY_PERMISSION_CATAL
         'server.schedules.manage',
         'server.network.view',
         'server.network.manage',
-        'server.activity.view'
+        'server.activity.view',
+        'server.performance.view'
     ];
 
 function normalizeServerApiPermissionList(input) {
@@ -2115,12 +2182,18 @@ function resolveModrinthProjectType(kind) {
     if (kind === 'plugin') return 'plugin';
     if (kind === 'mod') return 'mod';
     if (kind === 'datapack') return 'datapack';
+    if (kind === 'resourcepack') return 'resourcepack';
     return '';
 }
 
 function isMinecraftAddonArchiveFileName(fileName) {
     const name = String(fileName || '').trim().toLowerCase();
     return /\.(zip|tar|tar\.gz|tgz|tar\.bz2|tbz2|tar\.xz|txz|gz|bz2|xz|mcworld)$/.test(name);
+}
+
+function isMinecraftResourcePackFileName(fileName) {
+    const name = String(fileName || '').trim().toLowerCase();
+    return name.endsWith('.zip');
 }
 
 function normalizeRemoteDownloadUrl(rawUrl) {
@@ -3165,6 +3238,51 @@ function formatMinecraftCommandTarget(targetName) {
     if (!safeTarget) return '';
     if (safeTarget.includes(' ')) return `"${safeTarget}"`;
     return safeTarget;
+}
+
+function normalizeMinecraftTeleportTarget(value) {
+    const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!normalized) return '';
+    if (normalized.length > 64) return '';
+    if (!/^[A-Za-z0-9_.:@~^ -]+$/.test(normalized)) return '';
+    if (/[`"'\\\/;|&$<>]/.test(normalized)) return '';
+    return normalized;
+}
+
+function normalizeMinecraftDuration(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!normalized) return '';
+    if (normalized.length > 16) return '';
+    if (!/^[0-9a-z]+$/.test(normalized)) return '';
+    return normalized;
+}
+
+function normalizeMinecraftConsoleCommand(value) {
+    let normalized = String(value || '').trim();
+    if (!normalized) return '';
+    if (normalized.startsWith('/')) normalized = normalized.slice(1);
+    normalized = normalized.replace(/\s+/g, ' ').trim();
+    if (!normalized || normalized.length > 200) return '';
+    if (/[\r\n]/.test(normalized)) return '';
+    if (/[`"'\\|&$<>;]/.test(normalized)) return '';
+    return normalized;
+}
+
+const MINECRAFT_MINI_CONSOLE_BLOCKLIST = new Set([
+    'stop',
+    'restart',
+    'reload',
+    'op',
+    'deop',
+    'kick',
+    'ban',
+    'tempban'
+]);
+
+function isMinecraftMiniConsoleCommandBlocked(command) {
+    const base = String(command || '').trim().split(/\s+/)[0].toLowerCase();
+    if (!base) return true;
+    return MINECRAFT_MINI_CONSOLE_BLOCKLIST.has(base);
 }
 
 function normalizeMinecraftCommandReason(value, maxLength = 100) {
@@ -8302,6 +8420,169 @@ app.get('/server/:containerId/timeline', requireAuth, async (req, res) => {
     }
 });
 
+app.get('/server/:containerId/performance', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }]
+        });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.performance.view')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        let performanceRows = [];
+        const performanceStats = { pluginsCount: 0, modsCount: 0, totalSizeMb: 0 };
+
+        const performanceReportSetting = Settings
+            ? await Settings.findByPk(getServerPerformanceReportSettingKey(server.id))
+            : null;
+        const performanceReportUrl = performanceReportSetting && performanceReportSetting.value
+            ? String(performanceReportSetting.value || '').trim()
+            : '';
+
+        if (server.allocation && server.allocation.connectorId) {
+            const connectorWs = connectorConnections.get(server.allocation.connectorId);
+            if (connectorWs && connectorWs.readyState === WebSocket.OPEN) {
+                const directories = [
+                    { dir: '/plugins', kind: 'plugin' },
+                    { dir: '/mods', kind: 'mod' }
+                ];
+                for (const entry of directories) {
+                    const result = await runConnectorFileAction(connectorWs, {
+                        type: 'list_files',
+                        serverId: server.id,
+                        directory: entry.dir
+                    }, entry.dir, server.id, 8000);
+
+                    if (!result || !result.success || !Array.isArray(result.files)) {
+                        continue;
+                    }
+                    const files = result.files.filter((item) => item && !item.isDirectory);
+                    files.forEach((file) => {
+                        const sizeBytes = Number.parseInt(file.size, 10) || 0;
+                        const sizeMb = Math.max(0, (sizeBytes / (1024 * 1024)));
+                        performanceRows.push({
+                            kind: entry.kind,
+                            name: String(file.name || ''),
+                            sizeMb: Number.isFinite(sizeMb) ? Number(sizeMb.toFixed(2)) : 0,
+                            path: `${entry.dir}/${file.name}`
+                        });
+                        performanceStats.totalSizeMb += sizeMb;
+                        if (entry.kind === 'plugin') performanceStats.pluginsCount += 1;
+                        if (entry.kind === 'mod') performanceStats.modsCount += 1;
+                    });
+                }
+            }
+        }
+
+        performanceRows.sort((a, b) => b.sizeMb - a.sizeMb);
+        performanceRows = performanceRows.slice(0, 20);
+        performanceStats.totalSizeMb = Number(performanceStats.totalSizeMb.toFixed(2));
+
+        return res.render('server/performance', {
+            server,
+            user: req.session.user,
+            title: `Performance Insights ${server.name}`,
+            path: '/servers',
+            active: 'performance',
+            performanceRows,
+            performanceStats,
+            performanceReportUrl,
+            success: req.query.success || null,
+            error: req.query.error || null,
+            canRunCommands: hasServerPermission(access, 'server.console')
+        });
+    } catch (error) {
+        console.error('Error loading performance page:', error);
+        return res.redirect('/?error=' + encodeURIComponent('Failed to load performance page.'));
+    }
+});
+
+app.post('/server/:containerId/performance/report', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId }
+        });
+        if (!server) return res.redirect('/server/notfound');
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.performance.view')) {
+            return res.redirect('/server/no-permissions');
+        }
+
+        const reportUrlRaw = String(req.body.reportUrl || '').trim();
+        const reportUrl = reportUrlRaw ? sanitizeHttpUrl(reportUrlRaw) : '';
+        if (reportUrlRaw && !reportUrl) {
+            return res.redirect(`/server/${server.containerId}/performance?error=${encodeURIComponent('Report URL must be a valid http/https URL.')}`);
+        }
+
+        if (Settings) {
+            await Settings.upsert({
+                key: getServerPerformanceReportSettingKey(server.id),
+                value: reportUrl
+            });
+        }
+
+        return res.redirect(`/server/${server.containerId}/performance?success=${encodeURIComponent('Performance report link saved.')}`);
+    } catch (error) {
+        console.error('Error saving performance report URL:', error);
+        return res.redirect(`/server/${req.params.containerId}/performance?error=${encodeURIComponent('Failed to save report link.')}`);
+    }
+});
+
+app.post('/server/:containerId/performance/run-timings', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }]
+        });
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
+
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.console')) {
+            return res.status(403).json({ success: false, error: 'Missing permission: server.console' });
+        }
+
+        if (!server.allocation || !server.allocation.connectorId) {
+            return res.status(409).json({ success: false, error: 'Server allocation is missing.' });
+        }
+
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return res.status(503).json({ success: false, error: 'Connector is offline.' });
+        }
+
+        const requestId = `timings_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`;
+        connectorWs.send(JSON.stringify({
+            type: 'server_command',
+            serverId: server.id,
+            command: 'timings report',
+            requestId
+        }));
+
+        if (typeof writeServerAuditLog === 'function') {
+            await writeServerAuditLog({
+                actorUserId: req.session.user.id,
+                serverId: server.id,
+                action: 'server:performance.timings',
+                ip: String(getRequestIp(req) || '').slice(0, 120) || null,
+                userAgent: req.headers && req.headers['user-agent'] ? String(req.headers['user-agent']).slice(0, 1000) : null,
+                metadata: {
+                    requestId
+                }
+            });
+        }
+
+        return res.json({ success: true, requestId });
+    } catch (error) {
+        console.error('Error dispatching timings report:', error);
+        return res.status(500).json({ success: false, error: 'Failed to dispatch timings report.' });
+    }
+});
+
 app.get('/server/:containerId/macros', requireAuth, async (req, res) => {
     try {
         const server = await Server.findOne({ where: { containerId: req.params.containerId } });
@@ -12091,6 +12372,9 @@ app.get('/server/:containerId/minecraft', requireAuth, async (req, res) => {
         const defaultKind = normalizeMinecraftProjectKind(req.query.kind || defaults.kind);
         const defaultLoader = normalizeMinecraftLoader(req.query.loader || defaults.loader, defaultKind);
         const defaultVersion = normalizeMinecraftVersion(req.query.version || defaults.version || '');
+        const runtimeLabel = defaultKind === 'mod'
+            ? `${defaultLoader ? defaultLoader.toUpperCase() : 'MODDED'}`
+            : `${defaultLoader ? defaultLoader.toUpperCase() : 'PLUGIN'}`;
 
         res.render('server/minecraft', {
             server,
@@ -12107,7 +12391,13 @@ app.get('/server/:containerId/minecraft', requireAuth, async (req, res) => {
                 plugins: MODRINTH_PLUGIN_LOADERS,
                 mods: MODRINTH_MOD_LOADERS,
                 datapacks: [],
+                resourcepacks: [],
                 worlds: []
+            },
+            minecraftRuntime: {
+                kind: defaultKind,
+                loader: defaultLoader,
+                label: runtimeLabel
             }
         });
     } catch (err) {
@@ -12152,13 +12442,58 @@ app.get('/server/:containerId/minecraft-configs', requireAuth, async (req, res) 
 
         const connectorWs = connectorConnections.get(server.allocation.connectorId);
         const connectorOnline = Boolean(connectorWs && connectorWs.readyState === WebSocket.OPEN);
+        let minecraftProperties = {};
+        let minecraftPropertiesError = '';
+        if (connectorOnline) {
+            try {
+                connectorWs.send(JSON.stringify({
+                    type: 'read_file',
+                    serverId: server.id,
+                    filePath: MINECRAFT_CONFIG_PATHS.serverProperties
+                }));
+            } catch (error) {
+                minecraftPropertiesError = String(error && error.message || 'Failed to request server.properties.');
+            }
+            const propertiesResult = await waitForConnectorMessage(connectorWs, (message) => {
+                if (!message || Number.parseInt(message.serverId, 10) !== Number.parseInt(server.id, 10)) return false;
+                if (message.type === 'file_content' && String(message.filePath || '') === MINECRAFT_CONFIG_PATHS.serverProperties) {
+                    return { success: true, content: String(message.content || '') };
+                }
+                if (message.type === 'error') {
+                    return { success: false, error: String(message.message || 'Connector returned an error.') };
+                }
+                return false;
+            }, 8000);
+
+            if (propertiesResult && propertiesResult.success) {
+                minecraftProperties = parseMinecraftProperties(propertiesResult.content || '');
+            } else if (propertiesResult && propertiesResult.error) {
+                minecraftPropertiesError = String(propertiesResult.error || '');
+            }
+        }
+
         const actionPermissions = {
             canKick: hasServerPermission(access, 'minecraft.kick'),
             canBan: hasServerPermission(access, 'minecraft.ban'),
             canOp: hasServerPermission(access, 'minecraft.op'),
-            canDeop: hasServerPermission(access, 'minecraft.deop')
+            canDeop: hasServerPermission(access, 'minecraft.deop'),
+            canTempban: hasServerPermission(access, 'minecraft.tempban'),
+            canTeleport: hasServerPermission(access, 'minecraft.teleport')
         };
         const proxyMode = await getServerProxyMode(server.id);
+        const commandMacros = (typeof ServerCommandMacro !== 'undefined' && ServerCommandMacro && hasServerPermission(access, 'server.macros'))
+            ? await ServerCommandMacro.findAll({
+                where: { serverId: server.id },
+                attributes: ['id', 'name', 'command', 'description', 'position'],
+                order: [['position', 'ASC'], ['id', 'ASC']],
+                limit: 12
+            })
+            : [];
+        const motdRaw = minecraftProperties.motd ? String(minecraftProperties.motd).replace(/\\n/g, '\n') : '';
+        const resourcePackUrl = minecraftProperties['resource-pack'] || '';
+        const resourcePackSha1 = minecraftProperties['resource-pack-sha1'] || '';
+        const resourcePackRequired = normalizeMinecraftBooleanString(minecraftProperties['resource-pack-required'], 'false') === 'true';
+        const resourcePackPrompt = minecraftProperties['resource-pack-prompt'] || '';
 
         return res.render('server/minecraft-configs', {
             server,
@@ -12171,12 +12506,60 @@ app.get('/server/:containerId/minecraft-configs', requireAuth, async (req, res) 
             minecraftActionPermissions: actionPermissions,
             minecraftProxyMode: proxyMode,
             connectorOnline,
+            minecraftMotd: motdRaw,
+            minecraftResourcePack: {
+                url: resourcePackUrl,
+                sha1: resourcePackSha1,
+                required: resourcePackRequired,
+                prompt: resourcePackPrompt
+            },
+            minecraftPropertiesError,
+            commandMacros,
+            canUseMacros: hasServerPermission(access, 'server.macros'),
+            canRunConsole: hasServerPermission(access, 'server.console'),
             success: req.query.success || null,
             error: req.query.error || null
         });
     } catch (err) {
         console.error('Error loading minecraft control center:', err);
         return res.redirect('/?error=' + encodeURIComponent('Error loading Minecraft control center.'));
+    }
+});
+
+app.get('/server/:containerId/minecraft-configs/status', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }, { model: Image, as: 'image' }]
+        });
+
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft')) {
+            return res.status(403).json({ success: false, error: 'Forbidden.' });
+        }
+        if (!isServerLikelyMinecraft(server)) {
+            return res.status(400).json({ success: false, error: 'Minecraft tools are available only for Minecraft servers.' });
+        }
+
+        const bedrockFallback = inferMinecraftBedrockMode(server) ? 'true' : 'false';
+        const bedrockMode = normalizeMinecraftBooleanString(req.query.bedrock, bedrockFallback) === 'true';
+        const statusAddress = resolveMinecraftStatusAddress(server);
+        const statusPreview = await fetchMinecraftServerStatusPreview({
+            address: statusAddress,
+            bedrockMode,
+            settingsMap: res.locals.settings || {}
+        });
+
+        return res.json({
+            success: true,
+            address: statusAddress,
+            bedrock: bedrockMode,
+            status: statusPreview
+        });
+    } catch (error) {
+        console.error('Error refreshing minecraft status:', error);
+        return res.status(500).json({ success: false, error: 'Failed to refresh Minecraft status.' });
     }
 });
 
@@ -12886,10 +13269,12 @@ app.post('/server/:containerId/minecraft-configs', requireAuth, async (req, res)
 
         const action = String(req.body.action || '').trim().toLowerCase();
         const actionCatalog = {
-            op: { permission: 'minecraft.op', label: 'OP', command: 'op' },
-            deop: { permission: 'minecraft.deop', label: 'DEOP', command: 'deop' },
-            kick: { permission: 'minecraft.kick', label: 'KICK', command: 'kick' },
-            ban: { permission: 'minecraft.ban', label: 'BAN', command: 'ban' }
+            op: { permission: 'minecraft.op', label: 'OP', command: 'op', requireReason: false },
+            deop: { permission: 'minecraft.deop', label: 'DEOP', command: 'deop', requireReason: false },
+            kick: { permission: 'minecraft.kick', label: 'KICK', command: 'kick', requireReason: true },
+            ban: { permission: 'minecraft.ban', label: 'BAN', command: 'ban', requireReason: true },
+            tempban: { permission: 'minecraft.tempban', label: 'TEMPBAN', command: 'tempban', requireReason: true, requireDuration: true },
+            teleport: { permission: 'minecraft.teleport', label: 'TP', command: 'tp', requireReason: false, requireDestination: true }
         };
         const selectedAction = Object.prototype.hasOwnProperty.call(actionCatalog, action) ? actionCatalog[action] : null;
         if (!selectedAction) {
@@ -12907,12 +13292,31 @@ app.post('/server/:containerId/minecraft-configs', requireAuth, async (req, res)
         }
 
         const reason = normalizeMinecraftCommandReason(req.body.reason, 96);
-        if (!reason || reason.length < 3) {
+        if (selectedAction.requireReason && (!reason || reason.length < 3)) {
             return res.redirect(`${redirectBase}&error=${encodeURIComponent('Action reason is required (min 3 characters).')}`);
         }
-        const command = (selectedAction.command === 'kick' || selectedAction.command === 'ban')
-            ? `${selectedAction.command} ${target}${reason ? ` ${reason}` : ''}`
-            : `${selectedAction.command} ${target}`;
+
+        let command = '';
+        if (selectedAction.command === 'tp') {
+            const destinationRaw = req.body.destination || req.body.targetDestination || req.body.to;
+            const destination = normalizeMinecraftTeleportTarget(destinationRaw);
+            if (!destination) {
+                return res.redirect(`${redirectBase}&error=${encodeURIComponent('Teleport destination is required.')}`);
+            }
+            const destFormatted = destination.includes(' ') ? `"${destination}"` : destination;
+            command = `${selectedAction.command} ${target} ${destFormatted}`;
+        } else if (selectedAction.command === 'tempban') {
+            const durationRaw = req.body.duration || req.body.length;
+            const duration = normalizeMinecraftDuration(durationRaw);
+            if (!duration) {
+                return res.redirect(`${redirectBase}&error=${encodeURIComponent('Tempban duration is required.')}`);
+            }
+            command = `${selectedAction.command} ${target} ${duration}${reason ? ` ${reason}` : ''}`;
+        } else {
+            command = (selectedAction.command === 'kick' || selectedAction.command === 'ban')
+                ? `${selectedAction.command} ${target}${reason ? ` ${reason}` : ''}`
+                : `${selectedAction.command} ${target}`;
+        }
 
         const requestId = `mc_${action}_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`;
         connectorWs.send(JSON.stringify({
@@ -12943,6 +13347,307 @@ app.post('/server/:containerId/minecraft-configs', requireAuth, async (req, res)
     } catch (err) {
         console.error('Error executing minecraft action:', err);
         return res.redirect(`/server/${req.params.containerId}/minecraft-configs?error=${encodeURIComponent('Failed to execute Minecraft action.')}`);
+    }
+});
+
+app.post('/server/:containerId/minecraft-configs/command', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }, { model: Image, as: 'image' }]
+        });
+
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft') || !hasServerPermission(access, 'server.console')) {
+            return res.status(403).json({ success: false, error: 'Missing permission: server.console.' });
+        }
+        if (!isServerLikelyMinecraft(server)) {
+            return res.status(400).json({ success: false, error: 'Minecraft tools are available only for Minecraft servers.' });
+        }
+        if (server.isSuspended) {
+            return res.status(423).json({ success: false, error: 'Server is suspended.' });
+        }
+        const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
+        if (!featureFlags.remoteDownloadEnabled) {
+            return res.status(403).json({ success: false, error: 'Remote downloads are disabled by admin.' });
+        }
+        if (!server.allocation || !server.allocation.connectorId) {
+            return res.status(400).json({ success: false, error: 'Server allocation is missing.' });
+        }
+
+        const command = normalizeMinecraftConsoleCommand(req.body.command || req.body.cmd || '');
+        if (!command) {
+            return res.status(400).json({ success: false, error: 'Command is required.' });
+        }
+        if (isMinecraftMiniConsoleCommandBlocked(command)) {
+            return res.status(400).json({ success: false, error: 'Command blocked. Use the dedicated Minecraft action buttons instead.' });
+        }
+
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return res.status(503).json({ success: false, error: 'Connector is offline.' });
+        }
+
+        const requestId = `mc_cmd_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`;
+        connectorWs.send(JSON.stringify({
+            type: 'server_command',
+            serverId: server.id,
+            command,
+            requestId
+        }));
+
+        await writeServerAuditSafe({
+            actorUserId: req.session && req.session.user ? req.session.user.id : null,
+            serverId: server.id,
+            action: 'server:minecraft.command',
+            ip: req.headers['x-forwarded-for'] || req.ip || null,
+            userAgent: req.headers['user-agent'] || null,
+            metadata: {
+                requestId,
+                command: command.slice(0, 200)
+            }
+        });
+
+        return res.json({ success: true, message: 'Command sent.' });
+    } catch (error) {
+        console.error('Error executing minecraft console command:', error);
+        return res.status(500).json({ success: false, error: 'Failed to send command.' });
+    }
+});
+
+app.post('/server/:containerId/minecraft-configs/motd', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }, { model: Image, as: 'image' }]
+        });
+
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft') || !hasServerPermission(access, 'server.files')) {
+            return res.status(403).json({ success: false, error: 'Missing permission: server.files.' });
+        }
+        if (!isServerLikelyMinecraft(server)) {
+            return res.status(400).json({ success: false, error: 'Minecraft tools are available only for Minecraft servers.' });
+        }
+        if (server.isSuspended) {
+            return res.status(423).json({ success: false, error: 'Server is suspended.' });
+        }
+        if (!server.allocation || !server.allocation.connectorId) {
+            return res.status(400).json({ success: false, error: 'Server allocation is missing.' });
+        }
+
+        const motdRaw = String(req.body.motd || '').replace(/\r\n/g, '\n').trim();
+        const motdNormalized = motdRaw.replace(/\n/g, '\\n').slice(0, 200);
+
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return res.status(503).json({ success: false, error: 'Connector is offline.' });
+        }
+
+        connectorWs.send(JSON.stringify({
+            type: 'read_file',
+            serverId: server.id,
+            filePath: MINECRAFT_CONFIG_PATHS.serverProperties
+        }));
+
+        const readResult = await waitForConnectorMessage(connectorWs, (message) => {
+            if (!message || Number.parseInt(message.serverId, 10) !== Number.parseInt(server.id, 10)) return false;
+            if (message.type === 'file_content' && String(message.filePath || '') === MINECRAFT_CONFIG_PATHS.serverProperties) {
+                return { success: true, content: String(message.content || '') };
+            }
+            if (message.type === 'error') {
+                return { success: false, error: String(message.message || 'Connector returned an error.') };
+            }
+            return false;
+        }, 8000);
+
+        if (!readResult.success) {
+            return res.status(500).json({ success: false, error: readResult.error || 'Failed to read server.properties.' });
+        }
+
+        const updatedContent = upsertMinecraftPropertiesContent(readResult.content || '', {
+            motd: motdNormalized
+        });
+
+        connectorWs.send(JSON.stringify({
+            type: 'write_file',
+            serverId: server.id,
+            filePath: MINECRAFT_CONFIG_PATHS.serverProperties,
+            content: updatedContent
+        }));
+
+        const writeResult = await waitForConnectorMessage(connectorWs, (message) => {
+            if (!message || Number.parseInt(message.serverId, 10) !== Number.parseInt(server.id, 10)) return false;
+            if (message.type === 'write_success' && String(message.filePath || '') === MINECRAFT_CONFIG_PATHS.serverProperties) {
+                return { success: true };
+            }
+            if (message.type === 'error') {
+                return { success: false, error: String(message.message || 'Connector returned an error.') };
+            }
+            return false;
+        }, 8000);
+
+        if (!writeResult.success) {
+            return res.status(500).json({ success: false, error: writeResult.error || 'Failed to save MOTD.' });
+        }
+
+        await writeServerAuditSafe({
+            actorUserId: req.session && req.session.user ? req.session.user.id : null,
+            serverId: server.id,
+            action: 'server:minecraft.motd.update',
+            ip: req.headers['x-forwarded-for'] || req.ip || null,
+            userAgent: req.headers['user-agent'] || null,
+            metadata: {
+                motd: motdNormalized.slice(0, 200)
+            }
+        });
+
+        return res.json({ success: true, message: 'MOTD saved.' });
+    } catch (error) {
+        console.error('Error updating minecraft MOTD:', error);
+        return res.status(500).json({ success: false, error: 'Failed to update MOTD.' });
+    }
+});
+
+app.post('/server/:containerId/minecraft-configs/resource-pack', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }, { model: Image, as: 'image' }]
+        });
+
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft') || !hasServerPermission(access, 'server.files')) {
+            return res.status(403).json({ success: false, error: 'Missing permission: server.files.' });
+        }
+        if (!isServerLikelyMinecraft(server)) {
+            return res.status(400).json({ success: false, error: 'Minecraft tools are available only for Minecraft servers.' });
+        }
+        if (server.isSuspended) {
+            return res.status(423).json({ success: false, error: 'Server is suspended.' });
+        }
+        if (!server.allocation || !server.allocation.connectorId) {
+            return res.status(400).json({ success: false, error: 'Server allocation is missing.' });
+        }
+
+        const packUrl = normalizeRemoteDownloadUrl(req.body.url);
+        if (!packUrl) {
+            return res.status(400).json({ success: false, error: 'Invalid resource pack URL.' });
+        }
+
+        const fileName = inferDownloadFileNameFromUrl(packUrl, 'resource-pack.zip');
+        if (!isMinecraftResourcePackFileName(fileName)) {
+            return res.status(400).json({ success: false, error: 'Resource pack must be a .zip file.' });
+        }
+
+        const maxBytes = 100 * 1024 * 1024;
+        const response = await axios.get(packUrl, {
+            responseType: 'arraybuffer',
+            timeout: 15000,
+            maxContentLength: maxBytes,
+            maxBodyLength: maxBytes,
+            headers: { 'User-Agent': buildModrinthUserAgent(res.locals.settings) }
+        });
+
+        const buffer = Buffer.from(response.data || []);
+        if (!buffer.length) {
+            return res.status(400).json({ success: false, error: 'Resource pack download returned empty file.' });
+        }
+
+        const sha1 = nodeCrypto.createHash('sha1').update(buffer).digest('hex');
+        const required = normalizeMinecraftBooleanString(req.body.required, 'false') === 'true';
+        const prompt = normalizeMinecraftCommandReason(req.body.prompt, 120);
+
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return res.status(503).json({ success: false, error: 'Connector is offline.' });
+        }
+
+        const downloadRequestId = createWsRequestId();
+        connectorWs.send(JSON.stringify({
+            type: 'download_file',
+            serverId: server.id,
+            requestId: downloadRequestId,
+            directory: '/resourcepacks',
+            url: packUrl,
+            fileName
+        }));
+
+        const downloadResult = await waitForConnectorDownloadResult(connectorWs, server.id, downloadRequestId, 45000);
+        if (!downloadResult.success) {
+            return res.status(500).json({ success: false, error: downloadResult.error || 'Failed to download pack to server.' });
+        }
+
+        connectorWs.send(JSON.stringify({
+            type: 'read_file',
+            serverId: server.id,
+            filePath: MINECRAFT_CONFIG_PATHS.serverProperties
+        }));
+
+        const readResult = await waitForConnectorMessage(connectorWs, (message) => {
+            if (!message || Number.parseInt(message.serverId, 10) !== Number.parseInt(server.id, 10)) return false;
+            if (message.type === 'file_content' && String(message.filePath || '') === MINECRAFT_CONFIG_PATHS.serverProperties) {
+                return { success: true, content: String(message.content || '') };
+            }
+            if (message.type === 'error') {
+                return { success: false, error: String(message.message || 'Connector returned an error.') };
+            }
+            return false;
+        }, 8000);
+
+        if (!readResult.success) {
+            return res.status(500).json({ success: false, error: readResult.error || 'Failed to read server.properties.' });
+        }
+
+        const updatedContent = upsertMinecraftPropertiesContent(readResult.content || '', {
+            'resource-pack': packUrl,
+            'resource-pack-sha1': sha1,
+            'resource-pack-required': required ? 'true' : 'false',
+            'resource-pack-prompt': prompt || ''
+        });
+
+        connectorWs.send(JSON.stringify({
+            type: 'write_file',
+            serverId: server.id,
+            filePath: MINECRAFT_CONFIG_PATHS.serverProperties,
+            content: updatedContent
+        }));
+
+        const writeResult = await waitForConnectorMessage(connectorWs, (message) => {
+            if (!message || Number.parseInt(message.serverId, 10) !== Number.parseInt(server.id, 10)) return false;
+            if (message.type === 'write_success' && String(message.filePath || '') === MINECRAFT_CONFIG_PATHS.serverProperties) {
+                return { success: true };
+            }
+            if (message.type === 'error') {
+                return { success: false, error: String(message.message || 'Connector returned an error.') };
+            }
+            return false;
+        }, 8000);
+
+        if (!writeResult.success) {
+            return res.status(500).json({ success: false, error: writeResult.error || 'Failed to save resource pack settings.' });
+        }
+
+        await writeServerAuditSafe({
+            actorUserId: req.session && req.session.user ? req.session.user.id : null,
+            serverId: server.id,
+            action: 'server:minecraft.resource_pack.update',
+            ip: req.headers['x-forwarded-for'] || req.ip || null,
+            userAgent: req.headers['user-agent'] || null,
+            metadata: {
+                url: packUrl,
+                sha1
+            }
+        });
+
+        return res.json({ success: true, message: 'Resource pack validated and applied.', sha1 });
+    } catch (error) {
+        console.error('Error updating resource pack:', error);
+        const message = String(error && error.message || 'Failed to update resource pack.');
+        return res.status(500).json({ success: false, error: message });
     }
 });
 
@@ -13086,6 +13791,7 @@ app.get('/server/:containerId/minecraft/installed', requireAuth, async (req, res
 
         const kind = normalizeMinecraftProjectKind(req.query.kind);
         const directory = resolveMinecraftTargetDirectory(kind, req.query.targetDirectory);
+        const checkUpdates = normalizeMinecraftBooleanString(req.query.checkUpdates, 'false') === 'true';
         const connectorWs = connectorConnections.get(server.allocation.connectorId);
         if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
             return res.status(503).json({ success: false, error: 'Connector is offline.' });
@@ -13113,6 +13819,7 @@ app.get('/server/:containerId/minecraft/installed', requireAuth, async (req, res
                 if (entry.isDirectory) return allowDirectories;
                 if (kind === 'world') return isMinecraftAddonArchiveFileName(name);
                 if (kind === 'datapack') return /\.(zip|jar)$/i.test(name);
+                if (kind === 'resourcepack') return isMinecraftResourcePackFileName(name);
                 return /\.(jar|zip)$/i.test(name);
             })
             .map((entry) => {
@@ -13139,16 +13846,42 @@ app.get('/server/:containerId/minecraft/installed', requireAuth, async (req, res
                     gameVersion: tracked ? tracked.gameVersion : '',
                     versionId: tracked ? tracked.versionId : '',
                     versionNumber: tracked ? tracked.versionNumber : '',
-                    installedAt: tracked ? tracked.installedAt : null
+                    installedAt: tracked ? tracked.installedAt : null,
+                    updateAvailable: false,
+                    updateChecked: false,
+                    latestVersion: '',
+                    updateError: ''
                 };
             })
             .filter(Boolean)
             .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 
+        if (checkUpdates) {
+            const trackable = installed.filter((item) => item.tracked && item.projectId).slice(0, 15);
+            for (const item of trackable) {
+                try {
+                    const latest = await resolveModrinthVersionForInstall({
+                        projectId: item.projectId,
+                        versionId: '',
+                        loader: normalizeMinecraftLoader(item.loader || '', item.kind || kind),
+                        gameVersion: normalizeMinecraftVersion(item.gameVersion || ''),
+                        userAgent: buildModrinthUserAgent(res.locals.settings)
+                    });
+                    item.updateChecked = true;
+                    item.latestVersion = latest && latest.versionNumber ? String(latest.versionNumber) : '';
+                    item.updateAvailable = Boolean(latest && latest.versionId && latest.versionId !== item.versionId);
+                } catch (error) {
+                    item.updateChecked = true;
+                    item.updateError = String(error && error.message || 'Update check failed.');
+                }
+            }
+        }
+
         return res.json({
             success: true,
             kind,
             directory,
+            checkUpdates,
             count: installed.length,
             installed
         });
@@ -13398,6 +14131,18 @@ app.post('/server/:containerId/minecraft/install-url', requireAuth, async (req, 
                 return res.status(400).json({
                     success: false,
                     error: 'Archive extraction requires an archive file name (.zip/.tar/.gz/etc).'
+                });
+            }
+        }
+
+        if (kind === 'resourcepack' && !isMinecraftResourcePackFileName(fileName)) {
+            if (!/[.][A-Za-z0-9]{2,8}$/.test(fileName)) {
+                fileName = `${fileName}.zip`;
+            }
+            if (!isMinecraftResourcePackFileName(fileName)) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Resource packs must be .zip files.'
                 });
             }
         }
@@ -13937,6 +14682,7 @@ app.post('/server/:containerId/smartalerts', requireAuth, async (req, res) => {
                 enabled: parseBooleanInput(req.body.anomalyEnabled, false),
                 cpuThreshold: req.body.anomalyCpuThreshold,
                 memoryThreshold: req.body.anomalyMemoryThreshold,
+                diskThreshold: req.body.anomalyDiskThreshold,
                 durationSamples: req.body.anomalyDurationSamples,
                 cooldownSeconds: req.body.anomalyCooldownSeconds
             },

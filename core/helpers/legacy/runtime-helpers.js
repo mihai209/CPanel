@@ -1447,6 +1447,7 @@ function normalizeMinecraftProjectKind(value) {
     if (normalized === 'plugins' || normalized === 'plugin') return 'plugin';
     if (normalized === 'mods' || normalized === 'mod') return 'mod';
     if (normalized === 'datapacks' || normalized === 'datapack') return 'datapack';
+    if (normalized === 'resourcepacks' || normalized === 'resourcepack' || normalized === 'resource-pack') return 'resourcepack';
     if (normalized === 'worlds' || normalized === 'world') return 'world';
     return 'plugin';
 }
@@ -1566,6 +1567,7 @@ function resolveMinecraftTargetDirectory(kind, requestedDirectory) {
     let fallback = '/plugins';
     if (kind === 'mod') fallback = '/mods';
     if (kind === 'datapack') fallback = '/world/datapacks';
+    if (kind === 'resourcepack') fallback = '/resourcepacks';
     if (kind === 'world') fallback = '/';
     return sanitizeServerDirectoryPath(requestedDirectory, fallback);
 }
@@ -1896,6 +1898,7 @@ function defaultServerSmartAlerts() {
             enabled: false,
             cpuThreshold: 95,
             memoryThreshold: 90,
+            diskThreshold: 90,
             durationSamples: 3,
             cooldownSeconds: 300
         },
@@ -1942,6 +1945,7 @@ function normalizeServerSmartAlertsConfig(raw) {
 
     const cpuThreshold = parseIntegerInput(anomalyRaw.cpuThreshold, base.anomaly.cpuThreshold);
     const memoryThreshold = parseIntegerInput(anomalyRaw.memoryThreshold, base.anomaly.memoryThreshold);
+    const diskThreshold = parseIntegerInput(anomalyRaw.diskThreshold, base.anomaly.diskThreshold);
     const durationSamples = parseIntegerInput(anomalyRaw.durationSamples, base.anomaly.durationSamples);
     const cooldownSeconds = parseIntegerInput(anomalyRaw.cooldownSeconds, base.anomaly.cooldownSeconds);
 
@@ -1969,6 +1973,7 @@ function normalizeServerSmartAlertsConfig(raw) {
             enabled: parseBooleanInput(anomalyRaw.enabled, base.anomaly.enabled),
             cpuThreshold: Math.min(1000, Math.max(1, cpuThreshold.valid ? cpuThreshold.value : base.anomaly.cpuThreshold)),
             memoryThreshold: Math.min(1000, Math.max(1, memoryThreshold.valid ? memoryThreshold.value : base.anomaly.memoryThreshold)),
+            diskThreshold: Math.min(1000, Math.max(1, diskThreshold.valid ? diskThreshold.value : base.anomaly.diskThreshold)),
             durationSamples: Math.min(20, Math.max(1, durationSamples.valid ? durationSamples.value : base.anomaly.durationSamples)),
             cooldownSeconds: Math.min(86400, Math.max(10, cooldownSeconds.valid ? cooldownSeconds.value : base.anomaly.cooldownSeconds))
         },
@@ -2548,7 +2553,7 @@ function parseStatNumber(value, fallback = 0) {
     return parsed;
 }
 
-async function handleResourceAnomalyAlert(serverId, cpuRaw, memoryRaw) {
+async function handleResourceAnomalyAlert(serverId, cpuRaw, memoryRaw, diskRaw) {
     try {
         if (!Number.isInteger(serverId) || serverId <= 0) return;
         const now = Date.now();
@@ -2557,7 +2562,7 @@ async function handleResourceAnomalyAlert(serverId, cpuRaw, memoryRaw) {
         RESOURCE_ANOMALY_SAMPLE_TS.set(serverId, now);
 
         const [server, cfg] = await Promise.all([
-            Server.findByPk(serverId, { attributes: ['id', 'name', 'containerId', 'status', 'memory'] }),
+            Server.findByPk(serverId, { attributes: ['id', 'name', 'containerId', 'status', 'memory', 'disk'] }),
             getServerSmartAlertsConfig(serverId)
         ]);
         if (!server || !cfg || !cfg.enabled || !cfg.events || !cfg.events.resourceAnomaly) return;
@@ -2565,26 +2570,34 @@ async function handleResourceAnomalyAlert(serverId, cpuRaw, memoryRaw) {
 
         const cpuUsage = parseStatNumber(cpuRaw, 0);
         const memoryMB = parseStatNumber(memoryRaw, 0);
+        const diskMB = parseStatNumber(diskRaw, 0);
         const memoryLimit = Number.parseInt(server.memory, 10) || 0;
+        const diskLimit = Number.parseInt(server.disk, 10) || 0;
         if (memoryLimit <= 0) return;
         const memoryPercent = (memoryMB / memoryLimit) * 100;
+        const diskPercent = diskLimit > 0 ? (diskMB / diskLimit) * 100 : 0;
 
-        const state = RESOURCE_ANOMALY_STATE.get(serverId) || { cpuHits: 0, memoryHits: 0, lastAlertAt: 0 };
+        const state = RESOURCE_ANOMALY_STATE.get(serverId) || { cpuHits: 0, memoryHits: 0, diskHits: 0, lastAlertAt: 0 };
         state.cpuHits = cpuUsage >= cfg.anomaly.cpuThreshold ? state.cpuHits + 1 : 0;
         state.memoryHits = memoryPercent >= cfg.anomaly.memoryThreshold ? state.memoryHits + 1 : 0;
+        state.diskHits = diskLimit > 0 && diskPercent >= cfg.anomaly.diskThreshold ? state.diskHits + 1 : 0;
 
         const requiredHits = Math.max(1, Number.parseInt(cfg.anomaly.durationSamples, 10) || 1);
         const cooldownMs = Math.max(10000, (Number.parseInt(cfg.anomaly.cooldownSeconds, 10) * 1000) || DEFAULT_STATS_ALERT_COOLDOWN_MS);
 
         const cpuTriggered = state.cpuHits >= requiredHits;
         const memoryTriggered = state.memoryHits >= requiredHits;
-        if ((cpuTriggered || memoryTriggered) && now - state.lastAlertAt >= cooldownMs) {
+        const diskTriggered = diskLimit > 0 && state.diskHits >= requiredHits;
+        if ((cpuTriggered || memoryTriggered || diskTriggered) && now - state.lastAlertAt >= cooldownMs) {
             const parts = [];
             if (cpuTriggered) {
                 parts.push(`CPU ${cpuUsage.toFixed(1)}% >= ${cfg.anomaly.cpuThreshold}% for ${state.cpuHits} samples`);
             }
             if (memoryTriggered) {
                 parts.push(`RAM ${memoryMB.toFixed(0)}MB (${memoryPercent.toFixed(1)}%) >= ${cfg.anomaly.memoryThreshold}% for ${state.memoryHits} samples`);
+            }
+            if (diskTriggered) {
+                parts.push(`Disk ${diskMB.toFixed(0)}MB (${diskPercent.toFixed(1)}%) >= ${cfg.anomaly.diskThreshold}% for ${state.diskHits} samples`);
             }
 
             await sendServerSmartAlert(server, 'resourceAnomaly', {
@@ -2593,6 +2606,7 @@ async function handleResourceAnomalyAlert(serverId, cpuRaw, memoryRaw) {
             state.lastAlertAt = now;
             state.cpuHits = 0;
             state.memoryHits = 0;
+            state.diskHits = 0;
         }
 
         RESOURCE_ANOMALY_STATE.set(serverId, state);

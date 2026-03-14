@@ -99,6 +99,19 @@ const dashboardFoldersRaw = typeof dashboardFolders !== 'undefined' ? dashboardF
 const dashboardTagsRaw = typeof dashboardTags !== 'undefined' ? dashboardTags : [];
 const dashboardFoldersList = Array.isArray(dashboardFoldersRaw) ? dashboardFoldersRaw : [];
 const dashboardTagsList = Array.isArray(dashboardTagsRaw) ? dashboardTagsRaw : [];
+const rawDashboardLayout = typeof dashboardLayout !== 'undefined' ? dashboardLayout : {};
+const normalizeLayoutFlag = (value, fallback) => {
+    if (value === true || value === 'true') return true;
+    if (value === false || value === 'false') return false;
+    return fallback;
+};
+const activeDashboardLayout = {
+    metrics: normalizeLayoutFlag(rawDashboardLayout.metrics, true),
+    announcements: normalizeLayoutFlag(rawDashboardLayout.announcements, true),
+    opsFeed: normalizeLayoutFlag(rawDashboardLayout.opsFeed, true),
+    filters: normalizeLayoutFlag(rawDashboardLayout.filters, true),
+    resourcePills: normalizeLayoutFlag(rawDashboardLayout.resourcePills, true)
+};
 %>
 
 <style>
@@ -384,7 +397,7 @@ const dashboardTagsList = Array.isArray(dashboardTagsRaw) ? dashboardTagsRaw : [
                             <label class="small text-muted mb-0" for="dashboardOthersToggle">See Other Servers</label>
                         </form>
                     <% } %>
-                    <% if (serverList.length > 1) { %>
+                    <% if (activeDashboardLayout.filters && serverList.length > 1) { %>
                         <div class="dashboard-sort-controls">
                             <label for="dashboardServerSort" class="small text-muted mb-1 d-block">Order Servers</label>
                             <div class="d-flex align-items-center gap-2">
@@ -405,7 +418,7 @@ const dashboardTagsList = Array.isArray(dashboardTagsRaw) ? dashboardTagsRaw : [
                             <div id="dashboardSortFeedback" class="dashboard-sort-feedback text-muted small mt-1"></div>
                         </div>
                     <% } %>
-                    <% if (serverList.length > 0) { %>
+                    <% if (activeDashboardLayout.filters && serverList.length > 0) { %>
                         <div class="dashboard-sort-controls">
                             <label class="small text-muted mb-1 d-block">Filter</label>
                             <div class="d-flex align-items-center gap-2">
@@ -424,12 +437,15 @@ const dashboardTagsList = Array.isArray(dashboardTagsRaw) ? dashboardTagsRaw : [
                             </div>
                         </div>
                     <% } %>
+                    <button type="button" class="btn btn-outline-light btn-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#dashboardLayoutModal">
+                        <i class="bi bi-layout-text-window me-1"></i>Customize
+                    </button>
                     <div class="text-muted small">Signed in as <span class="text-light fw-semibold"><%= user.username %></span></div>
                 </div>
             </div>
         </div>
 
-        <% if (announcerEnabled && announcerMessage.length > 0) { %>
+        <% if (activeDashboardLayout.announcements && announcerEnabled && announcerMessage.length > 0) { %>
             <div class="announcement-card <%= activeAnnouncerConfig.classes %>" style="<%= activeAnnouncerConfig.style %>">
                 <div class="announcement-meta">
                     <i class="bi bi-megaphone me-1"></i>Announcer • <%= activeAnnouncerConfig.badge %>
@@ -438,7 +454,7 @@ const dashboardTagsList = Array.isArray(dashboardTagsRaw) ? dashboardTagsRaw : [
             </div>
         <% } %>
 
-        <% if (incidentFeed.length > 0 || maintenanceFeed.length > 0 || securityFeed.length > 0) { %>
+        <% if (activeDashboardLayout.opsFeed && (incidentFeed.length > 0 || maintenanceFeed.length > 0 || securityFeed.length > 0)) { %>
             <div class="row g-3 mb-3">
                 <% if (incidentFeed.length > 0) { %>
                     <div class="col-12 col-xl-4">
@@ -511,6 +527,7 @@ const dashboardTagsList = Array.isArray(dashboardTagsRaw) ? dashboardTagsRaw : [
             </div>
         <% } %>
 
+        <% if (activeDashboardLayout.metrics) { %>
         <div class="row g-3">
             <div class="col-6 col-lg-3">
                 <div class="metric-card">
@@ -543,6 +560,7 @@ const dashboardTagsList = Array.isArray(dashboardTagsRaw) ? dashboardTagsRaw : [
                 </div>
             </div>
         </div>
+        <% } %>
 
         <% if (serverList.length > 0) { %>
             <div class="d-flex align-items-center justify-content-between mt-4 mb-2">
@@ -608,20 +626,22 @@ const dashboardTagsList = Array.isArray(dashboardTagsRaw) ? dashboardTagsRaw : [
                                 <span class="badge <%= badgeClass %> text-uppercase"><%= statusLabel %></span>
                             </div>
 
-                            <div class="resource-grid">
-                                <div class="resource-pill">
-                                    <span class="resource-pill-label">Memory</span>
-                                    <span class="resource-pill-value"><%= formatLimit(server.memory) %></span>
+                            <% if (activeDashboardLayout.resourcePills) { %>
+                                <div class="resource-grid">
+                                    <div class="resource-pill">
+                                        <span class="resource-pill-label">Memory</span>
+                                        <span class="resource-pill-value"><%= formatLimit(server.memory) %></span>
+                                    </div>
+                                    <div class="resource-pill">
+                                        <span class="resource-pill-label">Disk</span>
+                                        <span class="resource-pill-value"><%= formatLimit(server.disk) %></span>
+                                    </div>
+                                    <div class="resource-pill">
+                                        <span class="resource-pill-label">CPU</span>
+                                        <span class="resource-pill-value"><%= server.cpu ? `${server.cpu}%` : 'N/A' %></span>
+                                    </div>
                                 </div>
-                                <div class="resource-pill">
-                                    <span class="resource-pill-label">Disk</span>
-                                    <span class="resource-pill-value"><%= formatLimit(server.disk) %></span>
-                                </div>
-                                <div class="resource-pill">
-                                    <span class="resource-pill-label">CPU</span>
-                                    <span class="resource-pill-value"><%= server.cpu ? `${server.cpu}%` : 'N/A' %></span>
-                                </div>
-                            </div>
+                            <% } %>
 
                             <div class="mt-3 d-grid gap-2">
                                 <a href="/server/<%= server.containerId %>" class="btn btn-primary btn-sm fw-semibold">Manage Server</a>
@@ -673,6 +693,56 @@ const dashboardTagsList = Array.isArray(dashboardTagsRaw) ? dashboardTagsRaw : [
                 </div>
             </div>
         <% } %>
+        <div class="modal fade" id="dashboardLayoutModal" tabindex="-1" aria-labelledby="dashboardLayoutModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content bg-dark text-light border-secondary">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title" id="dashboardLayoutModalLabel">Customize Dashboard</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="small text-muted mb-3">Toggle the sections you want to see on your dashboard.</p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="layoutMetrics" <%= activeDashboardLayout.metrics ? 'checked' : '' %>>
+                                    <label class="form-check-label" for="layoutMetrics">Show summary metrics</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="layoutAnnouncements" <%= activeDashboardLayout.announcements ? 'checked' : '' %>>
+                                    <label class="form-check-label" for="layoutAnnouncements">Show announcements</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="layoutOpsFeed" <%= activeDashboardLayout.opsFeed ? 'checked' : '' %>>
+                                    <label class="form-check-label" for="layoutOpsFeed">Show incident/maintenance feed</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="layoutFilters" <%= activeDashboardLayout.filters ? 'checked' : '' %>>
+                                    <label class="form-check-label" for="layoutFilters">Show sort & filter controls</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="layoutResourcePills" <%= activeDashboardLayout.resourcePills ? 'checked' : '' %>>
+                                    <label class="form-check-label" for="layoutResourcePills">Show resource pills on cards</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="dashboardLayoutFeedback" class="small text-muted mt-3"></div>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary btn-sm fw-semibold" id="dashboardLayoutSaveBtn">Save Layout</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -1029,6 +1099,60 @@ const dashboardTagsList = Array.isArray(dashboardTagsRaw) ? dashboardTagsRaw : [
                 customSaveButton.disabled = false;
             }
         });
+
+        const layoutModalEl = document.getElementById('dashboardLayoutModal');
+        const layoutSaveBtn = document.getElementById('dashboardLayoutSaveBtn');
+        const layoutFeedback = document.getElementById('dashboardLayoutFeedback');
+        const layoutInputs = {
+            metrics: document.getElementById('layoutMetrics'),
+            announcements: document.getElementById('layoutAnnouncements'),
+            opsFeed: document.getElementById('layoutOpsFeed'),
+            filters: document.getElementById('layoutFilters'),
+            resourcePills: document.getElementById('layoutResourcePills')
+        };
+
+        if (layoutModalEl && layoutSaveBtn && window.bootstrap) {
+            const layoutModal = bootstrap.Modal.getOrCreateInstance(layoutModalEl);
+            const setLayoutFeedback = (message, variant = 'muted') => {
+                if (!layoutFeedback) return;
+                layoutFeedback.textContent = message || '';
+                layoutFeedback.classList.remove('text-muted', 'text-success', 'text-danger');
+                if (variant === 'success') layoutFeedback.classList.add('text-success');
+                else if (variant === 'danger') layoutFeedback.classList.add('text-danger');
+                else layoutFeedback.classList.add('text-muted');
+            };
+
+            layoutSaveBtn.addEventListener('click', async () => {
+                layoutSaveBtn.disabled = true;
+                setLayoutFeedback('Saving layout...', 'muted');
+                try {
+                    const payload = {
+                        metrics: Boolean(layoutInputs.metrics && layoutInputs.metrics.checked),
+                        announcements: Boolean(layoutInputs.announcements && layoutInputs.announcements.checked),
+                        opsFeed: Boolean(layoutInputs.opsFeed && layoutInputs.opsFeed.checked),
+                        filters: Boolean(layoutInputs.filters && layoutInputs.filters.checked),
+                        resourcePills: Boolean(layoutInputs.resourcePills && layoutInputs.resourcePills.checked)
+                    };
+                    const response = await fetch('/dashboard/layout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) {
+                        throw new Error((data && data.error) || 'Failed to save layout.');
+                    }
+                    setLayoutFeedback('Layout saved. Refreshing...', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 600);
+                } catch (error) {
+                    setLayoutFeedback(error.message || 'Failed to save layout.', 'danger');
+                } finally {
+                    layoutSaveBtn.disabled = false;
+                }
+            });
+        }
     })();
 </script>
 </body>

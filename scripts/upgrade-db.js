@@ -1105,6 +1105,7 @@ async function upgrade() {
             { key: 'securityMaxBodyMb', value: '2' },
             { key: 'featurePolicyEngineEnabled', value: 'false' },
             { key: 'featurePlaybooksAutomationEnabled', value: 'false' },
+            { key: 'featureStrictAuditEnabled', value: 'false' },
             { key: 'featureSftpEnabled', value: 'true' },
             { key: 'featureWebUploadEnabled', value: 'true' },
             { key: 'featureWebUploadMaxMb', value: '50' },

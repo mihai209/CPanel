@@ -75,6 +75,20 @@ function parseAllocationIds(rawIds, maxItems = 2000) {
     return output;
 }
 
+function parseServerIds(rawIds, maxItems = 2000) {
+    const values = Array.isArray(rawIds) ? rawIds : (rawIds === undefined || rawIds === null ? [] : [rawIds]);
+    const seen = new Set();
+    const output = [];
+    for (const value of values) {
+        const parsed = Number.parseInt(value, 10);
+        if (!Number.isInteger(parsed) || parsed <= 0 || seen.has(parsed)) continue;
+        seen.add(parsed);
+        output.push(parsed);
+        if (output.length >= maxItems) break;
+    }
+    return output;
+}
+
 function renderAllocationAliasTemplate(template, allocation) {
     const sourceTemplate = String(template || '');
     const currentAlias = String(allocation && allocation.alias || '');
@@ -687,6 +701,115 @@ app.post('/admin/connectors/:id/allocations/:allocId/notes', requireAuth, requir
     } catch (error) {
         console.error('Error updating allocation notes:', error);
         res.status(500).json({ success: false, error: 'Failed to update notes' });
+    }
+});
+
+app.get('/admin/allocations/drift', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const allocations = await Allocation.findAll({
+            include: [
+                { model: Connector, as: 'connector', attributes: ['id', 'name'] },
+                { model: Server, as: 'server', attributes: ['id', 'name', 'containerId'] }
+            ],
+            order: [['ip', 'ASC'], ['port', 'ASC']]
+        });
+        const servers = await Server.findAll({
+            include: [{ model: Allocation, as: 'allocation', attributes: ['id', 'ip', 'port', 'serverId'] }],
+            order: [['id', 'ASC']]
+        });
+
+        const serverById = new Map(servers.map((srv) => [Number(srv.id), srv]));
+        const allocationById = new Map(allocations.map((alloc) => [Number(alloc.id), alloc]));
+
+        const missingServerAllocations = allocations.filter((alloc) => alloc.serverId && !serverById.has(Number(alloc.serverId)));
+        const missingAllocationServers = servers.filter((srv) => srv.allocationId && !allocationById.has(Number(srv.allocationId)));
+        const mismatchedAllocations = servers.filter((srv) => {
+            if (!srv.allocationId || !allocationById.has(Number(srv.allocationId))) return false;
+            const alloc = allocationById.get(Number(srv.allocationId));
+            return Number(alloc.serverId || 0) !== Number(srv.id);
+        });
+
+        const duplicates = [];
+        const duplicateMap = new Map();
+        allocations.forEach((alloc) => {
+            const key = `${alloc.ip}:${alloc.port}`;
+            if (!duplicateMap.has(key)) duplicateMap.set(key, []);
+            duplicateMap.get(key).push(alloc);
+        });
+        duplicateMap.forEach((list, key) => {
+            if (list.length > 1) {
+                duplicates.push({ key, allocations: list });
+            }
+        });
+
+        return res.render('admin/allocations-drift', {
+            user: req.session.user,
+            path: '/admin/allocations/drift',
+            missingServerAllocations,
+            missingAllocationServers,
+            mismatchedAllocations,
+            duplicates,
+            success: req.query.success || null,
+            error: req.query.error || null
+        });
+    } catch (error) {
+        console.error('Error loading allocation drift page:', error);
+        return res.redirect('/admin/overview?error=' + encodeURIComponent('Failed to load allocation drift.'));
+    }
+});
+
+app.post('/admin/allocations/drift/unassign', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const allocationIds = parseAllocationIds(req.body.allocationIds);
+        if (!allocationIds.length) {
+            return res.redirect('/admin/allocations/drift?error=' + encodeURIComponent('Select allocations to unassign.'));
+        }
+
+        await Allocation.update({ serverId: null }, { where: { id: allocationIds } });
+        return res.redirect('/admin/allocations/drift?success=' + encodeURIComponent(`Unassigned ${allocationIds.length} allocation(s).`));
+    } catch (error) {
+        console.error('Error unassigning allocations:', error);
+        return res.redirect('/admin/allocations/drift?error=' + encodeURIComponent('Failed to unassign allocations.'));
+    }
+});
+
+app.post('/admin/allocations/drift/clear', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const serverIds = parseServerIds(req.body.serverIds);
+        if (!serverIds.length) {
+            return res.redirect('/admin/allocations/drift?error=' + encodeURIComponent('Select servers to clear allocation.'));
+        }
+
+        await Server.update({ allocationId: null }, { where: { id: serverIds } });
+        return res.redirect('/admin/allocations/drift?success=' + encodeURIComponent(`Cleared allocation for ${serverIds.length} server(s).`));
+    } catch (error) {
+        console.error('Error clearing server allocations:', error);
+        return res.redirect('/admin/allocations/drift?error=' + encodeURIComponent('Failed to clear server allocations.'));
+    }
+});
+
+app.post('/admin/allocations/drift/reassign', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const serverIds = parseServerIds(req.body.serverIds);
+        if (!serverIds.length) {
+            return res.redirect('/admin/allocations/drift?error=' + encodeURIComponent('Select servers to reassign.'));
+        }
+
+        const servers = await Server.findAll({
+            where: { id: serverIds },
+            attributes: ['id', 'allocationId']
+        });
+        const updates = [];
+        servers.forEach((srv) => {
+            if (!srv.allocationId) return;
+            updates.push(Allocation.update({ serverId: srv.id }, { where: { id: srv.allocationId } }));
+        });
+        await Promise.all(updates);
+
+        return res.redirect('/admin/allocations/drift?success=' + encodeURIComponent(`Reassigned allocations for ${updates.length} server(s).`));
+    } catch (error) {
+        console.error('Error reassigning allocations:', error);
+        return res.redirect('/admin/allocations/drift?error=' + encodeURIComponent('Failed to reassign allocations.'));
     }
 });
 

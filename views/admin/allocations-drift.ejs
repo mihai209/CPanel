@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= settings.brandName.toUpperCase() %> - Allocation Drift</title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/mobile-layout.css">
+</head>
+<body>
+<%- include('../partials/error-modal') %>
+<div class="admin-wrapper">
+    <%- include('../partials/admin-sidebar') %>
+
+    <div class="admin-content">
+        <div class="admin-header">
+            <div class="d-flex align-items-baseline gap-3">
+                <h4 class="mb-0 text-light fw-normal">Allocation Drift</h4>
+                <small class="text-muted">Find and fix mismatched or missing allocation bindings.</small>
+            </div>
+            <div class="breadcrumb-admin">
+                <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span class="text-light">Allocation Drift</span>
+            </div>
+        </div>
+
+        <div class="container-fluid py-4 px-lg-4">
+            <% if (success) { %>
+                <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success">
+                    <i class="bi bi-check-circle-fill me-2"></i><%= success %>
+                </div>
+            <% } %>
+            <% if (error) { %>
+                <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i><%= error %>
+                </div>
+            <% } %>
+
+            <div class="card border-0 shadow-sm mb-4" style="background-color:#141419;">
+                <div class="card-header border-bottom border-secondary border-opacity-10 bg-transparent d-flex align-items-center justify-content-between">
+                    <h5 class="mb-0 fs-6 fw-bold text-light">Allocations pointing to missing servers</h5>
+                    <span class="badge bg-warning text-dark"><%= missingServerAllocations.length %></span>
+                </div>
+                <div class="card-body p-0">
+                    <form method="POST" action="/admin/allocations/drift/unassign">
+                        <div class="table-responsive">
+                            <table class="table table-dark table-hover align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px;"></th>
+                                        <th>IP</th>
+                                        <th>Port</th>
+                                        <th>Connector</th>
+                                        <th>Alias</th>
+                                        <th>Server ID (missing)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <% if (missingServerAllocations.length === 0) { %>
+                                    <tr><td colspan="6" class="text-secondary">No drift detected.</td></tr>
+                                <% } else { missingServerAllocations.forEach((alloc) => { %>
+                                    <tr>
+                                        <td><input type="checkbox" name="allocationIds" value="<%= alloc.id %>"></td>
+                                        <td><%= alloc.ip %></td>
+                                        <td><%= alloc.port %></td>
+                                        <td><%= alloc.connector ? alloc.connector.name : 'N/A' %></td>
+                                        <td><%= alloc.alias || '-' %></td>
+                                        <td><%= alloc.serverId %></td>
+                                    </tr>
+                                <% }) } %>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="p-3 text-end">
+                            <button type="submit" class="btn btn-outline-warning btn-sm">Unassign Selected</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4" style="background-color:#141419;">
+                <div class="card-header border-bottom border-secondary border-opacity-10 bg-transparent d-flex align-items-center justify-content-between">
+                    <h5 class="mb-0 fs-6 fw-bold text-light">Servers with missing allocation record</h5>
+                    <span class="badge bg-warning text-dark"><%= missingAllocationServers.length %></span>
+                </div>
+                <div class="card-body p-0">
+                    <form method="POST" action="/admin/allocations/drift/clear">
+                        <div class="table-responsive">
+                            <table class="table table-dark table-hover align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px;"></th>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Container</th>
+                                        <th>Allocation ID</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <% if (missingAllocationServers.length === 0) { %>
+                                    <tr><td colspan="5" class="text-secondary">No drift detected.</td></tr>
+                                <% } else { missingAllocationServers.forEach((srv) => { %>
+                                    <tr>
+                                        <td><input type="checkbox" name="serverIds" value="<%= srv.id %>"></td>
+                                        <td><%= srv.id %></td>
+                                        <td><%= srv.name %></td>
+                                        <td class="text-secondary"><%= srv.containerId ? srv.containerId.substring(0, 12) : '-' %></td>
+                                        <td><%= srv.allocationId %></td>
+                                    </tr>
+                                <% }) } %>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="p-3 text-end">
+                            <button type="submit" class="btn btn-outline-warning btn-sm">Clear Allocation Ref</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4" style="background-color:#141419;">
+                <div class="card-header border-bottom border-secondary border-opacity-10 bg-transparent d-flex align-items-center justify-content-between">
+                    <h5 class="mb-0 fs-6 fw-bold text-light">Servers with allocation mismatch</h5>
+                    <span class="badge bg-warning text-dark"><%= mismatchedAllocations.length %></span>
+                </div>
+                <div class="card-body p-0">
+                    <form method="POST" action="/admin/allocations/drift/reassign">
+                        <div class="table-responsive">
+                            <table class="table table-dark table-hover align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th style="width:40px;"></th>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Allocation ID</th>
+                                        <th>Allocation Server ID</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <% if (mismatchedAllocations.length === 0) { %>
+                                    <tr><td colspan="5" class="text-secondary">No drift detected.</td></tr>
+                                <% } else { mismatchedAllocations.forEach((srv) => { %>
+                                    <tr>
+                                        <td><input type="checkbox" name="serverIds" value="<%= srv.id %>"></td>
+                                        <td><%= srv.id %></td>
+                                        <td><%= srv.name %></td>
+                                        <td><%= srv.allocationId %></td>
+                                        <td><%= srv.allocation && srv.allocation.serverId ? srv.allocation.serverId : 'none' %></td>
+                                    </tr>
+                                <% }) } %>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="p-3 text-end">
+                            <button type="submit" class="btn btn-outline-warning btn-sm">Reassign Allocation</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm" style="background-color:#141419;">
+                <div class="card-header border-bottom border-secondary border-opacity-10 bg-transparent d-flex align-items-center justify-content-between">
+                    <h5 class="mb-0 fs-6 fw-bold text-light">Duplicate allocations (same IP:port)</h5>
+                    <span class="badge bg-secondary"><%= duplicates.length %></span>
+                </div>
+                <div class="card-body">
+                    <% if (duplicates.length === 0) { %>
+                        <div class="text-secondary">No duplicates detected.</div>
+                    <% } else { duplicates.forEach((entry) => { %>
+                        <div class="mb-3">
+                            <div class="fw-semibold text-light"><%= entry.key %></div>
+                            <div class="small text-secondary">
+                                <% entry.allocations.forEach((alloc, idx) => { %>
+                                    <span class="badge bg-dark border border-secondary me-1">
+                                        #<%= alloc.id %> → <%= alloc.serverId || 'unassigned' %>
+                                    </span>
+                                <% }) %>
+                            </div>
+                        </div>
+                    <% }) } %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -353,6 +353,19 @@
             <div class="scroll-area">
                 <div id="alerts"></div>
 
+                <div class="settings-card mb-3">
+                    <div class="settings-card-header">
+                        <h6 class="mb-0 fw-semibold">Runtime Detection</h6>
+                    </div>
+                    <div class="settings-card-body">
+                        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                            <span class="badge text-bg-secondary text-uppercase"><%= minecraftRuntime && minecraftRuntime.kind === 'mod' ? 'Modded' : 'Plugins' %></span>
+                            <span class="badge text-bg-dark text-uppercase"><%= minecraftRuntime && minecraftRuntime.label ? minecraftRuntime.label : 'Unknown' %></span>
+                        </div>
+                        <div class="small text-secondary">Detected from the server image/startup. Use this to pick the right loaders and update checks.</div>
+                    </div>
+                </div>
+
                 <div class="d-flex justify-content-between align-items-center mb-3 mode-switch">
                     <div class="d-flex gap-2">
                         <button type="button" class="btn btn-sm btn-outline-secondary" id="installedModeBtn" data-bs-toggle="modal" data-bs-target="#installedModal">
@@ -377,6 +390,7 @@
                                         <option value="plugin" <%= minecraftDefaults.kind === 'plugin' ? 'selected' : '' %>>Plugins</option>
                                         <option value="mod" <%= minecraftDefaults.kind === 'mod' ? 'selected' : '' %>>Mods</option>
                                         <option value="datapack" <%= minecraftDefaults.kind === 'datapack' ? 'selected' : '' %>>Datapacks</option>
+                                        <option value="resourcepack" <%= minecraftDefaults.kind === 'resourcepack' ? 'selected' : '' %>>Resource Packs</option>
                                         <option value="world" <%= minecraftDefaults.kind === 'world' ? 'selected' : '' %>>Worlds</option>
                                     </select>
                                 </div>
@@ -403,7 +417,7 @@
                                 </div>
                             </div>
                             <div class="small text-secondary mt-2">
-                                Search is powered by Modrinth for plugins/mods/datapacks. World archives can be downloaded with the direct URL installer below.
+                                Search is powered by Modrinth for plugins/mods/datapacks/resource packs. World archives can be downloaded with the direct URL installer below.
                             </div>
                         </div>
                     </div>
@@ -441,7 +455,7 @@
                                 </div>
                             </div>
                             <div class="small text-secondary mt-2">
-                                For worlds, keep extract enabled and target <code>/</code> unless your setup needs a custom folder.
+                                For worlds, keep extract enabled and target <code>/</code> unless your setup needs a custom folder. Resource packs should be zipped.
                             </div>
                         </div>
                     </div>
@@ -472,9 +486,14 @@
                         <div class="small text-secondary">
                             Update works only for addons installed from this panel (tracked source: Modrinth).
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshInstalledBtn">
-                            <i class="bi bi-arrow-clockwise me-1"></i> Refresh
-                        </button>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-info" id="checkUpdatesBtn">
+                                <i class="bi bi-shield-check me-1"></i> Check Updates
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshInstalledBtn">
+                                <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                            </button>
+                        </div>
                     </div>
                     <div id="installedList" class="installed-list"></div>
                 </div>
@@ -495,6 +514,7 @@
             plugin: <%- JSON.stringify(minecraftCatalog.plugins || []) %>,
             mod: <%- JSON.stringify(minecraftCatalog.mods || []) %>,
             datapack: <%- JSON.stringify(minecraftCatalog.datapacks || []) %>,
+            resourcepack: <%- JSON.stringify(minecraftCatalog.resourcepacks || []) %>,
             world: <%- JSON.stringify(minecraftCatalog.worlds || []) %>
         };
 
@@ -517,6 +537,7 @@
         const installedModeBtn = document.getElementById('installedModeBtn');
         const installedList = document.getElementById('installedList');
         const refreshInstalledBtn = document.getElementById('refreshInstalledBtn');
+        const checkUpdatesBtn = document.getElementById('checkUpdatesBtn');
         const installedModalElement = document.getElementById('installedModal');
 
         const state = {
@@ -524,7 +545,8 @@
             limit: 12,
             total: 0,
             loading: false,
-            installedMessages: new Set()
+            installedMessages: new Set(),
+            checkUpdates: false
         };
 
         function escapeHtml(value) {
@@ -639,6 +661,16 @@
                 const trackedBadge = item.tracked
                     ? '<span class="badge text-bg-success">Tracked</span>'
                     : '<span class="badge text-bg-secondary">Manual</span>';
+                let updateBadge = '';
+                if (item.updateChecked) {
+                    if (item.updateError) {
+                        updateBadge = '<span class="badge text-bg-danger">Update check failed</span>';
+                    } else if (item.updateAvailable) {
+                        updateBadge = '<span class="badge text-bg-warning text-dark">Update available</span>';
+                    } else {
+                        updateBadge = '<span class="badge text-bg-info">Up to date</span>';
+                    }
+                }
                 const updateDisabled = item.canUpdate && !isDirectory ? '' : 'disabled';
                 const updateTitle = item.canUpdate && !isDirectory
                     ? 'Update from Modrinth'
@@ -654,7 +686,10 @@
                                 </div>
                                 <div class="installed-item-meta">${escapeHtml(item.path)}${modrinthHint}</div>
                             </div>
-                            ${trackedBadge}
+                            <div class="d-flex flex-column align-items-end gap-1">
+                                ${trackedBadge}
+                                ${updateBadge}
+                            </div>
                         </div>
                         <div class="installed-item-meta mb-3">
                             ${typeLabel}${isDirectory ? '' : ` · ${formatBytes(item.size)}`} · ${escapeHtml(item.permissions || '---')}
@@ -786,7 +821,8 @@
                 const filters = getCurrentFilters();
                 const params = new URLSearchParams({
                     kind: filters.kind,
-                    targetDirectory: filters.targetDirectory
+                    targetDirectory: filters.targetDirectory,
+                    checkUpdates: state.checkUpdates ? '1' : '0'
                 });
                 const response = await fetch(`/server/${serverId}/minecraft/installed?${params.toString()}`);
                 const payload = await response.json();
@@ -869,6 +905,7 @@
         function defaultTargetDirectoryForKind(kind) {
             if (kind === 'mod') return '/mods';
             if (kind === 'datapack') return '/world/datapacks';
+            if (kind === 'resourcepack') return '/resourcepacks';
             if (kind === 'world') return '/';
             return '/plugins';
         }
@@ -977,9 +1014,19 @@
         });
 
         installedModeBtn.addEventListener('click', () => loadInstalled());
-        refreshInstalledBtn.addEventListener('click', () => loadInstalled());
+        refreshInstalledBtn.addEventListener('click', () => {
+            state.checkUpdates = false;
+            loadInstalled();
+        });
+        checkUpdatesBtn?.addEventListener('click', () => {
+            state.checkUpdates = true;
+            loadInstalled();
+        });
         if (installedModalElement) {
-            installedModalElement.addEventListener('shown.bs.modal', () => loadInstalled());
+            installedModalElement.addEventListener('shown.bs.modal', () => {
+                state.checkUpdates = false;
+                loadInstalled();
+            });
         }
 
         syncKindUi('<%= minecraftDefaults.kind %>', '<%= minecraftDefaults.loader || '' %>');
