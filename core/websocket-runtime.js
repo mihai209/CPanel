@@ -78,6 +78,14 @@ const CRASH_POLICY_SETTING_KEYS = [
 ];
 let crashPolicyCache = { ts: 0, config: null };
 const SERVER_CRASH_COOLDOWN_STATE = new Map(); // serverId -> last crash ts
+const SERVER_CRASH_LOOP_STATE = new Map(); // serverId -> { count, firstAt, cooldownUntil }
+const SERVER_TICK_SAMPLES = new Map(); // serverId -> [{ ts, tps1m, tps5m, tps15m, mspt1m, mspt5m, mspt15m, tickLag }]
+const SERVER_TICK_STATE = new Map(); // serverId -> { lastMspt1m, lastMspt5m, lastMspt15m, pendingTps }
+const SERVER_RESOURCE_PACK_STATE = new Map(); // serverId -> { updatedAt, players: Map(name -> { status, updatedAt }) }
+const SERVER_TICK_SAMPLE_LIMIT = 240;
+const CRASH_LOOP_WINDOW_MS = 5 * 60 * 1000;
+const CRASH_LOOP_THRESHOLD = 3;
+const CRASH_LOOP_COOLDOWN_MS = 10 * 60 * 1000;
 const RESOURCE_TIMELINE_LAST_WRITE_TS = new Map(); // serverId -> timestamp
 const RESOURCE_TIMELINE_WRITE_INTERVAL_MS = 10 * 1000;
 const RESOURCE_TIMELINE_RETENTION_MS = 12 * 60 * 60 * 1000;
@@ -1055,6 +1063,165 @@ function parseResourceNumber(value, fallback = 0) {
     return parsed;
 }
 
+function normalizeConsoleLine(line) {
+    if (!line) return '';
+    let cleaned = String(line);
+    cleaned = cleaned.replace(/\u001b\[[0-9;]*m/g, '');
+    cleaned = cleaned.replace(/§[0-9A-FK-ORX]/gi, '');
+    cleaned = cleaned.replace(/^\[[^\]]+\]\s*/g, '');
+    cleaned = cleaned.replace(/^\d{2}:\d{2}:\d{2}\s*/g, '');
+    return cleaned.trim();
+}
+
+function parseNumberSeries(line) {
+    const matches = String(line || '').match(/(\d+(?:[.,]\d+)?)/g);
+    if (!matches || matches.length === 0) return [];
+    return matches.map((value) => Number.parseFloat(String(value).replace(',', '.'))).filter((num) => Number.isFinite(num));
+}
+
+function recordTickSample(serverId, sample) {
+    if (!serverId || !sample) return;
+    const existing = SERVER_TICK_SAMPLES.get(serverId) || [];
+    existing.push(sample);
+    while (existing.length > SERVER_TICK_SAMPLE_LIMIT) existing.shift();
+    SERVER_TICK_SAMPLES.set(serverId, existing);
+}
+
+function handleTickStatsFromConsole(serverId, output) {
+    if (!output) return;
+    const state = SERVER_TICK_STATE.get(serverId) || { lastMspt1m: null, lastMspt5m: null, lastMspt15m: null, pendingTps: false };
+    const lines = String(output).split(/\r?\n/);
+    lines.forEach((rawLine) => {
+        const line = normalizeConsoleLine(rawLine);
+        if (!line) return;
+        const lower = line.toLowerCase();
+
+        if (lower.includes('mspt')) {
+            const values = parseNumberSeries(line);
+            if (values.length >= 3) {
+                const tail = values.slice(-3);
+                state.lastMspt1m = tail[0];
+                state.lastMspt5m = tail[1];
+                state.lastMspt15m = tail[2];
+            }
+        }
+
+        if (lower.includes('tps from last')) {
+            const values = parseNumberSeries(line);
+            if (values.length >= 3) {
+                const tail = values.slice(-3);
+                const mspt1m = state.lastMspt1m;
+                recordTickSample(serverId, {
+                    ts: Date.now(),
+                    tps1m: tail[0],
+                    tps5m: tail[1],
+                    tps15m: tail[2],
+                    mspt1m,
+                    mspt5m: state.lastMspt5m,
+                    mspt15m: state.lastMspt15m,
+                    tickLag: Number.isFinite(mspt1m) ? Math.max(0, mspt1m - 50) : null
+                });
+                state.pendingTps = false;
+            } else {
+                state.pendingTps = true;
+            }
+        } else if (state.pendingTps) {
+            const values = parseNumberSeries(line);
+            if (values.length >= 3) {
+                const tail = values.slice(-3);
+                const mspt1m = state.lastMspt1m;
+                recordTickSample(serverId, {
+                    ts: Date.now(),
+                    tps1m: tail[0],
+                    tps5m: tail[1],
+                    tps15m: tail[2],
+                    mspt1m,
+                    mspt5m: state.lastMspt5m,
+                    mspt15m: state.lastMspt15m,
+                    tickLag: Number.isFinite(mspt1m) ? Math.max(0, mspt1m - 50) : null
+                });
+            }
+            state.pendingTps = false;
+        }
+    });
+    SERVER_TICK_STATE.set(serverId, state);
+}
+
+function handleResourcePackStatusFromConsole(serverId, output) {
+    if (!output) return;
+    const patterns = [
+        { status: 'accepted', regex: /(.+?) has accepted the (?:server )?resource pack/i },
+        { status: 'declined', regex: /(.+?) has declined the (?:server )?resource pack/i },
+        { status: 'rejected', regex: /(.+?) has rejected the (?:server )?resource pack/i },
+        { status: 'failed', regex: /(.+?) failed to download the (?:server )?resource pack/i },
+        { status: 'downloaded', regex: /(.+?) has downloaded the (?:server )?resource pack/i }
+    ];
+
+    const lines = String(output).split(/\r?\n/);
+    const state = SERVER_RESOURCE_PACK_STATE.get(serverId) || { updatedAt: 0, players: new Map() };
+    const now = Date.now();
+    lines.forEach((rawLine) => {
+        const line = normalizeConsoleLine(rawLine);
+        if (!line) return;
+        for (const pattern of patterns) {
+            const match = line.match(pattern.regex);
+            if (match && match[1]) {
+                const player = String(match[1] || '').trim();
+                if (!player) return;
+                state.players.set(player, { status: pattern.status, updatedAt: now });
+                state.updatedAt = now;
+                break;
+            }
+        }
+    });
+    SERVER_RESOURCE_PACK_STATE.set(serverId, state);
+}
+
+function getServerTickSamples(serverId) {
+    const samples = SERVER_TICK_SAMPLES.get(serverId) || [];
+    return samples.map((entry) => ({ ...entry }));
+}
+
+function getServerResourcePackStatus(serverId) {
+    const state = SERVER_RESOURCE_PACK_STATE.get(serverId);
+    if (!state) return { updatedAt: null, players: [] };
+    const players = Array.from(state.players.entries()).map(([name, payload]) => ({
+        name,
+        status: payload.status,
+        updatedAt: payload.updatedAt
+    })).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    return { updatedAt: state.updatedAt || null, players };
+}
+
+function getServerCrashLoopState(serverId) {
+    const state = SERVER_CRASH_LOOP_STATE.get(serverId);
+    if (!state) return { active: false, count: 0, cooldownUntil: null };
+    const now = Date.now();
+    if (state.cooldownUntil && state.cooldownUntil > now) {
+        return { active: true, count: state.count || 0, cooldownUntil: state.cooldownUntil };
+    }
+    return { active: false, count: state.count || 0, cooldownUntil: state.cooldownUntil || null };
+}
+
+function recordCrashLoopEvent(serverId) {
+    const now = Date.now();
+    const state = SERVER_CRASH_LOOP_STATE.get(serverId) || { count: 0, firstAt: now, cooldownUntil: 0 };
+    if (!state.firstAt || now - state.firstAt > CRASH_LOOP_WINDOW_MS) {
+        state.count = 0;
+        state.firstAt = now;
+    }
+    state.count = Number(state.count || 0) + 1;
+    if (state.count >= CRASH_LOOP_THRESHOLD) {
+        state.cooldownUntil = now + CRASH_LOOP_COOLDOWN_MS;
+    }
+    SERVER_CRASH_LOOP_STATE.set(serverId, state);
+    return state;
+}
+
+function clearCrashLoopState(serverId) {
+    SERVER_CRASH_LOOP_STATE.delete(serverId);
+}
+
 async function persistResourceTimelineSample(serverId, cpu, memory, disk) {
     try {
         if (!ServerResourceSample || !Number.isInteger(Number.parseInt(serverId, 10))) return;
@@ -1768,6 +1935,8 @@ wss.on('connection', (ws, request) => {
                     sendToServerConsole(data.serverId, { type: 'console_output', output: data.output });
                     handlePluginConflictAlert(data.serverId, data.output);
                     await handleAntiMinerFromConsoleOutput(data.serverId, data.output);
+                    handleTickStatsFromConsole(data.serverId, data.output);
+                    handleResourcePackStatusFromConsole(data.serverId, data.output);
                 }
             }
 
@@ -1784,6 +1953,7 @@ wss.on('connection', (ws, request) => {
                     if (normalizedStatus === 'running' && previousStatus !== 'running') {
                         consumeServerPowerIntent(data.serverId);
                         SERVER_CRASH_COOLDOWN_STATE.delete(data.serverId);
+                        clearCrashLoopState(data.serverId);
                         sendServerSmartAlert(server, 'started', {
                             previousStatus
                         });
@@ -1850,6 +2020,14 @@ wss.on('connection', (ws, request) => {
                                 expectedStop ? '#f59e0b' : '#ef4444'
                             );
                             if (!expectedStop) {
+                                const crashLoopState = recordCrashLoopEvent(data.serverId);
+                                if (crashLoopState && crashLoopState.cooldownUntil) {
+                                    const cooldownMinutes = Math.round(CRASH_LOOP_COOLDOWN_MS / 60000);
+                                    sendToServerConsole(data.serverId, {
+                                        type: 'console_output',
+                                        output: `[!] Crash loop detected. Cooldown active for ${cooldownMinutes} minutes.\n`
+                                    });
+                                }
                                 await createRuntimeIncident({
                                     title: `Server crashed: ${server.name}`,
                                     message: `Server #${server.id} stopped unexpectedly.`,
@@ -2213,4 +2391,9 @@ setTimeout(() => {
     return { wss };
 }
 
-module.exports = { registerWebSocketRuntime };
+module.exports = {
+    registerWebSocketRuntime,
+    getServerTickSamples,
+    getServerResourcePackStatus,
+    getServerCrashLoopState
+};

@@ -148,7 +148,7 @@
 <div class="wrapper">
         <nav class="sidebar" id="sidebar">
             <div class="p-3">
-                <%- include('../partials/server-sidebar', { server, active: 'mcconfigs' }) %>
+                <%- include('../partials/server-sidebar', { server, active: 'mccenter' }) %>
             </div>
         </nav>
 
@@ -187,7 +187,7 @@
                             <div class="fw-semibold" id="mcStatusAddress"><%= minecraftStatusAddress || 'Unknown allocation' %></div>
                         </div>
                         <div class="d-flex align-items-center gap-2">
-                            <form method="GET" action="/server/<%= server.containerId %>/minecraft-configs" class="mb-0" data-turbo="false">
+                            <form method="GET" action="/server/<%= server.containerId %>/minecraft/configs" class="mb-0" data-turbo="false">
                                 <input type="hidden" name="bedrock" value="0">
                                 <div class="form-check form-switch m-0">
                                     <input class="form-check-input" type="checkbox" role="switch" id="bedrockSwitch" name="bedrock" value="1" <%= minecraftBedrockMode ? 'checked' : '' %> onchange="this.form.submit()">
@@ -213,7 +213,7 @@
                             <div class="small text-muted-2">Enable this only for BungeeCord/Waterfall/Velocity servers.</div>
                         </div>
                         <div class="d-flex align-items-center gap-2 flex-wrap">
-                            <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs/proxy-mode" class="d-flex align-items-center gap-2 mb-0">
+                            <form method="POST" action="/server/<%= server.containerId %>/minecraft/configs/proxy-mode" class="d-flex align-items-center gap-2 mb-0">
                                 <select class="form-select form-select-sm" name="proxyMode" style="min-width: 170px;">
                                     <option value="" <%= !proxyMode ? 'selected' : '' %>>Disabled</option>
                                     <option value="velocity" <%= proxyMode === 'velocity' ? 'selected' : '' %>>Velocity</option>
@@ -224,7 +224,7 @@
                                     <i class="bi bi-save me-1"></i>Save Mode
                                 </button>
                             </form>
-                            <a href="/server/<%= server.containerId %>/proxy-network" class="btn btn-sm btn-primary">
+                            <a href="/server/<%= server.containerId %>/minecraft/proxy" class="btn btn-sm btn-primary">
                                 <i class="bi bi-diagram-3 me-1"></i>Open Proxy Panel
                             </a>
                         </div>
@@ -349,7 +349,7 @@
                                 <code>minecraft.tempban</code>, <code>minecraft.teleport</code>.
                             </div>
 
-                            <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="mb-2" data-turbo="false">
+                            <form method="POST" action="/server/<%= server.containerId %>/minecraft/configs" class="mb-2" data-turbo="false">
                                 <input type="hidden" name="action" value="op">
                                 <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
                                 <label class="form-label small text-uppercase text-muted-2">OP Player</label>
@@ -360,7 +360,7 @@
                                 <input name="reason" class="form-control" required minlength="3" maxlength="96" placeholder="Reason (required)" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
                             </form>
 
-                            <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="mb-2" data-turbo="false">
+                            <form method="POST" action="/server/<%= server.containerId %>/minecraft/configs" class="mb-2" data-turbo="false">
                                 <input type="hidden" name="action" value="deop">
                                 <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
                                 <label class="form-label small text-uppercase text-muted-2">DEOP Player</label>
@@ -371,7 +371,7 @@
                                 <input name="reason" class="form-control" required minlength="3" maxlength="96" placeholder="Reason (required)" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
                             </form>
 
-                            <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="mb-2" data-turbo="false">
+                            <form method="POST" action="/server/<%= server.containerId %>/minecraft/configs" class="mb-2" data-turbo="false">
                                 <input type="hidden" name="action" value="kick">
                                 <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
                                 <label class="form-label small text-uppercase text-muted-2">Kick Player</label>
@@ -382,7 +382,7 @@
                                 <input name="reason" class="form-control" required minlength="3" maxlength="96" placeholder="Reason (required)" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
                             </form>
 
-                            <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="mb-2" data-turbo="false">
+                            <form method="POST" action="/server/<%= server.containerId %>/minecraft/configs" class="mb-2" data-turbo="false">
                                 <input type="hidden" name="action" value="teleport">
                                 <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
                                 <label class="form-label small text-uppercase text-muted-2">Teleport Player</label>
@@ -393,7 +393,7 @@
                                 <input name="destination" class="form-control" required maxlength="64" placeholder="Destination (player or coords)" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
                             </form>
 
-                            <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" data-turbo="false">
+                            <form method="POST" action="/server/<%= server.containerId %>/minecraft/configs" data-turbo="false">
                                 <input type="hidden" name="action" value="ban">
                                 <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
                                 <label class="form-label small text-uppercase text-muted-2">Ban Player</label>
@@ -404,7 +404,7 @@
                                 <input name="reason" class="form-control" required minlength="3" maxlength="96" placeholder="Reason (required)" style="background:#18181d;border-color:#2d2d35;color:#e1e1e6;">
                             </form>
 
-                            <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" data-turbo="false">
+                            <form method="POST" action="/server/<%= server.containerId %>/minecraft/configs" data-turbo="false">
                                 <input type="hidden" name="action" value="tempban">
                                 <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
                                 <label class="form-label small text-uppercase text-muted-2">Tempban Player</label>
@@ -558,42 +558,42 @@
                                             <td><code><%= player.uuid || '-' %></code></td>
                                             <td class="text-end">
                                                 <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
-                                                    <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="d-inline" data-turbo="false">
+                                                    <form method="POST" action="/server/<%= server.containerId %>/minecraft/configs" class="d-inline" data-turbo="false">
                                                         <input type="hidden" name="action" value="op">
                                                         <input type="hidden" name="player" value="<%= player.name %>">
                                                         <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
                                                         <input type="hidden" name="reason" value="">
                                                         <button type="submit" class="btn btn-sm btn-outline-success js-mc-guarded-action" data-action-label="OP" title="OP" <%= (!connectorOnline || !canOp) ? 'disabled' : '' %>>OP</button>
                                                     </form>
-                                                    <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="d-inline" data-turbo="false">
+                                                    <form method="POST" action="/server/<%= server.containerId %>/minecraft/configs" class="d-inline" data-turbo="false">
                                                         <input type="hidden" name="action" value="deop">
                                                         <input type="hidden" name="player" value="<%= player.name %>">
                                                         <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
                                                         <input type="hidden" name="reason" value="">
                                                         <button type="submit" class="btn btn-sm btn-outline-warning js-mc-guarded-action" data-action-label="DEOP" title="DEOP" <%= (!connectorOnline || !canDeop) ? 'disabled' : '' %>>DEOP</button>
                                                     </form>
-                                                    <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="d-inline" data-turbo="false">
+                                                    <form method="POST" action="/server/<%= server.containerId %>/minecraft/configs" class="d-inline" data-turbo="false">
                                                         <input type="hidden" name="action" value="kick">
                                                         <input type="hidden" name="player" value="<%= player.name %>">
                                                         <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
                                                         <input type="hidden" name="reason" value="">
                                                         <button type="submit" class="btn btn-sm btn-outline-light js-mc-guarded-action" data-action-label="KICK" data-requires-reason="1" title="KICK" <%= (!connectorOnline || !canKick) ? 'disabled' : '' %>>KICK</button>
                                                     </form>
-                                                    <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="d-inline" data-turbo="false">
+                                                    <form method="POST" action="/server/<%= server.containerId %>/minecraft/configs" class="d-inline" data-turbo="false">
                                                         <input type="hidden" name="action" value="teleport">
                                                         <input type="hidden" name="player" value="<%= player.name %>">
                                                         <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
                                                         <input type="hidden" name="destination" value="">
                                                         <button type="submit" class="btn btn-sm btn-outline-info js-mc-guarded-action" data-action-label="TP" data-requires-destination="1" title="Teleport" <%= (!connectorOnline || !canTeleport) ? 'disabled' : '' %>>TP</button>
                                                     </form>
-                                                    <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="d-inline" data-turbo="false">
+                                                    <form method="POST" action="/server/<%= server.containerId %>/minecraft/configs" class="d-inline" data-turbo="false">
                                                         <input type="hidden" name="action" value="ban">
                                                         <input type="hidden" name="player" value="<%= player.name %>">
                                                         <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
                                                         <input type="hidden" name="reason" value="">
                                                         <button type="submit" class="btn btn-sm btn-outline-danger js-mc-guarded-action" data-action-label="BAN" data-requires-reason="1" title="BAN" <%= (!connectorOnline || !canBan) ? 'disabled' : '' %>>BAN</button>
                                                     </form>
-                                                    <form method="POST" action="/server/<%= server.containerId %>/minecraft-configs" class="d-inline" data-turbo="false">
+                                                    <form method="POST" action="/server/<%= server.containerId %>/minecraft/configs" class="d-inline" data-turbo="false">
                                                         <input type="hidden" name="action" value="tempban">
                                                         <input type="hidden" name="player" value="<%= player.name %>">
                                                         <input type="hidden" name="bedrock" value="<%= minecraftBedrockMode ? '1' : '0' %>">
@@ -742,42 +742,42 @@
                         <td><code>${uuid || '-'}</code></td>
                         <td class="text-end">
                             <div class="d-inline-flex gap-1 flex-wrap justify-content-end">
-                                <form method="POST" action="/server/${serverId}/minecraft-configs" class="d-inline" data-turbo="false">
+                                <form method="POST" action="/server/${serverId}/minecraft/configs" class="d-inline" data-turbo="false">
                                     <input type="hidden" name="action" value="op">
                                     <input type="hidden" name="player" value="${name}">
                                     <input type="hidden" name="bedrock" value="${bedrockMode ? '1' : '0'}">
                                     <input type="hidden" name="reason" value="">
                                     <button type="submit" class="btn btn-sm btn-outline-success js-mc-guarded-action" data-action-label="OP" title="OP" ${(!connectorOnline || !perms.canOp) ? 'disabled' : ''}>OP</button>
                                 </form>
-                                <form method="POST" action="/server/${serverId}/minecraft-configs" class="d-inline" data-turbo="false">
+                                <form method="POST" action="/server/${serverId}/minecraft/configs" class="d-inline" data-turbo="false">
                                     <input type="hidden" name="action" value="deop">
                                     <input type="hidden" name="player" value="${name}">
                                     <input type="hidden" name="bedrock" value="${bedrockMode ? '1' : '0'}">
                                     <input type="hidden" name="reason" value="">
                                     <button type="submit" class="btn btn-sm btn-outline-warning js-mc-guarded-action" data-action-label="DEOP" title="DEOP" ${(!connectorOnline || !perms.canDeop) ? 'disabled' : ''}>DEOP</button>
                                 </form>
-                                <form method="POST" action="/server/${serverId}/minecraft-configs" class="d-inline" data-turbo="false">
+                                <form method="POST" action="/server/${serverId}/minecraft/configs" class="d-inline" data-turbo="false">
                                     <input type="hidden" name="action" value="kick">
                                     <input type="hidden" name="player" value="${name}">
                                     <input type="hidden" name="bedrock" value="${bedrockMode ? '1' : '0'}">
                                     <input type="hidden" name="reason" value="">
                                     <button type="submit" class="btn btn-sm btn-outline-light js-mc-guarded-action" data-action-label="KICK" data-requires-reason="1" title="KICK" ${(!connectorOnline || !perms.canKick) ? 'disabled' : ''}>KICK</button>
                                 </form>
-                                <form method="POST" action="/server/${serverId}/minecraft-configs" class="d-inline" data-turbo="false">
+                                <form method="POST" action="/server/${serverId}/minecraft/configs" class="d-inline" data-turbo="false">
                                     <input type="hidden" name="action" value="teleport">
                                     <input type="hidden" name="player" value="${name}">
                                     <input type="hidden" name="bedrock" value="${bedrockMode ? '1' : '0'}">
                                     <input type="hidden" name="destination" value="">
                                     <button type="submit" class="btn btn-sm btn-outline-info js-mc-guarded-action" data-action-label="TP" data-requires-destination="1" title="Teleport" ${(!connectorOnline || !perms.canTeleport) ? 'disabled' : ''}>TP</button>
                                 </form>
-                                <form method="POST" action="/server/${serverId}/minecraft-configs" class="d-inline" data-turbo="false">
+                                <form method="POST" action="/server/${serverId}/minecraft/configs" class="d-inline" data-turbo="false">
                                     <input type="hidden" name="action" value="ban">
                                     <input type="hidden" name="player" value="${name}">
                                     <input type="hidden" name="bedrock" value="${bedrockMode ? '1' : '0'}">
                                     <input type="hidden" name="reason" value="">
                                     <button type="submit" class="btn btn-sm btn-outline-danger js-mc-guarded-action" data-action-label="BAN" data-requires-reason="1" title="BAN" ${(!connectorOnline || !perms.canBan) ? 'disabled' : ''}>BAN</button>
                                 </form>
-                                <form method="POST" action="/server/${serverId}/minecraft-configs" class="d-inline" data-turbo="false">
+                                <form method="POST" action="/server/${serverId}/minecraft/configs" class="d-inline" data-turbo="false">
                                     <input type="hidden" name="action" value="tempban">
                                     <input type="hidden" name="player" value="${name}">
                                     <input type="hidden" name="bedrock" value="${bedrockMode ? '1' : '0'}">
@@ -797,7 +797,7 @@
             if (!refreshStatusBtn) return;
             refreshStatusBtn.disabled = true;
             try {
-                const response = await fetch(`/server/${serverId}/minecraft-configs/status?bedrock=${bedrockMode ? '1' : '0'}`);
+                const response = await fetch(`/server/${serverId}/minecraft/configs/status?bedrock=${bedrockMode ? '1' : '0'}`);
                 const payload = await response.json();
                 if (!response.ok || !payload.success) {
                     throw new Error(payload.error || 'Failed to refresh status.');
@@ -890,7 +890,7 @@
             playtimeLoadBtn.disabled = true;
             playtimeStatus.textContent = 'Loading playtime stats...';
             try {
-                const response = await fetch(`/server/${serverId}/minecraft-configs/playtime?bedrock=${bedrockMode ? '1' : '0'}`);
+                const response = await fetch(`/server/${serverId}/minecraft/configs/playtime?bedrock=${bedrockMode ? '1' : '0'}`);
                 const payload = await response.json();
                 if (!response.ok || !payload.success) {
                     throw new Error(payload.error || 'Failed to load playtime data.');
@@ -921,7 +921,7 @@
             if (!motdInput) return;
             saveMotdBtn.disabled = true;
             try {
-                const response = await fetch(`/server/${serverId}/minecraft-configs/motd`, {
+                const response = await fetch(`/server/${serverId}/minecraft/configs/motd`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ motd: motdInput.value || '' })
@@ -983,7 +983,7 @@
             }
             saveMotdPresetBtn.disabled = true;
             try {
-                const response = await fetch(`/server/${serverId}/minecraft-configs/motd-presets`, {
+                const response = await fetch(`/server/${serverId}/minecraft/configs/motd-presets`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'create', name: trimmed, content: motdInput.value || '' })
@@ -1024,7 +1024,7 @@
             if (action === 'delete') {
                 if (!confirm(`Delete preset "${preset.name}"?`)) return;
                 try {
-                    const response = await fetch(`/server/${serverId}/minecraft-configs/motd-presets`, {
+                    const response = await fetch(`/server/${serverId}/minecraft/configs/motd-presets`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ action: 'delete', id })
@@ -1088,7 +1088,7 @@
             }
             resourcePackApplyBtn.disabled = true;
             try {
-                const response = await fetch(`/server/${serverId}/minecraft-configs/resource-pack`, {
+                const response = await fetch(`/server/${serverId}/minecraft/configs/resource-pack`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1139,7 +1139,7 @@
             }
             mcMiniCommandBtn.disabled = true;
             try {
-                const response = await fetch(`/server/${serverId}/minecraft-configs/command`, {
+                const response = await fetch(`/server/${serverId}/minecraft/configs/command`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ command: normalized })

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Center <%= server.name %> | <%= settings.brandName.toUpperCase() %></title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --bg: #0f0f12;
+            --panel: #121216;
+            --border: #2d2d35;
+            --text: #e1e1e6;
+            --muted: #8b8b9a;
+        }
+        body { background:var(--bg); color:var(--text); margin:0; font-family:Inter,system-ui,-apple-system,sans-serif; height:100vh; overflow:hidden; }
+        .wrapper{display:flex;height:100vh}
+        .sidebar{width:260px;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto}
+        .sidebar.collapsed{margin-left:-260px}
+        .content{flex:1;display:flex;flex-direction:column;min-width:0}
+        .top{background:var(--panel);border-bottom:1px solid var(--border);padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem}
+        .scroll{flex:1;overflow:auto;padding:1rem}
+        .cardx{background:var(--panel);border:1px solid var(--border);border-radius:.9rem}
+        .btn-icon{background:transparent;border:0;color:var(--muted);font-size:1.2rem}
+        .center-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem}
+        .center-link{display:flex;flex-direction:column;gap:.6rem;padding:1rem;border-radius:.85rem;border:1px solid var(--border);text-decoration:none;color:var(--text);background:rgba(255,255,255,0.02);transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
+        .center-link:hover{transform:translateY(-3px);border-color:rgba(59,130,246,0.6);box-shadow:0 12px 24px rgba(0,0,0,0.3)}
+        .center-icon{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:rgba(59,130,246,0.15);color:#60a5fa;font-size:1.3rem}
+        .center-desc{color:var(--muted);font-size:.85rem}
+    </style>
+    <link rel="stylesheet" href="/css/mobile-layout.css">
+</head>
+<body>
+<%- include('../partials/error-modal') %>
+<div class="wrapper">
+    <nav class="sidebar" id="sidebar"><div class="p-3"><%- include('../partials/server-sidebar', { server, active: 'mccenter' }) %></div></nav>
+    <main class="content">
+        <header class="top">
+            <button class="btn-icon" id="sidebarToggle"><i class="bi bi-list"></i></button>
+            <h1 class="h5 mb-0">Minecraft Center / <span class="text-secondary"><%= server.name %></span></h1>
+        </header>
+        <section class="scroll">
+            <div class="cardx p-3 mb-3">
+                <div class="small text-muted">Everything Minecraft for this server.</div>
+            </div>
+            <div class="center-grid">
+                <a class="center-link" href="/server/<%= server.containerId %>/minecraft/addons">
+                    <div class="center-icon"><i class="bi bi-box"></i></div>
+                    <div>
+                        <div class="fw-semibold">Addons (Mods & Plugins)</div>
+                        <div class="center-desc">Browse Modrinth, install, update, rollback.</div>
+                    </div>
+                </a>
+                <a class="center-link" href="/server/<%= server.containerId %>/minecraft/configs">
+                    <div class="center-icon"><i class="bi bi-controller"></i></div>
+                    <div>
+                        <div class="fw-semibold">Minecraft Control</div>
+                        <div class="center-desc">MOTD, whitelist, resource pack, player actions.</div>
+                    </div>
+                </a>
+                <a class="center-link" href="/server/<%= server.containerId %>/minecraft/proxy">
+                    <div class="center-icon"><i class="bi bi-diagram-3"></i></div>
+                    <div>
+                        <div class="fw-semibold">Proxy Network</div>
+                        <div class="center-desc">Manage Bungee/Velocity networks.</div>
+                    </div>
+                </a>
+            <a class="center-link" href="/server/<%= server.containerId %>/minecraft/metrics">
+                    <div class="center-icon"><i class="bi bi-bar-chart"></i></div>
+                    <div>
+                        <div class="fw-semibold">Status & Metrics</div>
+                        <div class="center-desc">TPS/MSPT graphs, worlds, resource packs.</div>
+                    </div>
+                </a>
+            </div>
+        </section>
+    </main>
+</div>
+<script>
+    document.getElementById('sidebarToggle')?.addEventListener('click', () => document.getElementById('sidebar')?.classList.toggle('collapsed'));
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
+</body>
+</html>

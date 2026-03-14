@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Status & Metrics <%= server.name %> | <%= settings.brandName.toUpperCase() %></title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --bg: #0f0f12;
+            --panel: #121216;
+            --border: #2d2d35;
+            --text: #e1e1e6;
+            --muted: #8b8b9a;
+        }
+        body { background:var(--bg); color:var(--text); margin:0; font-family:Inter,system-ui,-apple-system,sans-serif; height:100vh; overflow:hidden; }
+        .wrapper{display:flex;height:100vh}
+        .sidebar{width:260px;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto}
+        .sidebar.collapsed{margin-left:-260px}
+        .content{flex:1;display:flex;flex-direction:column;min-width:0}
+        .top{background:var(--panel);border-bottom:1px solid var(--border);padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem}
+        .scroll{flex:1;overflow:auto;padding:1rem}
+        .cardx{background:var(--panel);border:1px solid var(--border);border-radius:.8rem}
+        .btn-icon{background:transparent;border:0;color:var(--muted);font-size:1.2rem}
+        .metric{font-size:.85rem;color:#9ca3af}
+        .metric strong{color:#e5e7eb}
+        .legend-dot{display:inline-block;width:.75rem;height:.75rem;border-radius:999px;margin-right:.35rem}
+        .chart-canvas{width:100%;height:240px;background:#0c0d10;border:1px solid var(--border);border-radius:.65rem}
+        .table-dark{--bs-table-bg:transparent}
+    </style>
+    <link rel="stylesheet" href="/css/mobile-layout.css">
+</head>
+<body>
+<%- include('../partials/error-modal') %>
+<div class="wrapper">
+    <nav class="sidebar" id="sidebar">
+        <div class="p-3">
+            <%- include('../partials/server-sidebar', { server, active: 'metrics' }) %>
+        </div>
+    </nav>
+    <main class="content">
+        <header class="top">
+            <button class="btn-icon" id="sidebarToggle"><i class="bi bi-list"></i></button>
+            <h1 class="h5 mb-0">Status & Metrics / <span class="text-secondary"><%= server.name %></span></h1>
+        </header>
+        <section class="scroll">
+            <div class="cardx p-3 mb-3">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <div class="d-flex gap-3 small">
+                        <span><span class="legend-dot" style="background:#22c55e"></span>TPS (1m)</span>
+                        <span><span class="legend-dot" style="background:#3b82f6"></span>MSPT (1m)</span>
+                        <span><span class="legend-dot" style="background:#f59e0b"></span>Tick Lag</span>
+                    </div>
+                    <div class="metric">Last: <strong id="tickLast">N/A</strong></div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-12 col-lg-6">
+                        <div class="metric mb-1">TPS (1m)</div>
+                        <canvas id="tpsCanvas" class="chart-canvas"></canvas>
+                    </div>
+                    <div class="col-12 col-lg-6">
+                        <div class="metric mb-1">MSPT / Tick Lag</div>
+                        <canvas id="msptCanvas" class="chart-canvas"></canvas>
+                    </div>
+                </div>
+                <div class="row g-2 mt-3">
+                    <div class="col-md-3 metric">TPS 1m: <strong id="tpsNow">--</strong></div>
+                    <div class="col-md-3 metric">MSPT 1m: <strong id="msptNow">--</strong></div>
+                    <div class="col-md-3 metric">Tick Lag: <strong id="lagNow">--</strong></div>
+                    <div class="col-md-3 metric">Crash Loop: <strong id="crashLoopNow">--</strong></div>
+                </div>
+            </div>
+
+            <div class="cardx p-3 mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h2 class="h6 mb-0">Worlds</h2>
+                    <button class="btn btn-sm btn-outline-info" id="refreshWorldsBtn"><i class="bi bi-arrow-repeat me-1"></i>Refresh</button>
+                </div>
+                <div class="small text-muted" id="worldsMeta">Loading...</div>
+                <div class="table-responsive mt-2">
+                    <table class="table table-dark table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>World</th>
+                                <th>Size (MB)</th>
+                                <th>Region Files</th>
+                                <th>Chunk Est.</th>
+                                <th>Known Players</th>
+                            </tr>
+                        </thead>
+                        <tbody id="worldsBody">
+                            <tr><td colspan="5" class="text-muted">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="small text-muted mt-2">Known players are derived from <code>playerdata</code> files (offline + online).</div>
+            </div>
+
+            <div class="cardx p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h2 class="h6 mb-0">Resource Pack Status</h2>
+                    <button class="btn btn-sm btn-outline-info" id="refreshPackBtn"><i class="bi bi-arrow-repeat me-1"></i>Refresh</button>
+                </div>
+                <div class="small text-muted" id="packMeta">Waiting for updates...</div>
+                <div class="table-responsive mt-2">
+                    <table class="table table-dark table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Player</th>
+                                <th>Status</th>
+                                <th>Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody id="packBody">
+                            <tr><td colspan="3" class="text-muted">No resource pack events yet.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script>
+    document.getElementById('sidebarToggle')?.addEventListener('click', () => document.getElementById('sidebar')?.classList.toggle('collapsed'));
+    const serverId = '<%= server.containerId %>';
+
+    const tickSamples = [];
+    const tpsCanvas = document.getElementById('tpsCanvas');
+    const msptCanvas = document.getElementById('msptCanvas');
+    const tpsNow = document.getElementById('tpsNow');
+    const msptNow = document.getElementById('msptNow');
+    const lagNow = document.getElementById('lagNow');
+    const tickLast = document.getElementById('tickLast');
+    const crashLoopNow = document.getElementById('crashLoopNow');
+
+    const drawChart = (canvas, points, valueKey, color, maxValue) => {
+        if (!canvas) return;
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        const width = Math.max(300, Math.floor(rect.width));
+        const height = Math.max(180, Math.floor(rect.height));
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = '#0c0d10';
+        ctx.fillRect(0, 0, width, height);
+
+        for (let i = 0; i <= 4; i += 1) {
+            const y = Math.round((height - 20) * (i / 4)) + 10;
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx.beginPath();
+            ctx.moveTo(10, y);
+            ctx.lineTo(width - 10, y);
+            ctx.stroke();
+        }
+
+        const pts = points.slice(-120);
+        if (!pts.length) return;
+        const xAt = (idx, total) => total <= 1 ? 10 : 10 + ((width - 20) * (idx / (total - 1)));
+        const clamp = (value) => Math.max(0, Math.min(maxValue, value));
+        const yAt = (value) => 10 + ((height - 20) * (1 - clamp(value) / maxValue));
+
+        const drawLine = (key, lineColor) => {
+            ctx.beginPath();
+            pts.forEach((point, idx) => {
+                const x = xAt(idx, pts.length);
+                const y = yAt(Number(point[key]) || 0);
+                if (idx === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        };
+
+        drawLine(valueKey, color);
+    };
+
+    const drawMsptChart = (canvas, points, maxValue) => {
+        if (!canvas) return;
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        const width = Math.max(300, Math.floor(rect.width));
+        const height = Math.max(180, Math.floor(rect.height));
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = '#0c0d10';
+        ctx.fillRect(0, 0, width, height);
+
+        for (let i = 0; i <= 4; i += 1) {
+            const y = Math.round((height - 20) * (i / 4)) + 10;
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx.beginPath();
+            ctx.moveTo(10, y);
+            ctx.lineTo(width - 10, y);
+            ctx.stroke();
+        }
+
+        const pts = points.slice(-120);
+        if (!pts.length) return;
+        const xAt = (idx, total) => total <= 1 ? 10 : 10 + ((width - 20) * (idx / (total - 1)));
+        const clamp = (value) => Math.max(0, Math.min(maxValue, value));
+        const yAt = (value) => 10 + ((height - 20) * (1 - clamp(value) / maxValue));
+
+        const drawLine = (key, lineColor) => {
+            ctx.beginPath();
+            pts.forEach((point, idx) => {
+                const x = xAt(idx, pts.length);
+                const y = yAt(Number(point[key]) || 0);
+                if (idx === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        };
+
+        drawLine('mspt1m', '#3b82f6');
+        drawLine('tickLag', '#f59e0b');
+    };
+
+    const updateCharts = () => {
+        drawChart(tpsCanvas, tickSamples, 'tps1m', '#22c55e', 20);
+        const msptMax = Math.max(50, ...tickSamples.map((s) => Number(s.mspt1m) || 0), ...tickSamples.map((s) => Number(s.tickLag) || 0));
+        drawMsptChart(msptCanvas, tickSamples, msptMax);
+        if (tickSamples.length > 0) {
+            const last = tickSamples[tickSamples.length - 1];
+            tpsNow.textContent = last.tps1m ? last.tps1m.toFixed(2) : '--';
+            msptNow.textContent = last.mspt1m ? `${last.mspt1m.toFixed(2)} ms` : '--';
+            lagNow.textContent = Number.isFinite(last.tickLag) ? `${Number(last.tickLag).toFixed(2)} ms` : '--';
+            tickLast.textContent = new Date(last.ts).toLocaleTimeString();
+        }
+    };
+
+    async function loadTickMetrics() {
+        try {
+            const response = await fetch(`/server/${serverId}/metrics/ticks`);
+            const payload = await response.json();
+            if (!response.ok || !payload.success) {
+                throw new Error(payload.error || 'Failed to load tick metrics.');
+            }
+            tickSamples.length = 0;
+            (payload.samples || []).forEach((entry) => tickSamples.push(entry));
+            updateCharts();
+            if (payload.crashLoop) {
+                crashLoopNow.textContent = payload.crashLoop.active
+                    ? `Active (cooldown until ${payload.crashLoop.cooldownUntil ? new Date(payload.crashLoop.cooldownUntil).toLocaleTimeString() : 'soon'})`
+                    : `Clear (${payload.crashLoop.count || 0} crashes tracked)`;
+            }
+        } catch (error) {
+            crashLoopNow.textContent = error.message || 'Unavailable';
+        }
+    }
+
+    const worldsBody = document.getElementById('worldsBody');
+    const worldsMeta = document.getElementById('worldsMeta');
+    async function loadWorldMetrics() {
+        worldsMeta.textContent = 'Loading...';
+        try {
+            const response = await fetch(`/server/${serverId}/metrics/worlds`);
+            const payload = await response.json();
+            if (!response.ok || !payload.success) {
+                throw new Error(payload.error || 'Failed to load world metrics.');
+            }
+            const worlds = payload.worlds || [];
+            if (worlds.length === 0) {
+                worldsBody.innerHTML = '<tr><td colspan="5" class="text-muted">No world data available.</td></tr>';
+            } else {
+                worldsBody.innerHTML = worlds.map((world) => `
+                    <tr>
+                        <td>${world.name}</td>
+                        <td>${Number(world.sizeMb || 0).toFixed(2)}</td>
+                        <td>${Number(world.regionFiles || 0)}</td>
+                        <td>${Number(world.chunkEstimate || 0)}</td>
+                        <td>${Number(world.knownPlayers || 0)}</td>
+                    </tr>
+                `).join('');
+            }
+            worldsMeta.textContent = `Updated: ${payload.generatedAt ? new Date(payload.generatedAt).toLocaleString() : 'N/A'}${payload.cached ? ' (cached)' : ''}`;
+        } catch (error) {
+            worldsBody.innerHTML = '<tr><td colspan="5" class="text-muted">Failed to load world metrics.</td></tr>';
+            worldsMeta.textContent = error.message || 'Failed to load world metrics.';
+        }
+    }
+
+    const packBody = document.getElementById('packBody');
+    const packMeta = document.getElementById('packMeta');
+    async function loadResourcePackStatus() {
+        try {
+            const response = await fetch(`/server/${serverId}/metrics/resource-pack`);
+            const payload = await response.json();
+            if (!response.ok || !payload.success) {
+                throw new Error(payload.error || 'Failed to load resource pack status.');
+            }
+            const players = payload.players || [];
+            if (players.length === 0) {
+                packBody.innerHTML = '<tr><td colspan="3" class="text-muted">No resource pack events yet.</td></tr>';
+            } else {
+                packBody.innerHTML = players.map((entry) => `
+                    <tr>
+                        <td>${entry.name}</td>
+                        <td>${entry.status}</td>
+                        <td>${entry.updatedAt ? new Date(entry.updatedAt).toLocaleTimeString() : 'N/A'}</td>
+                    </tr>
+                `).join('');
+            }
+            packMeta.textContent = payload.updatedAt ? `Last update: ${new Date(payload.updatedAt).toLocaleString()}` : 'Waiting for updates...';
+        } catch (error) {
+            packMeta.textContent = error.message || 'Failed to load resource pack status.';
+        }
+    }
+
+    document.getElementById('refreshWorldsBtn')?.addEventListener('click', () => loadWorldMetrics());
+    document.getElementById('refreshPackBtn')?.addEventListener('click', () => loadResourcePackStatus());
+
+    loadTickMetrics();
+    loadWorldMetrics();
+    loadResourcePackStatus();
+    setInterval(loadTickMetrics, 15000);
+    setInterval(loadResourcePackStatus, 12000);
+    window.addEventListener('resize', updateCharts);
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
+</body>
+</html>

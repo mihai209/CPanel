@@ -874,7 +874,7 @@ const consoleShortcuts = [
             const dispatchMinecraftAction = (action, player, extra = {}) => {
                 const form = document.createElement('form');
                 form.method = 'POST';
-                form.action = `/server/${serverContainerId}/minecraft-configs`;
+                form.action = `/server/${serverContainerId}/minecraft/configs`;
                 form.setAttribute('data-turbo', 'false');
 
                 const appendInput = (name, value) => {
@@ -970,7 +970,7 @@ const consoleShortcuts = [
                 if (!playerPanelList) return;
                 playerPanelList.innerHTML = '<div class="text-secondary small">Refreshing players...</div>';
                 try {
-                    const response = await fetch(`/server/${serverContainerId}/minecraft-configs/status?bedrock=${minecraftBedrockMode ? '1' : '0'}`);
+                    const response = await fetch(`/server/${serverContainerId}/minecraft/configs/status?bedrock=${minecraftBedrockMode ? '1' : '0'}`);
                     const payload = await response.json();
                     if (!response.ok || !payload.success) {
                         throw new Error(payload.error || 'Failed to refresh players.');

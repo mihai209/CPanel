@@ -353,7 +353,7 @@
     <div class="wrapper">
         <nav id="sidebar" class="sidebar">
             <div class="sidebar-content">
-                <%- include('../partials/server-sidebar', { server, active: 'minecraft' , settings }) %>
+                <%- include('../partials/server-sidebar', { server, active: 'mccenter' , settings }) %>
             </div>
         </nav>
 
@@ -390,7 +390,7 @@
                         <button type="button" class="btn btn-sm btn-outline-secondary" id="installedModeBtn" data-bs-toggle="modal" data-bs-target="#installedModal">
                             <i class="bi bi-archive me-1"></i> Installed
                         </button>
-                        <a href="/server/<%= server.containerId %>/minecraft-configs" class="btn btn-sm btn-outline-secondary">
+                        <a href="/server/<%= server.containerId %>/minecraft/configs" class="btn btn-sm btn-outline-secondary">
                             <i class="bi bi-sliders2 me-1"></i> Configs
                         </a>
                     </div>
@@ -540,6 +540,7 @@
         }
 
         const serverId = '<%= server.containerId %>';
+        const addonsBase = `/server/${serverId}/minecraft/addons`;
         const loaderCatalog = {
             plugin: <%- JSON.stringify(minecraftCatalog.plugins || []) %>,
             mod: <%- JSON.stringify(minecraftCatalog.mods || []) %>,
@@ -813,7 +814,7 @@
                     limit: String(state.limit)
                 });
 
-                const response = await fetch(`/server/${serverId}/minecraft/search?${params.toString()}`);
+                const response = await fetch(`${addonsBase}/search?${params.toString()}`);
                 const payload = await response.json();
                 if (!response.ok || !payload.success) {
                     throw new Error(payload.error || 'Failed to fetch Modrinth results.');
@@ -858,7 +859,7 @@
             button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Installing...';
 
             try {
-                const response = await fetch(`/server/${serverId}/minecraft/install`, {
+                const response = await fetch(`${addonsBase}/install`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -904,7 +905,7 @@
                     targetDirectory: filters.targetDirectory,
                     checkUpdates: state.checkUpdates ? '1' : '0'
                 });
-                const response = await fetch(`/server/${serverId}/minecraft/installed?${params.toString()}`);
+                const response = await fetch(`${addonsBase}/installed?${params.toString()}`);
                 const payload = await response.json();
                 if (!response.ok || !payload.success) {
                     throw new Error(payload.error || 'Failed to load installed addons.');
@@ -993,7 +994,7 @@
             loadDependenciesBtn.disabled = true;
             if (dependencyStatus) dependencyStatus.textContent = 'Analyzing dependencies...';
             try {
-                const response = await fetch(`/server/${serverId}/minecraft/dependencies`);
+            const response = await fetch(`${addonsBase}/dependencies`);
                 const payload = await response.json();
                 if (!response.ok || !payload.success) {
                     throw new Error(payload.error || 'Failed to load dependencies.');
@@ -1023,7 +1024,7 @@
             button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
             try {
-                const response = await fetch(`/server/${serverId}/minecraft/delete`, {
+                const response = await fetch(`${addonsBase}/delete`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ path: addonPath })
@@ -1052,7 +1053,7 @@
             button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
             try {
-                const response = await fetch(`/server/${serverId}/minecraft/update`, {
+                const response = await fetch(`${addonsBase}/update`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1089,7 +1090,7 @@
             button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
             try {
-                const response = await fetch(`/server/${serverId}/minecraft/stage-update`, {
+                const response = await fetch(`${addonsBase}/stage-update`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1125,7 +1126,7 @@
             button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
             try {
-                const response = await fetch(`/server/${serverId}/minecraft/apply-staged`, {
+                const response = await fetch(`${addonsBase}/apply-staged`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ path: addonPath })
@@ -1156,7 +1157,7 @@
             button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
             try {
-                const response = await fetch(`/server/${serverId}/minecraft/rollback`, {
+                const response = await fetch(`${addonsBase}/rollback`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ path: addonPath })
@@ -1222,7 +1223,7 @@
             downloadUrlBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Downloading...';
 
             try {
-                const response = await fetch(`/server/${serverId}/minecraft/install-url`, {
+                const response = await fetch(`${addonsBase}/install-url`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
