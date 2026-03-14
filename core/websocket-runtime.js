@@ -1,7 +1,41 @@
 const { appendIncidentCenterRecord } = require('./incidents');
 const { Op } = require('sequelize');
 
-    // crash loop + tick metrics state uses module-level maps
+const SERVER_CRASH_COOLDOWN_STATE = new Map(); // serverId -> last crash ts
+const SERVER_CRASH_LOOP_STATE = new Map(); // serverId -> { count, firstAt, cooldownUntil }
+const SERVER_TICK_SAMPLES = new Map(); // serverId -> [{ ts, tps1m, tps5m, tps15m, mspt1m, mspt5m, mspt15m, tickLag }]
+const SERVER_TICK_STATE = new Map(); // serverId -> { lastMspt1m, lastMspt5m, lastMspt15m, pendingTps }
+const SERVER_RESOURCE_PACK_STATE = new Map(); // serverId -> { updatedAt, players: Map(name -> { status, updatedAt }) }
+const SERVER_TICK_SAMPLE_LIMIT = 240;
+const CRASH_LOOP_WINDOW_MS = 5 * 60 * 1000;
+const CRASH_LOOP_THRESHOLD = 3;
+const CRASH_LOOP_COOLDOWN_MS = 10 * 60 * 1000;
+
+function getServerTickSamples(serverId) {
+    const samples = SERVER_TICK_SAMPLES.get(serverId) || [];
+    return samples.map((entry) => ({ ...entry }));
+}
+
+function getServerResourcePackStatus(serverId) {
+    const state = SERVER_RESOURCE_PACK_STATE.get(serverId);
+    if (!state) return { updatedAt: null, players: [] };
+    const players = Array.from(state.players.entries()).map(([name, payload]) => ({
+        name,
+        status: payload.status,
+        updatedAt: payload.updatedAt
+    })).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    return { updatedAt: state.updatedAt || null, players };
+}
+
+function getServerCrashLoopState(serverId) {
+    const state = SERVER_CRASH_LOOP_STATE.get(serverId);
+    if (!state) return { active: false, count: 0, cooldownUntil: null };
+    const now = Date.now();
+    if (state.cooldownUntil && state.cooldownUntil > now) {
+        return { active: true, count: state.count || 0, cooldownUntil: state.cooldownUntil };
+    }
+    return { active: false, count: state.count || 0, cooldownUntil: state.cooldownUntil || null };
+}
 
 function registerWebSocketRuntime(deps) {
     const {
@@ -78,42 +112,7 @@ const CRASH_POLICY_SETTING_KEYS = [
     'crashDetectCleanExitAsCrash',
     'crashDetectionCooldownSeconds'
 ];
-let crashPolicyCache = { ts: 0, config: null };
-const SERVER_CRASH_COOLDOWN_STATE = new Map(); // serverId -> last crash ts
-const SERVER_CRASH_LOOP_STATE = new Map(); // serverId -> { count, firstAt, cooldownUntil }
-const SERVER_TICK_SAMPLES = new Map(); // serverId -> [{ ts, tps1m, tps5m, tps15m, mspt1m, mspt5m, mspt15m, tickLag }]
-const SERVER_TICK_STATE = new Map(); // serverId -> { lastMspt1m, lastMspt5m, lastMspt15m, pendingTps }
-const SERVER_RESOURCE_PACK_STATE = new Map(); // serverId -> { updatedAt, players: Map(name -> { status, updatedAt }) }
-const SERVER_TICK_SAMPLE_LIMIT = 240;
-const CRASH_LOOP_WINDOW_MS = 5 * 60 * 1000;
-const CRASH_LOOP_THRESHOLD = 3;
-const CRASH_LOOP_COOLDOWN_MS = 10 * 60 * 1000;
-
-function getServerTickSamples(serverId) {
-    const samples = SERVER_TICK_SAMPLES.get(serverId) || [];
-    return samples.map((entry) => ({ ...entry }));
-}
-
-function getServerResourcePackStatus(serverId) {
-    const state = SERVER_RESOURCE_PACK_STATE.get(serverId);
-    if (!state) return { updatedAt: null, players: [] };
-    const players = Array.from(state.players.entries()).map(([name, payload]) => ({
-        name,
-        status: payload.status,
-        updatedAt: payload.updatedAt
-    })).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    return { updatedAt: state.updatedAt || null, players };
-}
-
-function getServerCrashLoopState(serverId) {
-    const state = SERVER_CRASH_LOOP_STATE.get(serverId);
-    if (!state) return { active: false, count: 0, cooldownUntil: null };
-    const now = Date.now();
-    if (state.cooldownUntil && state.cooldownUntil > now) {
-        return { active: true, count: state.count || 0, cooldownUntil: state.cooldownUntil };
-    }
-    return { active: false, count: state.count || 0, cooldownUntil: state.cooldownUntil || null };
-}
+    let crashPolicyCache = { ts: 0, config: null };
 const RESOURCE_TIMELINE_LAST_WRITE_TS = new Map(); // serverId -> timestamp
 const RESOURCE_TIMELINE_WRITE_INTERVAL_MS = 10 * 1000;
 const RESOURCE_TIMELINE_RETENTION_MS = 12 * 60 * 60 * 1000;
