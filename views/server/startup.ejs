@@ -282,10 +282,14 @@
                                 <h6 class="mb-0 fw-semibold">Startup Command</h6>
                             </div>
                             <div class="settings-card-body">
+                                <label for="startupTemplate" class="form-label">Startup Template</label>
+                                <textarea id="startupTemplate" name="startupTemplate" class="form-control mb-2" rows="4" placeholder="Leave blank to use image default..." style="font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;"><%= server.startup || image.startup %></textarea>
+                                <div class="hint mb-3">Optional override. Clear the field to use the image default template.</div>
+
                                 <label class="form-label">Resolved Startup</label>
                                 <textarea class="form-control" readonly><%= resolvedStartup %></textarea>
                                 <div class="hint mt-2">
-                                    Startup template comes from the selected image.
+                                    Resolved command is computed from the template + current variables.
                                 </div>
                             </div>
                         </div>
@@ -396,8 +400,8 @@
                         </div>
 
                         <div class="notice mb-3">
-                            Save updates database settings only. Use <strong>Save and Reinstall</strong> to apply
-                            immediately on the container.
+                            Save updates database settings only. Use <strong>Save and Restart</strong> to apply on runtime.
+                            Reinstall is optional and only needed if the container is broken.
                         </div>
 
                         <% const imageNameLower=String((image && image.name) ? image.name : '' ).toLowerCase(); %>
@@ -420,7 +424,10 @@
                                             </button>
                                             <button type="submit" name="action" value="apply"
                                                 class="btn btn-action btn-warning-soft">
-                                                <i class="bi bi-arrow-repeat me-1"></i> Save and Reinstall
+                                                <i class="bi bi-arrow-repeat me-1"></i> Save and Restart
+                                            </button>
+                                            <button type="button" class="btn btn-action btn-outline-danger" id="reinstallBtn">
+                                                <i class="bi bi-exclamation-triangle me-1"></i> Reinstall
                                             </button>
                                         </div>
                     </form>
@@ -429,6 +436,7 @@
         </div>
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
         <script>
             const sidebar = document.getElementById('sidebar');
             const sidebarToggle = document.getElementById('sidebarToggle');
@@ -453,6 +461,39 @@
             if (presetSelect) {
                 presetSelect.addEventListener('change', renderPresetPreview);
                 renderPresetPreview();
+            }
+
+            const reinstallBtn = document.getElementById('reinstallBtn');
+            if (reinstallBtn) {
+                reinstallBtn.addEventListener('click', () => {
+                    Swal.fire({
+                        title: 'Reinstall Server?',
+                        text: 'This will rebuild the container and may overwrite runtime changes.',
+                        imageUrl: '/assets/rocky-security.png',
+                        imageWidth: 140,
+                        imageAlt: 'Security Rocky',
+                        showCancelButton: true,
+                        confirmButtonColor: '#ef4444',
+                        cancelButtonColor: '#2d2d35',
+                        confirmButtonText: 'Yes, reinstall',
+                        background: '#141419',
+                        color: '#ffffff',
+                        customClass: {
+                            popup: 'border border-secondary border-opacity-10 shadow-lg',
+                            title: 'text-light fw-bold'
+                        }
+                    }).then((result) => {
+                        if (!result.isConfirmed) return;
+                        const form = reinstallBtn.closest('form');
+                        if (!form) return;
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'action';
+                        input.value = 'reinstall';
+                        form.appendChild(input);
+                        form.submit();
+                    });
+                });
             }
         </script>
 </body>

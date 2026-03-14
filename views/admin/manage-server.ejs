@@ -269,6 +269,112 @@
                                         </div>
                                     </div>
 
+                                    <div class="card border-0 shadow-sm mb-4" style="background-color: #141419;">
+                                        <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
+                                            <h5 class="card-title mb-0 fs-6 fw-bold text-light">Allocations</h5>
+                                        </div>
+                                        <div class="card-body">
+                                            <% if (!assignedAllocations || assignedAllocations.length === 0) { %>
+                                                <div class="text-muted">No allocations assigned.</div>
+                                            <% } else { %>
+                                                <div class="table-responsive mb-3">
+                                                    <table class="table table-dark table-sm align-middle mb-0">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Address</th>
+                                                                <th>Notes</th>
+                                                                <th>Type</th>
+                                                                <th class="text-end">Actions</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <% assignedAllocations.forEach((allocation) => { %>
+                                                                <% const isPrimary = Number(allocation.id) === Number(primaryAllocationId); %>
+                                                                <% const hasAlias = Boolean(allocation.alias && String(allocation.alias).trim()); %>
+                                                                <tr>
+                                                                    <td>
+                                                                        <% if (hasAlias) { %>
+                                                                            <code><%= allocation.alias %>:<%= allocation.port %></code>
+                                                                        <% } else { %>
+                                                                            <code><%= allocation.ip %>:<%= allocation.port %></code>
+                                                                        <% } %>
+                                                                    </td>
+                                                                    <td>
+                                                                        <form method="POST" action="/admin/servers/<%= server.containerId %>/allocations/<%= allocation.id %>/notes" class="d-flex gap-1">
+                                                                            <input type="text" name="notes" maxlength="20" class="form-control form-control-sm"
+                                                                                style="max-width: 180px; background:#1a1a20;border-color:#2d2d35;color:#e1e1e6;"
+                                                                                value="<%= allocation.notes || '' %>" placeholder="max 20 chars">
+                                                                            <button class="btn btn-sm btn-outline-info" type="submit">Save</button>
+                                                                        </form>
+                                                                    </td>
+                                                                    <td>
+                                                                        <% if (isPrimary) { %>
+                                                                            <span class="badge bg-primary">Primary</span>
+                                                                        <% } else { %>
+                                                                            <span class="badge bg-secondary">Additional</span>
+                                                                        <% } %>
+                                                                    </td>
+                                                                    <td class="text-end">
+                                                                        <% if (!isPrimary) { %>
+                                                                            <div class="d-flex justify-content-end gap-1 flex-wrap">
+                                                                                <form method="POST" action="/admin/servers/<%= server.containerId %>/allocations/<%= allocation.id %>/primary">
+                                                                                    <button class="btn btn-sm btn-outline-primary" type="submit">Set Primary</button>
+                                                                                </form>
+                                                                                <form method="POST" action="/admin/servers/<%= server.containerId %>/allocations/<%= allocation.id %>/unassign">
+                                                                                    <button class="btn btn-sm btn-outline-danger" type="submit">Unassign</button>
+                                                                                </form>
+                                                                            </div>
+                                                                        <% } else { %>
+                                                                            <span class="text-secondary small">-</span>
+                                                                        <% } %>
+                                                                    </td>
+                                                                </tr>
+                                                            <% }) %>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            <% } %>
+
+                                            <h6 class="text-muted small text-uppercase fw-bold">Assign Allocation</h6>
+                                            <form method="POST" action="/admin/servers/<%= server.containerId %>/allocations/assign" class="row g-2 align-items-end">
+                                                <div class="col-12">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Free Allocation</label>
+                                                    <select name="allocationId" class="form-select"
+                                                        style="background:#1a1a20;border-color:#2d2d35;color:#fff;">
+                                                        <option value="">Select free allocation (optional)</option>
+                                                        <% if (availableAllocations && availableAllocations.length > 0) { %>
+                                                            <% availableAllocations.forEach((allocation) => { %>
+                                                                <% const optionHasAlias = Boolean(allocation.alias && String(allocation.alias).trim()); %>
+                                                                <option value="<%= allocation.id %>">
+                                                                    <% if (optionHasAlias) { %>
+                                                                        <%= allocation.alias %>:<%= allocation.port %>
+                                                                    <% } else { %>
+                                                                        <%= allocation.ip %>:<%= allocation.port %>
+                                                                    <% } %>
+                                                                    <% if (allocation.notes) { %> - <%= allocation.notes %><% } %>
+                                                                </option>
+                                                            <% }) %>
+                                                        <% } %>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">IP (manual)</label>
+                                                    <input type="text" name="ip" class="form-control"
+                                                        style="background:#1a1a20;border-color:#2d2d35;color:#fff;" placeholder="212.227.49.38">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label text-muted small text-uppercase fw-bold">Port</label>
+                                                    <input type="number" name="port" class="form-control"
+                                                        style="background:#1a1a20;border-color:#2d2d35;color:#fff;" placeholder="25565" min="1" max="65535">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <button class="btn btn-primary w-100" type="submit">Assign</button>
+                                                </div>
+                                            </form>
+                                            <div class="text-muted small mt-2">Restart required after allocation changes to refresh port bindings.</div>
+                                        </div>
+                                    </div>
+
                                     <div
                                         class="card border-0 shadow-sm bg-transparent border border-danger border-opacity-10">
                                         <div class="card-body p-4">

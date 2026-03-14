@@ -1837,6 +1837,32 @@ app.get('/admin/servers/:containerId/manage', requireAuth, requireAdmin, async (
             order: [['name', 'ASC']]
         });
 
+        const primaryAllocationId = Number.parseInt(server.allocationId, 10)
+            || (server.allocation ? Number.parseInt(server.allocation.id, 10) : 0);
+        let assignedAllocations = [];
+        let availableAllocations = [];
+        if (Number.isInteger(server.id) && server.id > 0) {
+            assignedAllocations = await Allocation.findAll({
+                where: { serverId: server.id },
+                order: [['port', 'ASC'], ['id', 'ASC']]
+            });
+        }
+        if (server.allocation && Number.parseInt(server.allocation.connectorId, 10) > 0) {
+            availableAllocations = await Allocation.findAll({
+                where: { connectorId: server.allocation.connectorId, serverId: null },
+                order: [['port', 'ASC'], ['id', 'ASC']],
+                limit: 500
+            });
+        }
+
+        assignedAllocations.sort((left, right) => {
+            const leftPrimary = Number.parseInt(left.id, 10) === primaryAllocationId;
+            const rightPrimary = Number.parseInt(right.id, 10) === primaryAllocationId;
+            if (leftPrimary && !rightPrimary) return -1;
+            if (!leftPrimary && rightPrimary) return 1;
+            return (Number.parseInt(left.port, 10) || 0) - (Number.parseInt(right.port, 10) || 0);
+        });
+
         let connectorStatus = 'offline';
         if (server.allocation && server.allocation.connectorId) {
             const connectorWs = connectorConnections.get(server.allocation.connectorId);
@@ -1850,6 +1876,9 @@ app.get('/admin/servers/:containerId/manage', requireAuth, requireAdmin, async (
             users,
             images,
             connectors,
+            assignedAllocations,
+            availableAllocations,
+            primaryAllocationId,
             connectorStatus,
             user: req.session.user,
             title: `Manage Server: ${server.name}`,
@@ -1858,6 +1887,159 @@ app.get('/admin/servers/:containerId/manage', requireAuth, requireAdmin, async (
     } catch (err) {
         console.error("Error fetching server management details:", err);
         res.redirect('/admin/servers?error=Error fetching server details');
+    }
+});
+
+app.post('/admin/servers/:containerId/allocations/assign', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }]
+        });
+        if (!server) return res.redirect('/admin/servers?error=Server not found.');
+        if (!server.allocation) {
+            return res.redirect(`/admin/servers/${server.containerId}/manage?error=Server has no primary allocation.`);
+        }
+
+        const allocationIdRaw = String(req.body.allocationId || '').trim();
+        const ipRaw = String(req.body.ip || '').trim();
+        const portRaw = String(req.body.port || '').trim();
+        let allocation = null;
+
+        if (allocationIdRaw) {
+            const allocationId = Number.parseInt(allocationIdRaw, 10);
+            if (!Number.isInteger(allocationId) || allocationId <= 0) {
+                return res.redirect(`/admin/servers/${server.containerId}/manage?error=Invalid allocation id.`);
+            }
+            allocation = await Allocation.findByPk(allocationId);
+        } else if (ipRaw && portRaw) {
+            const port = Number.parseInt(portRaw, 10);
+            if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+                return res.redirect(`/admin/servers/${server.containerId}/manage?error=Invalid port value.`);
+            }
+            allocation = await Allocation.findOne({ where: { ip: ipRaw, port } });
+        } else {
+            return res.redirect(`/admin/servers/${server.containerId}/manage?error=Provide allocation id or ip:port.`);
+        }
+
+        if (!allocation) {
+            return res.redirect(`/admin/servers/${server.containerId}/manage?error=Allocation not found.`);
+        }
+        if (Number.parseInt(allocation.connectorId, 10) !== Number.parseInt(server.allocation.connectorId, 10)) {
+            return res.redirect(`/admin/servers/${server.containerId}/manage?error=Allocation is not on the same connector.`);
+        }
+        if (allocation.serverId && Number.parseInt(allocation.serverId, 10) !== Number.parseInt(server.id, 10)) {
+            return res.redirect(`/admin/servers/${server.containerId}/manage?error=Allocation already assigned to another server.`);
+        }
+        if (Number.parseInt(allocation.serverId, 10) === Number.parseInt(server.id, 10)) {
+            return res.redirect(`/admin/servers/${server.containerId}/manage?success=Allocation already assigned to this server.`);
+        }
+
+        await allocation.update({ serverId: server.id });
+        return res.redirect(`/admin/servers/${server.containerId}/manage?success=Allocation assigned. Restart required to refresh port bindings.`);
+    } catch (error) {
+        console.error('Error assigning admin allocation:', error);
+        return res.redirect(`/admin/servers/${req.params.containerId}/manage?error=Failed to assign allocation.`);
+    }
+});
+
+app.post('/admin/servers/:containerId/allocations/:allocationId/unassign', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }]
+        });
+        if (!server) return res.redirect('/admin/servers?error=Server not found.');
+
+        const allocationId = Number.parseInt(req.params.allocationId, 10);
+        if (!Number.isInteger(allocationId) || allocationId <= 0) {
+            return res.redirect(`/admin/servers/${server.containerId}/manage?error=Invalid allocation id.`);
+        }
+
+        const allocation = await Allocation.findOne({
+            where: { id: allocationId, serverId: server.id }
+        });
+        if (!allocation) {
+            return res.redirect(`/admin/servers/${server.containerId}/manage?error=Allocation not assigned to this server.`);
+        }
+
+        const primaryAllocationId = Number.parseInt(server.allocationId, 10)
+            || (server.allocation ? Number.parseInt(server.allocation.id, 10) : 0);
+        if (primaryAllocationId === allocation.id) {
+            return res.redirect(`/admin/servers/${server.containerId}/manage?error=Primary allocation cannot be removed.`);
+        }
+
+        await allocation.update({ serverId: null });
+        return res.redirect(`/admin/servers/${server.containerId}/manage?success=Allocation removed. Restart required to refresh port bindings.`);
+    } catch (error) {
+        console.error('Error unassigning admin allocation:', error);
+        return res.redirect(`/admin/servers/${req.params.containerId}/manage?error=Failed to remove allocation.`);
+    }
+});
+
+app.post('/admin/servers/:containerId/allocations/:allocationId/primary', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [{ model: Allocation, as: 'allocation' }]
+        });
+        if (!server) return res.redirect('/admin/servers?error=Server not found.');
+
+        const allocationId = Number.parseInt(req.params.allocationId, 10);
+        if (!Number.isInteger(allocationId) || allocationId <= 0) {
+            return res.redirect(`/admin/servers/${server.containerId}/manage?error=Invalid allocation id.`);
+        }
+
+        const allocation = await Allocation.findOne({
+            where: { id: allocationId, serverId: server.id }
+        });
+        if (!allocation) {
+            return res.redirect(`/admin/servers/${server.containerId}/manage?error=Allocation is not assigned to this server.`);
+        }
+        if (server.allocation && Number.parseInt(allocation.connectorId, 10) !== Number.parseInt(server.allocation.connectorId, 10)) {
+            return res.redirect(`/admin/servers/${server.containerId}/manage?error=Allocation is not on the same connector.`);
+        }
+
+        const currentPrimaryId = Number.parseInt(server.allocationId, 10)
+            || (server.allocation ? Number.parseInt(server.allocation.id, 10) : 0);
+        if (currentPrimaryId === allocation.id) {
+            return res.redirect(`/admin/servers/${server.containerId}/manage?success=Allocation already primary.`);
+        }
+
+        await server.update({ allocationId: allocation.id });
+        return res.redirect(`/admin/servers/${server.containerId}/manage?success=Primary allocation updated. Restart required to refresh port bindings.`);
+    } catch (error) {
+        console.error('Error switching admin primary allocation:', error);
+        return res.redirect(`/admin/servers/${req.params.containerId}/manage?error=Failed to switch primary allocation.`);
+    }
+});
+
+app.post('/admin/servers/:containerId/allocations/:allocationId/notes', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId }
+        });
+        if (!server) return res.redirect('/admin/servers?error=Server not found.');
+
+        const allocationId = Number.parseInt(req.params.allocationId, 10);
+        if (!Number.isInteger(allocationId) || allocationId <= 0) {
+            return res.redirect(`/admin/servers/${server.containerId}/manage?error=Invalid allocation id.`);
+        }
+
+        const allocation = await Allocation.findOne({
+            where: { id: allocationId, serverId: server.id }
+        });
+        if (!allocation) {
+            return res.redirect(`/admin/servers/${server.containerId}/manage?error=Allocation is not assigned to this server.`);
+        }
+
+        const notesRaw = String(req.body.notes || '').trim();
+        const notes = notesRaw.length > 20 ? notesRaw.slice(0, 20) : notesRaw;
+        await allocation.update({ notes: notes || null });
+        return res.redirect(`/admin/servers/${server.containerId}/manage?success=Allocation notes updated.`);
+    } catch (error) {
+        console.error('Error updating allocation notes:', error);
+        return res.redirect(`/admin/servers/${req.params.containerId}/manage?error=Failed to update allocation notes.`);
     }
 });
 

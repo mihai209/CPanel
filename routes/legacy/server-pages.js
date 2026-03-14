@@ -13721,6 +13721,10 @@ app.post('/server/:containerId/startup', requireAuth, async (req, res) => {
         });
         const startupPresets = getStartupPresetsForImage(image, variableDefinitions);
 
+        const startupTemplateRaw = typeof req.body.startupTemplate === 'string' ? req.body.startupTemplate.trim() : '';
+        const startupTemplate = startupTemplateRaw ? startupTemplateRaw : null;
+        const effectiveStartupTemplate = startupTemplate || image.startup;
+
         const requestedVariables = normalizeClientVariables(req.body.variables || {});
         const existingVariables = normalizeClientVariables(server.variables || {});
         let mergedVariables = { ...existingVariables, ...requestedVariables };
@@ -13738,7 +13742,7 @@ app.post('/server/:containerId/startup', requireAuth, async (req, res) => {
         }
 
         const { resolvedVariables, env } = buildServerEnvironment(image, mergedVariables, runtimeValues);
-        const startup = buildStartupCommand(server.startup || image.startup, env);
+        const startup = buildStartupCommand(effectiveStartupTemplate, env);
 
         const dockerChoices = resolveImageDockerChoices(image);
         const allowedDockerTags = new Set(dockerChoices.map((choice) => choice.tag));
@@ -13748,19 +13752,38 @@ app.post('/server/:containerId/startup', requireAuth, async (req, res) => {
             : (server.dockerImage || image.dockerImage);
 
         const action = String(req.body.action || 'save').toLowerCase();
-        const shouldApply = action === 'apply';
+        const shouldRestart = action === 'apply';
+        const shouldReinstall = action === 'reinstall';
 
         const updatePayload = {
             variables: resolvedVariables,
-            dockerImage: nextDockerImage
+            dockerImage: nextDockerImage,
+            startup: startupTemplate
         };
 
-        if (!shouldApply) {
+        if (!shouldReinstall) {
             await server.update(updatePayload);
             await setServerStartupPresetSelection(server.id, selectedPresetId);
-            const savedMessage = selectedPresetId
-                ? `Startup settings saved with preset "${selectedPresetId}". Use "Save and Reinstall" to apply changes.`
-                : 'Startup settings saved. Use "Save and Reinstall" to apply changes.';
+
+            let savedMessage = selectedPresetId
+                ? `Startup settings saved with preset "${selectedPresetId}".`
+                : 'Startup settings saved.';
+
+            if (shouldRestart) {
+                if (!hasServerPermission(access, 'server.power')) {
+                    savedMessage += ' Missing permission: server.power to restart.';
+                } else {
+                    const restartResult = await dispatchServerPowerSignal(server, 'restart');
+                    if (restartResult && restartResult.success) {
+                        savedMessage += ' Restart sent to connector.';
+                    } else {
+                        savedMessage += ` Restart failed: ${restartResult && restartResult.error ? restartResult.error : 'connector offline'}.`;
+                    }
+                }
+            } else {
+                savedMessage += ' Restart to apply changes.';
+            }
+
             return res.redirect(`/server/${server.containerId}/startup?success=${encodeURIComponent(savedMessage)}`);
         }
 

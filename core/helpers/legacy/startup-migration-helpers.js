@@ -747,6 +747,35 @@ function normalizeImportedInstallation(rawInstallation) {
     };
 }
 
+function sanitizeImportedConfigFilePath(rawPath) {
+    const value = String(rawPath || '').trim();
+    if (!value) {
+        return '';
+    }
+    if (value.length > 512) {
+        throw new Error('Config file path is too long.');
+    }
+    if (value.includes('\0')) {
+        throw new Error('Config file path contains invalid characters.');
+    }
+    if (value.startsWith('/') || value.startsWith('\\')) {
+        throw new Error('Config file path must be relative.');
+    }
+    if (/^[a-zA-Z]:[\\/]/.test(value)) {
+        throw new Error('Config file path must be relative.');
+    }
+    if (value.includes('..')) {
+        const segments = value.split('/');
+        if (segments.some((segment) => segment.trim() === '..')) {
+            throw new Error('Config file path contains traversal segments.');
+        }
+    }
+    if (value.includes('\\')) {
+        throw new Error('Config file path must use forward slashes.');
+    }
+    return value;
+}
+
 function extractImportedInstallation(rawPayload) {
     const directInstallation = normalizeImportedInstallation(rawPayload.installation);
     if (directInstallation) return directInstallation;
@@ -863,6 +892,8 @@ function normalizeImportedConfigFiles(rawConfigFiles) {
 
     const consumeDefinition = (fileName, rawDefinition, output) => {
         if (typeof fileName !== 'string' || !fileName.trim()) return;
+        const safeFileName = sanitizeImportedConfigFilePath(fileName);
+        if (!safeFileName) return;
         const definition = normalizeDefinition(rawDefinition);
         if (!definition) return;
 
@@ -873,7 +904,7 @@ function normalizeImportedConfigFiles(rawConfigFiles) {
         ];
         if (replaceEntries.length === 0) return;
 
-        output[fileName.trim()] = {
+        output[safeFileName] = {
             parser,
             replace: replaceEntries
         };
