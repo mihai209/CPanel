@@ -788,6 +788,30 @@ const consoleShortcuts = [
                 }
             });
 
+            // ================== Existing console functionality (preserved) ==================
+            const serverId = '<%= server.id %>';
+            const serverContainerId = '<%= server.containerId %>';
+            const serverMemory = <%= server.memory || 0 %>;
+            const serverDisk = <%= server.disk || 0 %>;
+            let currentServerStatus = '<%= String(server.status || "stopped").toLowerCase() %>';
+            const promptBrand = <%- JSON.stringify(String((settings && settings.brandName) ? settings.brandName : 'cpanel').toLowerCase()) %>;
+            const showMinecraftEulaModal = <%- JSON.stringify(Boolean(showMinecraftEulaModal)) %>;
+            const minecraftPanelEnabled = <%- JSON.stringify(Boolean(isMinecraftServer && canViewMinecraft)) %>;
+            const minecraftStatusAddress = <%- JSON.stringify(minecraftStatusAddress || '') %>;
+            const minecraftBedrockMode = <%- JSON.stringify(Boolean(minecraftBedrockMode)) %>;
+            const minecraftActionPerms = {
+                canKick: <%= minecraftActionPermissions && minecraftActionPermissions.canKick ? 'true' : 'false' %>,
+                canBan: <%= minecraftActionPermissions && minecraftActionPermissions.canBan ? 'true' : 'false' %>,
+                canOp: <%= minecraftActionPermissions && minecraftActionPermissions.canOp ? 'true' : 'false' %>,
+                canDeop: <%= minecraftActionPermissions && minecraftActionPermissions.canDeop ? 'true' : 'false' %>,
+                canTempban: <%= minecraftActionPermissions && minecraftActionPermissions.canTempban ? 'true' : 'false' %>,
+                canTeleport: <%= minecraftActionPermissions && minecraftActionPermissions.canTeleport ? 'true' : 'false' %>
+            };
+            const eulaModalEl = showMinecraftEulaModal ? document.getElementById('eulaModal') : null;
+            const eulaModalInstance = eulaModalEl && window.bootstrap ? bootstrap.Modal.getOrCreateInstance(eulaModalEl) : null;
+
+            let connectorOnline = true;
+
             const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (ch) => ({
                 '&': '&amp;',
                 '<': '&lt;',
@@ -930,30 +954,6 @@ const consoleShortcuts = [
                 });
                 setInterval(refreshPlayerPanel, 30000);
             }
-
-            // ================== Existing console functionality (preserved) ==================
-            const serverId = '<%= server.id %>';
-            const serverContainerId = '<%= server.containerId %>';
-            const serverMemory = <%= server.memory || 0 %>;
-            const serverDisk = <%= server.disk || 0 %>;
-            let currentServerStatus = '<%= String(server.status || "stopped").toLowerCase() %>';
-            const promptBrand = <%- JSON.stringify(String((settings && settings.brandName) ? settings.brandName : 'cpanel').toLowerCase()) %>;
-            const showMinecraftEulaModal = <%- JSON.stringify(Boolean(showMinecraftEulaModal)) %>;
-            const minecraftPanelEnabled = <%- JSON.stringify(Boolean(isMinecraftServer && canViewMinecraft)) %>;
-            const minecraftStatusAddress = <%- JSON.stringify(minecraftStatusAddress || '') %>;
-            const minecraftBedrockMode = <%- JSON.stringify(Boolean(minecraftBedrockMode)) %>;
-            const minecraftActionPerms = {
-                canKick: <%= minecraftActionPermissions && minecraftActionPermissions.canKick ? 'true' : 'false' %>,
-                canBan: <%= minecraftActionPermissions && minecraftActionPermissions.canBan ? 'true' : 'false' %>,
-                canOp: <%= minecraftActionPermissions && minecraftActionPermissions.canOp ? 'true' : 'false' %>,
-                canDeop: <%= minecraftActionPermissions && minecraftActionPermissions.canDeop ? 'true' : 'false' %>,
-                canTempban: <%= minecraftActionPermissions && minecraftActionPermissions.canTempban ? 'true' : 'false' %>,
-                canTeleport: <%= minecraftActionPermissions && minecraftActionPermissions.canTeleport ? 'true' : 'false' %>
-            };
-            const eulaModalEl = showMinecraftEulaModal ? document.getElementById('eulaModal') : null;
-            const eulaModalInstance = eulaModalEl && window.bootstrap ? bootstrap.Modal.getOrCreateInstance(eulaModalEl) : null;
-
-            let connectorOnline = true;
 
             const term = new Terminal({
                 theme: {
