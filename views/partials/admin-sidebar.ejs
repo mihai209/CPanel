@@ -278,3 +278,30 @@ const isAdminNavActive = (item) => {
         }
     }
 </style>
+
+<script>
+    (function () {
+        const isEditableTarget = (target) => {
+            if (!target) return false;
+            const tag = String(target.tagName || '').toLowerCase();
+            return target.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select';
+        };
+
+        const openAdminMenu = () => {
+            const modalEl = document.getElementById('adminNavModal');
+            if (!modalEl || !window.bootstrap) return;
+            const modal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        };
+
+        document.addEventListener('keydown', (event) => {
+            if (event.defaultPrevented) return;
+            if (isEditableTarget(event.target)) return;
+            const key = String(event.key || '').toLowerCase();
+            if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === 'k') {
+                event.preventDefault();
+                openAdminMenu();
+            }
+        });
+    })();
+</script>

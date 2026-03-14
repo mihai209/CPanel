@@ -1,5 +1,6 @@
 <%
 const coreItems = [
+    { id: 'dashboard', label: 'Back to Dashboard', icon: 'bi-grid-1x2', link: `/dashboard` },
     { id: 'overview', label: 'Overview', icon: 'bi-speedometer2', link: `/server/${server.containerId}/overview` },
     { id: 'console', label: 'Console', icon: 'bi-terminal', link: `/server/${server.containerId}`, turbo: false },
     { id: 'files', label: 'File Manager', icon: 'bi-folder2-open', link: `/server/${server.containerId}/files`, turbo: false },
@@ -104,6 +105,10 @@ const navSections = [
 </div>
 
 <style>
+    #sidebarToggle, .navbar-toggle, .sidebar-toggle {
+        display: none !important;
+    }
+
     .sidebar {
         width: 0 !important;
         min-width: 0 !important;
@@ -257,3 +262,30 @@ const navSections = [
         }
     }
 </style>
+
+<script>
+    (function () {
+        const isEditableTarget = (target) => {
+            if (!target) return false;
+            const tag = String(target.tagName || '').toLowerCase();
+            return target.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select';
+        };
+
+        const openServerMenu = () => {
+            const modalEl = document.getElementById('serverNavModal');
+            if (!modalEl || !window.bootstrap) return;
+            const modal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        };
+
+        document.addEventListener('keydown', (event) => {
+            if (event.defaultPrevented) return;
+            if (isEditableTarget(event.target)) return;
+            const key = String(event.key || '').toLowerCase();
+            if ((event.ctrlKey || event.metaKey) && !event.shiftKey && key === 'k') {
+                event.preventDefault();
+                openServerMenu();
+            }
+        });
+    })();
+</script>
