@@ -8791,10 +8791,6 @@ app.post('/server/:containerId/macros/:macroId/update', requireAuth, async (req,
         }
         const canManageMacro = Boolean(access.isAdmin || access.isOwner || Number(macro.createdByUserId) === Number(req.session.user.id));
         if (!canManageMacro) {
-            return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('You can only delete macros you created.')}`);
-        }
-        const canManageMacro = Boolean(access.isAdmin || access.isOwner || Number(macro.createdByUserId) === Number(req.session.user.id));
-        if (!canManageMacro) {
             return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('You can only edit macros you created.')}`);
         }
 
