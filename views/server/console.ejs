@@ -66,7 +66,7 @@
                 overflow: hidden;
             }
 
-            /* Sidebar styles (Pterodactyl-like) */
+            /* Sidebar styles */
             .sidebar {
                 width: 260px;
                 background: var(--bg-sidebar);
@@ -367,6 +367,35 @@
                 gap: 0.75rem;
             }
 
+            .console-info {
+                border-bottom: 1px solid var(--border-color);
+                background: rgba(15, 15, 18, 0.92);
+                padding: 0.5rem 1.25rem;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.75rem 1.5rem;
+                font-size: 0.8rem;
+                color: var(--text-secondary);
+            }
+
+            .console-info .info-label {
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                font-size: 0.65rem;
+                color: rgba(255, 255, 255, 0.4);
+                margin-right: 0.35rem;
+            }
+
+            .console-info .info-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.35rem;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 999px;
+                padding: 0.25rem 0.6rem;
+            }
+
             .terminal-title {
                 font-size: 0.85rem;
                 font-weight: 600;
@@ -600,19 +629,6 @@ const consoleShortcuts = [
                         <h1 class="server-name">
                             <%= server.name %>
                         </h1>
-                        <% if (server.description) { %>
-                            <div class="server-meta-line"><%= server.description %></div>
-                        <% } %>
-                        <% if (user && user.isAdmin) { %>
-                            <div class="server-meta-line">Owner: @<%= server.owner && server.owner.username ? server.owner.username : 'unknown' %></div>
-                        <% } %>
-
-                        <span id="statusBadge" class="status-badge status-<%= server.status %>">
-                            <span class="status-dot"></span>
-                            <span id="statusText">
-                                <%= server.status.toUpperCase() %>
-                            </span>
-                        </span>
                     </div>
                     <div class="top-navbar-right">
                         <% if (Number(server.ownerId) === Number(user && user.id)) { %>
@@ -651,6 +667,15 @@ const consoleShortcuts = [
                                 <span class="terminal-title">
                                     <i class="bi bi-terminal"></i> [<%= server.name %>] Console
                                 </span>
+                                <span id="statusBadge" class="status-badge status-<%= server.status %>" style="margin-left: 0.75rem;">
+                                    <span class="status-dot"></span>
+                                    <span id="statusText">
+                                        <%= server.status.toUpperCase() %>
+                                    </span>
+                                </span>
+                                <button id="toggleConsoleInfo" class="btn btn-outline-secondary btn-sm ms-2" type="button">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
                             </div>
                             <div class="terminal-controls">
                                 <span id="wsStatusBadge" class="badge bg-secondary" title="Panel status">
@@ -691,6 +716,17 @@ const consoleShortcuts = [
                                     </button>
                                 </div>
                             </div>
+                        </div>
+                        <div id="consoleInfoBar" class="console-info d-none">
+                            <% if (server.description) { %>
+                                <div class="info-pill"><span class="info-label">Description</span><span><%= server.description %></span></div>
+                            <% } %>
+                            <% if (user && user.isAdmin) { %>
+                                <div class="info-pill"><span class="info-label">Owner</span><span>@<%= server.owner && server.owner.username ? server.owner.username : 'unknown' %></span></div>
+                            <% } %>
+                            <% if (server.allocation && (server.allocation.alias || server.allocation.ip)) { %>
+                                <div class="info-pill"><span class="info-label">Address</span><span><%= server.allocation.alias || server.allocation.ip %>:<%= server.allocation.port %></span></div>
+                            <% } %>
                         </div>
                         <div id="terminal"></div>
                         <div class="terminal-footer">
@@ -786,6 +822,13 @@ const consoleShortcuts = [
                         sidebar.classList.remove('show');
                     }
                 }
+            });
+
+            const consoleInfoBar = document.getElementById('consoleInfoBar');
+            const toggleConsoleInfo = document.getElementById('toggleConsoleInfo');
+            toggleConsoleInfo?.addEventListener('click', () => {
+                if (!consoleInfoBar) return;
+                consoleInfoBar.classList.toggle('d-none');
             });
 
             // ================== Existing console functionality (preserved) ==================
