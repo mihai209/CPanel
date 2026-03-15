@@ -69,34 +69,60 @@ const isAdminNavActive = (item) => {
 };
 %>
 
-<div class="admin-sidebar-panel">
-    <div class="admin-sidebar-header">
-        <div class="admin-sidebar-title">Admin Menu</div>
-        <div class="form-check form-switch admin-nav-mode-toggle">
-            <input class="form-check-input" type="checkbox" id="adminNavModeToggleSidebar" data-admin-nav-toggle>
-            <label class="form-check-label" for="adminNavModeToggleSidebar">Sidebar mode</label>
-        </div>
+<div id="adminSidebar" class="admin-sidebar-modal-host" aria-hidden="true">
+    <div class="sidebar-header">
+        <span class="sidebar-brand"><%= (settings.brandName || 'CPanel').toUpperCase() %></span>
     </div>
-    <% adminNavSections.forEach((section) => { %>
-        <div class="sidebar-section">
-            <div class="sidebar-section-title"><%= section.title %></div>
-            <div class="sidebar-section-items">
+    <div class="admin-sidebar-panel">
+        <% adminNavSections.forEach((section) => { %>
+            <div class="small-heading px-3"><%= section.title %></div>
+            <div class="nav flex-column px-2 mb-2">
                 <% section.items.forEach((item) => { %>
-                    <a href="<%= item.href %>" class="sidebar-item <%= isAdminNavActive(item) ? 'active' : '' %>">
+                    <a href="<%= item.href %>" class="nav-link <%= isAdminNavActive(item) ? 'active' : '' %>">
                         <i class="bi <%= item.icon %>"></i>
-                        <span><%= item.label %></span>
+                        <span class="sidebar-text"><%= item.label %></span>
                     </a>
                 <% }) %>
             </div>
+        <% }) %>
+        <div class="admin-sidebar-mode px-3 py-3">
+            <div class="nav-mode-switch admin-nav-mode-switch">
+                <button type="button" class="nav-mode-btn" data-admin-nav-mode="modal">Popup</button>
+                <button type="button" class="nav-mode-btn" data-admin-nav-mode="sidebar">Sidebar</button>
+                <button type="button" class="nav-mode-btn" data-admin-nav-mode="navbar">Navbar</button>
+            </div>
         </div>
-    <% }) %>
-</div>
-
-<div id="adminSidebar" class="admin-sidebar-modal-host" aria-hidden="true">
+    </div>
     <button type="button" class="admin-menu-toggle" data-bs-toggle="modal" data-bs-target="#adminNavModal" aria-label="Open admin menu">
         <i class="bi bi-shield"></i>
         <span>Admin Menu</span>
     </button>
+</div>
+
+<div class="admin-nav-bar">
+    <div class="admin-nav-bar-inner">
+        <div class="admin-nav-bar-title">Admin Control</div>
+        <div class="nav-mode-switch admin-nav-mode-switch">
+            <button type="button" class="nav-mode-btn" data-admin-nav-mode="modal">Popup</button>
+            <button type="button" class="nav-mode-btn" data-admin-nav-mode="sidebar">Sidebar</button>
+            <button type="button" class="nav-mode-btn" data-admin-nav-mode="navbar">Navbar</button>
+        </div>
+    </div>
+    <div class="admin-nav-scroll" id="adminNavScroll">
+        <% adminNavSections.forEach((section) => { %>
+            <div class="admin-nav-group">
+                <div class="admin-nav-group-title"><%= section.title %></div>
+                <div class="admin-nav-group-items">
+                    <% section.items.forEach((item) => { %>
+                        <a href="<%= item.href %>" class="admin-nav-link <%= isAdminNavActive(item) ? 'active' : '' %>">
+                            <i class="bi <%= item.icon %>"></i>
+                            <span><%= item.label %></span>
+                        </a>
+                    <% }) %>
+                </div>
+            </div>
+        <% }) %>
+    </div>
 </div>
 
 <div class="modal fade" id="adminNavModal" tabindex="-1" aria-labelledby="adminNavModalLabel" aria-hidden="true">
@@ -136,9 +162,10 @@ const isAdminNavActive = (item) => {
                     <span class="text-muted small"><%= user.username %></span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
-                    <div class="form-check form-switch admin-nav-mode-toggle">
-                        <input class="form-check-input" type="checkbox" id="adminNavModeToggleModal" data-admin-nav-toggle>
-                        <label class="form-check-label" for="adminNavModeToggleModal">Sidebar mode</label>
+                    <div class="nav-mode-switch admin-nav-mode-switch">
+                        <button type="button" class="nav-mode-btn" data-admin-nav-mode="modal">Popup</button>
+                        <button type="button" class="nav-mode-btn" data-admin-nav-mode="sidebar">Sidebar</button>
+                        <button type="button" class="nav-mode-btn" data-admin-nav-mode="navbar">Navbar</button>
                     </div>
                     <a href="https://ko-fi.com/S6S11A22SE" target="_blank" rel="noopener noreferrer" class="admin-menu-support">
                         <i class="bi bi-cup-hot"></i>
@@ -172,74 +199,77 @@ const isAdminNavActive = (item) => {
         display: none;
     }
 
-    :root[data-admin-nav="sidebar"] .admin-menu-toggle {
+    :root[data-admin-nav="sidebar"] .admin-menu-toggle,
+    :root[data-admin-nav="navbar"] .admin-menu-toggle {
         display: none;
+    }
+
+    :root[data-admin-nav="navbar"] #adminSidebar {
+        width: 0 !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+    }
+
+    :root[data-admin-nav="navbar"] .sidebar {
+        width: 0 !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+    }
+
+    :root[data-admin-nav="navbar"] .admin-sidebar-panel {
+        display: none;
+    }
+
+    :root[data-admin-nav="modal"] .admin-nav-bar,
+    :root[data-admin-nav="sidebar"] .admin-nav-bar {
+        display: none;
+    }
+
+    :root[data-admin-nav="navbar"] .admin-nav-bar {
+        display: block;
+    }
+
+    :root[data-admin-nav="navbar"] .admin-content {
+        padding-top: 4.25rem;
     }
 
     .admin-sidebar-panel {
         padding: 0.75rem 0.5rem 1.5rem;
     }
 
-    .admin-sidebar-header {
-        display: flex;
+    .nav-mode-switch {
+        display: inline-flex;
         align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-        padding: 0.5rem 0.75rem 1rem;
+        gap: 0.25rem;
+        padding: 0.25rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
     }
 
-    .admin-sidebar-title {
-        font-weight: 700;
-        font-size: 0.95rem;
-        color: #e1e1e6;
-    }
-
-    .admin-nav-mode-toggle .form-check-label {
-        font-size: 0.78rem;
-        color: #9aa0a6;
-        margin-left: 0.35rem;
-    }
-
-    .sidebar-section {
-        margin-bottom: 1rem;
-    }
-
-    .sidebar-section-title {
-        font-size: 0.68rem;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: rgba(255, 255, 255, 0.4);
-        margin: 0.5rem 0.9rem;
-        font-weight: 700;
-    }
-
-    .sidebar-section-items {
-        display: flex;
-        flex-direction: column;
-        gap: 0.2rem;
-        padding: 0 0.5rem;
-    }
-
-    .sidebar-section-items .sidebar-item {
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
-        padding: 0.55rem 0.75rem;
-        border-radius: 0.65rem;
-        color: #cbd5f5;
-        text-decoration: none;
+    .nav-mode-btn {
+        border: 0;
+        background: transparent;
+        color: #aab0bf;
+        font-size: 0.72rem;
+        padding: 0.25rem 0.6rem;
+        border-radius: 999px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
         transition: all 0.2s ease;
     }
 
-    .sidebar-section-items .sidebar-item:hover {
-        background: rgba(99, 102, 241, 0.12);
+    .nav-mode-btn.active {
+        background: rgba(99, 102, 241, 0.28);
         color: #fff;
     }
 
-    .sidebar-section-items .sidebar-item.active {
-        background: rgba(99, 102, 241, 0.2);
+    .nav-mode-btn:hover {
         color: #fff;
-        box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.35);
     }
 
     .admin-menu-toggle {
@@ -378,6 +408,93 @@ const isAdminNavActive = (item) => {
         border-color: rgba(99, 102, 241, 0.5);
     }
 
+    .admin-nav-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1040;
+        background: rgba(12, 12, 16, 0.92);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(10px);
+        padding: 0.6rem 1rem 0.5rem;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .admin-nav-bar-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .admin-nav-bar-title {
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: #e6e6ef;
+        max-width: 40vw;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .admin-nav-scroll {
+        display: flex;
+        gap: 1.2rem;
+        overflow-x: auto;
+        padding-bottom: 0.25rem;
+        scrollbar-width: thin;
+    }
+
+    .admin-nav-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: max-content;
+    }
+
+    .admin-nav-group-title {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: rgba(255, 255, 255, 0.45);
+        font-weight: 700;
+    }
+
+    .admin-nav-group-items {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+
+    .admin-nav-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        color: #cbd5f5;
+        text-decoration: none;
+        background: rgba(99, 102, 241, 0.12);
+        border: 1px solid transparent;
+        font-size: 0.78rem;
+        white-space: nowrap;
+        transition: all 0.2s ease;
+    }
+
+    .admin-nav-link:hover {
+        color: #fff;
+        border-color: rgba(99, 102, 241, 0.45);
+        background: rgba(99, 102, 241, 0.22);
+    }
+
+    .admin-nav-link.active {
+        color: #fff;
+        background: rgba(99, 102, 241, 0.3);
+        border-color: rgba(99, 102, 241, 0.65);
+    }
+
     @media (max-width: 768px) {
         .admin-menu-toggle {
             left: 1rem;
@@ -385,8 +502,11 @@ const isAdminNavActive = (item) => {
             padding: 0.6rem 0.85rem;
             font-size: 0.85rem;
         }
-        .admin-nav-mode-toggle {
+        .nav-mode-switch {
             display: none;
+        }
+        .admin-nav-bar {
+            padding: 0.6rem 0.75rem;
         }
     }
 </style>
@@ -395,25 +515,25 @@ const isAdminNavActive = (item) => {
     (function () {
         const storageKey = 'cpanel.adminNavMode';
         const root = document.documentElement;
-        const toggles = Array.from(document.querySelectorAll('[data-admin-nav-toggle]'));
+        const modeButtons = Array.from(document.querySelectorAll('[data-admin-nav-mode]'));
         const modalEl = document.getElementById('adminNavModal');
         const applyMode = (mode) => {
-            const next = mode === 'sidebar' ? 'sidebar' : 'modal';
+            const next = ['modal', 'sidebar', 'navbar'].includes(mode) ? mode : 'modal';
             root.dataset.adminNav = next;
             localStorage.setItem(storageKey, next);
-            toggles.forEach((toggle) => {
-                toggle.checked = next === 'sidebar';
+            modeButtons.forEach((button) => {
+                button.classList.toggle('active', button.dataset.adminNavMode === next);
             });
-            if (next === 'sidebar' && modalEl && window.bootstrap) {
+            if (next !== 'modal' && modalEl && window.bootstrap) {
                 const modal = window.bootstrap.Modal.getInstance(modalEl);
                 if (modal) modal.hide();
             }
         };
         const savedMode = localStorage.getItem(storageKey);
-        applyMode(savedMode === 'sidebar' ? 'sidebar' : 'modal');
-        toggles.forEach((toggle) => {
-            toggle.addEventListener('change', (event) => {
-                applyMode(event.target.checked ? 'sidebar' : 'modal');
+        applyMode(savedMode || 'modal');
+        modeButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                applyMode(button.dataset.adminNavMode);
             });
         });
 
@@ -424,12 +544,44 @@ const isAdminNavActive = (item) => {
         };
 
         const openAdminMenu = () => {
-            if (root.dataset.adminNav === 'sidebar') return;
+            if (root.dataset.adminNav !== 'modal') return;
             const modalEl = document.getElementById('adminNavModal');
             if (!modalEl || !window.bootstrap) return;
             const modal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
             modal.show();
         };
+
+        const sidebarEl = document.getElementById('adminSidebar');
+        const sidebarScrollKey = 'cpanel.adminSidebarScroll';
+        if (sidebarEl) {
+            const savedScroll = Number.parseInt(localStorage.getItem(sidebarScrollKey), 10);
+            if (Number.isFinite(savedScroll)) {
+                sidebarEl.scrollTop = savedScroll;
+            }
+            let sidebarScrollTimer;
+            sidebarEl.addEventListener('scroll', () => {
+                window.clearTimeout(sidebarScrollTimer);
+                sidebarScrollTimer = window.setTimeout(() => {
+                    localStorage.setItem(sidebarScrollKey, String(sidebarEl.scrollTop || 0));
+                }, 120);
+            });
+        }
+
+        const navScrollEl = document.getElementById('adminNavScroll');
+        const navScrollKey = 'cpanel.adminNavbarScroll';
+        if (navScrollEl) {
+            const savedLeft = Number.parseInt(localStorage.getItem(navScrollKey), 10);
+            if (Number.isFinite(savedLeft)) {
+                navScrollEl.scrollLeft = savedLeft;
+            }
+            let navScrollTimer;
+            navScrollEl.addEventListener('scroll', () => {
+                window.clearTimeout(navScrollTimer);
+                navScrollTimer = window.setTimeout(() => {
+                    localStorage.setItem(navScrollKey, String(navScrollEl.scrollLeft || 0));
+                }, 120);
+            });
+        }
 
         document.addEventListener('keydown', (event) => {
             if (event.defaultPrevented) return;

@@ -58,9 +58,10 @@ const navSections = [
 <div class="server-sidebar-panel">
     <div class="server-sidebar-header">
         <div class="server-sidebar-title">Server Menu</div>
-        <div class="form-check form-switch server-nav-mode-toggle">
-            <input class="form-check-input" type="checkbox" id="serverNavModeToggleSidebar" data-server-nav-toggle>
-            <label class="form-check-label" for="serverNavModeToggleSidebar">Sidebar mode</label>
+        <div class="nav-mode-switch server-nav-mode-switch">
+            <button type="button" class="nav-mode-btn" data-server-nav-mode="modal">Popup</button>
+            <button type="button" class="nav-mode-btn" data-server-nav-mode="sidebar">Sidebar</button>
+            <button type="button" class="nav-mode-btn" data-server-nav-mode="navbar">Navbar</button>
         </div>
     </div>
     <% navSections.forEach((section) => { %>
@@ -82,6 +83,32 @@ const navSections = [
     <i class="bi bi-grid"></i>
     <span>Server Menu</span>
 </button>
+
+<div class="server-nav-bar">
+    <div class="server-nav-bar-inner">
+        <div class="server-nav-bar-title"><%= server.name %></div>
+        <div class="nav-mode-switch server-nav-mode-switch">
+            <button type="button" class="nav-mode-btn" data-server-nav-mode="modal">Popup</button>
+            <button type="button" class="nav-mode-btn" data-server-nav-mode="sidebar">Sidebar</button>
+            <button type="button" class="nav-mode-btn" data-server-nav-mode="navbar">Navbar</button>
+        </div>
+    </div>
+    <div class="server-nav-scroll" id="serverNavScroll">
+        <% navSections.forEach((section) => { %>
+            <div class="server-nav-group">
+                <div class="server-nav-group-title"><%= section.title %></div>
+                <div class="server-nav-group-items">
+                    <% section.items.forEach((item) => { %>
+                        <a href="<%= item.link %>" class="server-nav-link <%= active === item.id ? 'active' : '' %>" <%= item.turbo === false ? 'data-turbo="false"' : '' %>>
+                            <i class="bi <%= item.icon %>"></i>
+                            <span><%= item.label %></span>
+                        </a>
+                    <% }) %>
+                </div>
+            </div>
+        <% }) %>
+    </div>
+</div>
 
 <div class="modal fade" id="serverNavModal" tabindex="-1" aria-labelledby="serverNavModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable modal-lg">
@@ -115,9 +142,10 @@ const navSections = [
                 <% }) %>
             </div>
             <div class="modal-footer server-menu-footer">
-                <div class="form-check form-switch server-nav-mode-toggle">
-                    <input class="form-check-input" type="checkbox" id="serverNavModeToggleModal" data-server-nav-toggle>
-                    <label class="form-check-label" for="serverNavModeToggleModal">Sidebar mode</label>
+                <div class="nav-mode-switch server-nav-mode-switch">
+                    <button type="button" class="nav-mode-btn" data-server-nav-mode="modal">Popup</button>
+                    <button type="button" class="nav-mode-btn" data-server-nav-mode="sidebar">Sidebar</button>
+                    <button type="button" class="nav-mode-btn" data-server-nav-mode="navbar">Navbar</button>
                 </div>
                 <a href="https://ko-fi.com/S6S11A22SE" target="_blank" rel="noopener noreferrer" class="server-menu-support">
                     <i class="bi bi-cup-hot"></i>
@@ -149,8 +177,39 @@ const navSections = [
         display: none;
     }
 
-    :root[data-server-nav="sidebar"] .server-menu-toggle {
+    :root[data-server-nav="sidebar"] .server-menu-toggle,
+    :root[data-server-nav="navbar"] .server-menu-toggle {
         display: none;
+    }
+
+    :root[data-server-nav="navbar"] .sidebar {
+        width: 0 !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        overflow: visible !important;
+    }
+
+    :root[data-server-nav="navbar"] .server-sidebar-panel {
+        display: none;
+    }
+
+    :root[data-server-nav="modal"] .server-nav-bar,
+    :root[data-server-nav="sidebar"] .server-nav-bar {
+        display: none;
+    }
+
+    :root[data-server-nav="navbar"] .server-nav-bar {
+        display: block;
+    }
+
+    :root[data-server-nav="navbar"] .content,
+    :root[data-server-nav="navbar"] .main-content,
+    :root[data-server-nav="navbar"] .terminal-wrapper,
+    :root[data-server-nav="navbar"] .scroll,
+    :root[data-server-nav="navbar"] .scroll-area {
+        padding-top: 4.25rem;
     }
 
     .server-sidebar-panel {
@@ -171,10 +230,35 @@ const navSections = [
         color: #e1e1e6;
     }
 
-    .server-nav-mode-toggle .form-check-label {
-        font-size: 0.78rem;
-        color: #9aa0a6;
-        margin-left: 0.35rem;
+    .nav-mode-switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.25rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .nav-mode-btn {
+        border: 0;
+        background: transparent;
+        color: #aab0bf;
+        font-size: 0.72rem;
+        padding: 0.25rem 0.6rem;
+        border-radius: 999px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        transition: all 0.2s ease;
+    }
+
+    .nav-mode-btn.active {
+        background: rgba(59, 130, 246, 0.25);
+        color: #fff;
+    }
+
+    .nav-mode-btn:hover {
+        color: #fff;
     }
 
     .sidebar-section {
@@ -363,6 +447,93 @@ const navSections = [
         border-color: rgba(59, 130, 246, 0.5);
     }
 
+    .server-nav-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1040;
+        background: rgba(12, 12, 16, 0.92);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(10px);
+        padding: 0.6rem 1rem 0.5rem;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    .server-nav-bar-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .server-nav-bar-title {
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: #e6e6ef;
+        max-width: 40vw;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .server-nav-scroll {
+        display: flex;
+        gap: 1.2rem;
+        overflow-x: auto;
+        padding-bottom: 0.25rem;
+        scrollbar-width: thin;
+    }
+
+    .server-nav-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: max-content;
+    }
+
+    .server-nav-group-title {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: rgba(255, 255, 255, 0.45);
+        font-weight: 700;
+    }
+
+    .server-nav-group-items {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+
+    .server-nav-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.35rem 0.7rem;
+        border-radius: 999px;
+        color: #cbd5f5;
+        text-decoration: none;
+        background: rgba(59, 130, 246, 0.08);
+        border: 1px solid transparent;
+        font-size: 0.78rem;
+        white-space: nowrap;
+        transition: all 0.2s ease;
+    }
+
+    .server-nav-link:hover {
+        color: #fff;
+        border-color: rgba(59, 130, 246, 0.4);
+        background: rgba(59, 130, 246, 0.18);
+    }
+
+    .server-nav-link.active {
+        color: #fff;
+        background: rgba(59, 130, 246, 0.28);
+        border-color: rgba(59, 130, 246, 0.65);
+    }
+
     @media (max-width: 768px) {
         .server-menu-toggle {
             right: 1rem;
@@ -370,8 +541,11 @@ const navSections = [
             padding: 0.6rem 0.85rem;
             font-size: 0.85rem;
         }
-        .server-nav-mode-toggle {
+        .nav-mode-switch {
             display: none;
+        }
+        .server-nav-bar {
+            padding: 0.6rem 0.75rem;
         }
     }
 </style>
@@ -380,25 +554,26 @@ const navSections = [
     (function () {
         const storageKey = 'cpanel.serverNavMode';
         const root = document.documentElement;
-        const toggles = Array.from(document.querySelectorAll('[data-server-nav-toggle]'));
+        const modeButtons = Array.from(document.querySelectorAll('[data-server-nav-mode]'));
         const modalEl = document.getElementById('serverNavModal');
+        const serverId = "<%= server.containerId %>";
         const applyMode = (mode) => {
-            const next = mode === 'sidebar' ? 'sidebar' : 'modal';
+            const next = ['modal', 'sidebar', 'navbar'].includes(mode) ? mode : 'modal';
             root.dataset.serverNav = next;
             localStorage.setItem(storageKey, next);
-            toggles.forEach((toggle) => {
-                toggle.checked = next === 'sidebar';
+            modeButtons.forEach((button) => {
+                button.classList.toggle('active', button.dataset.serverNavMode === next);
             });
-            if (next === 'sidebar' && modalEl && window.bootstrap) {
+            if (next !== 'modal' && modalEl && window.bootstrap) {
                 const modal = window.bootstrap.Modal.getInstance(modalEl);
                 if (modal) modal.hide();
             }
         };
         const savedMode = localStorage.getItem(storageKey);
-        applyMode(savedMode === 'sidebar' ? 'sidebar' : 'modal');
-        toggles.forEach((toggle) => {
-            toggle.addEventListener('change', (event) => {
-                applyMode(event.target.checked ? 'sidebar' : 'modal');
+        applyMode(savedMode || 'modal');
+        modeButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                applyMode(button.dataset.serverNavMode);
             });
         });
 
@@ -409,12 +584,44 @@ const navSections = [
         };
 
         const openServerMenu = () => {
-            if (root.dataset.serverNav === 'sidebar') return;
+            if (root.dataset.serverNav !== 'modal') return;
             const modalEl = document.getElementById('serverNavModal');
             if (!modalEl || !window.bootstrap) return;
             const modal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
             modal.show();
         };
+
+        const sidebarEl = document.querySelector('.sidebar');
+        const sidebarScrollKey = `cpanel.serverSidebarScroll.${serverId}`;
+        if (sidebarEl) {
+            const savedScroll = Number.parseInt(localStorage.getItem(sidebarScrollKey), 10);
+            if (Number.isFinite(savedScroll)) {
+                sidebarEl.scrollTop = savedScroll;
+            }
+            let sidebarScrollTimer;
+            sidebarEl.addEventListener('scroll', () => {
+                window.clearTimeout(sidebarScrollTimer);
+                sidebarScrollTimer = window.setTimeout(() => {
+                    localStorage.setItem(sidebarScrollKey, String(sidebarEl.scrollTop || 0));
+                }, 120);
+            });
+        }
+
+        const navScrollEl = document.getElementById('serverNavScroll');
+        const navScrollKey = `cpanel.serverNavbarScroll.${serverId}`;
+        if (navScrollEl) {
+            const savedLeft = Number.parseInt(localStorage.getItem(navScrollKey), 10);
+            if (Number.isFinite(savedLeft)) {
+                navScrollEl.scrollLeft = savedLeft;
+            }
+            let navScrollTimer;
+            navScrollEl.addEventListener('scroll', () => {
+                window.clearTimeout(navScrollTimer);
+                navScrollTimer = window.setTimeout(() => {
+                    localStorage.setItem(navScrollKey, String(navScrollEl.scrollLeft || 0));
+                }, 120);
+            });
+        }
 
         document.addEventListener('keydown', (event) => {
             if (event.defaultPrevented) return;
