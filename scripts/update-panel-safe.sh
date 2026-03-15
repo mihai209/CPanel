@@ -29,7 +29,8 @@ if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git status --por
   echo "Stashing local changes (tracked + untracked), ignoring database.sqlite..."
   stash_before=$(git stash list | wc -l | tr -d ' ')
   set +e
-  git -c advice.addIgnoredFile=false stash push -u -m "auto-update-panel-$(date +%s)" -- \
+  git -c advice.addIgnoredFile=false stash push -a -m "auto-update-panel-$(date +%s)" -- \
+    . \
     ":(exclude)database.sqlite" \
     ":(exclude)panel/database.sqlite"
   stash_rc=$?
