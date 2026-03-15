@@ -3,6 +3,8 @@ function registerServerPagesRoutes(ctx) {
     const fs = require('fs');
     const nodePath = require('path');
     const nodeCrypto = require('crypto');
+    const zlib = require('zlib');
+    const nbt = require('prismarine-nbt');
     const { spawn } = require('child_process');
     const {
         GOOGLE_DRIVE_BACKUP_DEST,
@@ -2298,6 +2300,46 @@ async function readConnectorFileContent(connectorWs, serverId, filePath, timeout
     return response || { success: false, error: 'No response from connector.' };
 }
 
+async function readConnectorFileContentBase64(connectorWs, serverId, filePath, timeoutMs = 12000) {
+    if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+        return { success: false, error: 'Connector is offline.' };
+    }
+    const normalizedPath = String(filePath || '').trim();
+    if (!normalizedPath) {
+        return { success: false, error: 'Missing file path.' };
+    }
+
+    try {
+        connectorWs.send(JSON.stringify({
+            type: 'read_file',
+            serverId,
+            filePath: normalizedPath,
+            encoding: 'base64'
+        }));
+    } catch (error) {
+        return { success: false, error: String(error && error.message || 'Failed to request file.') };
+    }
+
+    const response = await waitForConnectorMessage(connectorWs, (message) => {
+        if (!message || Number.parseInt(message.serverId, 10) !== Number.parseInt(serverId, 10)) return false;
+        if (String(message.type || '') === 'file_content' && String(message.filePath || '') === normalizedPath) {
+            if (message.contentBase64) {
+                return { success: true, contentBase64: String(message.contentBase64 || '') };
+            }
+            if (message.content) {
+                return { success: true, contentBase64: Buffer.from(String(message.content || ''), 'binary').toString('base64') };
+            }
+            return { success: false, error: 'Empty file response.' };
+        }
+        if (String(message.type || '') === 'error') {
+            return { success: false, error: String(message.message || 'Connector returned an error.') };
+        }
+        return false;
+    }, timeoutMs);
+
+    return response || { success: false, error: 'No response from connector.' };
+}
+
 function resolveModrinthProjectType(kind) {
     if (kind === 'plugin') return 'plugin';
     if (kind === 'mod') return 'mod';
@@ -3471,6 +3513,19 @@ function computeOfflinePlayerUuid(name) {
     return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20)}`;
 }
 
+function resolvePlayerUuidFromUsercache(content, playerName) {
+    const needle = String(playerName || '').trim().toLowerCase();
+    if (!needle) return '';
+    try {
+        const parsed = JSON.parse(content || '[]');
+        if (!Array.isArray(parsed)) return '';
+        const match = parsed.find((entry) => String(entry && entry.name || '').trim().toLowerCase() === needle);
+        return match && match.uuid ? String(match.uuid).trim() : '';
+    } catch {
+        return '';
+    }
+}
+
 function normalizeMinecraftItemId(rawId) {
     const id = String(rawId || '').trim();
     if (!id) return '';
@@ -3490,6 +3545,46 @@ function parseMinecraftItemList(rawValue) {
         items.push({ id, count: Number.isFinite(count) ? count : 1 });
     }
     return items;
+}
+
+async function parseMinecraftPlayerNbt(base64Content) {
+    if (!base64Content) return null;
+    const raw = Buffer.from(base64Content, 'base64');
+    let buffer = raw;
+    try {
+        buffer = zlib.gunzipSync(raw);
+    } catch {
+        buffer = raw;
+    }
+    try {
+        const parsed = await nbt.parse(buffer);
+        return nbt.simplify(parsed.parsed);
+    } catch {
+        if (buffer !== raw) {
+            try {
+                const parsed = await nbt.parse(raw);
+                return nbt.simplify(parsed.parsed);
+            } catch {
+                return null;
+            }
+        }
+        return null;
+    }
+}
+
+function mapMinecraftNbtItemList(list) {
+    if (!Array.isArray(list)) return [];
+    return list.map((entry) => {
+        const id = normalizeMinecraftItemId(entry && entry.id || entry && entry.Id || '');
+        const count = Number.parseInt(entry && entry.Count !== undefined ? entry.Count : entry && entry.count, 10);
+        const slot = entry && entry.Slot !== undefined ? entry.Slot : entry && entry.slot;
+        if (!id) return null;
+        return {
+            id,
+            count: Number.isFinite(count) ? count : 1,
+            slot: Number.isFinite(slot) ? slot : null
+        };
+    }).filter(Boolean);
 }
 
 async function resolveMinecraftAdminApiContext(req, res, requiredPermissions = []) {
@@ -15980,6 +16075,12 @@ app.get('/server/:containerId/minecraft/admin/inspect', requireAuth, async (req,
         const target = formatMinecraftCommandTarget(req.query.player || '');
         if (!target) return res.status(400).json({ success: false, error: 'Player is required.' });
 
+        const bedrockMode = inferMinecraftBedrockMode(server);
+        const propertiesResult = await readConnectorFileContent(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.serverProperties, 8000);
+        const properties = parseMinecraftProperties(propertiesResult.success ? propertiesResult.content : '');
+        const levelName = String(properties['level-name'] || 'world').trim() || 'world';
+        const onlineMode = normalizeMinecraftBooleanString(properties['online-mode'], 'true') === 'true';
+
         const commands = [
             { key: 'health', command: `data get entity ${target} Health` },
             { key: 'location', command: `data get entity ${target} Pos` },
@@ -16000,15 +16101,54 @@ app.get('/server/:containerId/minecraft/admin/inspect', requireAuth, async (req,
             data.gamemode = mapMinecraftGameType(data.gamemode) || data.gamemode;
         }
 
-        const offlineUuid = computeOfflinePlayerUuid(req.query.player || '');
+        const username = String(req.query.player || '').trim();
+        let offlineUuid = computeOfflinePlayerUuid(username);
+        let usercacheUuid = '';
+        try {
+            const usercacheResult = await readConnectorFileContent(connectorWs, server.id, MINECRAFT_ADMIN_PATHS.usercache, 8000);
+            if (usercacheResult.success && usercacheResult.content) {
+                usercacheUuid = resolvePlayerUuidFromUsercache(usercacheResult.content, username);
+            }
+        } catch {}
+
+        let offlineData = null;
+        let offlineItems = { inventory: [], ender: [] };
+        if (!bedrockMode) {
+            const uuid = usercacheUuid || (!onlineMode ? offlineUuid : usercacheUuid || '');
+            if (uuid) {
+                const playerdataPath = `/${levelName}/playerdata/${uuid}.dat`;
+                const base64Result = await readConnectorFileContentBase64(connectorWs, server.id, playerdataPath, 8000);
+                if (base64Result.success && base64Result.contentBase64) {
+                    const parsed = await parseMinecraftPlayerNbt(base64Result.contentBase64);
+                    if (parsed) {
+                        offlineData = {
+                            health: parsed.Health ?? null,
+                            food: parsed.FoodLevel ?? parsed.foodLevel ?? null,
+                            gamemode: mapMinecraftGameType(parsed.playerGameType) || parsed.playerGameType || null,
+                            pos: parsed.Pos || null,
+                            rotation: parsed.Rotation || null,
+                            xpLevel: parsed.XpLevel ?? parsed.xpLevel ?? null
+                        };
+                        offlineItems = {
+                            inventory: mapMinecraftNbtItemList(parsed.Inventory),
+                            ender: mapMinecraftNbtItemList(parsed.EnderItems)
+                        };
+                    }
+                }
+            }
+        }
+
         return res.json({
             success: true,
             data,
             offlineUuid,
+            offlineData,
             items: {
                 inventory: parseMinecraftItemList(data.inventory),
                 ender: parseMinecraftItemList(data.enderChest)
-            }
+            },
+            offlineItems,
+            bedrock: bedrockMode
         });
     } catch (error) {
         console.error('Error inspecting player:', error);

@@ -67,15 +67,17 @@
                             <pre class="mt-1 small" id="inspectOutput" style="white-space:pre-wrap;max-height:160px;overflow:auto"></pre>
                         </div>
                         <div class="col-md-6">
-                            <div class="small muted">Inventory</div>
-                            <div class="d-flex flex-wrap gap-2 mt-2" id="inventoryGrid"></div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="small muted">Ender Chest</div>
-                            <div class="d-flex flex-wrap gap-2 mt-2" id="enderGrid"></div>
-                        </div>
-                    </div>
+                    <div class="small muted">Inventory</div>
+                    <div class="small muted" id="inventorySource"></div>
+                    <div class="d-flex flex-wrap gap-2 mt-2" id="inventoryGrid"></div>
                 </div>
+                <div class="col-md-6">
+                    <div class="small muted">Ender Chest</div>
+                    <div class="small muted" id="enderSource"></div>
+                    <div class="d-flex flex-wrap gap-2 mt-2" id="enderGrid"></div>
+                </div>
+            </div>
+        </div>
 
                 <div class="cardx p-3">
                     <div class="fw-semibold mb-2">Freeze / Unfreeze</div>
@@ -263,8 +265,18 @@
             if (offline) {
                 offline.textContent = data.offlineUuid ? `Offline UUID: ${data.offlineUuid}` : '';
             }
-            renderItems((data.items && data.items.inventory) || [], 'inventoryGrid');
-            renderItems((data.items && data.items.ender) || [], 'enderGrid');
+            const onlineInventory = (data.items && data.items.inventory) || [];
+            const onlineEnder = (data.items && data.items.ender) || [];
+            const offlineInventory = (data.offlineItems && data.offlineItems.inventory) || [];
+            const offlineEnder = (data.offlineItems && data.offlineItems.ender) || [];
+            const inventoryItems = onlineInventory.length ? onlineInventory : offlineInventory;
+            const enderItems = onlineEnder.length ? onlineEnder : offlineEnder;
+            renderItems(inventoryItems, 'inventoryGrid');
+            renderItems(enderItems, 'enderGrid');
+            const invSource = document.getElementById('inventorySource');
+            const enderSource = document.getElementById('enderSource');
+            if (invSource) invSource.textContent = onlineInventory.length ? 'Source: online' : (offlineInventory.length ? 'Source: offline' : '');
+            if (enderSource) enderSource.textContent = onlineEnder.length ? 'Source: online' : (offlineEnder.length ? 'Source: offline' : '');
             setMessage('Inspector data loaded.', 'success');
         } catch (err) {
             setMessage(err.message, 'error');
