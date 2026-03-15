@@ -5,6 +5,7 @@ function registerServerPagesRoutes(ctx) {
     const nodeCrypto = require('crypto');
     const zlib = require('zlib');
     const nbt = require('prismarine-nbt');
+    const AdmZip = require('adm-zip');
     const { spawn } = require('child_process');
     const {
         GOOGLE_DRIVE_BACKUP_DEST,
@@ -2619,6 +2620,28 @@ async function fetchMinecraftServerStatusPreview({
         };
     }
 
+    const redisRequired = await getRedisRequiredFlag();
+    if (redisRequired && !getRuntimeRedisClient()) {
+        return {
+            ok: false,
+            online: false,
+            requestedAddress,
+            bedrockMode: useBedrock,
+            error: 'Redis is required to fetch status previews.',
+            playersOnline: 0,
+            playersMax: 0,
+            playersList: [],
+            motdClean: []
+        };
+    }
+
+    const redisClient = getRuntimeRedisClient();
+    const cacheKey = `mcsrvstat:${useBedrock ? 'bedrock' : 'java'}:${requestedAddress}`;
+    const cached = await getMinecraftStatusCache(redisClient, cacheKey);
+    if (cached) {
+        return cached;
+    }
+
     const endpoint = useBedrock
         ? `${MCSRVSTAT_API_BASE_URL}/bedrock/3/${encodeURIComponent(requestedAddress)}`
         : `${MCSRVSTAT_API_BASE_URL}/3/${encodeURIComponent(requestedAddress)}`;
@@ -2651,12 +2674,14 @@ async function fetchMinecraftServerStatusPreview({
         }
 
         const payload = await response.json();
-        return normalizeMcsrvstatStatusPayload(payload, requestedAddress, useBedrock);
+        const normalized = normalizeMcsrvstatStatusPayload(payload, requestedAddress, useBedrock);
+        await setMinecraftStatusCache(redisClient, cacheKey, normalized);
+        return normalized;
     } catch (error) {
         const message = error && error.name === 'AbortError'
             ? 'Status request timed out.'
             : String(error && error.message || 'Failed to fetch Minecraft status.');
-        return {
+        const fallback = {
             ok: false,
             online: false,
             requestedAddress,
@@ -2667,6 +2692,8 @@ async function fetchMinecraftServerStatusPreview({
             playersList: [],
             motdClean: []
         };
+        await setMinecraftStatusCache(redisClient, cacheKey, fallback);
+        return fallback;
     } finally {
         clearTimeout(timer);
     }
@@ -3547,6 +3574,262 @@ function parseMinecraftItemList(rawValue) {
     return items;
 }
 
+const MINECRAFT_TEXTURE_CACHE = new Map(); // key -> { ts, buffer }
+const MINECRAFT_TEXTURE_CACHE_TTL_MS = 30 * 60 * 1000;
+const MINECRAFT_TEXTURE_CACHE_MAX = 600;
+const MINECRAFT_MOD_INDEX_CACHE = new Map(); // serverId -> { ts, index: Map(modid -> jarPath) }
+const MINECRAFT_MOD_INDEX_TTL_MS = 10 * 60 * 1000;
+const MINECRAFT_INSPECT_CACHE = new Map(); // key -> { ts, payload }
+const MINECRAFT_INSPECT_CACHE_TTL_MS = 2 * 60 * 1000;
+const MODRINTH_SEARCH_CACHE = new Map(); // key -> { ts, payload }
+const MODRINTH_SEARCH_CACHE_TTL_MS = 2 * 60 * 1000;
+
+function sanitizeMinecraftItemId(value) {
+    const id = String(value || '').trim().toLowerCase();
+    if (!id) return '';
+    if (!/^[a-z0-9_.-]+:[a-z0-9_./-]+$/.test(id)) return '';
+    return id;
+}
+
+function getMinecraftInspectCacheKey(serverId, player) {
+    return `minecraft:inspect:${serverId}:${String(player || '').trim().toLowerCase()}`;
+}
+
+function getRuntimeRedisClient() {
+    try {
+        if (typeof getRedisClient === 'function') {
+            const client = getRedisClient();
+            if (client && client.isOpen) return client;
+        }
+    } catch {}
+    return null;
+}
+
+async function getMinecraftInspectCache(redisClient, key) {
+    if (redisClient) {
+        try {
+            const raw = await redisClient.get(key);
+            if (raw) return JSON.parse(raw);
+        } catch {}
+    }
+    const entry = MINECRAFT_INSPECT_CACHE.get(key);
+    if (!entry) return null;
+    if ((Date.now() - entry.ts) > MINECRAFT_INSPECT_CACHE_TTL_MS) {
+        MINECRAFT_INSPECT_CACHE.delete(key);
+        return null;
+    }
+    return entry.payload;
+}
+
+async function setMinecraftInspectCache(redisClient, key, payload) {
+    if (!payload) return;
+    if (redisClient) {
+        try {
+            await redisClient.set(key, JSON.stringify(payload), { EX: Math.floor(MINECRAFT_INSPECT_CACHE_TTL_MS / 1000) });
+            return;
+        } catch {}
+    }
+    MINECRAFT_INSPECT_CACHE.set(key, { ts: Date.now(), payload });
+}
+
+async function getModrinthSearchCache(redisClient, key) {
+    if (redisClient) {
+        try {
+            const raw = await redisClient.get(key);
+            if (raw) return JSON.parse(raw);
+        } catch {}
+    }
+    const entry = MODRINTH_SEARCH_CACHE.get(key);
+    if (!entry) return null;
+    if ((Date.now() - entry.ts) > MODRINTH_SEARCH_CACHE_TTL_MS) {
+        MODRINTH_SEARCH_CACHE.delete(key);
+        return null;
+    }
+    return entry.payload;
+}
+
+async function setModrinthSearchCache(redisClient, key, payload) {
+    if (!payload) return;
+    if (redisClient) {
+        try {
+            await redisClient.set(key, JSON.stringify(payload), { EX: Math.floor(MODRINTH_SEARCH_CACHE_TTL_MS / 1000) });
+            return;
+        } catch {}
+    }
+    MODRINTH_SEARCH_CACHE.set(key, { ts: Date.now(), payload });
+}
+
+function getMinecraftTextureCacheEntry(key) {
+    const entry = MINECRAFT_TEXTURE_CACHE.get(key);
+    if (!entry) return null;
+    if ((Date.now() - entry.ts) > MINECRAFT_TEXTURE_CACHE_TTL_MS) {
+        MINECRAFT_TEXTURE_CACHE.delete(key);
+        return null;
+    }
+    return entry;
+}
+
+function setMinecraftTextureCacheEntry(key, buffer) {
+    if (!buffer) return;
+    if (MINECRAFT_TEXTURE_CACHE.size >= MINECRAFT_TEXTURE_CACHE_MAX) {
+        const firstKey = MINECRAFT_TEXTURE_CACHE.keys().next().value;
+        if (firstKey) MINECRAFT_TEXTURE_CACHE.delete(firstKey);
+    }
+    MINECRAFT_TEXTURE_CACHE.set(key, { ts: Date.now(), buffer });
+}
+
+function extractModIdsFromJarBuffer(buffer) {
+    const ids = new Set();
+    if (!buffer || !buffer.length) return [];
+    try {
+        const zip = new AdmZip(buffer);
+        const readEntry = (entryName) => {
+            const entry = zip.getEntry(entryName);
+            if (!entry) return '';
+            return String(entry.getData().toString('utf8') || '');
+        };
+        const modsToml = readEntry('META-INF/mods.toml');
+        if (modsToml) {
+            const regex = /modId\\s*=\\s*\"([^\"]+)\"/g;
+            let match;
+            while ((match = regex.exec(modsToml))) {
+                if (match[1]) ids.add(String(match[1]).trim().toLowerCase());
+            }
+        }
+        const fabricJson = readEntry('fabric.mod.json') || readEntry('quilt.mod.json');
+        if (fabricJson) {
+            try {
+                const parsed = JSON.parse(fabricJson);
+                if (parsed && parsed.id) ids.add(String(parsed.id).trim().toLowerCase());
+                if (Array.isArray(parsed && parsed.provides)) {
+                    parsed.provides.forEach((entry) => {
+                        if (entry && entry.id) ids.add(String(entry.id).trim().toLowerCase());
+                    });
+                }
+            } catch {}
+        }
+        const mcmodInfo = readEntry('mcmod.info');
+        if (mcmodInfo) {
+            try {
+                const parsed = JSON.parse(mcmodInfo);
+                const entries = Array.isArray(parsed) ? parsed : Array.isArray(parsed && parsed.modList) ? parsed.modList : [];
+                entries.forEach((entry) => {
+                    const modId = entry && (entry.modid || entry.modId || entry.modID);
+                    if (modId) ids.add(String(modId).trim().toLowerCase());
+                });
+            } catch {}
+        }
+    } catch {}
+    return Array.from(ids);
+}
+
+async function getMinecraftModIndex(server, connectorWs) {
+    const cache = MINECRAFT_MOD_INDEX_CACHE.get(server.id);
+    if (cache && (Date.now() - cache.ts) < MINECRAFT_MOD_INDEX_TTL_MS) return cache.index;
+    const index = new Map();
+    const listResult = await runConnectorFileAction(connectorWs, {
+        type: 'list_files',
+        serverId: server.id,
+        directory: '/mods'
+    }, '/mods', server.id, 15000);
+    if (!listResult || !listResult.success || !Array.isArray(listResult.files)) {
+        MINECRAFT_MOD_INDEX_CACHE.set(server.id, { ts: Date.now(), index });
+        return index;
+    }
+    const jarFiles = listResult.files.filter((file) => file && !file.isDirectory && String(file.name || '').toLowerCase().endsWith('.jar'));
+    for (const file of jarFiles) {
+        const fileName = String(file.name || '');
+        if (!fileName) continue;
+        const filePath = `/mods/${fileName}`;
+        const readResult = await readConnectorFileContentBase64(connectorWs, server.id, filePath, 20000);
+        if (!readResult || !readResult.success || !readResult.contentBase64) continue;
+        const buffer = Buffer.from(readResult.contentBase64, 'base64');
+        const modIds = extractModIdsFromJarBuffer(buffer);
+        modIds.forEach((id) => {
+            if (!index.has(id)) index.set(id, filePath);
+        });
+    }
+    MINECRAFT_MOD_INDEX_CACHE.set(server.id, { ts: Date.now(), index });
+    return index;
+}
+
+function resolveTexturePathFromModel(zip, modid, name, modelPath) {
+    try {
+        const entry = zip.getEntry(modelPath);
+        if (!entry) return '';
+        const raw = entry.getData().toString('utf8');
+        const parsed = JSON.parse(raw);
+        const textures = parsed && parsed.textures ? parsed.textures : {};
+        const candidates = [];
+        ['layer0', 'layer1', 'particle', 'all'].forEach((key) => {
+            if (textures[key]) candidates.push(String(textures[key]));
+        });
+        for (const value of candidates) {
+            if (!value || value.startsWith('#')) continue;
+            const [ns, texPath] = value.includes(':') ? value.split(':') : [modid, value];
+            if (!texPath) continue;
+            const cleanPath = texPath.replace(/^minecraft:/, '');
+            const pathVariants = cleanPath.startsWith('item/') || cleanPath.startsWith('block/') || cleanPath.startsWith('items/') || cleanPath.startsWith('blocks/')
+                ? [cleanPath]
+                : [`item/${cleanPath}`, `block/${cleanPath}`, `items/${cleanPath}`, `blocks/${cleanPath}`];
+            for (const variant of pathVariants) {
+                const full = `assets/${ns}/textures/${variant}.png`;
+                if (zip.getEntry(full)) return full;
+            }
+        }
+    } catch {}
+    return '';
+}
+
+function findTextureInJar(buffer, modid, name) {
+    try {
+        const zip = new AdmZip(buffer);
+        const cleanName = name.replace(/\\s/g, '_');
+        const directPaths = [
+            `assets/${modid}/textures/item/${cleanName}.png`,
+            `assets/${modid}/textures/items/${cleanName}.png`,
+            `assets/${modid}/textures/block/${cleanName}.png`,
+            `assets/${modid}/textures/blocks/${cleanName}.png`
+        ];
+        for (const path of directPaths) {
+            const entry = zip.getEntry(path);
+            if (entry) return entry.getData();
+        }
+        const modelPaths = [
+            `assets/${modid}/models/item/${cleanName}.json`,
+            `assets/${modid}/models/items/${cleanName}.json`,
+            `assets/${modid}/models/block/${cleanName}.json`,
+            `assets/${modid}/models/blocks/${cleanName}.json`
+        ];
+        for (const modelPath of modelPaths) {
+            const resolved = resolveTexturePathFromModel(zip, modid, cleanName, modelPath);
+            if (resolved) {
+                const entry = zip.getEntry(resolved);
+                if (entry) return entry.getData();
+            }
+        }
+    } catch {}
+    return null;
+}
+
+async function getMinecraftModTextureBuffer(server, connectorWs, itemId) {
+    const [modid, name] = itemId.split(':');
+    if (!modid || !name) return null;
+    const cacheKey = `${server.id}:${itemId}`;
+    const cached = getMinecraftTextureCacheEntry(cacheKey);
+    if (cached) return cached.buffer;
+    const index = await getMinecraftModIndex(server, connectorWs);
+    const jarPath = index.get(modid);
+    if (!jarPath) return null;
+    const readResult = await readConnectorFileContentBase64(connectorWs, server.id, jarPath, 20000);
+    if (!readResult || !readResult.success || !readResult.contentBase64) return null;
+    const buffer = Buffer.from(readResult.contentBase64, 'base64');
+    const textureBuffer = findTextureInJar(buffer, modid, name);
+    if (!textureBuffer) return null;
+    setMinecraftTextureCacheEntry(cacheKey, textureBuffer);
+    return textureBuffer;
+}
+
 async function parseMinecraftPlayerNbt(base64Content) {
     if (!base64Content) return null;
     const raw = Buffer.from(base64Content, 'base64');
@@ -3720,6 +4003,14 @@ const MINECRAFT_CONFIG_PATHS = Object.freeze({
 
 const MINECRAFT_PLAYTIME_CACHE_TTL_MS = 2 * 60 * 1000;
 const minecraftPlaytimeCache = new Map();
+const FILE_SEARCH_CACHE = new Map(); // key -> { ts, payload }
+const FILE_SEARCH_CACHE_TTL_MS = 2 * 60 * 1000;
+const MINECRAFT_STATUS_CACHE = new Map(); // key -> { ts, payload }
+const MINECRAFT_STATUS_CACHE_TTL_MS = 2 * 60 * 1000;
+const MINECRAFT_INSTALLED_CACHE = new Map(); // key -> { ts, payload }
+const MINECRAFT_INSTALLED_CACHE_TTL_MS = 2 * 60 * 1000;
+const REDIS_REQUIRED_CACHE = { ts: 0, value: false };
+const REDIS_REQUIRED_CACHE_TTL_MS = 10 * 1000;
 const MINECRAFT_HEAVY_ADDON_MB = 15;
 const MINECRAFT_VERY_HEAVY_ADDON_MB = 35;
 const MINECRAFT_STAGING_SUFFIX = '.staging';
@@ -3820,6 +4111,135 @@ function setMinecraftPlaytimeCacheEntry(cacheKey, payload) {
         expiresAt: Date.now() + MINECRAFT_PLAYTIME_CACHE_TTL_MS,
         payload
     });
+}
+
+async function getMinecraftPlaytimeCacheEntryAsync(redisClient, cacheKey) {
+    if (redisClient && cacheKey) {
+        try {
+            const raw = await redisClient.get(`minecraft:playtime:${cacheKey}`);
+            if (raw) return { payload: JSON.parse(raw), expiresAt: Date.now() + MINECRAFT_PLAYTIME_CACHE_TTL_MS };
+        } catch {}
+    }
+    return getMinecraftPlaytimeCacheEntry(cacheKey);
+}
+
+async function setMinecraftPlaytimeCacheEntryAsync(redisClient, cacheKey, payload) {
+    if (!cacheKey) return;
+    if (redisClient) {
+        try {
+            await redisClient.set(`minecraft:playtime:${cacheKey}`, JSON.stringify(payload), { EX: Math.floor(MINECRAFT_PLAYTIME_CACHE_TTL_MS / 1000) });
+            return;
+        } catch {}
+    }
+    setMinecraftPlaytimeCacheEntry(cacheKey, payload);
+}
+
+async function getFileSearchCache(redisClient, cacheKey) {
+    if (!cacheKey) return null;
+    if (redisClient) {
+        try {
+            const raw = await redisClient.get(cacheKey);
+            if (raw) return JSON.parse(raw);
+        } catch {}
+    }
+    const entry = FILE_SEARCH_CACHE.get(cacheKey);
+    if (!entry) return null;
+    if ((Date.now() - entry.ts) > FILE_SEARCH_CACHE_TTL_MS) {
+        FILE_SEARCH_CACHE.delete(cacheKey);
+        return null;
+    }
+    return entry.payload;
+}
+
+async function setFileSearchCache(redisClient, cacheKey, payload) {
+    if (!cacheKey) return;
+    if (redisClient) {
+        try {
+            await redisClient.set(cacheKey, JSON.stringify(payload), { EX: Math.floor(FILE_SEARCH_CACHE_TTL_MS / 1000) });
+            return;
+        } catch {}
+    }
+    FILE_SEARCH_CACHE.set(cacheKey, { ts: Date.now(), payload });
+}
+
+async function getMinecraftStatusCache(redisClient, cacheKey) {
+    if (!cacheKey) return null;
+    if (redisClient) {
+        try {
+            const raw = await redisClient.get(cacheKey);
+            if (raw) return JSON.parse(raw);
+        } catch {}
+    }
+    const entry = MINECRAFT_STATUS_CACHE.get(cacheKey);
+    if (!entry) return null;
+    if ((Date.now() - entry.ts) > MINECRAFT_STATUS_CACHE_TTL_MS) {
+        MINECRAFT_STATUS_CACHE.delete(cacheKey);
+        return null;
+    }
+    return entry.payload;
+}
+
+async function setMinecraftStatusCache(redisClient, cacheKey, payload) {
+    if (!cacheKey) return;
+    if (redisClient) {
+        try {
+            await redisClient.set(cacheKey, JSON.stringify(payload), { EX: Math.floor(MINECRAFT_STATUS_CACHE_TTL_MS / 1000) });
+            return;
+        } catch {}
+    }
+    MINECRAFT_STATUS_CACHE.set(cacheKey, { ts: Date.now(), payload });
+}
+
+async function getMinecraftInstalledCache(redisClient, cacheKey) {
+    if (!cacheKey) return null;
+    if (redisClient) {
+        try {
+            const raw = await redisClient.get(cacheKey);
+            if (raw) return JSON.parse(raw);
+        } catch {}
+    }
+    const entry = MINECRAFT_INSTALLED_CACHE.get(cacheKey);
+    if (!entry) return null;
+    if ((Date.now() - entry.ts) > MINECRAFT_INSTALLED_CACHE_TTL_MS) {
+        MINECRAFT_INSTALLED_CACHE.delete(cacheKey);
+        return null;
+    }
+    return entry.payload;
+}
+
+async function setMinecraftInstalledCache(redisClient, cacheKey, payload) {
+    if (!cacheKey) return;
+    if (redisClient) {
+        try {
+            await redisClient.set(cacheKey, JSON.stringify(payload), { EX: Math.floor(MINECRAFT_INSTALLED_CACHE_TTL_MS / 1000) });
+            return;
+        } catch {}
+    }
+    MINECRAFT_INSTALLED_CACHE.set(cacheKey, { ts: Date.now(), payload });
+}
+
+async function getRedisRequiredFlag() {
+    const now = Date.now();
+    if ((now - REDIS_REQUIRED_CACHE.ts) < REDIS_REQUIRED_CACHE_TTL_MS) {
+        return REDIS_REQUIRED_CACHE.value;
+    }
+    let required = false;
+    try {
+        const row = await Settings.findByPk('redisRequired');
+        required = ['1', 'true', 'yes', 'on'].includes(String(row && row.value || '').trim().toLowerCase());
+    } catch {}
+    REDIS_REQUIRED_CACHE.ts = now;
+    REDIS_REQUIRED_CACHE.value = required;
+    return required;
+}
+
+async function enforceRedisRequiredOrFail(res) {
+    const required = await getRedisRequiredFlag();
+    if (!required) return true;
+    const redisClient = getRuntimeRedisClient();
+    if (redisClient) return true;
+    res.status(503).json({ success: false, error: 'Redis is required for this feature. Configure Redis in Admin > Redis.' });
+    return false;
 }
 
 function buildMinecraftRollbackFileName(fileName) {
@@ -13219,6 +13639,7 @@ app.get(['/server/:containerId/minecraft-configs/playtime', '/server/:containerI
         if (!isServerLikelyMinecraft(server)) {
             return res.status(400).json({ success: false, error: 'Minecraft playtime is available only for Minecraft servers.' });
         }
+        if (!await enforceRedisRequiredOrFail(res)) return;
         if (!server.allocation || !server.allocation.connectorId) {
             return res.status(409).json({ success: false, error: 'Server allocation is missing.' });
         }
@@ -13243,8 +13664,10 @@ app.get(['/server/:containerId/minecraft-configs/playtime', '/server/:containerI
         }
 
         const cacheKey = getMinecraftPlaytimeCacheKey(server.id, levelName);
-        const cached = getMinecraftPlaytimeCacheEntry(cacheKey);
-        if (cached && !req.query.refresh) {
+        const refresh = normalizeMinecraftBooleanString(req.query.refresh, 'false') === 'true';
+        const redisClient = getRuntimeRedisClient();
+        const cached = await getMinecraftPlaytimeCacheEntryAsync(redisClient, cacheKey);
+        if (cached && !refresh) {
             return res.json({
                 success: true,
                 cached: true,
@@ -13277,7 +13700,7 @@ app.get(['/server/:containerId/minecraft-configs/playtime', '/server/:containerI
                 generatedAt: new Date().toISOString(),
                 truncated: false
             };
-            setMinecraftPlaytimeCacheEntry(cacheKey, payload);
+            await setMinecraftPlaytimeCacheEntryAsync(redisClient, cacheKey, payload);
             return res.json({ success: true, cached: false, ...payload });
         }
 
@@ -13337,7 +13760,7 @@ app.get(['/server/:containerId/minecraft-configs/playtime', '/server/:containerI
             truncated
         };
 
-        setMinecraftPlaytimeCacheEntry(cacheKey, payload);
+        await setMinecraftPlaytimeCacheEntryAsync(redisClient, cacheKey, payload);
         return res.json({ success: true, cached: false, ...payload });
     } catch (error) {
         console.error('Error loading playtime info:', error);
@@ -14336,6 +14759,7 @@ app.post(['/server/:containerId/minecraft-configs/command', '/server/:containerI
         if (server.isSuspended) {
             return res.status(423).json({ success: false, error: 'Server is suspended.' });
         }
+        if (!await enforceRedisRequiredOrFail(res)) return;
         const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
         if (!featureFlags.remoteDownloadEnabled) {
             return res.status(403).json({ success: false, error: 'Remote downloads are disabled by admin.' });
@@ -14716,6 +15140,13 @@ app.get(['/server/:containerId/minecraft/search', '/server/:containerId/minecraf
             });
         }
 
+        const cacheKey = `modrinth:search:${projectType}:${loader || 'any'}:${gameVersion || 'any'}:${query}:${offset}:${limit}`;
+        const redisClient = getRuntimeRedisClient();
+        const cached = await getModrinthSearchCache(redisClient, cacheKey);
+        if (cached) {
+            return res.json({ success: true, cached: true, ...cached });
+        }
+
         const executeModrinthSearch = async (includeVersionFacet) => {
             const facets = [[`project_type:${projectType}`]];
             if (loader) facets.push([`categories:${loader}`]);
@@ -14765,8 +15196,7 @@ app.get(['/server/:containerId/minecraft/search', '/server/:containerId/minecraf
             projectType: String(hit.project_type || projectType)
         })).filter((result) => result.id);
 
-        return res.json({
-            success: true,
+        const responsePayload = {
             query,
             kind,
             loader,
@@ -14778,7 +15208,9 @@ app.get(['/server/:containerId/minecraft/search', '/server/:containerId/minecraf
                 limit
             },
             results
-        });
+        };
+        await setModrinthSearchCache(redisClient, cacheKey, responsePayload);
+        return res.json({ success: true, cached: false, ...responsePayload });
     } catch (err) {
         const remoteError = err && err.response && err.response.data && err.response.data.description
             ? String(err.response.data.description)
@@ -14815,6 +15247,13 @@ app.get(['/server/:containerId/minecraft/installed', '/server/:containerId/minec
         const kind = normalizeMinecraftProjectKind(req.query.kind);
         const directory = resolveMinecraftTargetDirectory(kind, req.query.targetDirectory);
         const checkUpdates = normalizeMinecraftBooleanString(req.query.checkUpdates, 'false') === 'true';
+        const refresh = normalizeMinecraftBooleanString(req.query.refresh, 'false') === 'true';
+        const cacheKey = `minecraft:installed:${server.id}:${kind || 'any'}:${directory}:${checkUpdates ? 'updates' : 'plain'}`;
+        const redisClient = getRuntimeRedisClient();
+        const cached = await getMinecraftInstalledCache(redisClient, cacheKey);
+        if (cached && !refresh) {
+            return res.json({ success: true, cached: true, ...cached });
+        }
         const connectorWs = connectorConnections.get(server.allocation.connectorId);
         if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
             return res.status(503).json({ success: false, error: 'Connector is offline.' });
@@ -14915,14 +15354,15 @@ app.get(['/server/:containerId/minecraft/installed', '/server/:containerId/minec
             }
         }
 
-        return res.json({
-            success: true,
+        const payload = {
             kind,
             directory,
             checkUpdates,
             count: installed.length,
             installed
-        });
+        };
+        await setMinecraftInstalledCache(redisClient, cacheKey, payload);
+        return res.json({ success: true, cached: false, ...payload });
     } catch (err) {
         console.error('Error loading installed minecraft addons:', err);
         return res.status(500).json({ success: false, error: 'Failed to load installed addons.' });
@@ -16074,6 +16514,16 @@ app.get('/server/:containerId/minecraft/admin/inspect', requireAuth, async (req,
         const { server, connectorWs } = ctx;
         const target = formatMinecraftCommandTarget(req.query.player || '');
         if (!target) return res.status(400).json({ success: false, error: 'Player is required.' });
+        const username = String(req.query.player || '').trim();
+        const refresh = ['1', 'true', 'yes', 'on'].includes(String(req.query.refresh || '').trim().toLowerCase());
+        const cacheKey = getMinecraftInspectCacheKey(server.id, username);
+        if (!refresh) {
+            const redisClient = getRuntimeRedisClient();
+            const cached = await getMinecraftInspectCache(redisClient, cacheKey);
+            if (cached) {
+                return res.json({ success: true, cached: true, ...cached });
+            }
+        }
 
         const bedrockMode = inferMinecraftBedrockMode(server);
         const propertiesResult = await readConnectorFileContent(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.serverProperties, 8000);
@@ -16101,7 +16551,6 @@ app.get('/server/:containerId/minecraft/admin/inspect', requireAuth, async (req,
             data.gamemode = mapMinecraftGameType(data.gamemode) || data.gamemode;
         }
 
-        const username = String(req.query.player || '').trim();
         let offlineUuid = computeOfflinePlayerUuid(username);
         let usercacheUuid = '';
         try {
@@ -16138,8 +16587,7 @@ app.get('/server/:containerId/minecraft/admin/inspect', requireAuth, async (req,
             }
         }
 
-        return res.json({
-            success: true,
+        const payload = {
             data,
             offlineUuid,
             offlineData,
@@ -16149,10 +16597,44 @@ app.get('/server/:containerId/minecraft/admin/inspect', requireAuth, async (req,
             },
             offlineItems,
             bedrock: bedrockMode
-        });
+        };
+        const redisClient = getRuntimeRedisClient();
+        await setMinecraftInspectCache(redisClient, cacheKey, payload);
+        return res.json({ success: true, cached: false, ...payload });
     } catch (error) {
         console.error('Error inspecting player:', error);
         return res.status(500).json({ success: false, error: 'Failed to inspect player.' });
+    }
+});
+
+app.get('/server/:containerId/minecraft/admin/item-texture', requireAuth, async (req, res) => {
+    try {
+        const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.inspect']);
+        if (!ctx) return;
+        const { server, connectorWs } = ctx;
+        const rawItem = sanitizeMinecraftItemId(req.query.item || '');
+        if (!rawItem) {
+            return res.status(400).json({ success: false, error: 'Invalid item id.' });
+        }
+        const [modid, name] = rawItem.split(':');
+        if (!modid || !name) {
+            return res.status(400).json({ success: false, error: 'Invalid item id.' });
+        }
+        if (modid === 'minecraft') {
+            const clean = name.replace(/\\s/g, '_');
+            const base = 'https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.16.5/assets/minecraft/textures';
+            return res.redirect(`${base}/item/${encodeURIComponent(clean)}.png`);
+        }
+        const buffer = await getMinecraftModTextureBuffer(server, connectorWs, rawItem);
+        if (!buffer) {
+            return res.status(404).json({ success: false, error: 'Texture not found.' });
+        }
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.end(buffer);
+    } catch (error) {
+        console.error('Error resolving mod texture:', error);
+        return res.status(500).json({ success: false, error: 'Failed to resolve texture.' });
     }
 });
 
@@ -17612,6 +18094,8 @@ app.get('/server/:containerId/files-search', requireAuth, async (req, res) => {
             return res.status(403).json({ success: false, error: 'Forbidden' });
         }
 
+        if (!await enforceRedisRequiredOrFail(res)) return;
+
         const connectorWs = connectorConnections.get(server.allocation.connectorId);
         if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
             return res.status(503).json({ success: false, error: 'Connector is offline' });
@@ -17633,6 +18117,13 @@ app.get('/server/:containerId/files-search', requireAuth, async (req, res) => {
         const maxDirectories = Number.isFinite(maxDirectoriesRaw) && maxDirectoriesRaw > 0
             ? Math.min(maxDirectoriesRaw, 5000)
             : 1500;
+
+        const cacheKey = `file-search:${server.id}:${directory}:${filterMode}:${query}:${maxResults}:${maxDirectories}`;
+        const redisClient = getRuntimeRedisClient();
+        const cached = await getFileSearchCache(redisClient, cacheKey);
+        if (cached && !normalizeMinecraftBooleanString(req.query.refresh, 'false')) {
+            return res.json({ success: true, cached: true, ...cached });
+        }
 
         connectorWs.send(JSON.stringify({
             type: 'search_files',
@@ -17661,8 +18152,7 @@ app.get('/server/:containerId/files-search', requireAuth, async (req, res) => {
             });
         }
 
-        return res.json({
-            success: true,
+        const payload = {
             query: String(response.query || query),
             filterMode: String(response.filterMode || filterMode),
             directory: String(response.directory || directory),
@@ -17670,7 +18160,9 @@ app.get('/server/:containerId/files-search', requireAuth, async (req, res) => {
             truncated: Boolean(response.truncated),
             scannedDirectories: Number.isFinite(Number(response.scannedDirectories)) ? Number(response.scannedDirectories) : 0,
             durationMs: Number.isFinite(Number(response.durationMs)) ? Number(response.durationMs) : 0
-        });
+        };
+        await setFileSearchCache(redisClient, cacheKey, payload);
+        return res.json({ success: true, cached: false, ...payload });
     } catch (err) {
         console.error('Error in files-search:', err);
         return res.status(500).json({ success: false, error: 'Internal server error' });

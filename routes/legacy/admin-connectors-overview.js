@@ -937,6 +937,17 @@ app.get('/admin/overview', requireAuth, requireAdmin, async (req, res) => {
             nodes: await Connector.count()
         };
 
+        const redisInfo = typeof getRedisRuntimeInfo === 'function'
+            ? getRedisRuntimeInfo()
+            : { enabled: false, ready: false };
+        const connectorStatus = global.connectorStatus || {};
+        const hasOnlineConnector = Object.values(connectorStatus).some((entry) => {
+            if (!entry) return false;
+            if (typeof entry.status === 'string' && entry.status.toLowerCase() === 'online') return true;
+            return Boolean(entry.lastSeen);
+        });
+        const redisPrompt = stats.nodes > 0 && hasOnlineConnector && !(redisInfo && redisInfo.ready);
+
         const currentVersion = require('../../package.json').version;
         let versionStatus = {
             message: `Panel up to date v${currentVersion}`,
@@ -965,6 +976,8 @@ app.get('/admin/overview', requireAuth, requireAdmin, async (req, res) => {
             user: req.session.user,
             stats,
             versionStatus,
+            redisPrompt,
+            redisInfo,
             success: null,
             error: null,
             path: '/admin/overview'
@@ -975,6 +988,8 @@ app.get('/admin/overview', requireAuth, requireAdmin, async (req, res) => {
             user: req.session.user,
             stats: { users: 0, servers: 0, locations: 0, databases: 0, nodes: 0 },
             versionStatus: { message: 'Database statistics unavailable', type: 'error' },
+            redisPrompt: false,
+            redisInfo: { enabled: false, ready: false },
             success: null,
             error: 'Failed to fetch dashboard statistics.',
             path: '/admin/overview'

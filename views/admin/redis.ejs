@@ -97,6 +97,10 @@
                                 <input class="form-check-input" type="checkbox" role="switch" id="redisEnabledSwitch" name="redisEnabled" value="1" <%= enabled ? 'checked' : '' %>>
                                 <label class="form-check-label text-light" for="redisEnabledSwitch">Enable Redis integration</label>
                             </div>
+                            <div class="mb-3 form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="redisRequiredSwitch" name="redisRequired" value="1" <%= redisRequired ? 'checked' : '' %>>
+                                <label class="form-check-label text-light" for="redisRequiredSwitch">Require Redis for performance features</label>
+                            </div>
 
                             <div class="mb-3">
                                 <label class="form-label text-muted small text-uppercase fw-bold">Connection Mode</label>

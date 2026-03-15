@@ -15,7 +15,8 @@ const REDIS_SETTING_KEYS = [
     'redisUsername',
     'redisPassword',
     'redisTls',
-    'redisSessionPrefix'
+    'redisSessionPrefix',
+    'redisRequired'
 ];
 const nodeFs = require('fs');
 const nodeFsPromises = nodeFs.promises;
@@ -669,6 +670,8 @@ if (!global.__cpanelServiceHealthSweepTimer) {
 app.get('/admin/redis', requireAuth, requireAdmin, async (req, res) => {
     try {
         const storedConfig = await getStoredRedisConfig();
+        const redisRequiredRow = await Settings.findByPk('redisRequired');
+        const redisRequired = ['1', 'true', 'yes', 'on'].includes(String(redisRequiredRow && redisRequiredRow.value || '').trim().toLowerCase());
         const runtimeInfo = typeof getRedisRuntimeInfo === 'function'
             ? getRedisRuntimeInfo()
             : { enabled: false, ready: false, source: 'unknown', lastError: '', config: {} };
@@ -700,6 +703,7 @@ app.get('/admin/redis', requireAuth, requireAdmin, async (req, res) => {
             redisRuntime: runtimeInfo,
             redisSuggestions: suggestions,
             hasStoredRedisConfig: Boolean(storedConfig),
+            redisRequired,
             nowMs: Date.now()
         });
     } catch (error) {
@@ -726,6 +730,7 @@ app.get('/admin/redis', requireAuth, requireAdmin, async (req, res) => {
             redisRuntime: { enabled: false, ready: false, source: 'unknown', lastError: '', config: {} },
             redisSuggestions: [],
             hasStoredRedisConfig: false,
+            redisRequired: false,
             nowMs: Date.now()
         });
     }
@@ -1029,6 +1034,8 @@ app.post('/admin/redis', requireAuth, requireAdmin, async (req, res) => {
         const existingConfig = await getStoredRedisConfig();
         const nextConfig = buildRedisConfigFromBody(req.body, existingConfig);
         await persistRedisConfig(nextConfig);
+        const redisRequired = toRedisBoolString(req.body.redisRequired) === 'true';
+        await Settings.upsert({ key: 'redisRequired', value: redisRequired ? 'true' : 'false' });
 
         const envRedisEnabled = ['1', 'true', 'yes', 'on'].includes(String(process.env.REDIS_ENABLED || '').trim().toLowerCase());
         if (envRedisEnabled) {

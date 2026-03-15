@@ -33,6 +33,12 @@
         .input-dark{background:#0e0e14;border:1px solid var(--border);color:var(--text)}
         .input-dark:focus{border-color:var(--accent);box-shadow:none;color:var(--text)}
         .list-box{max-height:320px;overflow:auto}
+        .item-grid{display:grid;grid-template-columns:repeat(9,44px);gap:6px;align-content:start}
+        .item-slot{width:44px;height:44px;background:#15151c;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;position:relative;box-shadow:inset 0 0 12px rgba(0,0,0,0.35)}
+        .item-icon{width:32px;height:32px;image-rendering:pixelated}
+        .item-count{position:absolute;bottom:3px;right:4px;font-size:.65rem;background:rgba(0,0,0,.65);padding:0 4px;border-radius:6px}
+        .item-fallback{font-size:.55rem;color:var(--muted);text-align:center;line-height:1.1;padding:4px}
+        .item-empty{opacity:.35}
     </style>
     <link rel="stylesheet" href="/css/mobile-layout.css">
 </head>
@@ -69,12 +75,12 @@
                         <div class="col-md-6">
                     <div class="small muted">Inventory</div>
                     <div class="small muted" id="inventorySource"></div>
-                    <div class="d-flex flex-wrap gap-2 mt-2" id="inventoryGrid"></div>
+                    <div class="item-grid mt-2" id="inventoryGrid" data-slots="36"></div>
                 </div>
                 <div class="col-md-6">
                     <div class="small muted">Ender Chest</div>
                     <div class="small muted" id="enderSource"></div>
-                    <div class="d-flex flex-wrap gap-2 mt-2" id="enderGrid"></div>
+                    <div class="item-grid mt-2" id="enderGrid" data-slots="27"></div>
                 </div>
             </div>
         </div>
@@ -230,26 +236,83 @@
         });
     };
 
-    const renderItems = (items, containerId) => {
+    const modTextureBase = `/server/${serverId}/minecraft/admin/item-texture?item=`;
+    const resolveItemTextureUrls = (rawId) => {
+        const id = String(rawId || '').trim();
+        if (!id) return { itemUrl: '', blockUrl: '' };
+        const [ns, name] = id.includes(':') ? id.split(':') : ['minecraft', id];
+        if (ns !== 'minecraft') {
+            return { itemUrl: `${modTextureBase}${encodeURIComponent(id)}`, blockUrl: '' };
+        }
+        const clean = name.replace(/^minecraft:/, '').replace(/[\s]/g, '_');
+        const base = 'https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.16.5/assets/minecraft/textures';
+        return {
+            itemUrl: `${base}/item/${encodeURIComponent(clean)}.png`,
+            blockUrl: `${base}/block/${encodeURIComponent(clean)}.png`
+        };
+    };
+
+    const renderItemGrid = (items, containerId) => {
         const container = document.getElementById(containerId);
         if (!container) return;
         container.innerHTML = '';
+        const slots = Number.parseInt(container.dataset.slots || '0', 10);
+        const gridSize = Number.isFinite(slots) && slots > 0 ? slots : (items || []).length;
+        const arranged = new Array(gridSize).fill(null);
+        const loose = [];
         (items || []).forEach((item) => {
-            const wrap = document.createElement('div');
-            wrap.className = 'd-flex align-items-center gap-2 px-2 py-1 rounded border border-secondary border-opacity-25';
-            const icon = document.createElement('img');
-            icon.width = 20;
-            icon.height = 20;
+            if (Number.isFinite(item.slot) && item.slot >= 0 && item.slot < gridSize) {
+                arranged[item.slot] = item;
+            } else {
+                loose.push(item);
+            }
+        });
+        loose.forEach((item) => {
+            const idx = arranged.findIndex((entry) => entry === null);
+            if (idx >= 0) arranged[idx] = item;
+        });
+        arranged.forEach((item, idx) => {
+            const slot = document.createElement('div');
+            slot.className = `item-slot${item ? '' : ' item-empty'}`;
+            slot.title = item ? `${item.id || 'unknown'}${item.count ? ` x${item.count}` : ''}` : `Empty slot ${idx + 1}`;
+            if (!item) {
+                container.appendChild(slot);
+                return;
+            }
             const rawId = String(item.id || '');
-            const iconId = rawId.replace(/^minecraft:/, '');
-            icon.src = `https://mc-heads.net/item/${encodeURIComponent(iconId)}`;
-            icon.onerror = () => { icon.remove(); };
-            const label = document.createElement('div');
-            label.className = 'small';
-            label.textContent = `${rawId}${item.count ? ` x${item.count}` : ''}`;
-            wrap.appendChild(icon);
-            wrap.appendChild(label);
-            container.appendChild(wrap);
+            const { itemUrl, blockUrl } = resolveItemTextureUrls(rawId);
+            if (itemUrl) {
+                const icon = document.createElement('img');
+                icon.className = 'item-icon';
+                icon.alt = rawId;
+                icon.dataset.stage = 'item';
+                icon.src = itemUrl;
+                icon.onerror = () => {
+                    if (icon.dataset.stage === 'item' && blockUrl) {
+                        icon.dataset.stage = 'block';
+                        icon.src = blockUrl;
+                        return;
+                    }
+                    icon.remove();
+                    const fallback = document.createElement('div');
+                    fallback.className = 'item-fallback';
+                    fallback.textContent = rawId.split(':').slice(-1)[0] || rawId;
+                    slot.appendChild(fallback);
+                };
+                slot.appendChild(icon);
+            } else {
+                const fallback = document.createElement('div');
+                fallback.className = 'item-fallback';
+                fallback.textContent = rawId.split(':').slice(-1)[0] || rawId;
+                slot.appendChild(fallback);
+            }
+            if (item.count && item.count > 1) {
+                const count = document.createElement('div');
+                count.className = 'item-count';
+                count.textContent = String(item.count);
+                slot.appendChild(count);
+            }
+            container.appendChild(slot);
         });
     };
 
@@ -271,8 +334,8 @@
             const offlineEnder = (data.offlineItems && data.offlineItems.ender) || [];
             const inventoryItems = onlineInventory.length ? onlineInventory : offlineInventory;
             const enderItems = onlineEnder.length ? onlineEnder : offlineEnder;
-            renderItems(inventoryItems, 'inventoryGrid');
-            renderItems(enderItems, 'enderGrid');
+            renderItemGrid(inventoryItems, 'inventoryGrid');
+            renderItemGrid(enderItems, 'enderGrid');
             const invSource = document.getElementById('inventorySource');
             const enderSource = document.getElementById('enderSource');
             if (invSource) invSource.textContent = onlineInventory.length ? 'Source: online' : (offlineInventory.length ? 'Source: offline' : '');

@@ -16,6 +16,7 @@ const { printStartupBoot, bootInfo, bootWarn } = require('./core/boot');
 const {
     createRedisClient,
     getRedisClient,
+    isRedisReady,
     reconfigureRedis,
     testRedisConnection,
     getRedisRuntimeInfo,
@@ -108,6 +109,7 @@ const APP_URL = (process.env.APP_URL || '').replace(/\/$/, '');
 const passport = require('passport');
 const md5 = require('blueimp-md5');
 const DEBUG_ENABLED = ['1', 'true', 'yes', 'on'].includes(String(process.env.DEBUG || '').trim().toLowerCase());
+const REDIS_REQUIRED_ENV = ['1', 'true', 'yes', 'on'].includes(String(process.env.REDIS_REQUIRED || '').trim().toLowerCase());
 
 printStartupBoot({
     appUrl: APP_URL,
@@ -118,6 +120,7 @@ printStartupBoot({
 });
 
 const redisClient = createRedisClient(getEnvRedisConfig(), 'env');
+enforceRedisRequired('env').catch(() => {});
 const settingsCache = createSettingsCache({
     Settings,
     redisClient,
@@ -134,7 +137,8 @@ const REDIS_SETTINGS_KEYS = [
     'redisUsername',
     'redisPassword',
     'redisTls',
-    'redisSessionPrefix'
+    'redisSessionPrefix',
+    'redisRequired'
 ];
 
 async function loadRedisConfigFromSettings() {
@@ -159,6 +163,36 @@ async function loadRedisConfigFromSettings() {
         tls: map.redisTls,
         sessionPrefix: map.redisSessionPrefix
     }, { fallbackToEnv: false });
+}
+
+async function loadRedisRequiredSetting() {
+    try {
+        const row = await Settings.findByPk('redisRequired');
+        if (!row || row.value === undefined || row.value === null) return false;
+        return ['1', 'true', 'yes', 'on'].includes(String(row.value).trim().toLowerCase());
+    } catch {
+        return false;
+    }
+}
+
+async function enforceRedisRequired(source = 'env') {
+    const required = REDIS_REQUIRED_ENV || await loadRedisRequiredSetting();
+    if (!required) return;
+    const startedAt = Date.now();
+    const timeoutMs = 6000;
+    while ((Date.now() - startedAt) < timeoutMs) {
+        if (isRedisReady()) return;
+        await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+    const info = getRedisRuntimeInfo();
+    bootWarn(
+        'redis is required (source=%s) but not ready; enabled=%s ready=%s lastError=%s',
+        source,
+        info && info.enabled,
+        info && info.ready,
+        info && info.lastError
+    );
+    process.exit(1);
 }
 
 const { loginLimiter } = bootstrapApp({
@@ -482,6 +516,7 @@ loadRedisConfigFromSettings().then(async (storedRedisConfig) => {
     } else {
         bootInfo('redis configuration source set to settings enabled=%s', applyResult.enabled ? 'true' : 'false');
     }
+    await enforceRedisRequired('settings');
 }).catch((error) => {
     bootWarn('failed to load redis settings from database error=%s', error.message || error);
 });

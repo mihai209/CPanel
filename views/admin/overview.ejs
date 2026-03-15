@@ -70,6 +70,25 @@
                 padding: 2rem 2.5rem;
             }
 
+            .redis-card {
+                grid-column: span 4;
+                flex-direction: row;
+                align-items: center;
+                gap: 2rem;
+                background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), transparent),
+                    rgba(26, 26, 35, 0.4);
+                padding: 1.75rem 2.25rem;
+            }
+
+            .redis-card img {
+                height: 160px;
+                filter: drop-shadow(0 16px 20px rgba(0, 0, 0, 0.45));
+            }
+
+            .redis-card .redis-actions .btn {
+                min-width: 170px;
+            }
+
             .hero-content {
                 flex: 1;
                 max-width: 60%;
@@ -370,7 +389,32 @@
                                 </div>
                             </div>
 
-
+                            <% if (redisPrompt) { %>
+                            <div class="grid-card redis-card">
+                                <div class="hero-content">
+                                    <div class="status-badge mb-3 warning">
+                                        <span class="status-pulse"></span>
+                                        Redis required for performance features
+                                    </div>
+                                    <h2 class="h4 fw-bold text-light mb-2">Add a Redis server to unlock fast tools</h2>
+                                    <p class="text-muted opacity-75 mb-3">
+                                        File search, Minecraft status, playtime leaderboards, and addon lists are faster with Redis caching.
+                                        Rocky can help you set it up now.
+                                    </p>
+                                    <div class="d-flex gap-2 flex-wrap redis-actions">
+                                        <a href="/admin/redis" class="btn btn-success rounded-pill fw-bold">
+                                            <i class="bi bi-database-fill-gear me-2"></i>Open Redis Setup
+                                        </a>
+                                        <a href="/admin/connectors" class="btn btn-outline-light rounded-pill fw-bold">
+                                            <i class="bi bi-hdd-network me-2"></i>View Connectors
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="hero-mascot-container">
+                                    <img src="/assets/happy-rocky.png" alt="Rocky" class="floating-mascot">
+                                </div>
+                            </div>
+                            <% } %>
 
 
                             <div class="grid-card combined-card">
