@@ -25,7 +25,7 @@ git fetch origin main
 # Stash anything dirty to avoid merge conflicts from partial state
 if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
   echo "Stashing local changes (tracked + untracked), ignoring database.sqlite..."
-  git stash push -u -m "auto-update-panel-$(date +%s)" -- \
+  git -c advice.addIgnoredFile=false stash push -u -m "auto-update-panel-$(date +%s)" -- \
     ":(exclude)database.sqlite" \
     ":(exclude)panel/database.sqlite"
   STASHED=1
