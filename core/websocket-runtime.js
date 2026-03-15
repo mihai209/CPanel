@@ -297,7 +297,10 @@ const MINECRAFT_DETECTION_KEYWORDS = [
     'bungeecord',
     'waterfall',
     'bedrock',
-    'pufferfish'
+    'pufferfish',
+    'mohist',
+    'archlight',
+    'sponge'
 ];
 
 function parseBoolean(value) {
@@ -2394,6 +2397,7 @@ setTimeout(() => {
 
 module.exports = {
     registerWebSocketRuntime,
+    getServerConsoleBuffer,
     getServerTickSamples,
     getServerResourcePackStatus,
     getServerCrashLoopState

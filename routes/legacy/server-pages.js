@@ -42,6 +42,7 @@ function registerServerPagesRoutes(ctx) {
         getServerScheduledScalingSettingKey
     } = require('../../core/helpers/scheduled-scaling');
     const {
+        getServerConsoleBuffer,
         getServerTickSamples,
         getServerResourcePackStatus,
         getServerCrashLoopState
@@ -990,12 +991,17 @@ const SERVER_PERMISSIONS = Object.freeze([
     'server.startup',
     'server.minecraft',
     'server.proxy.manage',
+    'minecraft.inspect',
+    'minecraft.freeze',
     'minecraft.kick',
     'minecraft.ban',
+    'minecraft.banlist',
     'minecraft.op',
     'minecraft.deop',
     'minecraft.tempban',
     'minecraft.teleport',
+    'minecraft.chat',
+    'minecraft.whitelist',
     'server.backups.view',
     'server.backups.manage',
     'server.gdrive',
@@ -1048,10 +1054,15 @@ const SUBUSER_PERMISSION_PRESETS = Object.freeze([
             'server.view',
             'server.console',
             'server.minecraft',
+            'minecraft.inspect',
+            'minecraft.freeze',
             'minecraft.kick',
             'minecraft.ban',
+            'minecraft.banlist',
             'minecraft.tempban',
             'minecraft.teleport',
+            'minecraft.chat',
+            'minecraft.whitelist',
             'server.activity.view',
             'server.users.view'
         ]
@@ -3364,6 +3375,164 @@ function normalizeMinecraftDuration(value) {
     if (normalized.length > 16) return '';
     if (!/^[0-9a-z]+$/.test(normalized)) return '';
     return normalized;
+}
+
+const MINECRAFT_ADMIN_PATHS = Object.freeze({
+    whitelist: '/whitelist.json',
+    bannedPlayers: '/banned-players.json',
+    bannedIps: '/banned-ips.json',
+    usercache: '/usercache.json'
+});
+
+function normalizeMinecraftCommandOutputLine(rawLine) {
+    return String(rawLine || '').replace(/\r/g, '').trim();
+}
+
+async function dispatchMinecraftCommand(connectorWs, serverId, command) {
+    if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+        return { success: false, error: 'Connector is offline.' };
+    }
+    const safeCommand = String(command || '').trim();
+    if (!safeCommand) return { success: false, error: 'Command is required.' };
+    const requestId = `mc_admin_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`;
+    connectorWs.send(JSON.stringify({
+        type: 'server_command',
+        serverId,
+        command: safeCommand,
+        requestId
+    }));
+    return { success: true, requestId };
+}
+
+async function captureMinecraftCommandOutput(serverId, connectorWs, command, timeoutMs = 3000) {
+    const before = getServerConsoleBuffer(serverId) || '';
+    const beforeLength = before.length;
+    const dispatch = await dispatchMinecraftCommand(connectorWs, serverId, command);
+    if (!dispatch.success) return dispatch;
+    const deadline = Date.now() + timeoutMs;
+    let captured = '';
+    while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        const current = getServerConsoleBuffer(serverId) || '';
+        if (current.length > beforeLength) {
+            captured = current.slice(beforeLength);
+        } else {
+            captured = current;
+        }
+        if (captured.trim()) break;
+    }
+    return { success: true, output: captured || '' };
+}
+
+function parseMinecraftDataGetOutput(output) {
+    const lines = String(output || '').split('\n').map(normalizeMinecraftCommandOutputLine).filter(Boolean);
+    const match = lines.find((line) => line.includes('has the following entity data:'));
+    if (!match) return '';
+    const parts = match.split('has the following entity data:');
+    return parts.length > 1 ? String(parts[1]).trim() : '';
+}
+
+function mapMinecraftGameType(value) {
+    const numeric = Number.parseInt(String(value || '').replace(/[^0-9-]/g, ''), 10);
+    if (!Number.isFinite(numeric)) return '';
+    return ['survival', 'creative', 'adventure', 'spectator'][numeric] || String(numeric);
+}
+
+const MINECRAFT_CHAT_CONFIG_KEY_PREFIX = 'minecraft_admin_chat_config_';
+
+function getMinecraftChatConfigKey(serverId) {
+    return `${MINECRAFT_CHAT_CONFIG_KEY_PREFIX}${Number.parseInt(serverId, 10) || 0}`;
+}
+
+function normalizeMinecraftChatConfig(raw) {
+    let parsed = raw;
+    if (typeof parsed === 'string') {
+        try {
+            parsed = JSON.parse(parsed);
+        } catch {
+            parsed = {};
+        }
+    }
+    if (!parsed || typeof parsed !== 'object') parsed = {};
+    const muteCommand = String(parsed.muteCommand || 'mutechat').trim().slice(0, 60);
+    const unmuteCommand = String(parsed.unmuteCommand || 'unmutechat').trim().slice(0, 60);
+    const slowCommand = String(parsed.slowCommand || 'slowchat {seconds}').trim().slice(0, 80);
+    return {
+        muteCommand: muteCommand || 'mutechat',
+        unmuteCommand: unmuteCommand || 'unmutechat',
+        slowCommand: slowCommand || 'slowchat {seconds}'
+    };
+}
+
+function computeOfflinePlayerUuid(name) {
+    const clean = String(name || '').trim();
+    if (!clean) return '';
+    const hash = nodeCrypto.createHash('md5').update(`OfflinePlayer:${clean}`, 'utf8').digest('hex');
+    return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20)}`;
+}
+
+function normalizeMinecraftItemId(rawId) {
+    const id = String(rawId || '').trim();
+    if (!id) return '';
+    return id.includes(':') ? id : `minecraft:${id}`;
+}
+
+function parseMinecraftItemList(rawValue) {
+    const input = String(rawValue || '');
+    if (!input) return [];
+    const items = [];
+    const itemRegex = /id:\"([^\"]+)\"[^}]*?Count:(\d+)b/gi;
+    let match;
+    while ((match = itemRegex.exec(input))) {
+        const id = normalizeMinecraftItemId(match[1]);
+        const count = Number.parseInt(match[2], 10);
+        if (!id) continue;
+        items.push({ id, count: Number.isFinite(count) ? count : 1 });
+    }
+    return items;
+}
+
+async function resolveMinecraftAdminApiContext(req, res, requiredPermissions = []) {
+    const server = await Server.findOne({
+        where: { containerId: req.params.containerId },
+        include: [
+            { model: Allocation, as: 'allocation', include: [{ model: Connector, as: 'connector' }] },
+            { model: Image, as: 'image' }
+        ]
+    });
+    if (!server) {
+        res.status(404).json({ success: false, error: 'Server not found.' });
+        return null;
+    }
+    const access = await resolveServerAccess(server, req.session.user);
+    if (!hasServerPermission(access, 'server.minecraft')) {
+        res.status(403).json({ success: false, error: 'Missing permission: server.minecraft.' });
+        return null;
+    }
+    for (const perm of requiredPermissions) {
+        if (!hasServerPermission(access, perm)) {
+            res.status(403).json({ success: false, error: `Missing permission: ${perm}.` });
+            return null;
+        }
+    }
+    if (!isServerLikelyMinecraft(server)) {
+        res.status(400).json({ success: false, error: 'Minecraft tools are available only for Minecraft servers.' });
+        return null;
+    }
+    if (server.isSuspended) {
+        res.status(423).json({ success: false, error: 'Server is suspended.' });
+        return null;
+    }
+    if (!server.allocation || !server.allocation.connectorId) {
+        res.status(400).json({ success: false, error: 'Server allocation is missing.' });
+        return null;
+    }
+    const connectorWs = connectorConnections.get(server.allocation.connectorId);
+    if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+        res.status(503).json({ success: false, error: 'Connector is offline.' });
+        return null;
+    }
+    return { server, access, connectorWs };
 }
 
 function normalizeMinecraftConsoleCommand(value) {
@@ -12677,6 +12846,42 @@ app.get('/server/:containerId/minecraft-center', requireAuth, async (req, res) =
     }
 });
 
+// User Server Minecraft Admin & Control
+app.get('/server/:containerId/minecraft/admin', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [
+                { model: Allocation, as: 'allocation', include: [{ model: Connector, as: 'connector' }] },
+                { model: Image, as: 'image' }
+            ]
+        });
+
+        if (!server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft')) {
+            return res.redirect('/server/no-permissions');
+        }
+        if (!isServerLikelyMinecraft(server)) {
+            return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Minecraft tools are available only for Minecraft servers.')}`);
+        }
+        if (server.isSuspended) {
+            return res.redirect(`/server/${server.containerId}/suspended`);
+        }
+
+        return res.render('server/minecraft-admin', {
+            server,
+            user: req.session.user,
+            title: `Minecraft Admin ${server.name}`,
+            path: '/servers',
+            active: 'mccenter'
+        });
+    } catch (err) {
+        console.error('Error loading Minecraft admin:', err);
+        return res.redirect('/?error=' + encodeURIComponent('Failed to load Minecraft admin tools.'));
+    }
+});
+
 // Legacy minecraft root -> center
 app.get('/server/:containerId/minecraft', requireAuth, async (req, res) => {
     return res.redirect(`/server/${req.params.containerId}/minecraft-center`);
@@ -15545,6 +15750,304 @@ app.post(['/server/:containerId/minecraft/install', '/server/:containerId/minecr
             success: false,
             error: err && err.message ? String(err.message) : 'Failed to install addon.'
         });
+    }
+});
+
+// Minecraft Admin & Control API
+app.get('/server/:containerId/minecraft/admin/whitelist', requireAuth, async (req, res) => {
+    try {
+        const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.whitelist']);
+        if (!ctx) return;
+        const { server, connectorWs } = ctx;
+        const result = await readConnectorFileContent(connectorWs, server.id, MINECRAFT_ADMIN_PATHS.whitelist, 8000);
+        let entries = [];
+        if (result.success && result.content) {
+            try {
+                const parsed = JSON.parse(result.content);
+                if (Array.isArray(parsed)) {
+                    entries = parsed.map((entry) => ({
+                        uuid: String(entry && entry.uuid || '').trim(),
+                        name: String(entry && entry.name || '').trim()
+                    })).filter((entry) => entry.name || entry.uuid);
+                }
+            } catch {
+                entries = [];
+            }
+        }
+        return res.json({ success: true, entries });
+    } catch (error) {
+        console.error('Error loading whitelist:', error);
+        return res.status(500).json({ success: false, error: 'Failed to load whitelist.' });
+    }
+});
+
+app.post('/server/:containerId/minecraft/admin/whitelist/add', requireAuth, async (req, res) => {
+    try {
+        const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.whitelist']);
+        if (!ctx) return;
+        const { server, connectorWs } = ctx;
+        const target = formatMinecraftCommandTarget(req.body.player || req.body.username || '');
+        if (!target) return res.status(400).json({ success: false, error: 'Invalid player name.' });
+        const result = await dispatchMinecraftCommand(connectorWs, server.id, `whitelist add ${target}`);
+        if (!result.success) return res.status(500).json({ success: false, error: result.error || 'Failed to add whitelist entry.' });
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Error adding whitelist:', error);
+        return res.status(500).json({ success: false, error: 'Failed to add whitelist entry.' });
+    }
+});
+
+app.post('/server/:containerId/minecraft/admin/whitelist/remove', requireAuth, async (req, res) => {
+    try {
+        const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.whitelist']);
+        if (!ctx) return;
+        const { server, connectorWs } = ctx;
+        const target = formatMinecraftCommandTarget(req.body.player || req.body.username || '');
+        if (!target) return res.status(400).json({ success: false, error: 'Invalid player name.' });
+        const result = await dispatchMinecraftCommand(connectorWs, server.id, `whitelist remove ${target}`);
+        if (!result.success) return res.status(500).json({ success: false, error: result.error || 'Failed to remove whitelist entry.' });
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Error removing whitelist:', error);
+        return res.status(500).json({ success: false, error: 'Failed to remove whitelist entry.' });
+    }
+});
+
+app.post('/server/:containerId/minecraft/admin/whitelist/import', requireAuth, async (req, res) => {
+    try {
+        const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.whitelist']);
+        if (!ctx) return;
+        const { server, connectorWs } = ctx;
+        const raw = String(req.body.players || '').trim();
+        const players = raw.split(/\r?\n/).map((line) => String(line || '').trim()).filter(Boolean).slice(0, 200);
+        if (!players.length) return res.status(400).json({ success: false, error: 'No player names provided.' });
+        for (const player of players) {
+            const target = formatMinecraftCommandTarget(player);
+            if (!target) continue;
+            await dispatchMinecraftCommand(connectorWs, server.id, `whitelist add ${target}`);
+        }
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Error importing whitelist:', error);
+        return res.status(500).json({ success: false, error: 'Failed to import whitelist entries.' });
+    }
+});
+
+app.get('/server/:containerId/minecraft/admin/banlist', requireAuth, async (req, res) => {
+    try {
+        const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.banlist']);
+        if (!ctx) return;
+        const { server, connectorWs } = ctx;
+        const [playersResult, ipsResult] = await Promise.all([
+            readConnectorFileContent(connectorWs, server.id, MINECRAFT_ADMIN_PATHS.bannedPlayers, 8000),
+            readConnectorFileContent(connectorWs, server.id, MINECRAFT_ADMIN_PATHS.bannedIps, 8000)
+        ]);
+        let players = [];
+        let ips = [];
+        if (playersResult.success && playersResult.content) {
+            try {
+                const parsed = JSON.parse(playersResult.content);
+                if (Array.isArray(parsed)) {
+                    players = parsed.map((entry) => ({
+                        name: String(entry && entry.name || '').trim(),
+                        uuid: String(entry && entry.uuid || '').trim(),
+                        reason: String(entry && entry.reason || '').trim(),
+                        created: String(entry && entry.created || '').trim(),
+                        source: String(entry && entry.source || '').trim(),
+                        expires: String(entry && entry.expires || '').trim()
+                    }));
+                }
+            } catch {}
+        }
+        if (ipsResult.success && ipsResult.content) {
+            try {
+                const parsed = JSON.parse(ipsResult.content);
+                if (Array.isArray(parsed)) {
+                    ips = parsed.map((entry) => ({
+                        ip: String(entry && entry.ip || '').trim(),
+                        reason: String(entry && entry.reason || '').trim(),
+                        created: String(entry && entry.created || '').trim(),
+                        source: String(entry && entry.source || '').trim(),
+                        expires: String(entry && entry.expires || '').trim()
+                    }));
+                }
+            } catch {}
+        }
+        return res.json({ success: true, players, ips });
+    } catch (error) {
+        console.error('Error loading banlist:', error);
+        return res.status(500).json({ success: false, error: 'Failed to load banlist.' });
+    }
+});
+
+app.post('/server/:containerId/minecraft/admin/unban', requireAuth, async (req, res) => {
+    try {
+        const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.banlist']);
+        if (!ctx) return;
+        const { server, connectorWs } = ctx;
+        const rawTarget = String(req.body.target || '').trim();
+        if (!rawTarget) return res.status(400).json({ success: false, error: 'Target is required.' });
+        const target = normalizeMinecraftPlayerTarget(rawTarget) || rawTarget;
+        const command = target.includes('.') ? `pardon-ip ${target}` : `pardon ${formatMinecraftCommandTarget(target)}`;
+        const result = await dispatchMinecraftCommand(connectorWs, server.id, command);
+        if (!result.success) return res.status(500).json({ success: false, error: result.error || 'Failed to unban target.' });
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Error unbanning:', error);
+        return res.status(500).json({ success: false, error: 'Failed to unban target.' });
+    }
+});
+
+app.post('/server/:containerId/minecraft/admin/freeze', requireAuth, async (req, res) => {
+    try {
+        const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.freeze']);
+        if (!ctx) return;
+        const { server, connectorWs } = ctx;
+        const target = formatMinecraftCommandTarget(req.body.player || req.body.username || '');
+        if (!target) return res.status(400).json({ success: false, error: 'Invalid player name.' });
+        const action = String(req.body.action || 'freeze').toLowerCase();
+        const commands = action === 'unfreeze'
+            ? [
+                `effect clear ${target} minecraft:slowness`,
+                `effect clear ${target} minecraft:jump_boost`,
+                `effect clear ${target} minecraft:mining_fatigue`
+            ]
+            : [
+                `effect give ${target} minecraft:slowness 1000000 255 true`,
+                `effect give ${target} minecraft:jump_boost 1000000 128 true`,
+                `effect give ${target} minecraft:mining_fatigue 1000000 255 true`
+            ];
+        for (const cmd of commands) {
+            await dispatchMinecraftCommand(connectorWs, server.id, cmd);
+        }
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Error freezing player:', error);
+        return res.status(500).json({ success: false, error: 'Failed to update freeze status.' });
+    }
+});
+
+app.post('/server/:containerId/minecraft/admin/teleport', requireAuth, async (req, res) => {
+    try {
+        const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.teleport']);
+        if (!ctx) return;
+        const { server, connectorWs } = ctx;
+        const target = formatMinecraftCommandTarget(req.body.player || '');
+        const destination = normalizeMinecraftTeleportTarget(req.body.destination || '');
+        if (!target || !destination) return res.status(400).json({ success: false, error: 'Player and destination are required.' });
+        const result = await dispatchMinecraftCommand(connectorWs, server.id, `tp ${target} ${destination}`);
+        if (!result.success) return res.status(500).json({ success: false, error: result.error || 'Failed to teleport player.' });
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Error teleporting player:', error);
+        return res.status(500).json({ success: false, error: 'Failed to teleport player.' });
+    }
+});
+
+app.post('/server/:containerId/minecraft/admin/chat', requireAuth, async (req, res) => {
+    try {
+        const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.chat']);
+        if (!ctx) return;
+        const { server, connectorWs } = ctx;
+        const chatSetting = await Settings.findByPk(getMinecraftChatConfigKey(server.id));
+        const chatConfig = normalizeMinecraftChatConfig(chatSetting && chatSetting.value);
+        const action = String(req.body.action || '').toLowerCase();
+        let command = '';
+        if (action === 'mute') command = chatConfig.muteCommand;
+        if (action === 'unmute') command = chatConfig.unmuteCommand;
+        if (action === 'slow') {
+            const seconds = clampInteger(req.body.seconds, 0, 1, 60);
+            if (!seconds) return res.status(400).json({ success: false, error: 'Slow chat seconds are required.' });
+            command = chatConfig.slowCommand.includes('{seconds}')
+                ? chatConfig.slowCommand.replace('{seconds}', String(seconds))
+                : `${chatConfig.slowCommand} ${seconds}`;
+        }
+        if (!command) return res.status(400).json({ success: false, error: 'Invalid chat action.' });
+        const result = await dispatchMinecraftCommand(connectorWs, server.id, command);
+        if (!result.success) return res.status(500).json({ success: false, error: result.error || 'Failed to execute chat command.' });
+        return res.json({ success: true });
+    } catch (error) {
+        console.error('Error executing chat command:', error);
+        return res.status(500).json({ success: false, error: 'Failed to execute chat command.' });
+    }
+});
+
+app.get('/server/:containerId/minecraft/admin/inspect', requireAuth, async (req, res) => {
+    try {
+        const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.inspect']);
+        if (!ctx) return;
+        const { server, connectorWs } = ctx;
+        const target = formatMinecraftCommandTarget(req.query.player || '');
+        if (!target) return res.status(400).json({ success: false, error: 'Player is required.' });
+
+        const commands = [
+            { key: 'health', command: `data get entity ${target} Health` },
+            { key: 'location', command: `data get entity ${target} Pos` },
+            { key: 'rotation', command: `data get entity ${target} Rotation` },
+            { key: 'gamemode', command: `data get entity ${target} playerGameType` },
+            { key: 'inventory', command: `data get entity ${target} Inventory` },
+            { key: 'enderChest', command: `data get entity ${target} EnderItems` }
+        ];
+
+        const data = {};
+        for (const entry of commands) {
+            const output = await captureMinecraftCommandOutput(server.id, connectorWs, entry.command, 2500);
+            const rawValue = output.success ? parseMinecraftDataGetOutput(output.output) : '';
+            data[entry.key] = rawValue;
+        }
+
+        if (data.gamemode) {
+            data.gamemode = mapMinecraftGameType(data.gamemode) || data.gamemode;
+        }
+
+        const offlineUuid = computeOfflinePlayerUuid(req.query.player || '');
+        return res.json({
+            success: true,
+            data,
+            offlineUuid,
+            items: {
+                inventory: parseMinecraftItemList(data.inventory),
+                ender: parseMinecraftItemList(data.enderChest)
+            }
+        });
+    } catch (error) {
+        console.error('Error inspecting player:', error);
+        return res.status(500).json({ success: false, error: 'Failed to inspect player.' });
+    }
+});
+
+app.get('/server/:containerId/minecraft/admin/chat-config', requireAuth, async (req, res) => {
+    try {
+        const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.chat']);
+        if (!ctx) return;
+        const { server } = ctx;
+        const setting = await Settings.findByPk(getMinecraftChatConfigKey(server.id));
+        const config = normalizeMinecraftChatConfig(setting && setting.value);
+        return res.json({ success: true, config });
+    } catch (error) {
+        console.error('Error loading chat config:', error);
+        return res.status(500).json({ success: false, error: 'Failed to load chat config.' });
+    }
+});
+
+app.post('/server/:containerId/minecraft/admin/chat-config', requireAuth, async (req, res) => {
+    try {
+        const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.chat']);
+        if (!ctx) return;
+        const { server } = ctx;
+        const config = normalizeMinecraftChatConfig({
+            muteCommand: req.body.muteCommand,
+            unmuteCommand: req.body.unmuteCommand,
+            slowCommand: req.body.slowCommand
+        });
+        await Settings.upsert({
+            id: getMinecraftChatConfigKey(server.id),
+            value: JSON.stringify(config)
+        });
+        return res.json({ success: true, config });
+    } catch (error) {
+        console.error('Error saving chat config:', error);
+        return res.status(500).json({ success: false, error: 'Failed to save chat config.' });
     }
 });
 

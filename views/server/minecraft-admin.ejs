@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Admin <%= server.name %> | <%= settings.brandName.toUpperCase() %></title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --bg: #0f0f12;
+            --panel: #121216;
+            --border: #2d2d35;
+            --text: #e1e1e6;
+            --muted: #8b8b9a;
+            --accent: #3b82f6;
+        }
+        body { background:var(--bg); color:var(--text); margin:0; font-family:Inter,system-ui,-apple-system,sans-serif; height:100vh; overflow:hidden; }
+        .wrapper{display:flex;height:100vh}
+        .sidebar{width:260px;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto}
+        .sidebar.collapsed{margin-left:-260px}
+        .content{flex:1;display:flex;flex-direction:column;min-width:0}
+        .top{background:var(--panel);border-bottom:1px solid var(--border);padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem}
+        .scroll{flex:1;overflow:auto;padding:1rem}
+        .cardx{background:var(--panel);border:1px solid var(--border);border-radius:.9rem}
+        .btn-icon{background:transparent;border:0;color:var(--muted);font-size:1.2rem}
+        .section-title{font-size:.9rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:600}
+        .muted{color:var(--muted)}
+        .table thead th{color:#aab0bf}
+        .pill{display:inline-flex;align-items:center;gap:.35rem;border-radius:999px;padding:.15rem .6rem;font-size:.75rem;border:1px solid rgba(255,255,255,0.12)}
+        .action-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem}
+        .input-dark{background:#0e0e14;border:1px solid var(--border);color:var(--text)}
+        .input-dark:focus{border-color:var(--accent);box-shadow:none;color:var(--text)}
+        .list-box{max-height:320px;overflow:auto}
+    </style>
+    <link rel="stylesheet" href="/css/mobile-layout.css">
+</head>
+<body>
+<%- include('../partials/error-modal') %>
+<div class="wrapper">
+    <nav class="sidebar" id="sidebar"><div class="p-3"><%- include('../partials/server-sidebar', { server, active: 'mccenter' }) %></div></nav>
+    <main class="content">
+        <header class="top">
+            <button class="btn-icon" id="sidebarToggle"><i class="bi bi-list"></i></button>
+            <h1 class="h5 mb-0">Minecraft Admin / <span class="text-secondary"><%= server.name %></span></h1>
+        </header>
+        <section class="scroll">
+            <div class="cardx p-3 mb-3">
+                <div class="section-title">Admin & Control</div>
+                <div class="small muted">Inspector, moderation, whitelist, banlist, and chat controls.</div>
+                <div id="adminMessage" class="small mt-2"></div>
+            </div>
+
+            <div class="action-grid mb-4">
+                <div class="cardx p-3">
+                    <div class="fw-semibold mb-2">Player Inspector</div>
+                <div class="input-group mb-2">
+                    <input class="form-control input-dark" id="inspectPlayer" placeholder="Player name">
+                    <button class="btn btn-primary" id="inspectBtn">Inspect</button>
+                </div>
+                    <div class="small muted">Online players only. Offline UUID is shown for cracked servers.</div>
+                    <div class="small muted mt-1" id="inspectOfflineUuid"></div>
+                    <div class="row g-2 mt-2">
+                        <div class="col-12">
+                            <div class="small muted">Summary</div>
+                            <pre class="mt-1 small" id="inspectOutput" style="white-space:pre-wrap;max-height:160px;overflow:auto"></pre>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small muted">Inventory</div>
+                            <div class="d-flex flex-wrap gap-2 mt-2" id="inventoryGrid"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small muted">Ender Chest</div>
+                            <div class="d-flex flex-wrap gap-2 mt-2" id="enderGrid"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cardx p-3">
+                    <div class="fw-semibold mb-2">Freeze / Unfreeze</div>
+                    <div class="input-group mb-2">
+                        <input class="form-control input-dark" id="freezePlayer" placeholder="Player name">
+                        <button class="btn btn-warning" id="freezeBtn">Freeze</button>
+                        <button class="btn btn-outline-light" id="unfreezeBtn">Unfreeze</button>
+                    </div>
+                    <div class="small muted">Applies slowness + jump fatigue effects.</div>
+                </div>
+
+                <div class="cardx p-3">
+                    <div class="fw-semibold mb-2">Silent Teleport</div>
+                    <div class="input-group mb-2">
+                        <input class="form-control input-dark" id="tpPlayer" placeholder="Player">
+                        <input class="form-control input-dark" id="tpDestination" placeholder="Destination (player or coords)">
+                        <button class="btn btn-outline-info" id="tpBtn">Teleport</button>
+                    </div>
+                    <div class="small muted">Uses /tp silently.</div>
+                </div>
+
+                <div class="cardx p-3">
+                <div class="fw-semibold mb-2">Chat Controls</div>
+                    <div class="d-flex gap-2 flex-wrap mb-2">
+                        <button class="btn btn-outline-danger" id="muteChatBtn">Mute Chat</button>
+                        <button class="btn btn-outline-success" id="unmuteChatBtn">Unmute</button>
+                    </div>
+                    <div class="input-group">
+                        <input class="form-control input-dark" id="slowChatSeconds" type="number" min="1" max="60" placeholder="Slow seconds">
+                        <button class="btn btn-outline-warning" id="slowChatBtn">Slow Chat</button>
+                    </div>
+                    <div class="small muted mt-2">Requires a chat plugin with /mutechat, /unmutechat, /slowchat.</div>
+                    <div class="mt-3">
+                        <div class="small muted mb-1">Command settings</div>
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <input class="form-control input-dark" id="chatMuteCmd" placeholder="mutechat">
+                            </div>
+                            <div class="col-md-4">
+                                <input class="form-control input-dark" id="chatUnmuteCmd" placeholder="unmutechat">
+                            </div>
+                            <div class="col-md-4">
+                                <input class="form-control input-dark" id="chatSlowCmd" placeholder="slowchat {seconds}">
+                            </div>
+                        </div>
+                        <button class="btn btn-outline-light btn-sm mt-2" id="saveChatConfig">Save Chat Commands</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-lg-6">
+                    <div class="cardx p-3">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="fw-semibold">Whitelist Manager</div>
+                            <button class="btn btn-sm btn-outline-info" id="refreshWhitelist">Refresh</button>
+                        </div>
+                        <div class="input-group mb-2">
+                            <input class="form-control input-dark" id="whitelistPlayer" placeholder="Player name">
+                            <button class="btn btn-outline-success" id="whitelistAdd">Add</button>
+                            <button class="btn btn-outline-danger" id="whitelistRemove">Remove</button>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small muted">Bulk import (one name per line)</label>
+                            <textarea class="form-control input-dark" id="whitelistBulk" rows="3" placeholder="player1\nplayer2"></textarea>
+                            <button class="btn btn-outline-light mt-2" id="whitelistImport">Import</button>
+                        </div>
+                        <div class="list-box">
+                            <table class="table table-dark table-striped table-sm align-middle mb-0">
+                                <thead><tr><th>Name</th><th>UUID</th><th></th></tr></thead>
+                                <tbody id="whitelistTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="cardx p-3">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <div class="fw-semibold">Banlist</div>
+                            <button class="btn btn-sm btn-outline-info" id="refreshBanlist">Refresh</button>
+                        </div>
+                        <div class="list-box">
+                            <table class="table table-dark table-striped table-sm align-middle mb-0">
+                                <thead><tr><th>Name</th><th>Reason</th><th>When</th><th></th></tr></thead>
+                                <tbody id="banlistTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+<script>
+    const serverId = "<%= server.containerId %>";
+    const setMessage = (msg, type = 'info') => {
+        const el = document.getElementById('adminMessage');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.className = `small mt-2 text-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'muted'}`;
+    };
+
+    const apiFetch = async (url, opts) => {
+        const res = await fetch(url, opts);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) {
+            throw new Error(data.error || 'Request failed');
+        }
+        return data;
+    };
+
+    const loadWhitelist = async () => {
+        const data = await apiFetch(`/server/${serverId}/minecraft/admin/whitelist`);
+        const tbody = document.getElementById('whitelistTable');
+        tbody.innerHTML = '';
+        (data.entries || []).forEach((entry) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${entry.name || '-'}</td><td class="small text-muted">${entry.uuid || ''}</td><td><button class="btn btn-sm btn-outline-danger" data-remove="${entry.name || ''}">Remove</button></td>`;
+            tbody.appendChild(tr);
+        });
+        tbody.querySelectorAll('[data-remove]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+                const name = btn.getAttribute('data-remove');
+                if (!name) return;
+                await apiFetch(`/server/${serverId}/minecraft/admin/whitelist/remove`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player: name }) });
+                setMessage(`Removed ${name} from whitelist.`, 'success');
+                loadWhitelist();
+            });
+        });
+    };
+
+    const loadBanlist = async () => {
+        const data = await apiFetch(`/server/${serverId}/minecraft/admin/banlist`);
+        const tbody = document.getElementById('banlistTable');
+        tbody.innerHTML = '';
+        (data.players || []).forEach((entry) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${entry.name || entry.uuid || '-'}</td><td class="small text-muted">${entry.reason || ''}</td><td class="small text-muted">${entry.created || ''}</td><td><button class="btn btn-sm btn-outline-warning" data-unban="${entry.name || entry.uuid || ''}">Unban</button></td>`;
+            tbody.appendChild(tr);
+        });
+        tbody.querySelectorAll('[data-unban]').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+                const name = btn.getAttribute('data-unban');
+                if (!name) return;
+                await apiFetch(`/server/${serverId}/minecraft/admin/unban`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target: name }) });
+                setMessage(`Unbanned ${name}.`, 'success');
+                loadBanlist();
+            });
+        });
+    };
+
+    const renderItems = (items, containerId) => {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = '';
+        (items || []).forEach((item) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'd-flex align-items-center gap-2 px-2 py-1 rounded border border-secondary border-opacity-25';
+            const icon = document.createElement('img');
+            icon.width = 20;
+            icon.height = 20;
+            const rawId = String(item.id || '');
+            const iconId = rawId.replace(/^minecraft:/, '');
+            icon.src = `https://mc-heads.net/item/${encodeURIComponent(iconId)}`;
+            icon.onerror = () => { icon.remove(); };
+            const label = document.createElement('div');
+            label.className = 'small';
+            label.textContent = `${rawId}${item.count ? ` x${item.count}` : ''}`;
+            wrap.appendChild(icon);
+            wrap.appendChild(label);
+            container.appendChild(wrap);
+        });
+    };
+
+    document.getElementById('inspectBtn')?.addEventListener('click', async () => {
+        const player = document.getElementById('inspectPlayer').value.trim();
+        if (!player) return;
+        setMessage('Inspecting player...');
+        try {
+            const data = await apiFetch(`/server/${serverId}/minecraft/admin/inspect?player=${encodeURIComponent(player)}`);
+            const output = document.getElementById('inspectOutput');
+            output.textContent = JSON.stringify(data.data || {}, null, 2);
+            const offline = document.getElementById('inspectOfflineUuid');
+            if (offline) {
+                offline.textContent = data.offlineUuid ? `Offline UUID: ${data.offlineUuid}` : '';
+            }
+            renderItems((data.items && data.items.inventory) || [], 'inventoryGrid');
+            renderItems((data.items && data.items.ender) || [], 'enderGrid');
+            setMessage('Inspector data loaded.', 'success');
+        } catch (err) {
+            setMessage(err.message, 'error');
+        }
+    });
+
+    document.getElementById('freezeBtn')?.addEventListener('click', async () => {
+        const player = document.getElementById('freezePlayer').value.trim();
+        if (!player) return;
+        await apiFetch(`/server/${serverId}/minecraft/admin/freeze`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player, action: 'freeze' }) });
+        setMessage(`Froze ${player}.`, 'success');
+    });
+
+    document.getElementById('unfreezeBtn')?.addEventListener('click', async () => {
+        const player = document.getElementById('freezePlayer').value.trim();
+        if (!player) return;
+        await apiFetch(`/server/${serverId}/minecraft/admin/freeze`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player, action: 'unfreeze' }) });
+        setMessage(`Unfroze ${player}.`, 'success');
+    });
+
+    document.getElementById('tpBtn')?.addEventListener('click', async () => {
+        const player = document.getElementById('tpPlayer').value.trim();
+        const destination = document.getElementById('tpDestination').value.trim();
+        if (!player || !destination) return;
+        await apiFetch(`/server/${serverId}/minecraft/admin/teleport`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player, destination }) });
+        setMessage(`Teleported ${player}.`, 'success');
+    });
+
+    document.getElementById('muteChatBtn')?.addEventListener('click', async () => {
+        await apiFetch(`/server/${serverId}/minecraft/admin/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'mute' }) });
+        setMessage('Mute chat command sent.', 'success');
+    });
+
+    document.getElementById('unmuteChatBtn')?.addEventListener('click', async () => {
+        await apiFetch(`/server/${serverId}/minecraft/admin/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'unmute' }) });
+        setMessage('Unmute chat command sent.', 'success');
+    });
+
+    document.getElementById('slowChatBtn')?.addEventListener('click', async () => {
+        const seconds = Number.parseInt(document.getElementById('slowChatSeconds').value, 10);
+        if (!Number.isFinite(seconds) || seconds < 1) return;
+        await apiFetch(`/server/${serverId}/minecraft/admin/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'slow', seconds }) });
+        setMessage('Slow chat command sent.', 'success');
+    });
+
+    const loadChatConfig = async () => {
+        const data = await apiFetch(`/server/${serverId}/minecraft/admin/chat-config`);
+        const cfg = data.config || {};
+        document.getElementById('chatMuteCmd').value = cfg.muteCommand || '';
+        document.getElementById('chatUnmuteCmd').value = cfg.unmuteCommand || '';
+        document.getElementById('chatSlowCmd').value = cfg.slowCommand || '';
+    };
+
+    document.getElementById('saveChatConfig')?.addEventListener('click', async () => {
+        const muteCommand = document.getElementById('chatMuteCmd').value.trim();
+        const unmuteCommand = document.getElementById('chatUnmuteCmd').value.trim();
+        const slowCommand = document.getElementById('chatSlowCmd').value.trim();
+        await apiFetch(`/server/${serverId}/minecraft/admin/chat-config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ muteCommand, unmuteCommand, slowCommand }) });
+        setMessage('Chat command config saved.', 'success');
+    });
+
+    document.getElementById('whitelistAdd')?.addEventListener('click', async () => {
+        const player = document.getElementById('whitelistPlayer').value.trim();
+        if (!player) return;
+        await apiFetch(`/server/${serverId}/minecraft/admin/whitelist/add`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player }) });
+        setMessage(`Whitelisted ${player}.`, 'success');
+        loadWhitelist();
+    });
+
+    document.getElementById('whitelistRemove')?.addEventListener('click', async () => {
+        const player = document.getElementById('whitelistPlayer').value.trim();
+        if (!player) return;
+        await apiFetch(`/server/${serverId}/minecraft/admin/whitelist/remove`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player }) });
+        setMessage(`Removed ${player} from whitelist.`, 'success');
+        loadWhitelist();
+    });
+
+    document.getElementById('whitelistImport')?.addEventListener('click', async () => {
+        const raw = document.getElementById('whitelistBulk').value || '';
+        await apiFetch(`/server/${serverId}/minecraft/admin/whitelist/import`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ players: raw }) });
+        setMessage('Whitelist import dispatched.', 'success');
+        loadWhitelist();
+    });
+
+    document.getElementById('refreshWhitelist')?.addEventListener('click', () => loadWhitelist());
+    document.getElementById('refreshBanlist')?.addEventListener('click', () => loadBanlist());
+
+    document.getElementById('sidebarToggle')?.addEventListener('click', () => document.getElementById('sidebar')?.classList.toggle('collapsed'));
+
+    loadWhitelist().catch(() => {});
+    loadBanlist().catch(() => {});
+    loadChatConfig().catch(() => {});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
+</body>
+</html>
