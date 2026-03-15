@@ -10,6 +10,7 @@ const SERVER_TICK_SAMPLE_LIMIT = 240;
 const CRASH_LOOP_WINDOW_MS = 5 * 60 * 1000;
 const CRASH_LOOP_THRESHOLD = 3;
 const CRASH_LOOP_COOLDOWN_MS = 10 * 60 * 1000;
+let getServerConsoleBuffer = () => '';
 
 function getServerTickSamples(serverId) {
     const samples = SERVER_TICK_SAMPLES.get(serverId) || [];
@@ -797,11 +798,11 @@ function appendToServerConsoleBuffer(serverId, output) {
     serverConsoleBuffers.set(serverId, buffer);
 }
 
-function getServerConsoleBuffer(serverId) {
+getServerConsoleBuffer = function getServerConsoleBuffer(serverId) {
     const buffer = serverConsoleBuffers.get(serverId);
     if (!buffer || buffer.lines.length === 0) return '';
     return buffer.lines.join('');
-}
+};
 
 function getServerConsoleTailForDebug(serverId) {
     const full = getServerConsoleBuffer(serverId);
