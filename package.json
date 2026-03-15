@@ -13,7 +13,7 @@
     "sync-images": "node scripts/sync-images.js",
     "ngrok": "ngrok http 3000 --url https://default.internal",
     "kill3000": "npx kill-port 3000",
-    "update-panel": "git pull --rebase --autostash origin main && npm install && npm run upgrade-db && echo 'Panel updated successfully!'"
+    "update-panel": "bash ./scripts/update-panel-safe.sh"
   },
   "keywords": [],
   "author": "",
