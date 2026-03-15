@@ -69,6 +69,29 @@ const isAdminNavActive = (item) => {
 };
 %>
 
+<div class="admin-sidebar-panel">
+    <div class="admin-sidebar-header">
+        <div class="admin-sidebar-title">Admin Menu</div>
+        <div class="form-check form-switch admin-nav-mode-toggle">
+            <input class="form-check-input" type="checkbox" id="adminNavModeToggleSidebar" data-admin-nav-toggle>
+            <label class="form-check-label" for="adminNavModeToggleSidebar">Sidebar mode</label>
+        </div>
+    </div>
+    <% adminNavSections.forEach((section) => { %>
+        <div class="sidebar-section">
+            <div class="sidebar-section-title"><%= section.title %></div>
+            <div class="sidebar-section-items">
+                <% section.items.forEach((item) => { %>
+                    <a href="<%= item.href %>" class="sidebar-item <%= isAdminNavActive(item) ? 'active' : '' %>">
+                        <i class="bi <%= item.icon %>"></i>
+                        <span><%= item.label %></span>
+                    </a>
+                <% }) %>
+            </div>
+        </div>
+    <% }) %>
+</div>
+
 <div id="adminSidebar" class="admin-sidebar-modal-host" aria-hidden="true">
     <button type="button" class="admin-menu-toggle" data-bs-toggle="modal" data-bs-target="#adminNavModal" aria-label="Open admin menu">
         <i class="bi bi-shield"></i>
@@ -113,6 +136,10 @@ const isAdminNavActive = (item) => {
                     <span class="text-muted small"><%= user.username %></span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
+                    <div class="form-check form-switch admin-nav-mode-toggle">
+                        <input class="form-check-input" type="checkbox" id="adminNavModeToggleModal" data-admin-nav-toggle>
+                        <label class="form-check-label" for="adminNavModeToggleModal">Sidebar mode</label>
+                    </div>
                     <a href="https://ko-fi.com/S6S11A22SE" target="_blank" rel="noopener noreferrer" class="admin-menu-support">
                         <i class="bi bi-cup-hot"></i>
                         Support The Dev
@@ -125,12 +152,94 @@ const isAdminNavActive = (item) => {
 </div>
 
 <style>
-    #adminSidebar.admin-sidebar-modal-host {
+    :root[data-admin-nav="modal"] #adminSidebar.admin-sidebar-modal-host {
         width: 0 !important;
         min-width: 0 !important;
         padding: 0 !important;
         border: 0 !important;
         background: transparent !important;
+    }
+
+    :root[data-admin-nav="modal"] .sidebar {
+        width: 0 !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+    }
+
+    :root[data-admin-nav="modal"] .admin-sidebar-panel {
+        display: none;
+    }
+
+    :root[data-admin-nav="sidebar"] .admin-menu-toggle {
+        display: none;
+    }
+
+    .admin-sidebar-panel {
+        padding: 0.75rem 0.5rem 1.5rem;
+    }
+
+    .admin-sidebar-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.5rem 0.75rem 1rem;
+    }
+
+    .admin-sidebar-title {
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: #e1e1e6;
+    }
+
+    .admin-nav-mode-toggle .form-check-label {
+        font-size: 0.78rem;
+        color: #9aa0a6;
+        margin-left: 0.35rem;
+    }
+
+    .sidebar-section {
+        margin-bottom: 1rem;
+    }
+
+    .sidebar-section-title {
+        font-size: 0.68rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.4);
+        margin: 0.5rem 0.9rem;
+        font-weight: 700;
+    }
+
+    .sidebar-section-items {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        padding: 0 0.5rem;
+    }
+
+    .sidebar-section-items .sidebar-item {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.55rem 0.75rem;
+        border-radius: 0.65rem;
+        color: #cbd5f5;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+
+    .sidebar-section-items .sidebar-item:hover {
+        background: rgba(99, 102, 241, 0.12);
+        color: #fff;
+    }
+
+    .sidebar-section-items .sidebar-item.active {
+        background: rgba(99, 102, 241, 0.2);
+        color: #fff;
+        box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.35);
     }
 
     .admin-menu-toggle {
@@ -276,11 +385,38 @@ const isAdminNavActive = (item) => {
             padding: 0.6rem 0.85rem;
             font-size: 0.85rem;
         }
+        .admin-nav-mode-toggle {
+            display: none;
+        }
     }
 </style>
 
 <script>
     (function () {
+        const storageKey = 'cpanel.adminNavMode';
+        const root = document.documentElement;
+        const toggles = Array.from(document.querySelectorAll('[data-admin-nav-toggle]'));
+        const modalEl = document.getElementById('adminNavModal');
+        const applyMode = (mode) => {
+            const next = mode === 'sidebar' ? 'sidebar' : 'modal';
+            root.dataset.adminNav = next;
+            localStorage.setItem(storageKey, next);
+            toggles.forEach((toggle) => {
+                toggle.checked = next === 'sidebar';
+            });
+            if (next === 'sidebar' && modalEl && window.bootstrap) {
+                const modal = window.bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            }
+        };
+        const savedMode = localStorage.getItem(storageKey);
+        applyMode(savedMode === 'sidebar' ? 'sidebar' : 'modal');
+        toggles.forEach((toggle) => {
+            toggle.addEventListener('change', (event) => {
+                applyMode(event.target.checked ? 'sidebar' : 'modal');
+            });
+        });
+
         const isEditableTarget = (target) => {
             if (!target) return false;
             const tag = String(target.tagName || '').toLowerCase();
@@ -288,6 +424,7 @@ const isAdminNavActive = (item) => {
         };
 
         const openAdminMenu = () => {
+            if (root.dataset.adminNav === 'sidebar') return;
             const modalEl = document.getElementById('adminNavModal');
             if (!modalEl || !window.bootstrap) return;
             const modal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
