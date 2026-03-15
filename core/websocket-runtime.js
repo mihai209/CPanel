@@ -81,7 +81,8 @@ function registerWebSocketRuntime(deps) {
     } = deps;
 
 // WebSocket Server for Connectors & UI
-const wss = new WebSocket.Server({ noServer: true, maxPayload: 2 * 1024 * 1024 });
+// Allow larger payloads for modded inventory/icon data while staying bounded.
+const wss = new WebSocket.Server({ noServer: true, maxPayload: 64 * 1024 * 1024 });
 const uiClients = new Set();
 const serverConsoleClients = new Map(); // serverId -> Set<ws>
 const recentConsolePayloads = new Map(); // serverId -> { output: string, ts: number }

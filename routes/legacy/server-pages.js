@@ -3579,6 +3579,7 @@ const MINECRAFT_TEXTURE_CACHE_TTL_MS = 30 * 60 * 1000;
 const MINECRAFT_TEXTURE_CACHE_MAX = 600;
 const MINECRAFT_MOD_INDEX_CACHE = new Map(); // serverId -> { ts, index: Map(modid -> jarPath) }
 const MINECRAFT_MOD_INDEX_TTL_MS = 10 * 60 * 1000;
+const MINECRAFT_MOD_JAR_MAX_BYTES = 25 * 1024 * 1024;
 const MINECRAFT_INSPECT_CACHE = new Map(); // key -> { ts, payload }
 const MINECRAFT_INSPECT_CACHE_TTL_MS = 2 * 60 * 1000;
 const MODRINTH_SEARCH_CACHE = new Map(); // key -> { ts, payload }
@@ -3741,12 +3742,16 @@ async function getMinecraftModIndex(server, connectorWs) {
         const fileName = String(file.name || '');
         if (!fileName) continue;
         const filePath = `/mods/${fileName}`;
+        const fileSize = Number.parseInt(file.size, 10) || 0;
+        if (fileSize > MINECRAFT_MOD_JAR_MAX_BYTES) {
+            continue;
+        }
         const readResult = await readConnectorFileContentBase64(connectorWs, server.id, filePath, 20000);
         if (!readResult || !readResult.success || !readResult.contentBase64) continue;
         const buffer = Buffer.from(readResult.contentBase64, 'base64');
         const modIds = extractModIdsFromJarBuffer(buffer);
         modIds.forEach((id) => {
-            if (!index.has(id)) index.set(id, filePath);
+            if (!index.has(id)) index.set(id, { path: filePath, size: fileSize });
         });
     }
     MINECRAFT_MOD_INDEX_CACHE.set(server.id, { ts: Date.now(), index });
@@ -3819,8 +3824,10 @@ async function getMinecraftModTextureBuffer(server, connectorWs, itemId) {
     const cached = getMinecraftTextureCacheEntry(cacheKey);
     if (cached) return cached.buffer;
     const index = await getMinecraftModIndex(server, connectorWs);
-    const jarPath = index.get(modid);
+    const jarEntry = index.get(modid);
+    const jarPath = jarEntry && jarEntry.path ? jarEntry.path : jarEntry;
     if (!jarPath) return null;
+    if (jarEntry && jarEntry.size && jarEntry.size > MINECRAFT_MOD_JAR_MAX_BYTES) return null;
     const readResult = await readConnectorFileContentBase64(connectorWs, server.id, jarPath, 20000);
     if (!readResult || !readResult.success || !readResult.contentBase64) return null;
     const buffer = Buffer.from(readResult.contentBase64, 'base64');

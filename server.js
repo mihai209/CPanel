@@ -192,7 +192,7 @@ async function enforceRedisRequired(source = 'env') {
         info && info.ready,
         info && info.lastError
     );
-    process.exit(1);
+    return false;
 }
 
 const { loginLimiter } = bootstrapApp({
