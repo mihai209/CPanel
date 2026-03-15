@@ -301,6 +301,7 @@ const jobQueue = createJobQueue({
 
 registerDefaultJobHandlers(jobQueue, {
     Server,
+    Image,
     Allocation,
     Connector,
     ServerBackupPolicy,
@@ -310,6 +311,12 @@ registerDefaultJobHandlers(jobQueue, {
     pendingMigrationFileImports,
     dispatchServerLogCleanup: legacyHelpers.dispatchServerLogCleanup,
     getPanelFeatureFlagsFromMap: legacyHelpers.getPanelFeatureFlagsFromMap,
+    buildServerEnvironment: legacyHelpers.buildServerEnvironment,
+    buildStartupCommand: legacyHelpers.buildStartupCommand,
+    resolveImagePorts: legacyHelpers.resolveImagePorts,
+    buildDeploymentPorts: legacyHelpers.buildDeploymentPorts,
+    shouldUseCommandStartup: legacyHelpers.shouldUseCommandStartup,
+    getServerMountsForInstall: legacyHelpers.getServerMountsForInstall,
     resolveModrinthVersionForInstall: legacyHelpers.resolveModrinthVersionForInstall,
     createWsRequestId: legacyHelpers.createWsRequestId,
     waitForConnectorDownloadResult: legacyHelpers.waitForConnectorDownloadResult,
@@ -319,6 +326,58 @@ registerDefaultJobHandlers(jobQueue, {
 });
 
 jobQueue.start();
+
+async function runUdpPortRepairSweep() {
+    if (!Settings || !settingsCache || typeof settingsCache.getSettingsMap !== 'function') return;
+    let settingsMap = {};
+    try {
+        settingsMap = await settingsCache.getSettingsMap();
+    } catch {
+        settingsMap = {};
+    }
+    const enabledRaw = settingsMap.udpAutoRepairEnabled;
+    const enabled = enabledRaw === undefined || enabledRaw === null
+        ? true
+        : String(enabledRaw).toLowerCase() === 'true';
+    if (!enabled) return;
+    if (settingsMap.udpAutoRepairCompletedAt) return;
+
+    const servers = await Server.findAll({
+        include: [{ model: Allocation, as: 'allocation' }],
+        attributes: ['id', 'status']
+    });
+    let queued = 0;
+    for (const server of servers) {
+        if (!server || !server.allocation || !server.allocation.connectorId) continue;
+        const startAfter = String(server.status || '').toLowerCase() === 'running';
+        await jobQueue.enqueue({
+            type: 'server.redeploy.dispatch',
+            payload: {
+                serverId: server.id,
+                startAfter,
+                brandName: (settingsMap && settingsMap.brandName) || 'cpanel'
+            },
+            priority: 5,
+            maxAttempts: 3
+        });
+        queued += 1;
+    }
+
+    await Settings.upsert({
+        key: 'udpAutoRepairCompletedAt',
+        value: new Date().toISOString()
+    }).catch(() => {});
+
+    if (queued > 0) {
+        bootInfo('udp port auto-repair queued servers=%d', queued);
+    }
+}
+
+setTimeout(() => {
+    runUdpPortRepairSweep().catch((err) => {
+        bootWarn('udp port auto-repair sweep failed: %s', err && err.message ? err.message : err);
+    });
+}, 20 * 1000);
 
 const stopBackupPolicyScheduler = startBackupPolicyScheduler({
     ServerBackupPolicy,

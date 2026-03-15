@@ -88,14 +88,20 @@ function buildDeploymentPorts(input) {
         return [];
     }
 
-    const protocols = Array.from(new Set(
+    const protocolSet = new Set(
         imagePorts
             .map((port) => String((port && port.protocol) || 'tcp').toLowerCase())
             .filter((protocol) => protocol === 'tcp' || protocol === 'udp')
-    ));
-    if (protocols.length === 0) {
-        protocols.push('tcp');
+    );
+    if (protocolSet.size === 0) {
+        protocolSet.add('tcp');
     }
+    // Match Wings behavior: expose both TCP and UDP by default for allocations,
+    // since many Minecraft voice/chat mods require UDP but eggs only declare TCP.
+    if (protocolSet.size === 1 && protocolSet.has('tcp')) {
+        protocolSet.add('udp');
+    }
+    const protocols = Array.from(protocolSet);
 
     const primaryPort = primaryAllocation
         ? (Number.parseInt(env.SERVER_PORT, 10) || Number.parseInt(primaryAllocation.port, 10))

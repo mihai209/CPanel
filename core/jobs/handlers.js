@@ -6,6 +6,7 @@ const {
 function registerDefaultJobHandlers(jobQueue, deps) {
     const {
         Server,
+        Image,
         Allocation,
         Connector,
         ServerBackupPolicy,
@@ -15,6 +16,12 @@ function registerDefaultJobHandlers(jobQueue, deps) {
         dispatchServerLogCleanup,
         pendingMigrationFileImports,
         connectorConnections,
+        buildServerEnvironment,
+        buildStartupCommand,
+        resolveImagePorts,
+        buildDeploymentPorts,
+        shouldUseCommandStartup,
+        getServerMountsForInstall,
         resolveModrinthVersionForInstall,
         createWsRequestId,
         waitForConnectorDownloadResult,
@@ -286,6 +293,109 @@ function registerDefaultJobHandlers(jobQueue, deps) {
             updatePayload.isSuspended = false;
         }
         await server.update(updatePayload);
+
+        return {
+            serverId,
+            connectorId: server.allocation.connectorId,
+            dispatched: true
+        };
+    });
+
+    jobQueue.registerHandler('server.redeploy.dispatch', async (job) => {
+        const payload = job.payload || {};
+        const serverId = Number.parseInt(payload.serverId, 10);
+        if (!Number.isInteger(serverId) || serverId <= 0) {
+            throw new Error('Invalid serverId for server.redeploy.dispatch job');
+        }
+
+        const server = await Server.findByPk(serverId, {
+            include: [
+                { model: Allocation, as: 'allocation' },
+                { model: Connector, as: 'connector' },
+                { model: Image, as: 'image' }
+            ]
+        });
+        if (!server) throw new Error(`Server ${serverId} not found`);
+        if (!server.allocation || !server.allocation.connectorId) {
+            throw new Error(`Server ${serverId} has no connector allocation`);
+        }
+
+        const connectorWs = getConnectorSocket(server.allocation.connectorId);
+        if (!connectorWs) {
+            throw new Error(`Connector ${server.allocation.connectorId} is offline`);
+        }
+
+        if (typeof buildServerEnvironment !== 'function' || typeof buildStartupCommand !== 'function' || typeof resolveImagePorts !== 'function' || typeof buildDeploymentPorts !== 'function') {
+            throw new Error('Server redeploy helpers are not available.');
+        }
+
+        const image = server.image || server.Image;
+        if (!image) {
+            throw new Error('Server image is missing for redeploy.');
+        }
+
+        const primaryAllocation = server.allocation;
+        const assignedAllocations = await Allocation.findAll({
+            where: { serverId: server.id },
+            attributes: ['id', 'ip', 'port'],
+            order: [['port', 'ASC']]
+        });
+
+        const runtimeValues = {
+            SERVER_MEMORY: String(server.memory || ''),
+            SERVER_IP: '0.0.0.0',
+            SERVER_PORT: String(primaryAllocation.port || '')
+        };
+        const built = buildServerEnvironment(image, server.variables || {}, runtimeValues);
+        const startup = buildStartupCommand(server.startup || image.startup, built.env);
+        const imagePorts = resolveImagePorts(image.ports);
+        const deploymentPorts = buildDeploymentPorts({
+            imagePorts,
+            env: built.env,
+            primaryAllocation,
+            allocations: assignedAllocations
+        });
+        const startupMode = typeof shouldUseCommandStartup === 'function' && shouldUseCommandStartup(image) ? 'command' : 'environment';
+        const mountConfig = typeof getServerMountsForInstall === 'function'
+            ? await getServerMountsForInstall(server.id)
+            : [];
+        const startAfterInstall = payload.startAfter === true || (payload.startAfter == null && String(server.status || '').toLowerCase() === 'running');
+
+        try {
+            connectorWs.send(JSON.stringify({
+                type: 'install_server',
+                serverId,
+                reinstall: false,
+                config: {
+                    image: server.dockerImage || image.dockerImage,
+                    memory: server.memory,
+                    cpu: server.cpu,
+                    disk: server.disk,
+                    swapLimit: server.swapLimit,
+                    ioWeight: server.ioWeight,
+                    pidsLimit: server.pidsLimit,
+                    oomKillDisable: Boolean(server.oomKillDisable),
+                    oomScoreAdj: server.oomScoreAdj,
+                    env: built.env,
+                    startup,
+                    startupMode,
+                    eggConfig: {},
+                    eggScripts: {},
+                    installation: null,
+                    configFiles: null,
+                    brandName: String(payload.brandName || 'cpanel'),
+                    ports: deploymentPorts,
+                    mounts: mountConfig,
+                    skipInstallationScript: true,
+                    startAfterInstall
+                }
+            }));
+        } catch (sendError) {
+            if (isFinalAttempt) {
+                await server.update({ status: 'error' }).catch(() => {});
+            }
+            throw new Error(`Failed to dispatch redeploy to connector: ${sendError.message}`);
+        }
 
         return {
             serverId,
