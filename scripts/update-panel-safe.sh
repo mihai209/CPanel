@@ -51,7 +51,7 @@ echo "Updating to origin/main (fast-forward merge)..."
 # If fast-forward fails, do a regular merge (still no rebase)
 if ! git merge --ff-only origin/main; then
   echo "Fast-forward not possible; performing a merge..."
-  git merge origin/main
+  git merge --no-edit origin/main
 fi
 
 if [ "$STASHED" -eq 1 ]; then
