@@ -12,6 +12,8 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
+git config advice.addIgnoredFile false >/dev/null 2>&1 || true
+
 if [ -d ".git/rebase-apply" ] || [ -d ".git/rebase-merge" ]; then
   echo "Rebase in progress. Resolve it first:"
   echo "  git status"
@@ -25,10 +27,22 @@ git fetch origin main
 # Stash anything dirty to avoid merge conflicts from partial state
 if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
   echo "Stashing local changes (tracked + untracked), ignoring database.sqlite..."
+  stash_before=$(git stash list | wc -l | tr -d ' ')
+  set +e
   git -c advice.addIgnoredFile=false stash push -u -m "auto-update-panel-$(date +%s)" -- \
     ":(exclude)database.sqlite" \
     ":(exclude)panel/database.sqlite"
-  STASHED=1
+  stash_rc=$?
+  set -e
+  stash_after=$(git stash list | wc -l | tr -d ' ')
+  if [ "$stash_after" -gt "$stash_before" ]; then
+    STASHED=1
+  else
+    STASHED=0
+    if [ "$stash_rc" -ne 0 ]; then
+      echo "Warning: stash returned code $stash_rc but no stash was created." >&2
+    fi
+  fi
 else
   STASHED=0
 fi
