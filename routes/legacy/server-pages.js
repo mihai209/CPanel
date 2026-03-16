@@ -3797,6 +3797,41 @@ function parseAiAction(input) {
     return '';
 }
 
+function extractAiReply(payload) {
+    if (!payload) return '';
+    const data = payload.data ? payload.data : payload;
+    if (!data) return '';
+    if (data.error) {
+        const errMessage = data.error.message || data.error.error || data.error;
+        return '';
+    }
+    if (Array.isArray(data.choices)) {
+        for (const choice of data.choices) {
+            const msg = choice && choice.message && typeof choice.message.content === 'string'
+                ? choice.message.content
+                : (typeof choice.text === 'string' ? choice.text : '');
+            if (msg && msg.trim()) return msg.trim();
+        }
+    }
+    if (Array.isArray(data.candidates)) {
+        const candidate = data.candidates[0];
+        if (candidate && candidate.content && Array.isArray(candidate.content.parts)) {
+            const text = candidate.content.parts.map((part) => part && part.text ? part.text : '').join('').trim();
+            if (text) return text;
+        }
+        if (candidate && typeof candidate.output === 'string' && candidate.output.trim()) {
+            return candidate.output.trim();
+        }
+    }
+    if (typeof data.output_text === 'string' && data.output_text.trim()) {
+        return data.output_text.trim();
+    }
+    if (typeof data.reply === 'string' && data.reply.trim()) {
+        return data.reply.trim();
+    }
+    return '';
+}
+
 function isPureAiActionMessage(input) {
     const text = String(input || '').trim().toLowerCase();
     if (!text) return false;
@@ -9249,9 +9284,10 @@ app.post('/server/:containerId/ai/chat', requireAuth, async (req, res) => {
                     headers,
                     timeout: 20000
                 });
-                reply = aiResponse && aiResponse.data && aiResponse.data.choices && aiResponse.data.choices[0]
-                    ? String(aiResponse.data.choices[0].message && aiResponse.data.choices[0].message.content || '').trim()
-                    : '';
+                if (aiResponse && aiResponse.data && aiResponse.data.error) {
+                    throw new Error(aiResponse.data.error.message || aiResponse.data.error.error || 'AI provider returned an error.');
+                }
+                reply = extractAiReply(aiResponse && aiResponse.data);
                 if (reply) {
                     usedProvider = candidate;
                     break;
@@ -9284,7 +9320,10 @@ app.post('/server/:containerId/ai/chat', requireAuth, async (req, res) => {
                 userAgent: req.headers['user-agent'],
                 metadata: safeAiAuditMeta(message, { reason: 'empty_response', error: lastError ? String(lastError.message || lastError) : '' })
             });
-            return res.status(502).json({ success: false, error: 'AI returned an empty response.' });
+            return res.status(502).json({
+                success: false,
+                error: lastError && lastError.message ? `AI request failed: ${lastError.message}` : 'AI returned an empty response.'
+            });
         }
 
         const nextHistory = [...history, { role: 'user', content: message }, { role: 'assistant', content: reply }].slice(-10);
