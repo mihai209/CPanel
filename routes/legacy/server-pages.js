@@ -9117,6 +9117,7 @@ app.post('/server/:containerId/ai/chat', requireAuth, async (req, res) => {
             return res.status(429).json({ success: false, error: `Rate limit exceeded. Try again in ${retrySeconds}s.` });
         }
 
+        const isAllowedTopic = Boolean(requestedAction || isAllowedAiTopic(message));
         const smallTalkReply = getAiSmallTalkReply(message);
         if (!requestedAction && smallTalkReply) {
             return res.json({ success: true, reply: smallTalkReply });
@@ -9131,7 +9132,6 @@ app.post('/server/:containerId/ai/chat', requireAuth, async (req, res) => {
                 metadata: safeAiAuditMeta(message, { reason: 'general_chat' })
             });
         }
-        const isAllowedTopic = Boolean(requestedAction || isAllowedAiTopic(message));
 
         const quotaLimit = await resolveAiDailyQuotaLimit(req.session.user);
         const quotaOk = await checkDailyQuota(getRuntimeRedisClient(), req.session.user.id, quotaLimit);
