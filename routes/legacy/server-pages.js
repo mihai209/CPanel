@@ -3639,6 +3639,19 @@ const AI_INJECTION_PATTERNS = [
     /reveal (the )?rules/i
 ];
 const AI_ALLOWED_TOPIC_PATTERNS = [
+    /\bsalut\b/i,
+    /\bhello\b/i,
+    /\bhi\b/i,
+    /\bhey\b/i,
+    /\bbuna\b/i,
+    /\bbună\b/i,
+    /\bcine esti\b/i,
+    /\bcine ești\b/i,
+    /\bcum te nume(st|ș)ti\b/i,
+    /\bwho are you\b/i,
+    /\bwhat is your name\b/i,
+    /\bhelp\b/i,
+    /\bajutor\b/i,
     /\bserver\b/i,
     /\bconsole\b/i,
     /\blogs?\b/i,
@@ -3766,13 +3779,45 @@ function getAgentRulesText() {
 function parseAiAction(input) {
     const text = String(input || '').trim().toLowerCase();
     if (!text) return '';
-    const direct = ['start', 'stop', 'restart'];
+    const direct = ['start', 'stop', 'restart', 'kill', 'shutdown', 'poweroff', 'power-off'];
     if (direct.includes(text) || direct.includes(text.replace('/', ''))) {
-        return text.replace('/', '');
+        const normalized = text.replace('/', '');
+        if (normalized === 'kill' || normalized === 'shutdown' || normalized === 'poweroff' || normalized === 'power-off') return 'stop';
+        return normalized;
     }
     if (text.includes('start server')) return 'start';
     if (text.includes('stop server')) return 'stop';
     if (text.includes('restart server')) return 'restart';
+    if (text.includes('kill server')) return 'stop';
+    if (text.includes('shutdown server')) return 'stop';
+    if (text.includes('power off server')) return 'stop';
+    if (text.includes('opreste server') || text.includes('oprește server') || text.includes('opreste serverul') || text.includes('oprește serverul')) return 'stop';
+    if (text.includes('porneste server') || text.includes('pornește server') || text.includes('porneste serverul') || text.includes('pornește serverul')) return 'start';
+    if (text.includes('reporneste server') || text.includes('reporneste serverul') || text.includes('repornește server') || text.includes('repornește serverul')) return 'restart';
+    return '';
+}
+
+function isPureAiActionMessage(input) {
+    const text = String(input || '').trim().toLowerCase();
+    if (!text) return false;
+    if (/^\/?(start|stop|restart|kill|shutdown|power\s*off)\b/.test(text) && text.length <= 40) return true;
+    if (/^(please|pls|te rog|can you|could you|va rog)\s+(start|stop|restart|kill|shutdown|power\s*off)(\s+the)?\s+server[.!?]*$/.test(text)) return true;
+    if (/^(porneste|pornește|opreste|oprește|reporneste|repornește)\s+(server|serverul)[.!?]*$/.test(text)) return true;
+    return false;
+}
+
+function getAiSmallTalkReply(input) {
+    const text = String(input || '').trim().toLowerCase();
+    if (!text) return '';
+    if (/(salut|hello|hi|hey|buna|bună|yo|ciao|hola|servus)/i.test(text)) {
+        return 'Salut! Eu sunt Rocky. Pot ajuta cu status, console, config și acțiuni sigure pe server.';
+    }
+    if (/(cum te numesti|cum te numești|cine esti|cine ești|who are you|what is your name|your name)/i.test(text)) {
+        return 'Mă numesc Rocky. Sunt asistentul de server al panelului.';
+    }
+    if (/(ajutor|help|ce poti face|ce poți face)/i.test(text)) {
+        return 'Pot ajuta cu status, loguri, config, start/stop/restart și întrebări despre server.';
+    }
     return '';
 }
 
@@ -8962,6 +9007,14 @@ app.post('/server/:containerId/ai/chat', requireAuth, async (req, res) => {
         if (!message) {
             return res.status(400).json({ success: false, error: 'Message is required.' });
         }
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [
+                { model: Allocation, as: 'allocation' },
+                { model: Image, as: 'image' }
+            ]
+        });
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
         if (message.length > AI_CHAT_MAX_INPUT_CHARS) {
             await writeServerAuditSafe({
                 actorUserId: req.session.user.id,
@@ -8973,7 +9026,9 @@ app.post('/server/:containerId/ai/chat', requireAuth, async (req, res) => {
             });
             return res.status(400).json({ success: false, error: 'Message too long.' });
         }
-        if (isDangerousAiInput(message)) {
+        const requestedAction = parseAiAction(message);
+        const isPureAction = requestedAction && isPureAiActionMessage(message);
+        if (!isPureAction && isDangerousAiInput(message)) {
             await writeServerAuditSafe({
                 actorUserId: req.session.user.id,
                 serverId: server.id,
@@ -9006,15 +9061,6 @@ app.post('/server/:containerId/ai/chat', requireAuth, async (req, res) => {
             });
             return res.json({ success: true, reply: 'Request refused. That looks like a prompt injection attempt.' });
         }
-
-        const server = await Server.findOne({
-            where: { containerId: req.params.containerId },
-            include: [
-                { model: Allocation, as: 'allocation' },
-                { model: Image, as: 'image' }
-            ]
-        });
-        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
         const access = await resolveServerAccess(server, req.session.user);
         if (!hasServerPermission(access, 'server.console')) {
             return res.status(403).json({ success: false, error: 'No access.' });
@@ -9071,18 +9117,21 @@ app.post('/server/:containerId/ai/chat', requireAuth, async (req, res) => {
             return res.status(429).json({ success: false, error: `Rate limit exceeded. Try again in ${retrySeconds}s.` });
         }
 
-        const requestedAction = parseAiAction(message);
-        if (!requestedAction && !isAllowedAiTopic(message)) {
+        const smallTalkReply = getAiSmallTalkReply(message);
+        if (!requestedAction && smallTalkReply) {
+            return res.json({ success: true, reply: smallTalkReply });
+        }
+        if (!isAllowedTopic) {
             await writeServerAuditSafe({
                 actorUserId: req.session.user.id,
                 serverId: server.id,
-                action: 'server.ai.chat.blocked',
+                action: 'server.ai.chat.general',
                 ip: req.ip,
                 userAgent: req.headers['user-agent'],
-                metadata: safeAiAuditMeta(message, { reason: 'topic_not_allowed' })
+                metadata: safeAiAuditMeta(message, { reason: 'general_chat' })
             });
-            return res.json({ success: true, reply: 'I can only help with server/console topics and safe actions.' });
         }
+        const isAllowedTopic = Boolean(requestedAction || isAllowedAiTopic(message));
 
         const quotaLimit = await resolveAiDailyQuotaLimit(req.session.user);
         const quotaOk = await checkDailyQuota(getRuntimeRedisClient(), req.session.user.id, quotaLimit);
@@ -9156,6 +9205,7 @@ app.post('/server/:containerId/ai/chat', requireAuth, async (req, res) => {
             'You are Rocky, the server assistant for this panel.',
             'You can answer questions about the server, but you may only trigger start/stop/restart when allowed.',
             'Never provide destructive commands or instructions. Refuse unsafe requests.',
+            isAllowedTopic ? '' : 'If the user asks about unrelated topics, respond briefly and avoid operational or security guidance.',
             getAgentRulesText()
         ].filter(Boolean).join('\n');
 
