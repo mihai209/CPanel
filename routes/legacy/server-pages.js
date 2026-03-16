@@ -3600,6 +3600,12 @@ const AI_CHAT_RATE_LIMIT_STATE = new Map(); // key -> { ts, count }
 const AI_CHAT_IP_RATE_LIMIT_STATE = new Map(); // key -> { ts, count }
 const AI_DAILY_QUOTA_DEFAULT_LIMIT = 100;
 const AI_DAILY_QUOTA_CACHE = new Map(); // key -> { date, count }
+const AI_PROVIDER_DEFAULT_MODELS = {
+    openrouter: 'openrouter/auto',
+    groq: 'llama-3.1-70b-versatile',
+    openai: 'gpt-4o-mini',
+    google: 'gemini-1.5-flash'
+};
 const AI_DANGEROUS_PATTERNS = [
     /rm\s+-rf/i,
     /\bmkfs\b/i,
@@ -3830,6 +3836,23 @@ function extractAiReply(payload) {
         return data.reply.trim();
     }
     return '';
+}
+
+function getAiProviderFallbackModel(providerId) {
+    const id = String(providerId || '').toLowerCase();
+    return AI_PROVIDER_DEFAULT_MODELS[id] || '';
+}
+
+function shouldRetryWithFallbackModel(error, candidate) {
+    if (!candidate || !candidate.id) return false;
+    const fallback = getAiProviderFallbackModel(candidate.id);
+    if (!fallback || fallback === candidate.model) return false;
+    const message = String((error && error.message) || '').toLowerCase();
+    const status = error && error.response ? error.response.status : null;
+    if (message.includes('no resource with given identifier') || message.includes('model') || status === 404) {
+        return true;
+    }
+    return false;
 }
 
 function isPureAiActionMessage(input) {
@@ -9293,6 +9316,51 @@ app.post('/server/:containerId/ai/chat', requireAuth, async (req, res) => {
                     break;
                 }
             } catch (err) {
+                const responseData = err && err.response ? err.response.data : null;
+                console.error('AI provider error', {
+                    provider: candidate.id,
+                    url: chatUrl,
+                    model: candidate.model,
+                    status: err && err.response ? err.response.status : null,
+                    message: err && err.message ? err.message : String(err || ''),
+                    data: responseData
+                });
+                if (shouldRetryWithFallbackModel(err, candidate)) {
+                    const fallbackModel = getAiProviderFallbackModel(candidate.id);
+                    if (fallbackModel) {
+                        try {
+                            const fallbackResponse = await axios.post(chatUrl, {
+                                model: fallbackModel,
+                                messages,
+                                temperature: 0.2,
+                                max_tokens: 400
+                            }, {
+                                headers,
+                                timeout: 20000
+                            });
+                            if (fallbackResponse && fallbackResponse.data && fallbackResponse.data.error) {
+                                throw new Error(fallbackResponse.data.error.message || fallbackResponse.data.error.error || 'AI provider returned an error.');
+                            }
+                            reply = extractAiReply(fallbackResponse && fallbackResponse.data);
+                            if (reply) {
+                                usedProvider = candidate;
+                                candidate.model = fallbackModel;
+                                break;
+                            }
+                        } catch (fallbackErr) {
+                            console.error('AI provider fallback error', {
+                                provider: candidate.id,
+                                url: chatUrl,
+                                model: fallbackModel,
+                                status: fallbackErr && fallbackErr.response ? fallbackErr.response.status : null,
+                                message: fallbackErr && fallbackErr.message ? fallbackErr.message : String(fallbackErr || ''),
+                                data: fallbackErr && fallbackErr.response ? fallbackErr.response.data : null
+                            });
+                            lastError = fallbackErr;
+                            continue;
+                        }
+                    }
+                }
                 lastError = err;
                 continue;
             }
