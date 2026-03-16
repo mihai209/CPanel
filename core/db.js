@@ -58,7 +58,9 @@ const User = sequelize.define('User', {
     twoFactorSecret: { type: DataTypes.STRING, allowNull: true },
     twoFactorEnabled: { type: DataTypes.BOOLEAN, defaultValue: false },
     oauthProvider: { type: DataTypes.STRING, allowNull: true, defaultValue: null },
-    oauthId: { type: DataTypes.STRING, allowNull: true, defaultValue: null }
+    oauthId: { type: DataTypes.STRING, allowNull: true, defaultValue: null },
+    experimentalAiEnabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    aiDailyQuotaOverride: { type: DataTypes.INTEGER, allowNull: true }
 });
 
 const LinkedAccount = sequelize.define('LinkedAccount', {
@@ -137,7 +139,8 @@ const Server = sequelize.define('Server', {
     oomScoreAdj: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
     dockerImage: { type: DataTypes.STRING, allowNull: true },
     startup: { type: DataTypes.TEXT, allowNull: true },
-    variables: { type: DataTypes.JSON, defaultValue: {} }
+    variables: { type: DataTypes.JSON, defaultValue: {} },
+    aiPolicy: { type: DataTypes.JSON, allowNull: false, defaultValue: { enabled: false, allowStart: false, allowStop: false, allowRestart: false } }
 });
 
 const ServerSubuser = sequelize.define('ServerSubuser', {

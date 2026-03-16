@@ -1,0 +1,154 @@
+<%- include('../partials/header') %>
+<%- include('../partials/navbar') %>
+<%- include('../partials/error-modal') %>
+
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-12 d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <h2 class="mb-0 text-light">AI Agents</h2>
+            <div class="d-flex align-items-center gap-2">
+                <div class="text-muted small">Configure provider keys and enable the Rocky agent.</div>
+                <button class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#aiProviderHelpModal">
+                    <i class="bi bi-question-circle me-1"></i>Setup Guide
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12">
+            <form action="/admin/ai-agents" method="POST" class="card border-0 shadow-sm"
+                style="background-color:#141419; border:1px solid rgba(255,255,255,0.05) !important; border-radius:15px;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+                        <div>
+                            <h5 class="text-light mb-1"><i class="bi bi-robot me-2 text-primary"></i>Enable Rocky AI</h5>
+                            <div class="text-muted small">Global toggle for AI usage.</div>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="aiEnabled" name="aiEnabled" value="true"
+                                <%= config && config.enabled ? 'checked' : '' %>>
+                            <label class="form-check-label text-light" for="aiEnabled">Enabled</label>
+                        </div>
+                    </div>
+
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label text-light">Default Provider</label>
+                        <select class="form-select" name="defaultProviderId">
+                            <% (providers || []).forEach((provider) => { %>
+                                <option value="<%= provider.id %>" <%= config && config.defaultProviderId === provider.id ? 'selected' : '' %>>
+                                    <%= provider.name %>
+                                </option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label text-light">Daily quota per user</label>
+                        <input type="number" class="form-control" name="dailyQuota" min="10" max="10000"
+                            value="<%= typeof dailyQuota === 'number' ? dailyQuota : 100 %>">
+                        <div class="text-muted small mt-1">Default: 100 messages per day.</div>
+                    </div>
+                </div>
+
+                    <hr class="border-secondary border-opacity-25 my-4">
+
+                    <div class="row g-4">
+                        <% (providers || []).forEach((provider) => { %>
+                            <div class="col-12">
+                                <div class="p-3 rounded-3" style="background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05);">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                                        <div>
+                                            <div class="text-light fw-bold"><%= provider.name %></div>
+                                            <div class="text-muted small">OpenAI‑compatible endpoint.</div>
+                                        </div>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="provider_<%= provider.id %>_enabled"
+                                                name="provider_<%= provider.id %>_enabled" value="true" <%= provider.enabled ? 'checked' : '' %>>
+                                            <label class="form-check-label text-light" for="provider_<%= provider.id %>_enabled">Enabled</label>
+                                        </div>
+                                    </div>
+                                    <div class="row g-3">
+                                        <div class="col-12 col-md-6">
+                                            <label class="form-label text-light">Base URL</label>
+                                            <input type="text" class="form-control" name="provider_<%= provider.id %>_baseUrl"
+                                                value="<%= provider.baseUrl %>" placeholder="https://.../chat/completions">
+                                        </div>
+                                        <div class="col-12 col-md-3">
+                                            <label class="form-label text-light">Model</label>
+                                            <input type="text" class="form-control" name="provider_<%= provider.id %>_model"
+                                                value="<%= provider.model %>">
+                                        </div>
+                                        <div class="col-12 col-md-3">
+                                            <label class="form-label text-light">API Key</label>
+                                            <input type="password" class="form-control" name="provider_<%= provider.id %>_apiKey"
+                                                value="<%= provider.apiKey %>" placeholder="sk-...">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        <% }) %>
+                    </div>
+
+                    <div class="alert alert-warning mt-4 mb-0">
+                        Keep keys secret. Users can only access the AI if they enable Experimental Features.
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent border-0 p-4 pt-0">
+                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="aiProviderHelpModal" tabindex="-1" aria-labelledby="aiProviderHelpLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content" style="background:#111319; border:1px solid rgba(255,255,255,0.08);">
+            <div class="modal-header border-0">
+                <h5 class="modal-title text-light" id="aiProviderHelpLabel">
+                    <i class="bi bi-life-preserver me-2"></i>AI Provider Setup & Troubleshooting
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="text-light fw-bold mb-1">General steps</div>
+                    <ol class="text-muted small">
+                        <li>Enable Rocky AI and choose a default provider.</li>
+                        <li>Enable a provider, set Base URL, Model, and API Key.</li>
+                        <li>Save settings, then let users enable Experimental Features.</li>
+                    </ol>
+                </div>
+
+                <div class="mb-3">
+                    <div class="text-light fw-bold mb-1">Provider presets</div>
+                    <ul class="text-muted small">
+                        <li><strong>OpenRouter</strong>: Base URL already correct. Add API key, choose model (ex: <code>openrouter/auto</code>).</li>
+                        <li><strong>Groq</strong>: Use API key + model (ex: <code>llama-3.1-70b-versatile</code>).</li>
+                        <li><strong>OpenAI</strong>: Use key + model (ex: <code>gpt-4o-mini</code>).</li>
+                        <li><strong>Google Gemini</strong>: Use OpenAI‑compatible endpoint. Model ex: <code>gemini-1.5-flash</code>.</li>
+                        <li><strong>Custom</strong>: Only OpenAI‑compatible endpoints supported.</li>
+                    </ul>
+                </div>
+
+                <div class="mb-3">
+                    <div class="text-light fw-bold mb-1">Known errors</div>
+                    <ul class="text-muted small">
+                        <li><strong>401/403</strong>: Invalid API key or missing permissions. Regenerate key.</li>
+                        <li><strong>404</strong>: Wrong Base URL. Use exact <code>/chat/completions</code> endpoint.</li>
+                        <li><strong>429</strong>: Rate limit reached. Reduce usage or upgrade plan.</li>
+                        <li><strong>timeout</strong>: Provider is down or network blocked. Try another provider.</li>
+                        <li><strong>empty response</strong>: Model not available for that provider.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

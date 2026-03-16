@@ -994,6 +994,8 @@ const SERVER_PERMISSIONS = Object.freeze([
     'server.startup',
     'server.minecraft',
     'server.proxy.manage',
+    'server.ai.use',
+    'server.ai.manage',
     'minecraft.inspect',
     'minecraft.freeze',
     'minecraft.kick',
@@ -3584,12 +3586,359 @@ const MINECRAFT_INSPECT_CACHE = new Map(); // key -> { ts, payload }
 const MINECRAFT_INSPECT_CACHE_TTL_MS = 2 * 60 * 1000;
 const MODRINTH_SEARCH_CACHE = new Map(); // key -> { ts, payload }
 const MODRINTH_SEARCH_CACHE_TTL_MS = 2 * 60 * 1000;
+const AI_CONFIG_CACHE = { ts: 0, value: null };
+const AI_CONFIG_CACHE_TTL_MS = 15 * 1000;
+const AI_CHAT_HISTORY_CACHE = new Map(); // key -> { ts, messages }
+const AI_CHAT_HISTORY_TTL_MS = 10 * 60 * 1000;
+const AI_AGENT_RULES_PATH = nodePath.join(process.cwd(), 'agent.md');
+const AI_AGENT_RULES_CACHE = { ts: 0, value: '' };
+const AI_CHAT_MAX_INPUT_CHARS = 600;
+const AI_CHAT_MAX_OUTPUT_CHARS = 1200;
+const AI_CHAT_RATE_LIMIT_WINDOW_MS = 30 * 1000;
+const AI_CHAT_RATE_LIMIT_MAX = 6;
+const AI_CHAT_RATE_LIMIT_STATE = new Map(); // key -> { ts, count }
+const AI_CHAT_IP_RATE_LIMIT_STATE = new Map(); // key -> { ts, count }
+const AI_DAILY_QUOTA_DEFAULT_LIMIT = 100;
+const AI_DAILY_QUOTA_CACHE = new Map(); // key -> { date, count }
+const AI_DANGEROUS_PATTERNS = [
+    /rm\s+-rf/i,
+    /\bmkfs\b/i,
+    /\bdd\s+if=/i,
+    /\bshutdown\b/i,
+    /\breboot\b/i,
+    /\bchmod\s+-r\b/i,
+    /\bchown\s+-r\b/i,
+    /\biptables\b/i,
+    /\bapt(-get)?\s+remove\b/i,
+    /\bdel\s+\/[qs]/i,
+    /\brmdir\s+\/s/i
+];
+const AI_SENSITIVE_PATTERNS = [
+    /\bapi\s*key\b/i,
+    /\btoken\b/i,
+    /\bsecret\b/i,
+    /\bpassword\b/i,
+    /\bdb\b/i,
+    /\bdatabase\b/i,
+    /\bcredential\b/i,
+    /\busers?\b/i,
+    /\baccess\s*key\b/i,
+    /\bprivate\s*key\b/i,
+    /\bssh\b/i
+];
+const AI_INJECTION_PATTERNS = [
+    /ignore (all|previous|system|developer) instructions/i,
+    /system prompt/i,
+    /developer message/i,
+    /jailbreak/i,
+    /act as/i,
+    /you are now/i,
+    /bypass/i,
+    /policy/i,
+    /prompt injection/i,
+    /reveal (the )?rules/i
+];
+const AI_ALLOWED_TOPIC_PATTERNS = [
+    /\bserver\b/i,
+    /\bconsole\b/i,
+    /\blogs?\b/i,
+    /\bstatus\b/i,
+    /\bstart\b/i,
+    /\bstop\b/i,
+    /\brestart\b/i,
+    /\bpower\b/i,
+    /\bperformance\b/i,
+    /\btps\b/i,
+    /\bmspt\b/i,
+    /\bresource\b/i,
+    /\bmemory\b/i,
+    /\bcpu\b/i,
+    /\bdisk\b/i,
+    /\blag\b/i,
+    /\bcrash\b/i,
+    /\berror\b/i,
+    /\bport\b/i,
+    /\bnetwork\b/i,
+    /\bvoice\b/i,
+    /\budp\b/i,
+    /\bbackup\b/i,
+    /\bschedule\b/i,
+    /\bplugin\b/i,
+    /\bmod\b/i,
+    /\bminecraft\b/i,
+    /\bplayer\b/i,
+    /\bjucator\b/i,
+    /\bporne(st|ste)\b/i,
+    /\bopre(st|ste)\b/i,
+    /\breporneste\b/i,
+    /\bconfig\b/i
+];
 
 function sanitizeMinecraftItemId(value) {
     const id = String(value || '').trim().toLowerCase();
     if (!id) return '';
     if (!/^[a-z0-9_.-]+:[a-z0-9_./-]+$/.test(id)) return '';
     return id;
+}
+
+function normalizeAiPolicy(raw) {
+    const base = { enabled: false, allowStart: false, allowStop: false, allowRestart: false };
+    if (!raw || typeof raw !== 'object') return { ...base };
+    return {
+        enabled: Boolean(raw.enabled),
+        allowStart: Boolean(raw.allowStart),
+        allowStop: Boolean(raw.allowStop),
+        allowRestart: Boolean(raw.allowRestart)
+    };
+}
+
+function normalizeAiAdminConfig(raw) {
+    const parsed = raw && typeof raw === 'object' ? raw : {};
+    const providers = Array.isArray(parsed.providers) ? parsed.providers : [];
+    return {
+        enabled: String(parsed.enabled || 'false').toLowerCase() === 'true',
+        defaultProviderId: String(parsed.defaultProviderId || ''),
+        providers: providers
+            .filter((p) => p && p.id)
+            .map((p) => ({
+                id: String(p.id),
+                name: String(p.name || p.id),
+                baseUrl: String(p.baseUrl || '').trim(),
+                apiKey: String(p.apiKey || '').trim(),
+                model: String(p.model || '').trim(),
+                enabled: Boolean(p.enabled)
+            }))
+    };
+}
+
+async function getAiAdminConfig() {
+    const now = Date.now();
+    if (AI_CONFIG_CACHE.value && (now - AI_CONFIG_CACHE.ts) < AI_CONFIG_CACHE_TTL_MS) {
+        return AI_CONFIG_CACHE.value;
+    }
+    if (!Settings || typeof Settings.findByPk !== 'function') {
+        return { enabled: false, providers: [], defaultProviderId: '' };
+    }
+    try {
+        const row = await Settings.findByPk('aiAgentsConfig');
+        const parsed = row && row.value ? normalizeAiAdminConfig(JSON.parse(row.value)) : normalizeAiAdminConfig({});
+        AI_CONFIG_CACHE.ts = now;
+        AI_CONFIG_CACHE.value = parsed;
+        return parsed;
+    } catch {
+        return { enabled: false, providers: [], defaultProviderId: '' };
+    }
+}
+
+function getActiveAiProvider(config) {
+    if (!config || !Array.isArray(config.providers)) return null;
+    const preferred = config.defaultProviderId
+        ? config.providers.find((p) => p.id === config.defaultProviderId)
+        : null;
+    const pick = preferred && preferred.enabled && preferred.apiKey ? preferred : config.providers.find((p) => p.enabled && p.apiKey);
+    if (!pick || !pick.baseUrl || !pick.apiKey || !pick.model) return null;
+    return pick;
+}
+
+function buildAiChatUrl(baseUrl) {
+    const raw = String(baseUrl || '').trim();
+    if (!raw) return '';
+    if (/\/chat\/completions\/?$/i.test(raw)) return raw;
+    if (/\/v1\/?$/i.test(raw) || /\/api\/v1\/?$/i.test(raw)) return raw.replace(/\/$/, '') + '/chat/completions';
+    return raw.replace(/\/$/, '') + '/chat/completions';
+}
+
+function getAgentRulesText() {
+    const now = Date.now();
+    if (AI_AGENT_RULES_CACHE.value && (now - AI_AGENT_RULES_CACHE.ts) < 60 * 1000) {
+        return AI_AGENT_RULES_CACHE.value;
+    }
+    try {
+        const raw = fs.readFileSync(AI_AGENT_RULES_PATH, 'utf8');
+        AI_AGENT_RULES_CACHE.ts = now;
+        AI_AGENT_RULES_CACHE.value = String(raw || '').trim();
+        return AI_AGENT_RULES_CACHE.value;
+    } catch {
+        return '';
+    }
+}
+
+function parseAiAction(input) {
+    const text = String(input || '').trim().toLowerCase();
+    if (!text) return '';
+    const direct = ['start', 'stop', 'restart'];
+    if (direct.includes(text) || direct.includes(text.replace('/', ''))) {
+        return text.replace('/', '');
+    }
+    if (text.includes('start server')) return 'start';
+    if (text.includes('stop server')) return 'stop';
+    if (text.includes('restart server')) return 'restart';
+    return '';
+}
+
+function isDangerousAiInput(text) {
+    const value = String(text || '');
+    return AI_DANGEROUS_PATTERNS.some((regex) => regex.test(value));
+}
+
+function isSensitiveAiRequest(text) {
+    const value = String(text || '');
+    return AI_SENSITIVE_PATTERNS.some((regex) => regex.test(value));
+}
+
+function isSensitiveAiOutput(text) {
+    const value = String(text || '');
+    if (AI_SENSITIVE_PATTERNS.some((regex) => regex.test(value))) return true;
+    // Block any obvious secret-like strings.
+    if (/sk-[A-Za-z0-9]{10,}/.test(value)) return true;
+    if (/ghp_[A-Za-z0-9]{20,}/.test(value)) return true;
+    if (/AIzaSy[A-Za-z0-9_-]{20,}/.test(value)) return true;
+    return false;
+}
+
+function isDangerousAiOutput(text) {
+    const value = String(text || '');
+    return AI_DANGEROUS_PATTERNS.some((regex) => regex.test(value));
+}
+
+function isPromptInjectionAttempt(text) {
+    const value = String(text || '');
+    if (AI_INJECTION_PATTERNS.some((regex) => regex.test(value))) return true;
+    // Detect high ratio of non-printable chars (binary/obfuscation)
+    const nonPrintable = value.split('').filter((ch) => {
+        const code = ch.charCodeAt(0);
+        return code < 9 || (code > 13 && code < 32);
+    }).length;
+    if (value.length > 0 && (nonPrintable / value.length) > 0.1) return true;
+    // Detect large base64-like blobs
+    const base64Like = value.replace(/\s+/g, '');
+    if (base64Like.length > 300 && /^[A-Za-z0-9+/=]+$/.test(base64Like)) return true;
+    return false;
+}
+
+function isAllowedAiTopic(text) {
+    const value = String(text || '');
+    return AI_ALLOWED_TOPIC_PATTERNS.some((regex) => regex.test(value));
+}
+
+function sanitizeAiMessageInput(text) {
+    let value = String(text || '');
+    value = value.replace(/\u0000/g, '');
+    value = value.replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+    value = value.replace(/[^\S\r\n]{2,}/g, ' ');
+    return value.trim();
+}
+
+function safeAiAuditMeta(message, extra = {}) {
+    const preview = String(message || '').slice(0, 160);
+    const hash = nodeCrypto.createHash('sha256').update(String(message || '')).digest('hex');
+    return {
+        messagePreview: preview,
+        messageHash: hash,
+        messageLength: String(message || '').length,
+        ...extra
+    };
+}
+
+function getDailyQuotaKey(userId) {
+    const today = new Date().toISOString().slice(0, 10);
+    return { key: `ai:quota:${userId}:${today}`, date: today };
+}
+
+async function resolveAiDailyQuotaLimit(user) {
+    if (!Settings || typeof Settings.findByPk !== 'function') {
+        return Number.isInteger(user && user.aiDailyQuotaOverride) ? user.aiDailyQuotaOverride : AI_DAILY_QUOTA_DEFAULT_LIMIT;
+    }
+    try {
+        if (user && Number.isInteger(user.aiDailyQuotaOverride)) {
+            return user.aiDailyQuotaOverride;
+        }
+        const row = await Settings.findByPk('aiDailyQuota');
+        const parsed = Number.parseInt(row && row.value, 10);
+        if (Number.isInteger(parsed) && parsed > 0 && parsed < 10000) return parsed;
+    } catch {}
+    return AI_DAILY_QUOTA_DEFAULT_LIMIT;
+}
+
+async function checkDailyQuota(redisClient, userId, limit) {
+    const { key, date } = getDailyQuotaKey(userId);
+    if (redisClient) {
+        try {
+            const current = await redisClient.incr(key);
+            if (current === 1) {
+                await redisClient.expire(key, 60 * 60 * 24 * 2);
+            }
+            return current <= limit;
+        } catch {
+            // fall back to memory
+        }
+    }
+    const entry = AI_DAILY_QUOTA_CACHE.get(key);
+    if (!entry || entry.date !== date) {
+        AI_DAILY_QUOTA_CACHE.set(key, { date, count: 1 });
+        return true;
+    }
+    entry.count += 1;
+    return entry.count <= limit;
+}
+
+function checkAiRateLimit(key) {
+    if (!key) return { allowed: true };
+    const now = Date.now();
+    const entry = AI_CHAT_RATE_LIMIT_STATE.get(key);
+    if (!entry || (now - entry.ts) > AI_CHAT_RATE_LIMIT_WINDOW_MS) {
+        AI_CHAT_RATE_LIMIT_STATE.set(key, { ts: now, count: 1 });
+        return { allowed: true };
+    }
+    if (entry.count >= AI_CHAT_RATE_LIMIT_MAX) {
+        return { allowed: false, retryAfterMs: AI_CHAT_RATE_LIMIT_WINDOW_MS - (now - entry.ts) };
+    }
+    entry.count += 1;
+    return { allowed: true };
+}
+
+function checkAiIpRateLimit(key) {
+    if (!key) return { allowed: true };
+    const now = Date.now();
+    const entry = AI_CHAT_IP_RATE_LIMIT_STATE.get(key);
+    if (!entry || (now - entry.ts) > AI_CHAT_RATE_LIMIT_WINDOW_MS) {
+        AI_CHAT_IP_RATE_LIMIT_STATE.set(key, { ts: now, count: 1 });
+        return { allowed: true };
+    }
+    if (entry.count >= (AI_CHAT_RATE_LIMIT_MAX * 2)) {
+        return { allowed: false, retryAfterMs: AI_CHAT_RATE_LIMIT_WINDOW_MS - (now - entry.ts) };
+    }
+    entry.count += 1;
+    return { allowed: true };
+}
+
+async function getAiChatHistory(redisClient, key) {
+    if (!key) return [];
+    if (redisClient) {
+        try {
+            const raw = await redisClient.get(key);
+            if (raw) return JSON.parse(raw);
+        } catch {}
+    }
+    const entry = AI_CHAT_HISTORY_CACHE.get(key);
+    if (!entry) return [];
+    if ((Date.now() - entry.ts) > AI_CHAT_HISTORY_TTL_MS) {
+        AI_CHAT_HISTORY_CACHE.delete(key);
+        return [];
+    }
+    return entry.messages || [];
+}
+
+async function setAiChatHistory(redisClient, key, messages) {
+    if (!key) return;
+    const trimmed = Array.isArray(messages) ? messages.slice(-10) : [];
+    if (redisClient) {
+        try {
+            await redisClient.set(key, JSON.stringify(trimmed), { EX: Math.floor(AI_CHAT_HISTORY_TTL_MS / 1000) });
+            return;
+        } catch {}
+    }
+    AI_CHAT_HISTORY_CACHE.set(key, { ts: Date.now(), messages: trimmed });
 }
 
 function getMinecraftInspectCacheKey(serverId, player) {
@@ -8504,6 +8853,19 @@ app.get('/server/:containerId', requireAuth, async (req, res) => {
             : [];
         const commandMacros = (commandMacrosRaw || []).filter((macro) => canAccessMacroByVisibility(macro, access));
 
+        const aiAdminConfig = await getAiAdminConfig();
+        const aiProvider = getActiveAiProvider(aiAdminConfig);
+        const aiPolicy = normalizeAiPolicy(server.aiPolicy);
+        const aiUserEnabled = Boolean(req.session.user && req.session.user.experimentalAiEnabled);
+        const aiUsePermission = hasServerPermission(access, 'server.ai.use') || access.isOwner || access.isAdmin;
+        const aiChatEnabled = Boolean(aiAdminConfig.enabled && aiProvider && aiUserEnabled && aiPolicy.enabled && aiUsePermission);
+        let aiDisabledReason = '';
+        if (!aiAdminConfig.enabled) aiDisabledReason = 'AI disabled by admin';
+        else if (!aiProvider) aiDisabledReason = 'AI provider not configured';
+        else if (!aiUserEnabled) aiDisabledReason = 'Enable Experimental Features';
+        else if (!aiPolicy.enabled) aiDisabledReason = 'AI disabled for this server';
+        else if (!aiUsePermission) aiDisabledReason = 'No permission';
+
         res.render('server/console', {
             server,
             user: req.session.user,
@@ -8524,11 +8886,382 @@ app.get('/server/:containerId', requireAuth, async (req, res) => {
                 canDeop: hasServerPermission(access, 'minecraft.deop'),
                 canTempban: hasServerPermission(access, 'minecraft.tempban'),
                 canTeleport: hasServerPermission(access, 'minecraft.teleport')
+            },
+            aiChat: {
+                enabled: aiChatEnabled,
+                disabledReason: aiDisabledReason,
+                policy: aiPolicy
             }
         });
     } catch (err) {
         console.error("Error fetching console:", err);
         res.redirect('/?error=Error loading server console');
+    }
+});
+
+app.get('/server/:containerId/ai-manage', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [
+                { model: Allocation, as: 'allocation' },
+                { model: Image, as: 'image' }
+            ]
+        });
+        if (!server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(server, req.session.user);
+        const canManageAi = access.isOwner || access.isAdmin || hasServerPermission(access, 'server.ai.manage');
+        if (!canManageAi) return res.redirect('/server/no-permissions');
+
+        const aiAdminConfig = await getAiAdminConfig();
+        const aiPolicy = normalizeAiPolicy(server.aiPolicy);
+
+        return res.render('server/ai-manage', {
+            server,
+            user: req.session.user,
+            title: `AI Controls · ${server.name}`,
+            path: '/servers',
+            active: 'ai',
+            aiPolicy,
+            aiAdminEnabled: Boolean(aiAdminConfig.enabled)
+        });
+    } catch (err) {
+        console.error('Error loading AI manage page:', err);
+        return res.redirect('/server/notfound');
+    }
+});
+
+app.post('/server/:containerId/ai-manage', requireAuth, async (req, res) => {
+    try {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId }
+        });
+        if (!server) return res.redirect('/server/notfound');
+        const access = await resolveServerAccess(server, req.session.user);
+        const canManageAi = access.isOwner || access.isAdmin || hasServerPermission(access, 'server.ai.manage');
+        if (!canManageAi) return res.redirect('/server/no-permissions');
+
+        const aiPolicy = {
+            enabled: req.body.aiEnabled === 'true' || req.body.aiEnabled === 'on' || req.body.aiEnabled === '1',
+            allowStart: req.body.aiAllowStart === 'true' || req.body.aiAllowStart === 'on' || req.body.aiAllowStart === '1',
+            allowStop: req.body.aiAllowStop === 'true' || req.body.aiAllowStop === 'on' || req.body.aiAllowStop === '1',
+            allowRestart: req.body.aiAllowRestart === 'true' || req.body.aiAllowRestart === 'on' || req.body.aiAllowRestart === '1'
+        };
+        await server.update({ aiPolicy });
+        return res.redirect(`/server/${server.containerId}/ai-manage?success=` + encodeURIComponent('AI settings saved.'));
+    } catch (err) {
+        console.error('Error saving AI manage settings:', err);
+        return res.redirect(`/server/${req.params.containerId}/ai-manage?error=` + encodeURIComponent('Failed to save AI settings.'));
+    }
+});
+
+app.post('/server/:containerId/ai/chat', requireAuth, async (req, res) => {
+    try {
+        const rawMessage = String((req.body && req.body.message) || '');
+        const message = sanitizeAiMessageInput(rawMessage);
+        if (!message) {
+            return res.status(400).json({ success: false, error: 'Message is required.' });
+        }
+        if (message.length > AI_CHAT_MAX_INPUT_CHARS) {
+            await writeServerAuditSafe({
+                actorUserId: req.session.user.id,
+                serverId: server.id,
+                action: 'server.ai.chat.blocked',
+                ip: req.ip,
+                userAgent: req.headers['user-agent'],
+                metadata: safeAiAuditMeta(message, { reason: 'message_too_long' })
+            });
+            return res.status(400).json({ success: false, error: 'Message too long.' });
+        }
+        if (isDangerousAiInput(message)) {
+            await writeServerAuditSafe({
+                actorUserId: req.session.user.id,
+                serverId: server.id,
+                action: 'server.ai.chat.blocked',
+                ip: req.ip,
+                userAgent: req.headers['user-agent'],
+                metadata: safeAiAuditMeta(message, { reason: 'dangerous_input' })
+            });
+            return res.json({ success: true, reply: 'Request refused. That looks unsafe or destructive.' });
+        }
+        if (isSensitiveAiRequest(message)) {
+            await writeServerAuditSafe({
+                actorUserId: req.session.user.id,
+                serverId: server.id,
+                action: 'server.ai.chat.blocked',
+                ip: req.ip,
+                userAgent: req.headers['user-agent'],
+                metadata: safeAiAuditMeta(message, { reason: 'sensitive_request' })
+            });
+            return res.json({ success: true, reply: 'I cannot help with requests involving sensitive data (tokens, database, users, or secrets).' });
+        }
+        if (isPromptInjectionAttempt(message)) {
+            await writeServerAuditSafe({
+                actorUserId: req.session.user.id,
+                serverId: server.id,
+                action: 'server.ai.chat.blocked',
+                ip: req.ip,
+                userAgent: req.headers['user-agent'],
+                metadata: safeAiAuditMeta(message, { reason: 'prompt_injection' })
+            });
+            return res.json({ success: true, reply: 'Request refused. That looks like a prompt injection attempt.' });
+        }
+
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [
+                { model: Allocation, as: 'allocation' },
+                { model: Image, as: 'image' }
+            ]
+        });
+        if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.console')) {
+            return res.status(403).json({ success: false, error: 'No access.' });
+        }
+
+        const aiAdminConfig = await getAiAdminConfig();
+        if (!aiAdminConfig.enabled) {
+            return res.status(403).json({ success: false, error: 'AI is disabled by admin.' });
+        }
+        const provider = getActiveAiProvider(aiAdminConfig);
+        if (!provider) {
+            return res.status(400).json({ success: false, error: 'AI provider not configured.' });
+        }
+        if (!req.session.user.experimentalAiEnabled) {
+            return res.status(403).json({ success: false, error: 'Enable Experimental Features first.' });
+        }
+
+        const aiPolicy = normalizeAiPolicy(server.aiPolicy);
+        if (!aiPolicy.enabled) {
+            return res.status(403).json({ success: false, error: 'AI is disabled for this server.' });
+        }
+
+        const canUseAi = access.isOwner || access.isAdmin || hasServerPermission(access, 'server.ai.use');
+        if (!canUseAi) {
+            return res.status(403).json({ success: false, error: 'No permission to use AI.' });
+        }
+
+        const rateKey = `ai:rate:${server.id}:${req.session.user.id}`;
+        const rate = checkAiRateLimit(rateKey);
+        if (!rate.allowed) {
+            await writeServerAuditSafe({
+                actorUserId: req.session.user.id,
+                serverId: server.id,
+                action: 'server.ai.chat.blocked',
+                ip: req.ip,
+                userAgent: req.headers['user-agent'],
+                metadata: safeAiAuditMeta(message, { reason: 'rate_limited' })
+            });
+            const retrySeconds = Math.max(1, Math.ceil((rate.retryAfterMs || 1000) / 1000));
+            return res.status(429).json({ success: false, error: `Rate limit exceeded. Try again in ${retrySeconds}s.` });
+        }
+        const ipKey = `ai:rate:ip:${req.ip || 'unknown'}`;
+        const ipRate = checkAiIpRateLimit(ipKey);
+        if (!ipRate.allowed) {
+            await writeServerAuditSafe({
+                actorUserId: req.session.user.id,
+                serverId: server.id,
+                action: 'server.ai.chat.blocked',
+                ip: req.ip,
+                userAgent: req.headers['user-agent'],
+                metadata: safeAiAuditMeta(message, { reason: 'ip_rate_limited' })
+            });
+            const retrySeconds = Math.max(1, Math.ceil((ipRate.retryAfterMs || 1000) / 1000));
+            return res.status(429).json({ success: false, error: `Rate limit exceeded. Try again in ${retrySeconds}s.` });
+        }
+
+        if (!requestedAction && !isAllowedAiTopic(message)) {
+            await writeServerAuditSafe({
+                actorUserId: req.session.user.id,
+                serverId: server.id,
+                action: 'server.ai.chat.blocked',
+                ip: req.ip,
+                userAgent: req.headers['user-agent'],
+                metadata: safeAiAuditMeta(message, { reason: 'topic_not_allowed' })
+            });
+            return res.json({ success: true, reply: 'I can only help with server/console topics and safe actions.' });
+        }
+
+        const quotaLimit = await resolveAiDailyQuotaLimit(req.session.user);
+        const quotaOk = await checkDailyQuota(getRuntimeRedisClient(), req.session.user.id, quotaLimit);
+        if (!quotaOk) {
+            await writeServerAuditSafe({
+                actorUserId: req.session.user.id,
+                serverId: server.id,
+                action: 'server.ai.chat.blocked',
+                ip: req.ip,
+                userAgent: req.headers['user-agent'],
+                metadata: safeAiAuditMeta(message, { reason: 'daily_quota', limit: quotaLimit })
+            });
+            return res.status(429).json({ success: false, error: 'Daily AI quota reached.' });
+        }
+
+        const requestedAction = parseAiAction(message);
+        if (requestedAction) {
+            const allowedAction = (
+                (requestedAction === 'start' && aiPolicy.allowStart) ||
+                (requestedAction === 'stop' && aiPolicy.allowStop) ||
+                (requestedAction === 'restart' && aiPolicy.allowRestart)
+            );
+            if (!allowedAction) {
+                await writeServerAuditSafe({
+                    actorUserId: req.session.user.id,
+                    serverId: server.id,
+                    action: 'server.ai.chat.blocked',
+                    ip: req.ip,
+                    userAgent: req.headers['user-agent'],
+                    metadata: safeAiAuditMeta(message, { reason: 'action_not_allowed', action: requestedAction })
+                });
+                return res.json({ success: true, reply: 'Action not allowed by server AI policy.' });
+            }
+            if (!hasServerPermission(access, 'server.power')) {
+                await writeServerAuditSafe({
+                    actorUserId: req.session.user.id,
+                    serverId: server.id,
+                    action: 'server.ai.chat.blocked',
+                    ip: req.ip,
+                    userAgent: req.headers['user-agent'],
+                    metadata: safeAiAuditMeta(message, { reason: 'missing_power_permission', action: requestedAction })
+                });
+                return res.status(403).json({ success: false, error: 'You do not have power permissions.' });
+            }
+            const actionResult = await dispatchServerPowerSignal(server, requestedAction);
+            if (!actionResult.success) {
+                await writeServerAuditSafe({
+                    actorUserId: req.session.user.id,
+                    serverId: server.id,
+                    action: 'server.ai.chat.failed',
+                    ip: req.ip,
+                    userAgent: req.headers['user-agent'],
+                    metadata: safeAiAuditMeta(message, { reason: 'dispatch_failed', action: requestedAction, error: actionResult.error })
+                });
+                return res.status(400).json({ success: false, error: actionResult.error || 'Failed to dispatch action.' });
+            }
+            await writeServerAuditSafe({
+                actorUserId: req.session.user.id,
+                serverId: server.id,
+                action: 'server.ai.chat.action',
+                ip: req.ip,
+                userAgent: req.headers['user-agent'],
+                metadata: safeAiAuditMeta(message, { action: requestedAction })
+            });
+            return res.json({ success: true, reply: `Queued ${requestedAction} action.` });
+        }
+
+        const redisClient = getRuntimeRedisClient();
+        const historyKey = `ai:chat:${server.id}:${req.session.user.id}`;
+        const history = await getAiChatHistory(redisClient, historyKey);
+        const systemPrompt = [
+            'You are Rocky, the server assistant for this panel.',
+            'You can answer questions about the server, but you may only trigger start/stop/restart when allowed.',
+            'Never provide destructive commands or instructions. Refuse unsafe requests.',
+            getAgentRulesText()
+        ].filter(Boolean).join('\n');
+
+        const messages = [
+            { role: 'system', content: systemPrompt },
+            ...history,
+            { role: 'user', content: message }
+        ];
+
+        const providerCandidates = [];
+        if (provider) providerCandidates.push(provider);
+        if (aiAdminConfig && Array.isArray(aiAdminConfig.providers)) {
+            aiAdminConfig.providers.forEach((entry) => {
+                if (!entry || entry.id === provider.id) return;
+                if (entry.enabled && entry.apiKey && entry.baseUrl && entry.model) {
+                    providerCandidates.push(entry);
+                }
+            });
+        }
+
+        let reply = '';
+        let usedProvider = provider;
+        let lastError = null;
+        for (const candidate of providerCandidates) {
+            const chatUrl = buildAiChatUrl(candidate.baseUrl);
+            const headers = {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${candidate.apiKey}`
+            };
+            if (candidate.id === 'openrouter') {
+                headers['HTTP-Referer'] = APP_URL || 'https://rocky.local';
+                headers['X-Title'] = (res.locals.settings && res.locals.settings.brandName) || 'Rocky Panel';
+            }
+            try {
+                const aiResponse = await axios.post(chatUrl, {
+                    model: candidate.model,
+                    messages,
+                    temperature: 0.2,
+                    max_tokens: 400
+                }, {
+                    headers,
+                    timeout: 20000
+                });
+                reply = aiResponse && aiResponse.data && aiResponse.data.choices && aiResponse.data.choices[0]
+                    ? String(aiResponse.data.choices[0].message && aiResponse.data.choices[0].message.content || '').trim()
+                    : '';
+                if (reply) {
+                    usedProvider = candidate;
+                    break;
+                }
+            } catch (err) {
+                lastError = err;
+                continue;
+            }
+        }
+        if (reply.length > AI_CHAT_MAX_OUTPUT_CHARS) {
+            reply = reply.slice(0, AI_CHAT_MAX_OUTPUT_CHARS).trim();
+        }
+        if (isDangerousAiOutput(reply) || isSensitiveAiOutput(reply)) {
+            await writeServerAuditSafe({
+                actorUserId: req.session.user.id,
+                serverId: server.id,
+                action: 'server.ai.chat.blocked',
+                ip: req.ip,
+                userAgent: req.headers['user-agent'],
+                metadata: safeAiAuditMeta(message, { reason: 'unsafe_output' })
+            });
+            return res.json({ success: true, reply: 'Response withheld for safety.' });
+        }
+        if (!reply) {
+            await writeServerAuditSafe({
+                actorUserId: req.session.user.id,
+                serverId: server.id,
+                action: 'server.ai.chat.failed',
+                ip: req.ip,
+                userAgent: req.headers['user-agent'],
+                metadata: safeAiAuditMeta(message, { reason: 'empty_response', error: lastError ? String(lastError.message || lastError) : '' })
+            });
+            return res.status(502).json({ success: false, error: 'AI returned an empty response.' });
+        }
+
+        const nextHistory = [...history, { role: 'user', content: message }, { role: 'assistant', content: reply }].slice(-10);
+        await setAiChatHistory(redisClient, historyKey, nextHistory);
+        await writeServerAuditSafe({
+            actorUserId: req.session.user.id,
+            serverId: server.id,
+            action: 'server.ai.chat.success',
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
+            metadata: safeAiAuditMeta(message, { provider: usedProvider.id, model: usedProvider.model })
+        });
+        return res.json({ success: true, reply });
+    } catch (err) {
+        console.error('AI chat error:', err);
+        try {
+            const serverId = req.params.containerId ? String(req.params.containerId) : null;
+            await writeServerAuditSafe({
+                actorUserId: req.session && req.session.user ? req.session.user.id : null,
+                serverId: serverId,
+                action: 'server.ai.chat.failed',
+                ip: req.ip,
+                userAgent: req.headers['user-agent'],
+                metadata: { error: err && err.message ? err.message : String(err || 'unknown') }
+            });
+        } catch {}
+        return res.status(500).json({ success: false, error: 'AI request failed.' });
     }
 });
 

@@ -28,6 +28,38 @@ const getGoogleTokenSettingKey = (userId) => {
 };
 const LANG_DIRECTORY = nodePath.join(process.cwd(), 'public', 'lang');
 const MAX_LANGUAGE_JSON_SIZE_BYTES = 2 * 1024 * 1024;
+const AI_PROVIDER_PRESETS = [
+    {
+        id: 'openrouter',
+        name: 'OpenRouter',
+        baseUrl: 'https://openrouter.ai/api/v1/chat/completions',
+        defaultModel: 'openrouter/auto'
+    },
+    {
+        id: 'groq',
+        name: 'Groq',
+        baseUrl: 'https://api.groq.com/openai/v1/chat/completions',
+        defaultModel: 'llama-3.1-70b-versatile'
+    },
+    {
+        id: 'openai',
+        name: 'OpenAI',
+        baseUrl: 'https://api.openai.com/v1/chat/completions',
+        defaultModel: 'gpt-4o-mini'
+    },
+    {
+        id: 'google',
+        name: 'Google Gemini (OpenAI-compatible)',
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+        defaultModel: 'gemini-1.5-flash'
+    },
+    {
+        id: 'custom',
+        name: 'Custom (OpenAI-compatible)',
+        baseUrl: '',
+        defaultModel: ''
+    }
+];
 
 const toRedisBoolString = (value) => (
     value === true || value === 'true' || value === '1' || value === 1 || value === 'on'
@@ -39,6 +71,43 @@ const toRedisInt = (value, fallback, min, max) => {
     const parsed = Number.parseInt(String(value === undefined || value === null ? '' : value).trim(), 10);
     if (!Number.isInteger(parsed)) return fallback;
     return Math.min(max, Math.max(min, parsed));
+};
+
+const parseToggle = (value) => (
+    value === true || value === 'true' || value === '1' || value === 1 || value === 'on' || value === 'yes'
+);
+
+const normalizeAiConfig = (raw) => {
+    const parsed = raw && typeof raw === 'object' ? raw : {};
+    const providersMap = new Map();
+    (parsed.providers || []).forEach((entry) => {
+        if (!entry || !entry.id) return;
+        providersMap.set(String(entry.id), entry);
+    });
+    const providers = AI_PROVIDER_PRESETS.map((preset) => {
+        const saved = providersMap.get(preset.id) || {};
+        return {
+            id: preset.id,
+            name: preset.name,
+            baseUrl: String(saved.baseUrl || preset.baseUrl || '').trim(),
+            apiKey: String(saved.apiKey || '').trim(),
+            model: String(saved.model || preset.defaultModel || '').trim(),
+            enabled: Boolean(saved.enabled)
+        };
+    });
+    return {
+        enabled: Boolean(parsed.enabled),
+        defaultProviderId: String(parsed.defaultProviderId || ''),
+        providers
+    };
+};
+
+const clampAiDailyQuota = (value) => {
+    const parsed = Number.parseInt(String(value || '').trim(), 10);
+    if (!Number.isInteger(parsed)) return 100;
+    if (parsed < 10) return 10;
+    if (parsed > 10000) return 10000;
+    return parsed;
 };
 
 const sanitizeLanguageCode = (value) => {
@@ -1083,6 +1152,73 @@ app.post('/admin/redis/test', requireAuth, requireAdmin, async (req, res) => {
     }
 });
 
+app.get('/admin/ai-agents', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const row = await Settings.findByPk('aiAgentsConfig');
+        const parsed = row && row.value ? normalizeAiConfig(JSON.parse(row.value)) : normalizeAiConfig({});
+        const quotaRow = await Settings.findByPk('aiDailyQuota');
+        const quotaValue = clampAiDailyQuota(quotaRow && quotaRow.value);
+        return res.render('admin/ai-agents', {
+            user: req.session.user,
+            title: 'AI Agents',
+            path: '/admin/ai-agents',
+            config: parsed,
+            dailyQuota: quotaValue,
+            providers: parsed.providers,
+            success: req.query.success || null,
+            error: req.query.error || null
+        });
+    } catch (err) {
+        console.error('Failed to load AI agents settings:', err);
+        return res.render('admin/ai-agents', {
+            user: req.session.user,
+            title: 'AI Agents',
+            path: '/admin/ai-agents',
+            config: normalizeAiConfig({}),
+            dailyQuota: 100,
+            providers: normalizeAiConfig({}).providers,
+            success: null,
+            error: 'Failed to load AI agents settings.'
+        });
+    }
+});
+
+app.post('/admin/ai-agents', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const enabled = parseToggle(req.body && req.body.aiEnabled);
+        const defaultProviderId = String((req.body && req.body.defaultProviderId) || '').trim();
+        const dailyQuota = clampAiDailyQuota(req.body && req.body.dailyQuota);
+        const providers = AI_PROVIDER_PRESETS.map((preset) => {
+            const id = preset.id;
+            return {
+                id,
+                name: preset.name,
+                baseUrl: String((req.body && req.body[`provider_${id}_baseUrl`]) || preset.baseUrl || '').trim(),
+                apiKey: String((req.body && req.body[`provider_${id}_apiKey`]) || '').trim(),
+                model: String((req.body && req.body[`provider_${id}_model`]) || preset.defaultModel || '').trim(),
+                enabled: parseToggle(req.body && req.body[`provider_${id}_enabled`])
+            };
+        });
+        const payload = {
+            enabled,
+            defaultProviderId,
+            providers
+        };
+        await Settings.upsert({
+            key: 'aiAgentsConfig',
+            value: JSON.stringify(payload)
+        });
+        await Settings.upsert({
+            key: 'aiDailyQuota',
+            value: String(dailyQuota)
+        });
+        return res.redirect('/admin/ai-agents?success=' + encodeURIComponent('AI agent settings saved.'));
+    } catch (err) {
+        console.error('Failed to save AI agent settings:', err);
+        return res.redirect('/admin/ai-agents?error=' + encodeURIComponent('Failed to save AI agent settings.'));
+    }
+});
+
 // Admin Languages
 app.get('/admin/lang', requireAuth, requireAdmin, async (req, res) => {
     try {
@@ -1270,12 +1406,42 @@ app.post('/admin/locations/delete/:id', requireAuth, requireAdmin, async (req, r
 // Admin Users
 app.get('/admin/users', requireAuth, requireAdmin, async (req, res) => {
     try {
+        const quotaRow = await Settings.findByPk('aiDailyQuota');
+        const defaultQuota = clampAiDailyQuota(quotaRow && quotaRow.value);
         const users = await User.findAll({
             include: [{ model: LinkedAccount, as: 'linkedAccounts' }]
         });
+        const today = new Date().toISOString().slice(0, 10);
+        const quotaKeys = users.map((u) => `ai:quota:${u.id}:${today}`);
+        let quotaMap = new Map();
+        let redisClient = null;
+        try {
+            if (typeof getRedisClient === 'function') {
+                redisClient = getRedisClient();
+            }
+        } catch {}
+        if (redisClient && redisClient.isReady && quotaKeys.length > 0) {
+            try {
+                const values = await redisClient.mGet(quotaKeys);
+                values.forEach((val, idx) => {
+                    const count = Number.parseInt(val, 10);
+                    if (Number.isInteger(count)) quotaMap.set(quotaKeys[idx], count);
+                });
+            } catch {}
+        }
+        const decoratedUsers = users.map((u) => {
+            const override = u.aiDailyQuotaOverride;
+            const limit = Number.isInteger(override) ? override : defaultQuota;
+            const used = quotaMap.get(`ai:quota:${u.id}:${today}`) || 0;
+            return {
+                ...u.toJSON(),
+                aiQuotaOverride: Number.isInteger(override) ? override : null,
+                aiQuotaRemaining: Math.max(0, limit - used)
+            };
+        });
         res.render('admin/users', {
             user: req.session.user,
-            users,
+            users: decoratedUsers,
             md5, // Pass md5 for gravatar hashing in the view
             path: '/admin/users',
             success: req.query.success || null,
@@ -1409,6 +1575,49 @@ app.post('/admin/users/delete/:id', requireAuth, requireAdmin, async (req, res) 
     } catch (error) {
         console.error("Error deleting user:", error);
         res.redirect('/admin/users?error=Failed to delete user.');
+    }
+});
+
+app.post('/admin/users/:id/ai-quota', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const userId = Number.parseInt(req.params.id, 10);
+        if (!Number.isInteger(userId)) return res.redirect('/admin/users?error=Invalid user.');
+        const targetUser = await User.findByPk(userId);
+        if (!targetUser) return res.redirect('/admin/users?error=User not found.');
+        const raw = String(req.body && req.body.dailyQuota || '').trim();
+        if (raw === '') {
+            await targetUser.update({ aiDailyQuotaOverride: null });
+            return res.redirect('/admin/users?success=AI quota override cleared.');
+        }
+        const quota = clampAiDailyQuota(raw);
+        await targetUser.update({ aiDailyQuotaOverride: quota });
+        return res.redirect('/admin/users?success=AI quota updated.');
+    } catch (err) {
+        console.error('Failed to update AI quota:', err);
+        return res.redirect('/admin/users?error=Failed to update AI quota.');
+    }
+});
+
+app.post('/admin/users/:id/ai-quota/reset', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const userId = Number.parseInt(req.params.id, 10);
+        if (!Number.isInteger(userId)) return res.redirect('/admin/users?error=Invalid user.');
+        const targetUser = await User.findByPk(userId);
+        if (!targetUser) return res.redirect('/admin/users?error=User not found.');
+        const today = new Date().toISOString().slice(0, 10);
+        const key = `ai:quota:${userId}:${today}`;
+        try {
+            if (typeof getRedisClient === 'function') {
+                const client = getRedisClient();
+                if (client && client.isReady) {
+                    await client.del(key);
+                }
+            }
+        } catch {}
+        return res.redirect('/admin/users?success=AI quota reset.');
+    } catch (err) {
+        console.error('Failed to reset AI quota:', err);
+        return res.redirect('/admin/users?error=Failed to reset AI quota.');
     }
 });
 

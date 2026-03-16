@@ -51,6 +51,48 @@
                 --accent-yellow: #f59e0b;
             }
 
+            .rocky-ai-messages {
+                height: 320px;
+                overflow-y: auto;
+                background: #0c0e13;
+                border: 1px solid rgba(255,255,255,0.08);
+                border-radius: 12px;
+                padding: 12px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .rocky-ai-message {
+                padding: 10px 12px;
+                border-radius: 10px;
+                font-size: 0.9rem;
+                line-height: 1.4;
+            }
+
+            .rocky-ai-message.user {
+                background: rgba(59, 130, 246, 0.18);
+                border: 1px solid rgba(59, 130, 246, 0.4);
+                color: #e5f1ff;
+                align-self: flex-end;
+                max-width: 85%;
+            }
+
+            .rocky-ai-message.assistant {
+                background: rgba(16, 185, 129, 0.12);
+                border: 1px solid rgba(16, 185, 129, 0.35);
+                color: #e8fff4;
+                align-self: flex-start;
+                max-width: 85%;
+            }
+
+            .rocky-ai-message.system {
+                background: rgba(245, 158, 11, 0.12);
+                border: 1px solid rgba(245, 158, 11, 0.35);
+                color: #fff4dc;
+                align-self: stretch;
+            }
+
             body {
                 background-color: var(--bg-dark);
                 color: var(--text-primary);
@@ -693,6 +735,12 @@ const consoleShortcuts = [
                                     </button>
                                     <button class="btn btn-outline-secondary btn-sm" title="Keyboard shortcuts" data-shortcuts-modal="consoleShortcutsModal">
                                         <i class="bi bi-keyboard"></i>
+                                    </button>
+                                    <button id="btnAiChat" class="btn btn-outline-info btn-sm"
+                                        title="<%= aiChat && aiChat.enabled ? 'Open Rocky AI' : (aiChat && aiChat.disabledReason ? aiChat.disabledReason : 'AI unavailable') %>"
+                                        data-bs-toggle="modal" data-bs-target="#rockyAiModal"
+                                        <%= aiChat && aiChat.enabled ? '' : 'disabled' %>>
+                                        <i class="bi bi-robot"></i>
                                     </button>
                                 </div>
                                 <div id="powerActions" class="d-flex gap-2">
@@ -1733,6 +1781,54 @@ const consoleShortcuts = [
             window.addEventListener('beforeunload', cleanupConsoleRuntime);
             document.addEventListener('turbo:before-cache', cleanupConsoleRuntime);
         </script>
+        <script>
+            (() => {
+                const aiEnabled = <%- JSON.stringify(aiChat && aiChat.enabled) %>;
+                if (!aiEnabled) return;
+
+                const serverId = <%- JSON.stringify(server.containerId) %>;
+                const form = document.getElementById('rockyAiForm');
+                const input = document.getElementById('rockyAiInput');
+                const messages = document.getElementById('rockyAiMessages');
+
+                const appendMessage = (role, text) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = `rocky-ai-message ${role}`;
+                    wrapper.textContent = text;
+                    messages.appendChild(wrapper);
+                    messages.scrollTop = messages.scrollHeight;
+                };
+
+                form?.addEventListener('submit', async (event) => {
+                    event.preventDefault();
+                    const content = input.value.trim();
+                    if (!content) return;
+                    appendMessage('user', content);
+                    input.value = '';
+                    input.disabled = true;
+
+                    try {
+                        const resp = await fetch(`/server/${serverId}/ai/chat`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ message: content })
+                        });
+                        const data = await resp.json();
+                        if (!resp.ok || !data || !data.success) {
+                            appendMessage('system', data && data.error ? data.error : 'AI request failed.');
+                        } else {
+                            appendMessage('assistant', data.reply || 'No response.');
+                        }
+                    } catch (err) {
+                        appendMessage('system', 'AI request failed.');
+                    } finally {
+                        input.disabled = false;
+                        input.focus();
+                    }
+                });
+            })();
+        </script>
+        <%- include('../partials/modal-chat') %>
         <%- include('../partials/shortcuts-modal', { shortcutsId: 'consoleShortcutsModal', shortcutsTitle: 'Console Shortcuts', shortcutsList: consoleShortcuts }) %>
 </body>
 

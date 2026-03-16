@@ -41,6 +41,36 @@ function registerAccountRoutes({
         if (customTheme) req.session.user.uiCustomTheme = normalizeUserCustomThemeConfig(customTheme);
     };
 
+    const getAiAdminConfig = async () => {
+        if (!Settings || typeof Settings.findByPk !== 'function') {
+            return { enabled: false, providers: [], defaultProviderId: '' };
+        }
+        const row = await Settings.findByPk('aiAgentsConfig');
+        if (!row || !row.value) return { enabled: false, providers: [], defaultProviderId: '' };
+        try {
+            const parsed = JSON.parse(row.value);
+            if (!parsed || typeof parsed !== 'object') return { enabled: false, providers: [], defaultProviderId: '' };
+            return {
+                enabled: String(parsed.enabled || 'false').toLowerCase() === 'true',
+                providers: Array.isArray(parsed.providers) ? parsed.providers : [],
+                defaultProviderId: String(parsed.defaultProviderId || '')
+            };
+        } catch {
+            return { enabled: false, providers: [], defaultProviderId: '' };
+        }
+    };
+
+    const resolveAiDailyQuotaLimit = async (user) => {
+        if (user && Number.isInteger(user.aiDailyQuotaOverride)) return user.aiDailyQuotaOverride;
+        if (!Settings || typeof Settings.findByPk !== 'function') return 100;
+        try {
+            const row = await Settings.findByPk('aiDailyQuota');
+            const parsed = Number.parseInt(row && row.value, 10);
+            if (Number.isInteger(parsed) && parsed > 0 && parsed < 10000) return parsed;
+        } catch {}
+        return 100;
+    };
+
     const applyPresetThemeForUser = async (user, rawTheme) => {
         const nextTheme = normalizeThemeId(rawTheme);
         if (rawTheme && !allowedThemeIds.has(String(rawTheme).trim().toLowerCase())) {
@@ -154,6 +184,67 @@ function registerAccountRoutes({
         } catch (err) {
             console.error('Failed to load themes page:', err);
             return res.redirect('/account?error=' + encodeURIComponent('Failed to load themes.'));
+        }
+    });
+
+    app.get('/experimental/ai', requireAuth, async (req, res) => {
+        try {
+            const user = await User.findByPk(req.session.user.id);
+            if (!user) return res.redirect('/login');
+            const aiAdminConfig = await getAiAdminConfig();
+            const providerReady = Array.isArray(aiAdminConfig.providers)
+                ? aiAdminConfig.providers.some((p) => p && p.enabled && p.apiKey)
+                : false;
+            const limit = await resolveAiDailyQuotaLimit(user);
+            const today = new Date().toISOString().slice(0, 10);
+            let used = 0;
+            try {
+                if (typeof getRedisClient === 'function') {
+                    const redisClient = getRedisClient();
+                    if (redisClient && redisClient.isReady) {
+                        const raw = await redisClient.get(`ai:quota:${user.id}:${today}`);
+                        const parsed = Number.parseInt(raw, 10);
+                        if (Number.isInteger(parsed)) used = parsed;
+                    }
+                }
+            } catch {}
+            return res.render('experimental/ai', {
+                user: user.toJSON(),
+                title: 'Experimental Features',
+                path: '/experimental/ai',
+                aiAdminEnabled: Boolean(aiAdminConfig.enabled),
+                aiProviderReady: providerReady,
+                quotaUsed: used,
+                quotaLimit: limit,
+                success: req.query.success || null,
+                error: req.query.error || null
+            });
+        } catch (err) {
+            console.error('Failed to load experimental AI page:', err);
+            return res.redirect('/account?error=' + encodeURIComponent('Failed to load experimental features.'));
+        }
+    });
+
+    app.post('/experimental/ai', requireAuth, async (req, res) => {
+        try {
+            const user = await User.findByPk(req.session.user.id);
+            if (!user) return res.redirect('/login');
+            const aiAdminConfig = await getAiAdminConfig();
+            const providerReady = Array.isArray(aiAdminConfig.providers)
+                ? aiAdminConfig.providers.some((p) => p && p.enabled && p.apiKey)
+                : false;
+            if (!aiAdminConfig.enabled || !providerReady) {
+                return res.redirect('/experimental/ai?error=' + encodeURIComponent('AI agents are not enabled by admin.'));
+            }
+            const enabled = parseToggle(req.body && req.body.enabled);
+            await user.update({ experimentalAiEnabled: enabled });
+            if (req.session && req.session.user) {
+                req.session.user.experimentalAiEnabled = enabled;
+            }
+            return res.redirect('/experimental/ai?success=' + encodeURIComponent('Experimental AI setting updated.'));
+        } catch (err) {
+            console.error('Failed to update experimental AI setting:', err);
+            return res.redirect('/experimental/ai?error=' + encodeURIComponent('Failed to update setting.'));
         }
     });
 

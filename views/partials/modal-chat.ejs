@@ -1,0 +1,24 @@
+<div class="modal fade" id="rockyAiModal" tabindex="-1" aria-labelledby="rockyAiLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content" style="background:#111319; border:1px solid rgba(255,255,255,0.08);">
+            <div class="modal-header border-0">
+                <h5 class="modal-title text-light" id="rockyAiLabel"><i class="bi bi-robot me-2"></i>Rocky AI</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-muted small mb-3">
+                    Experimental feature. Rocky can answer questions and (if allowed) start/stop/restart the server.
+                </div>
+                <div id="rockyAiMessages" class="rocky-ai-messages">
+                    <div class="rocky-ai-message system">Ask me about server status, configs, or request a safe action.</div>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <form id="rockyAiForm" class="w-100 d-flex gap-2">
+                    <input type="text" id="rockyAiInput" class="form-control" placeholder="Type a message..." autocomplete="off">
+                    <button class="btn btn-primary" type="submit">Send</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
