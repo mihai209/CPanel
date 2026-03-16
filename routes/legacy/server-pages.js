@@ -9071,6 +9071,7 @@ app.post('/server/:containerId/ai/chat', requireAuth, async (req, res) => {
             return res.status(429).json({ success: false, error: `Rate limit exceeded. Try again in ${retrySeconds}s.` });
         }
 
+        const requestedAction = parseAiAction(message);
         if (!requestedAction && !isAllowedAiTopic(message)) {
             await writeServerAuditSafe({
                 actorUserId: req.session.user.id,
@@ -9097,7 +9098,6 @@ app.post('/server/:containerId/ai/chat', requireAuth, async (req, res) => {
             return res.status(429).json({ success: false, error: 'Daily AI quota reached.' });
         }
 
-        const requestedAction = parseAiAction(message);
         if (requestedAction) {
             const allowedAction = (
                 (requestedAction === 'start' && aiPolicy.allowStart) ||
