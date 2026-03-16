@@ -75,7 +75,7 @@
                                                 value="<%= provider.baseUrl %>" placeholder="https://.../chat/completions">
                                         </div>
                                         <div class="col-12 col-md-3">
-                                            <label class="form-label text-light">Model</label>
+                                            <label class="form-label text-light">Model (comma‑separated fallback)</label>
                                             <input type="text" class="form-control" name="provider_<%= provider.id %>_model"
                                                 value="<%= provider.model %>">
                                         </div>
@@ -129,6 +129,7 @@
                         <li><strong>OpenAI</strong>: Use key + model (ex: <code>gpt-4o-mini</code>).</li>
                         <li><strong>Google Gemini</strong>: Use OpenAI‑compatible endpoint. Model ex: <code>gemini-1.5-flash</code>.</li>
                         <li><strong>Custom</strong>: Only OpenAI‑compatible endpoints supported.</li>
+                        <li><strong>Fallback models</strong>: You can provide multiple models separated by commas (first available wins).</li>
                     </ul>
                 </div>
 
