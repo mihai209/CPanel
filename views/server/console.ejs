@@ -1790,6 +1790,7 @@ const consoleShortcuts = [
                 const form = document.getElementById('rockyAiForm');
                 const input = document.getElementById('rockyAiInput');
                 const messages = document.getElementById('rockyAiMessages');
+                const sendButton = document.getElementById('rockyAiSend');
 
                 const appendMessage = (role, text) => {
                     const wrapper = document.createElement('div');
@@ -1799,13 +1800,13 @@ const consoleShortcuts = [
                     messages.scrollTop = messages.scrollHeight;
                 };
 
-                form?.addEventListener('submit', async (event) => {
-                    event.preventDefault();
+                const sendMessage = async () => {
                     const content = input.value.trim();
                     if (!content) return;
                     appendMessage('user', content);
                     input.value = '';
                     input.disabled = true;
+                    if (sendButton) sendButton.disabled = true;
 
                     try {
                         const resp = await fetch(`/server/${serverId}/ai/chat`, {
@@ -1823,8 +1824,19 @@ const consoleShortcuts = [
                         appendMessage('system', 'AI request failed.');
                     } finally {
                         input.disabled = false;
+                        if (sendButton) sendButton.disabled = false;
                         input.focus();
                     }
+                };
+
+                form?.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    sendMessage();
+                });
+
+                sendButton?.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    sendMessage();
                 });
             })();
         </script>
