@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Installer <%= server.name %> | <%= settings.brandName.toUpperCase() %></title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --bg: #0f0f12;
+            --panel: #121216;
+            --border: #2d2d35;
+            --text: #e1e1e6;
+            --muted: #8b8b9a;
+            --accent: #3b82f6;
+            --warn: #f59e0b;
+        }
+        body { background:var(--bg); color:var(--text); margin:0; font-family:Inter,system-ui,-apple-system,sans-serif; height:100vh; overflow:hidden; }
+        .wrapper{display:flex;height:100vh}
+        .sidebar{width:260px;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto}
+        .sidebar.collapsed{margin-left:-260px}
+        .content{flex:1;display:flex;flex-direction:column;min-width:0}
+        .top{background:var(--panel);border-bottom:1px solid var(--border);padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem}
+        .scroll{flex:1;overflow:auto;padding:1rem}
+        .cardx{background:var(--panel);border:1px solid var(--border);border-radius:.9rem}
+        .btn-icon{background:transparent;border:0;color:var(--muted);font-size:1.2rem}
+        .form-control,.form-select{background:rgba(255,255,255,0.02);border:1px solid var(--border);color:var(--text)}
+        .form-control:focus,.form-select:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(59,130,246,0.2)}
+        .form-select option{background:#0b0b10;color:var(--text)}
+        .badge-warn{background:rgba(245,158,11,0.15);color:#fcd34d;border:1px solid rgba(245,158,11,0.3)}
+        .info-box{border:1px solid rgba(245,158,11,0.35);background:rgba(245,158,11,0.08);padding:1rem;border-radius:.75rem}
+        .install-preview{font-size:.9rem;color:var(--muted)}
+        .install-preview code{color:#fbbf24}
+    </style>
+    <link rel="stylesheet" href="/css/mobile-layout.css">
+</head>
+<body>
+<%- include('../partials/error-modal') %>
+<div class="wrapper">
+    <nav class="sidebar" id="sidebar"><div class="p-3"><%- include('../partials/server-sidebar', { server, active: 'mcinstaller' }) %></div></nav>
+    <main class="content">
+        <header class="top">
+            <button class="btn-icon" id="sidebarToggle"><i class="bi bi-list"></i></button>
+            <h1 class="h5 mb-0">Minecraft Installer / <span class="text-secondary"><%= server.name %></span></h1>
+        </header>
+        <section class="scroll">
+            <% if (installerMessage) { %>
+                <div class="alert <%= installerMessage.type === 'success' ? 'alert-success' : 'alert-danger' %>">
+                    <%= installerMessage.text %>
+                </div>
+            <% } %>
+            <div class="cardx p-3 mb-3">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div>
+                        <div class="fw-semibold">Version Installer (Arclight)</div>
+                        <div class="small text-secondary">Install a specific Arclight build directly to your server jar.</div>
+                    </div>
+                    <span class="badge badge-warn">Early Development</span>
+                </div>
+                <div class="info-box mt-3 small">
+                    <strong>Attention:</strong> this installer is in early development and can cause errors. Be sure to take a backup before proceeding.
+                </div>
+            </div>
+
+            <div class="cardx p-3">
+                <form method="POST" action="/server/<%= server.containerId %>/minecraft/installer" class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label text-uppercase small text-secondary">Loader</label>
+                        <select id="installerLoader" name="loader" class="form-select" required></select>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label text-uppercase small text-secondary">Minecraft Version</label>
+                        <select id="installerVersion" name="version" class="form-select" required></select>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label text-uppercase small text-secondary">Build</label>
+                        <select id="installerBuild" name="build" class="form-select" required></select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label text-uppercase small text-secondary">Target Jar</label>
+                        <input type="text" class="form-control" name="targetFile" value="server.jar">
+                        <div class="small text-secondary mt-1">Existing file will be backed up if present.</div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label text-uppercase small text-secondary">Download URL</label>
+                        <div class="install-preview mt-2" id="installerPreview">Select a build to preview URL.</div>
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-primary" type="submit"><i class="bi bi-cloud-download me-1"></i>Install Version</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </main>
+</div>
+<script>
+    const catalog = <%- JSON.stringify(archlightCatalog || {}) %>;
+    const loaders = catalog.loaders || {};
+    const baseUrl = catalog.baseUrl || '';
+    const loaderSelect = document.getElementById('installerLoader');
+    const versionSelect = document.getElementById('installerVersion');
+    const buildSelect = document.getElementById('installerBuild');
+    const preview = document.getElementById('installerPreview');
+
+    const setOptions = (select, values) => {
+        select.innerHTML = '';
+        values.forEach((value) => {
+            const opt = document.createElement('option');
+            opt.value = value;
+            opt.textContent = value;
+            select.appendChild(opt);
+        });
+    };
+
+    const refreshBuilds = () => {
+        const loader = loaderSelect.value;
+        const version = versionSelect.value;
+        const entries = loader && version && loaders[loader] ? (loaders[loader][version] || []) : [];
+        const names = entries.map((entry) => entry.name);
+        setOptions(buildSelect, names);
+        refreshPreview();
+    };
+
+    const refreshVersions = () => {
+        const loader = loaderSelect.value;
+        const versions = loader && loaders[loader] ? Object.keys(loaders[loader]) : [];
+        setOptions(versionSelect, versions);
+        refreshBuilds();
+    };
+
+    const refreshPreview = () => {
+        const build = buildSelect.value;
+        if (!build) {
+            preview.textContent = 'Select a build to preview URL.';
+            return;
+        }
+        const normalized = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+        preview.innerHTML = `Will download: <code>${normalized}${encodeURIComponent(build)}</code>`;
+    };
+
+    const loaderKeys = Object.keys(loaders);
+    setOptions(loaderSelect, loaderKeys);
+    refreshVersions();
+
+    loaderSelect.addEventListener('change', refreshVersions);
+    versionSelect.addEventListener('change', refreshBuilds);
+    buildSelect.addEventListener('change', refreshPreview);
+
+    document.getElementById('sidebarToggle')?.addEventListener('click', () => document.getElementById('sidebar')?.classList.toggle('collapsed'));
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
+</body>
+</html>

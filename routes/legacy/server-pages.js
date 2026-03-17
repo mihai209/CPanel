@@ -4705,6 +4705,47 @@ function registerServerPagesRoutes(ctx) {
         return `${safeName}.rollback-${stamp}`;
     }
 
+    const ARCHLIGHT_CATALOG_PATH = nodePath.join(process.cwd(), 'mc', 'archlight.json');
+    const ARCHLIGHT_CACHE_TTL_MS = 5 * 60 * 1000;
+    const ARCHLIGHT_CATALOG_CACHE = { ts: 0, data: null };
+
+    function loadArchlightCatalog() {
+        const now = Date.now();
+        if (ARCHLIGHT_CATALOG_CACHE.data && (now - ARCHLIGHT_CATALOG_CACHE.ts) < ARCHLIGHT_CACHE_TTL_MS) {
+            return ARCHLIGHT_CATALOG_CACHE.data;
+        }
+        try {
+            const raw = fs.readFileSync(ARCHLIGHT_CATALOG_PATH, 'utf8');
+            const parsed = JSON.parse(raw || '{}');
+            const archlight = parsed && parsed.archlight ? parsed.archlight : {};
+            const baseUrl = String(archlight.base_url || '').trim();
+            const loaders = archlight && typeof archlight.loaders === 'object' ? archlight.loaders : {};
+            const normalized = { baseUrl, loaders };
+            ARCHLIGHT_CATALOG_CACHE.ts = now;
+            ARCHLIGHT_CATALOG_CACHE.data = normalized;
+            return normalized;
+        } catch (err) {
+            console.error('Failed to load archlight catalog:', err && err.message ? err.message : err);
+            return { baseUrl: '', loaders: {} };
+        }
+    }
+
+    function resolveArchlightBuild(catalog, loader, version, fileName) {
+        if (!catalog || !catalog.loaders || !loader || !version || !fileName) return null;
+        const loaderBucket = catalog.loaders[loader] || {};
+        const versionEntries = loaderBucket[version];
+        if (!Array.isArray(versionEntries)) return null;
+        return versionEntries.find((entry) => entry && entry.name === fileName) || null;
+    }
+
+    function buildArchlightDownloadUrl(baseUrl, fileName) {
+        const base = String(baseUrl || '').trim();
+        const name = String(fileName || '').trim();
+        if (!base || !name) return '';
+        const normalized = base.endsWith('/') ? base : `${base}/`;
+        return `${normalized}${encodeURIComponent(name)}`;
+    }
+
     async function renameConnectorFile(connectorWs, serverId, directory, name, newName, timeoutMs = 12000) {
         if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
             return { success: false, error: 'Connector is offline.' };
@@ -14285,6 +14326,154 @@ function registerServerPagesRoutes(ctx) {
     // Legacy minecraft root -> center
     app.get('/server/:containerId/minecraft', requireAuth, async (req, res) => {
         return res.redirect(`/server/${req.params.containerId}/minecraft-center`);
+    });
+
+    app.get('/server/:containerId/minecraft/installer', requireAuth, async (req, res) => {
+        try {
+            const server = await Server.findOne({
+                where: { containerId: req.params.containerId },
+                include: [
+                    { model: Allocation, as: 'allocation', include: [{ model: Connector, as: 'connector' }] },
+                    { model: Image, as: 'image' }
+                ]
+            });
+
+            if (!server) return res.redirect('/server/notfound');
+            const access = await resolveServerAccess(server, req.session.user);
+            if (!hasServerPermission(access, 'server.minecraft') || !hasServerPermission(access, 'server.files')) {
+                return res.redirect('/server/no-permissions');
+            }
+            if (!isServerLikelyMinecraft(server)) {
+                return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Minecraft tools are available only for Minecraft servers.')}`);
+            }
+            if (server.isSuspended) {
+                return res.redirect(`/server/${server.containerId}/suspended`);
+            }
+
+            const catalog = loadArchlightCatalog();
+            return res.render('server/minecraft-installer', {
+                server,
+                user: req.session.user,
+                title: `Minecraft Installer · ${server.name}`,
+                path: '/servers',
+                active: 'mcinstaller',
+                archlightCatalog: catalog,
+                installerMessage: req.query.success ? { type: 'success', text: String(req.query.success) } : req.query.error ? { type: 'error', text: String(req.query.error) } : null
+            });
+        } catch (err) {
+            console.error('Error loading minecraft installer:', err);
+            return res.redirect('/?error=' + encodeURIComponent('Failed to load Minecraft installer.'));
+        }
+    });
+
+    app.post('/server/:containerId/minecraft/installer', requireAuth, async (req, res) => {
+        try {
+            const server = await Server.findOne({
+                where: { containerId: req.params.containerId },
+                include: [
+                    { model: Allocation, as: 'allocation', include: [{ model: Connector, as: 'connector' }] },
+                    { model: Image, as: 'image' }
+                ]
+            });
+
+            if (!server) return res.redirect('/server/notfound');
+            const access = await resolveServerAccess(server, req.session.user);
+            if (!hasServerPermission(access, 'server.minecraft') || !hasServerPermission(access, 'server.files')) {
+                return res.redirect('/server/no-permissions');
+            }
+            if (!isServerLikelyMinecraft(server)) {
+                return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Minecraft tools are available only for Minecraft servers.')}`);
+            }
+            if (server.isSuspended) {
+                return res.redirect(`/server/${server.containerId}/suspended`);
+            }
+            if (String(server.status || '').toLowerCase() === 'running') {
+                return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent('Stop the server before installing a new version.')}`);
+            }
+
+            const catalog = loadArchlightCatalog();
+            const loader = String(req.body.loader || '').trim();
+            const version = String(req.body.version || '').trim();
+            const buildName = String(req.body.build || '').trim();
+            const build = resolveArchlightBuild(catalog, loader, version, buildName);
+            if (!build) {
+                return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent('Invalid loader/version/build selection.')}`);
+            }
+            const downloadUrl = buildArchlightDownloadUrl(catalog.baseUrl, build.name);
+            if (!downloadUrl) {
+                return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent('Invalid download URL.')}`);
+            }
+
+            const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
+            if (!featureFlags.remoteDownloadEnabled) {
+                return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent('Remote downloads are disabled by admin.')}`);
+            }
+            if (!server.allocation || !server.allocation.connectorId) {
+                return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent('Server allocation is missing.')}`);
+            }
+
+            const connectorWs = connectorConnections.get(server.allocation.connectorId);
+            if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+                return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent('Connector is offline.')}`);
+            }
+
+            let targetFile = sanitizeDownloadFileName(String(req.body.targetFile || 'server.jar'), 'server.jar');
+            if (!targetFile.toLowerCase().endsWith('.jar')) targetFile = `${targetFile}.jar`;
+            const rootListing = await runConnectorFileAction(connectorWs, {
+                type: 'list_files',
+                serverId: server.id,
+                directory: '/'
+            }, '/', server.id, 12000);
+
+            let backupName = '';
+            if (rootListing && rootListing.success && Array.isArray(rootListing.files)) {
+                const existing = rootListing.files.find((entry) => entry && !entry.isDirectory && String(entry.name || '') === targetFile);
+                if (existing) {
+                    backupName = buildMinecraftRollbackFileName(targetFile);
+                    const renameResult = await renameConnectorFile(connectorWs, server.id, '/', targetFile, backupName);
+                    if (!renameResult.success) {
+                        return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent(renameResult.error || 'Failed to backup existing jar.')}`);
+                    }
+                }
+            }
+
+            const requestId = createWsRequestId();
+            connectorWs.send(JSON.stringify({
+                type: 'download_file',
+                serverId: server.id,
+                requestId,
+                directory: '/',
+                url: downloadUrl,
+                fileName: targetFile
+            }));
+
+            const installResult = await waitForConnectorDownloadResult(connectorWs, server.id, requestId, 60000);
+            if (!installResult.success) {
+                if (backupName) {
+                    await renameConnectorFile(connectorWs, server.id, '/', backupName, targetFile);
+                }
+                return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent(installResult.error || 'Failed to download installer file.')}`);
+            }
+
+            await writeServerAuditSafe({
+                actorUserId: req.session && req.session.user ? req.session.user.id : null,
+                serverId: server.id,
+                action: 'server:minecraft.installer',
+                ip: req.headers['x-forwarded-for'] || req.ip || null,
+                userAgent: req.headers['user-agent'] || null,
+                metadata: {
+                    loader,
+                    version,
+                    fileName: build.name,
+                    targetFile
+                }
+            });
+
+            return res.redirect(`/server/${server.containerId}/minecraft/installer?success=${encodeURIComponent(`Installed ${build.name} to ${targetFile}.`)}`);
+        } catch (err) {
+            console.error('Error installing minecraft version:', err);
+            return res.redirect(`/server/${req.params.containerId}/minecraft/installer?error=${encodeURIComponent('Failed to install Minecraft version.')}`);
+        }
     });
 
     // User Server Minecraft Addons (Modrinth)
