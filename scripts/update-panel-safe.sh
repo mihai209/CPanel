@@ -81,8 +81,16 @@ fi
 echo "===> Updating to origin/main..."
 
 if ! git merge --ff-only origin/main; then
-echo "Fast-forward not possible; performing merge..."
-git merge --no-edit origin/main
+  echo "Fast-forward not possible; performing merge..."
+
+  if ! git merge --no-edit origin/main; then
+    echo "Merge conflicts detected. Auto-resolving (keeping local versions)..."
+
+    git checkout --ours .
+    git add -A
+
+    git commit -m "auto-merge: keep local changes"
+  fi
 fi
 
 # ---------------------------------------------------------
