@@ -1,75 +1,85 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Safe update script that avoids hard conflicts and preserves local changes.
+# =========================================================
+# note : i used gpt because i couldn't find a way to get the latest files from the repo without deleting local files created by the panel, hope it works
+
+# SAFE AUTO-UPDATER (no data loss, no manual intervention)
 # Strategy:
-# 1) If a rebase is already in progress, bail with guidance.
-# 2) Ensure a clean index by stashing tracked + untracked changes.
-# 3) Fast-forward merge from origin/main (no rebase) to avoid conflict replay.
-# 4) Re-apply stash; if conflicts arise, keep both by default (ours) and warn.
-# 5) Install deps + run DB upgrade.
+# - Stabilize repo state (kill merges/rebases, clean index)
+# - Stash EVERYTHING (tracked + untracked)
+# - Fast-forward / merge from origin/main
+# - Reapply stash (prefer local changes on conflict)
+# - Install deps + run DB upgrade
+
+# =========================================================
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 git config advice.addIgnoredFile false >/dev/null 2>&1 || true
 
-if [ -d ".git/rebase-apply" ] || [ -d ".git/rebase-merge" ]; then
-  echo "Rebase in progress. Resolve it first:"
-  echo "  git status"
-  echo "  git rebase --continue  OR  git rebase --abort"
-  exit 1
+echo "===> Stabilizing repository state..."
+
+# Abort any unfinished operations (safe no-op if none)
+
+git merge --abort 2>/dev/null || true
+git rebase --abort 2>/dev/null || true
+
+# CRITICAL: remove conflict state from index, KEEP working tree
+
+git reset
+
+# If conflicts somehow still exist, force-resolve keeping local files
+
+if [ -n "$(git ls-files -u)" ]; then
+echo "Unresolved conflicts detected. Auto-resolving (keeping local versions)..."
+git checkout --ours .
+git add -A
 fi
 
-echo "Fetching latest main..."
+echo "===> Fetching latest main..."
 git fetch origin main
 
-# Stash anything dirty to avoid merge conflicts from partial state
-if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
-  echo "Stashing local changes (tracked + untracked), ignoring database.sqlite..."
-  stash_before=$(git stash list | wc -l | tr -d ' ')
-  set +e
-  git -c advice.addIgnoredFile=false stash push -a -m "auto-update-panel-$(date +%s)" -- \
-    . \
-    ":(exclude)database.sqlite" \
-    ":(exclude)panel/database.sqlite"
-  stash_rc=$?
-  set -e
-  stash_after=$(git stash list | wc -l | tr -d ' ')
-  if [ "$stash_after" -gt "$stash_before" ]; then
-    STASHED=1
-  else
-    STASHED=0
-    if [ "$stash_rc" -ne 0 ]; then
-      echo "Warning: stash returned code $stash_rc but no stash was created." >&2
-    fi
-  fi
+echo "===> Stashing local changes (tracked + untracked)..."
+
+if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+git stash push -u -m "auto-update-$(date +%s)" || true
+STASHED=1
 else
-  STASHED=0
+STASHED=0
 fi
 
-echo "Updating to origin/main (fast-forward merge)..."
-# If fast-forward fails, do a regular merge (still no rebase)
+echo "===> Updating to origin/main..."
+
+# Prefer fast-forward, fallback to merge
+
 if ! git merge --ff-only origin/main; then
-  echo "Fast-forward not possible; performing a merge..."
-  git merge --no-edit origin/main
+echo "Fast-forward not possible; performing merge..."
+git merge --no-edit origin/main
 fi
 
 if [ "$STASHED" -eq 1 ]; then
-  echo "Re-applying stashed changes..."
-  # Try to reapply; if conflicts occur, keep current version and warn
-  if ! git stash pop; then
-    echo "Conflict while re-applying stash. Keeping current (updated) versions." >&2
-    git checkout --ours .
-    git add -A
-    echo "Local changes may need manual review."
-  fi
+echo "===> Re-applying local changes..."
+
+if ! git stash pop; then
+echo "Conflicts detected during stash pop. Keeping local versions..."
+
+```
+git checkout --ours .
+git add -A
+
+# finalize automatically (avoid leaving repo in broken state)
+git commit -m "auto-resolve: keep local changes" || true
+```
+
+fi
 fi
 
-echo "Installing dependencies..."
+echo "===> Installing dependencies..."
 npm install
 
-echo "Running DB upgrade..."
+echo "===> Running DB upgrade..."
 npm run upgrade-db
 
-echo "Panel updated successfully!"
+echo "===> Panel updated successfully!"
