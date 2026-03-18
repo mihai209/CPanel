@@ -2,35 +2,45 @@
 set -euo pipefail
 
 # =========================================================
-# note : i used gpt because i couldn't find a way to get the latest files from the repo without deleting local files created by the panel, hope it works
 
-# SAFE AUTO-UPDATER (no data loss, no manual intervention)
-# Strategy:
-# - Stabilize repo state (kill merges/rebases, clean index)
-# - Stash EVERYTHING (tracked + untracked)
-# - Fast-forward / merge from origin/main
-# - Reapply stash (prefer local changes on conflict)
-# - Install deps + run DB upgrade
+# SAFE AUTO-UPDATER (auto-healing, no data loss)
+# number 2 
 
 # =========================================================
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# --- Detect real git repo root (robust) ---
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+
+if [ -z "$repo_root" ]; then
+echo "Error: Not inside a git repository."
+exit 1
+fi
+
 cd "$repo_root"
 
 git config advice.addIgnoredFile false >/dev/null 2>&1 || true
 
+echo "===> Using repo: $repo_root"
+
+# ---------------------------------------------------------
+
+# 1. Stabilize repository (CRITICAL)
+
+# ---------------------------------------------------------
+
 echo "===> Stabilizing repository state..."
 
-# Abort any unfinished operations (safe no-op if none)
+# Abort any broken operations
 
 git merge --abort 2>/dev/null || true
 git rebase --abort 2>/dev/null || true
 
-# CRITICAL: remove conflict state from index, KEEP working tree
+# Clean index but KEEP working tree
 
 git reset
 
-# If conflicts somehow still exist, force-resolve keeping local files
+# Force resolve if index still corrupted
 
 if [ -n "$(git ls-files -u)" ]; then
 echo "Unresolved conflicts detected. Auto-resolving (keeping local versions)..."
@@ -38,8 +48,20 @@ git checkout --ours .
 git add -A
 fi
 
+# ---------------------------------------------------------
+
+# 2. Fetch latest
+
+# ---------------------------------------------------------
+
 echo "===> Fetching latest main..."
 git fetch origin main
+
+# ---------------------------------------------------------
+
+# 3. Stash local changes
+
+# ---------------------------------------------------------
 
 echo "===> Stashing local changes (tracked + untracked)..."
 
@@ -50,34 +72,56 @@ else
 STASHED=0
 fi
 
-echo "===> Updating to origin/main..."
+# ---------------------------------------------------------
 
-# Prefer fast-forward, fallback to merge
+# 4. Update code
+
+# ---------------------------------------------------------
+
+echo "===> Updating to origin/main..."
 
 if ! git merge --ff-only origin/main; then
 echo "Fast-forward not possible; performing merge..."
 git merge --no-edit origin/main
 fi
 
+# ---------------------------------------------------------
+
+# 5. Reapply local changes (user wins)
+
+# ---------------------------------------------------------
+
 if [ "$STASHED" -eq 1 ]; then
 echo "===> Re-applying local changes..."
 
 if ! git stash pop; then
-echo "Conflicts detected during stash pop. Keeping local versions..."
+echo "Conflicts detected. Keeping local versions..."
 
 ```
 git checkout --ours .
 git add -A
 
-# finalize automatically (avoid leaving repo in broken state)
+# finalize to avoid broken repo state
 git commit -m "auto-resolve: keep local changes" || true
 ```
 
 fi
 fi
 
+# ---------------------------------------------------------
+
+# 6. Install deps
+
+# ---------------------------------------------------------
+
 echo "===> Installing dependencies..."
 npm install
+
+# ---------------------------------------------------------
+
+# 7. Run DB migrations
+
+# ---------------------------------------------------------
 
 echo "===> Running DB upgrade..."
 npm run upgrade-db
