@@ -1464,22 +1464,54 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                     }
 
                     const icon = file.isDirectory ? 'bi-folder-fill icon-folder' : 'bi-file-earmark-text icon-file';
-                    const isChecked = selectedItems.has(file.name) ? 'checked' : '';
+                    const isChecked = selectedItems.has(file.name);
 
-                    row.innerHTML = `
-                        <td class="file-checkbox-col">
-                            <input type="checkbox" class="file-checkbox item-checkbox" data-name="${file.name}" ${isChecked}>
-                        </td>
-                        <td class="file-name">
-                            <div class="d-flex align-items-center">
-                                <i class="bi ${icon} me-3 fs-5"></i>
-                                <span class="fw-medium">${file.name}</span>
-                            </div>
-                        </td>
-                        <td class="d-none d-xl-table-cell text-info small fw-semibold">${file.permissions || '-'}</td>
-                        <td class="d-none d-md-table-cell text-secondary small">${file.isDirectory ? '-' : formatSize(file.size)}</td>
-                        <td class="d-none d-lg-table-cell text-secondary small">${formatDate(file.mtime)}</td>
-                    `;
+                    // Checkbox column
+                    const checkboxTd = document.createElement('td');
+                    checkboxTd.className = 'file-checkbox-col';
+                    const checkboxInput = document.createElement('input');
+                    checkboxInput.type = 'checkbox';
+                    checkboxInput.className = 'file-checkbox item-checkbox';
+                    checkboxInput.setAttribute('data-name', file.name);
+                    if (isChecked) {
+                        checkboxInput.checked = true;
+                    }
+                    checkboxTd.appendChild(checkboxInput);
+                    row.appendChild(checkboxTd);
+
+                    // File name column with icon and name
+                    const nameTd = document.createElement('td');
+                    nameTd.className = 'file-name';
+                    const nameWrapper = document.createElement('div');
+                    nameWrapper.className = 'd-flex align-items-center';
+                    const iconElem = document.createElement('i');
+                    iconElem.className = `bi ${icon} me-3 fs-5`;
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'fw-medium';
+                    nameSpan.textContent = file.name;
+                    nameWrapper.appendChild(iconElem);
+                    nameWrapper.appendChild(nameSpan);
+                    nameTd.appendChild(nameWrapper);
+                    row.appendChild(nameTd);
+
+                    // Permissions column
+                    const permissionsTd = document.createElement('td');
+                    permissionsTd.className = 'd-none d-xl-table-cell text-info small fw-semibold';
+                    permissionsTd.textContent = file.permissions || '-';
+                    row.appendChild(permissionsTd);
+
+                    // Size column
+                    const sizeTd = document.createElement('td');
+                    sizeTd.className = 'd-none d-md-table-cell text-secondary small';
+                    sizeTd.textContent = file.isDirectory ? '-' : formatSize(file.size);
+                    row.appendChild(sizeTd);
+
+                    // Date column
+                    const dateTd = document.createElement('td');
+                    dateTd.className = 'd-none d-lg-table-cell text-secondary small';
+                    dateTd.textContent = formatDate(file.mtime);
+                    row.appendChild(dateTd);
+
                     row.addEventListener('click', (e) => {
                         // Don't navigate if clicking the checkbox
                         if (e.target.closest('.file-checkbox-col')) return;
