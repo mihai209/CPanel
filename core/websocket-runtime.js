@@ -183,7 +183,7 @@ function pushConnectorWSReadLimitToSocket(ws, connectorId, limitMb, source = 'pa
             source
         }));
         if (Number.isInteger(Number(connectorId))) {
-            console.log(`Pushed connector WS read limit to connector ${connectorId}: ${clampConnectorWSReadLimitMb(limitMb)} MB`);
+            console.log(`Pushed connector WS read limit: ${clampConnectorWSReadLimitMb(limitMb)} MB`);
         }
         return true;
     } catch (error) {
