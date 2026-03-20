@@ -1509,7 +1509,8 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 if (!ext) return '';
                 const mapped = fileIconMap[ext];
                 if (!mapped) return '';
-                return String(mapped).startsWith('/') ? mapped : `/${String(mapped).replace(/^\\/+/, '')}`;
+                const normalized = String(mapped).replace(/^\/+/, '');
+                return String(mapped).startsWith('/') ? mapped : '/' + normalized;
             }
 
             function renderFiles(files) {
