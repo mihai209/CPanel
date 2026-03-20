@@ -86,6 +86,8 @@ function bootstrapApp(deps) {
         bootInfo('configured session store type=database');
     }
 
+    const cookieSecure = process.env.NODE_ENV === 'production';
+
     app.use(session({
         secret: secretKey,
         store: sessionStore,
@@ -93,7 +95,7 @@ function bootstrapApp(deps) {
         saveUninitialized: false,
         proxy: true,
         cookie: {
-            secure: false,
+            secure: cookieSecure,
             httpOnly: true,
             sameSite: 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000
