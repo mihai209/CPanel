@@ -34,6 +34,11 @@ function registerLocalsMiddleware(app, Settings, User, settingsCache = null) {
         res.locals.error = req.query.error || null;
         res.locals.success = req.query.success || null;
         res.locals.themeCatalog = getThemeCatalog();
+        try {
+            res.locals.csrfToken = typeof req.csrfToken === 'function' ? req.csrfToken() : null;
+        } catch (error) {
+            res.locals.csrfToken = null;
+        }
 
         let activeThemeId = DEFAULT_THEME_ID;
         let activeUserCustomTheme = getUserCustomTheme(null);
