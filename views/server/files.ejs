@@ -354,6 +354,15 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 opacity: 0.8;
             }
 
+            .file-icon-img {
+                width: 22px;
+                height: 22px;
+                object-fit: contain;
+                margin-right: 12px;
+                display: inline-block;
+                filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
+            }
+
             .empty-state {
                 padding: 5rem 2rem;
                 text-align: center;
@@ -1467,7 +1476,44 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 return date.toLocaleString();
             }
 
+            let fileIconMap = null;
+            let lastRenderedFiles = [];
+
+            async function loadFileIconMap() {
+                if (fileIconMap) return fileIconMap;
+                try {
+                    const resp = await fetch('/assets/index-ext.json', { cache: 'force-cache' });
+                    if (!resp.ok) throw new Error('Failed to load icon map');
+                    const data = await resp.json();
+                    fileIconMap = data && typeof data === 'object' ? data : {};
+                    if (Array.isArray(lastRenderedFiles) && lastRenderedFiles.length > 0) {
+                        renderFiles(lastRenderedFiles);
+                    }
+                    return fileIconMap;
+                } catch (err) {
+                    fileIconMap = {};
+                    return fileIconMap;
+                }
+            }
+
+            function getFileExtension(fileName) {
+                const name = String(fileName || '').toLowerCase();
+                const idx = name.lastIndexOf('.');
+                if (idx === -1 || idx === name.length - 1) return '';
+                return name.slice(idx + 1);
+            }
+
+            function getIconPathForFile(fileName) {
+                if (!fileIconMap) return '';
+                const ext = getFileExtension(fileName);
+                if (!ext) return '';
+                const mapped = fileIconMap[ext];
+                if (!mapped) return '';
+                return String(mapped).startsWith('/') ? mapped : `/${String(mapped).replace(/^\\/+/, '')}`;
+            }
+
             function renderFiles(files) {
+                lastRenderedFiles = Array.isArray(files) ? files : [];
                 const container = document.getElementById('fileList');
                 container.innerHTML = '';
                 currentEntriesByName.clear();
@@ -1536,8 +1582,23 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                     nameTd.className = 'file-name';
                     const nameWrapper = document.createElement('div');
                     nameWrapper.className = 'd-flex align-items-center';
-                    const iconElem = document.createElement('i');
-                    iconElem.className = `bi ${icon} me-3 fs-5`;
+                    let iconElem = null;
+                    if (file.isDirectory) {
+                        iconElem = document.createElement('i');
+                        iconElem.className = `bi ${icon} me-3 fs-5`;
+                    } else {
+                        const iconPath = getIconPathForFile(file.name);
+                        if (iconPath) {
+                            const img = document.createElement('img');
+                            img.className = 'file-icon-img';
+                            img.src = iconPath;
+                            img.alt = `${file.name} icon`;
+                            iconElem = img;
+                        } else {
+                            iconElem = document.createElement('i');
+                            iconElem.className = `bi ${icon} me-3 fs-5`;
+                        }
+                    }
                     const nameSpan = document.createElement('span');
                     nameSpan.className = 'fw-medium';
                     nameSpan.textContent = file.name;
@@ -3224,6 +3285,7 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
             // Start all tasks
             startStatusCheck();
             startAutoRefresh();
+            loadFileIconMap();
             connect();
         </script>
         <%- include('../partials/shortcuts-modal', { shortcutsId: 'filesShortcutsModal', shortcutsTitle: 'File Manager Shortcuts', shortcutsList: fileManagerShortcuts }) %>

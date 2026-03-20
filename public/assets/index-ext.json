@@ -1,0 +1,8 @@
+{
+  "java": "assets/file-icons/java.png",
+  "json": "assets/file-icons/json.webp",
+  "toml": "assets/file-icons/toml.webp",
+  "txt": "assets/file-icons/txt.png",
+  "yaml": "assets/file-icons/yaml.webp",
+  "yml": "assets/file-icons/yml.webp"
+}
