@@ -105,13 +105,11 @@ echo "===> Re-applying local changes..."
 if ! git stash pop; then
 echo "Conflicts detected. Keeping local versions..."
 
-```
 git checkout --ours .
 git add -A
 
 # finalize to avoid broken repo state
 git commit -m "auto-resolve: keep local changes" || true
-```
 
 fi
 fi
@@ -123,7 +121,16 @@ fi
 # ---------------------------------------------------------
 
 echo "===> Installing dependencies..."
-pnpm install
+if command -v pnpm >/dev/null 2>&1; then
+  pnpm install
+else
+  if grep -Rqs "\"link:\"\\|link:" "$repo_root/package.json"; then
+    echo "Error: package.json contains link: dependencies. Install pnpm (recommended) and retry."
+    echo "Tip: corepack enable && corepack prepare pnpm@latest --activate"
+    exit 1
+  fi
+  npm install
+fi
 
 # ---------------------------------------------------------
 

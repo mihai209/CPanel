@@ -2866,7 +2866,14 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
             function openArchiveModal(items) {
                 if (!archiveModal || !archiveNameInput || !archiveItemsList) return;
                 archiveTargets = Array.isArray(items) ? items : [];
-                archiveItemsList.innerHTML = archiveTargets.map((name) => `<div>• ${name}</div>`).join('') || '<div class=\"text-secondary\">No items selected.</div>';
+                const escapeHtml = (value) => String(value || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/\"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+                const listHtml = archiveTargets.map((name) => '<div>\u2022 ' + escapeHtml(name) + '</div>').join('');
+                archiveItemsList.innerHTML = listHtml || '<div class=\"text-secondary\">No items selected.</div>';
                 archiveNameInput.value = suggestArchiveName(archiveTargets);
                 archiveModal.show();
                 setTimeout(() => archiveNameInput.focus(), 300);
