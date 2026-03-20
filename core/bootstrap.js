@@ -2,6 +2,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 const SequelizeStore = require('connect-session-sequelize')(session.Store);
+const { csrf } = require('lusca');
 const { bootInfo, bootWarn } = require('./boot');
 
 function bootstrapApp(deps) {
@@ -98,6 +99,8 @@ function bootstrapApp(deps) {
             maxAge: 7 * 24 * 60 * 60 * 1000
         }
     }));
+
+    app.use(csrf());
 
     if (!usingRedisSessionStore && typeof sessionStore.sync === 'function') {
         sessionStore.sync().catch((error) => {
