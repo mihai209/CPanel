@@ -275,6 +275,7 @@ const CONNECTOR_SERVER_SCOPED_MESSAGE_TYPES = new Set([
     'write_success',
     'extract_started',
     'extract_complete',
+    'archive_complete',
     'file_versions',
     'file_version_content',
     'resource_limits_result',
@@ -1622,6 +1623,18 @@ wss.on('connection', (ws, request) => {
                             name: data.name,
                             targetDirectory: data.targetDirectory
                         }));
+                    } else if (data.type === 'create_archive') {
+                        if (!hasConsolePermission('server.files')) {
+                            ws.send(JSON.stringify({ type: 'error', message: 'Missing permission: server.files' }));
+                            return;
+                        }
+                        connectorWs.send(JSON.stringify({
+                            type: 'create_archive',
+                            serverId: serverId,
+                            directory: data.directory,
+                            items: Array.isArray(data.items) ? data.items : [],
+                            archiveName: data.archiveName
+                        }));
                     } else if (data.type === 'read_file') {
                         if (!hasConsolePermission('server.files')) {
                             ws.send(JSON.stringify({ type: 'error', message: 'Missing permission: server.files' }));
@@ -2230,6 +2243,15 @@ wss.on('connection', (ws, request) => {
                     directory: data.directory || '/',
                     targetDirectory: data.targetDirectory || data.directory || '/',
                     operationId: data.operationId || '',
+                    error: String(data.error || '')
+                });
+            }
+            if (data.type === 'archive_complete') {
+                sendToServerConsole(data.serverId, {
+                    type: 'archive_complete',
+                    success: Boolean(data.success),
+                    archiveName: data.archiveName || '',
+                    directory: data.directory || '/',
                     error: String(data.error || '')
                 });
             }
