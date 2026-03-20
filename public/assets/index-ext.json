@@ -4,5 +4,6 @@
   "toml": "assets/file-icons/toml.webp",
   "txt": "assets/file-icons/txt.png",
   "yaml": "assets/file-icons/yaml.webp",
-  "yml": "assets/file-icons/yml.webp"
+  "yml": "assets/file-icons/yml.webp",
+  "jar": "assets/file-icons/java.png"
 }
