@@ -625,6 +625,81 @@ const navSections = [
             });
         }
 
+        const menuButton = document.querySelector('.server-menu-toggle');
+        const menuPosKey = `cpanel.serverMenuButtonPos`;
+        if (menuButton) {
+            const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+            const applyMenuPos = (pos) => {
+                if (!pos || typeof pos.left !== 'number' || typeof pos.top !== 'number') return;
+                menuButton.style.position = 'fixed';
+                menuButton.style.left = `${pos.left}px`;
+                menuButton.style.top = `${pos.top}px`;
+                menuButton.style.right = 'auto';
+                menuButton.style.bottom = 'auto';
+                menuButton.style.zIndex = '1090';
+            };
+            try {
+                const stored = JSON.parse(localStorage.getItem(menuPosKey) || 'null');
+                if (stored) applyMenuPos(stored);
+            } catch (_) {}
+
+            let dragging = false;
+            let dragOffsetX = 0;
+            let dragOffsetY = 0;
+
+            const stopDragging = () => {
+                if (!dragging) return;
+                dragging = false;
+                menuButton.dataset.dragging = 'false';
+                document.body.style.userSelect = '';
+                document.body.style.cursor = '';
+                const rect = menuButton.getBoundingClientRect();
+                const pos = { left: Math.round(rect.left), top: Math.round(rect.top) };
+                localStorage.setItem(menuPosKey, JSON.stringify(pos));
+            };
+
+            menuButton.addEventListener('pointerdown', (event) => {
+                if (!event.shiftKey) return;
+                event.preventDefault();
+                event.stopPropagation();
+                const rect = menuButton.getBoundingClientRect();
+                dragging = true;
+                menuButton.dataset.dragging = 'true';
+                dragOffsetX = event.clientX - rect.left;
+                dragOffsetY = event.clientY - rect.top;
+                document.body.style.userSelect = 'none';
+                document.body.style.cursor = 'grabbing';
+                menuButton.setPointerCapture(event.pointerId);
+            });
+
+            menuButton.addEventListener('pointermove', (event) => {
+                if (!dragging) return;
+                event.preventDefault();
+                const rect = menuButton.getBoundingClientRect();
+                const maxLeft = window.innerWidth - rect.width;
+                const maxTop = window.innerHeight - rect.height;
+                const left = clamp(event.clientX - dragOffsetX, 0, maxLeft);
+                const top = clamp(event.clientY - dragOffsetY, 0, maxTop);
+                applyMenuPos({ left, top });
+            });
+
+            menuButton.addEventListener('pointerup', (event) => {
+                if (!dragging) return;
+                event.preventDefault();
+                stopDragging();
+            });
+
+            menuButton.addEventListener('pointercancel', stopDragging);
+
+            menuButton.addEventListener('click', (event) => {
+                if (menuButton.dataset.dragging === 'true') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    menuButton.dataset.dragging = 'false';
+                }
+            });
+        }
+
         document.addEventListener('keydown', (event) => {
             if (event.defaultPrevented) return;
             if (isEditableTarget(event.target)) return;
