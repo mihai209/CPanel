@@ -69,6 +69,13 @@
                 <form method="POST" action="/server/<%= server.containerId %>/minecraft/installer" class="row g-3">
                     <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
                     <div class="col-12 col-md-4">
+                        <label class="form-label text-uppercase small text-secondary">Distribution</label>
+                        <select id="installerDistribution" name="distribution" class="form-select" required>
+                            <option value="archlight">Arclight</option>
+                            <option value="waterfall">Waterfall</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-4" id="installerLoaderWrap">
                         <label class="form-label text-uppercase small text-secondary">Loader</label>
                         <select id="installerLoader" name="loader" class="form-select" required></select>
                     </div>
@@ -89,6 +96,13 @@
                         <label class="form-label text-uppercase small text-secondary">Download URL</label>
                         <div class="install-preview mt-2" id="installerPreview">Select a build to preview URL.</div>
                     </div>
+                    <div class="col-12" id="installerModulesWrap" style="display:none;">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="installerModules" name="installModules" value="true">
+                            <label class="form-check-label text-light" for="installerModules">Install Waterfall modules (cmd_* + reconnect_yaml)</label>
+                        </div>
+                        <div class="small text-secondary mt-1" id="installerModulesHint"></div>
+                    </div>
                     <div class="col-12">
                         <button class="btn btn-primary" type="submit"><i class="bi bi-cloud-download me-1"></i>Install Version</button>
                     </div>
@@ -98,13 +112,22 @@
     </main>
 </div>
 <script>
-    const catalog = <%- JSON.stringify(archlightCatalog || {}) %>;
-    const loaders = catalog.loaders || {};
-    const baseUrl = catalog.baseUrl || '';
+    const catalog = <%- JSON.stringify(installerCatalog || {}) %>;
+    const archlight = catalog.archlight || {};
+    const waterfall = catalog.waterfall || {};
+    const loaders = archlight.loaders || {};
+    const archlightBase = archlight.baseUrl || '';
+    const waterfallBase = waterfall.baseUrl || '';
+    const waterfallVersions = waterfall.versions || {};
     const loaderSelect = document.getElementById('installerLoader');
     const versionSelect = document.getElementById('installerVersion');
     const buildSelect = document.getElementById('installerBuild');
     const preview = document.getElementById('installerPreview');
+    const distributionSelect = document.getElementById('installerDistribution');
+    const loaderWrap = document.getElementById('installerLoaderWrap');
+    const modulesWrap = document.getElementById('installerModulesWrap');
+    const modulesToggle = document.getElementById('installerModules');
+    const modulesHint = document.getElementById('installerModulesHint');
 
     const setOptions = (select, values) => {
         select.innerHTML = '';
@@ -116,7 +139,36 @@
         });
     };
 
+    const refreshPreview = () => {
+        const build = buildSelect.value;
+        if (!build) {
+            preview.textContent = 'Select a build to preview URL.';
+            return;
+        }
+        const distribution = distributionSelect.value;
+        if (distribution === 'waterfall') {
+            const version = versionSelect.value;
+            const normalized = waterfallBase.endsWith('/') ? waterfallBase : `${waterfallBase}/`;
+            preview.innerHTML = `Will download: <code>${normalized}${encodeURIComponent(version)}/${encodeURIComponent(build)}</code>`;
+            const modules = waterfallVersions[version]?.modules || [];
+            if (modulesHint) {
+                modulesHint.textContent = modules.length ? `${modules.length} module jar(s) available for this version.` : 'No modules found for this version.';
+            }
+        } else {
+            const normalized = archlightBase.endsWith('/') ? archlightBase : `${archlightBase}/`;
+            preview.innerHTML = `Will download: <code>${normalized}${encodeURIComponent(build)}</code>`;
+        }
+    };
+
     const refreshBuilds = () => {
+        const distribution = distributionSelect.value;
+        if (distribution === 'waterfall') {
+            const version = versionSelect.value;
+            const entries = waterfallVersions[version]?.builds || [];
+            setOptions(buildSelect, entries);
+            refreshPreview();
+            return;
+        }
         const loader = loaderSelect.value;
         const version = versionSelect.value;
         const entries = loader && version && loaders[loader] ? (loaders[loader][version] || []) : [];
@@ -126,26 +178,45 @@
     };
 
     const refreshVersions = () => {
+        const distribution = distributionSelect.value;
+        if (distribution === 'waterfall') {
+            const versions = Object.keys(waterfallVersions || {});
+            setOptions(versionSelect, versions);
+            refreshBuilds();
+            return;
+        }
         const loader = loaderSelect.value;
         const versions = loader && loaders[loader] ? Object.keys(loaders[loader]) : [];
         setOptions(versionSelect, versions);
         refreshBuilds();
     };
 
-    const refreshPreview = () => {
-        const build = buildSelect.value;
-        if (!build) {
-            preview.textContent = 'Select a build to preview URL.';
-            return;
+    const refreshDistribution = () => {
+        const distribution = distributionSelect.value;
+        if (distribution === 'waterfall') {
+            if (loaderWrap) loaderWrap.style.display = 'none';
+            if (modulesWrap) modulesWrap.style.display = '';
+            if (modulesToggle) modulesToggle.checked = false;
+            if (loaderSelect) {
+                loaderSelect.disabled = true;
+                loaderSelect.required = false;
+            }
+        } else {
+            if (loaderWrap) loaderWrap.style.display = '';
+            if (modulesWrap) modulesWrap.style.display = 'none';
+            if (loaderSelect) {
+                loaderSelect.disabled = false;
+                loaderSelect.required = true;
+            }
         }
-        const normalized = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-        preview.innerHTML = `Will download: <code>${normalized}${encodeURIComponent(build)}</code>`;
+        refreshVersions();
     };
 
     const loaderKeys = Object.keys(loaders);
     setOptions(loaderSelect, loaderKeys);
-    refreshVersions();
+    refreshDistribution();
 
+    distributionSelect.addEventListener('change', refreshDistribution);
     loaderSelect.addEventListener('change', refreshVersions);
     versionSelect.addEventListener('change', refreshBuilds);
     buildSelect.addEventListener('change', refreshPreview);

@@ -4706,8 +4706,12 @@ function registerServerPagesRoutes(ctx) {
     }
 
     const ARCHLIGHT_CATALOG_PATH = nodePath.join(process.cwd(), 'mc', 'archlight.json');
+    const WATERFALL_CATALOG_PATH = nodePath.join(process.cwd(), 'mc', 'waterfall.json');
+    const WATERFALL_FILES_ROOT = nodePath.join(process.cwd(), 'mc-versions', 'waterfall');
     const ARCHLIGHT_CACHE_TTL_MS = 5 * 60 * 1000;
     const ARCHLIGHT_CATALOG_CACHE = { ts: 0, data: null };
+    const WATERFALL_CACHE_TTL_MS = 5 * 60 * 1000;
+    const WATERFALL_CATALOG_CACHE = { ts: 0, data: null };
 
     function loadArchlightCatalog() {
         const now = Date.now();
@@ -4744,6 +4748,112 @@ function registerServerPagesRoutes(ctx) {
         if (!base || !name) return '';
         const normalized = base.endsWith('/') ? base : `${base}/`;
         return `${normalized}${encodeURIComponent(name)}`;
+    }
+
+    function loadWaterfallCatalog() {
+        const now = Date.now();
+        if (WATERFALL_CATALOG_CACHE.data && (now - WATERFALL_CATALOG_CACHE.ts) < WATERFALL_CACHE_TTL_MS) {
+            return WATERFALL_CATALOG_CACHE.data;
+        }
+        try {
+            const raw = fs.readFileSync(WATERFALL_CATALOG_PATH, 'utf8');
+            const parsed = JSON.parse(raw || '{}');
+            const waterfall = parsed && parsed.waterfall ? parsed.waterfall : {};
+            const baseUrl = String(waterfall.base_url || '').trim();
+            const modulesFolder = String(waterfall.modules_folder || '/modules').trim() || '/modules';
+            let versions = {};
+            if (waterfall.versions && typeof waterfall.versions === 'object') {
+                versions = waterfall.versions;
+            } else {
+                const folders = Array.isArray(waterfall.folders) ? waterfall.folders.map((entry) => String(entry || '').trim()).filter(Boolean) : [];
+                folders.forEach((folder) => {
+                    const dir = nodePath.join(WATERFALL_FILES_ROOT, folder);
+                    let files = [];
+                    try {
+                        if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+                            files = fs.readdirSync(dir).filter((name) => name.endsWith('.jar'));
+                        }
+                    } catch {
+                        files = [];
+                    }
+                    const builds = files.filter((name) => String(name || '').startsWith('waterfall-')).sort();
+                    const modules = files.filter((name) => !String(name || '').startsWith('waterfall-')).sort();
+                    versions[folder] = { builds, modules };
+                });
+            }
+
+            const normalized = { baseUrl, versions, modulesFolder };
+            WATERFALL_CATALOG_CACHE.ts = now;
+            WATERFALL_CATALOG_CACHE.data = normalized;
+            return normalized;
+        } catch (err) {
+            console.error('Failed to load waterfall catalog:', err && err.message ? err.message : err);
+            return { baseUrl: '', versions: {}, modulesFolder: '/modules' };
+        }
+    }
+
+    function resolveWaterfallBuild(catalog, version, fileName) {
+        if (!catalog || !catalog.versions || !version || !fileName) return null;
+        const bucket = catalog.versions[version];
+        if (!bucket || !Array.isArray(bucket.builds)) return null;
+        if (!bucket.builds.includes(fileName)) return null;
+        return {
+            name: fileName,
+            modules: Array.isArray(bucket.modules) ? bucket.modules : []
+        };
+    }
+
+    function buildWaterfallDownloadUrl(baseUrl, version, fileName) {
+        const base = String(baseUrl || '').trim();
+        const ver = String(version || '').trim();
+        const name = String(fileName || '').trim();
+        if (!base || !ver || !name) return '';
+        const normalized = base.endsWith('/') ? base : `${base}/`;
+        return `${normalized}${encodeURIComponent(ver)}/${encodeURIComponent(name)}`;
+    }
+
+    function normalizeModulesDirectory(raw) {
+        const value = String(raw || '').trim() || '/modules';
+        if (value.startsWith('/home/container')) {
+            const trimmed = value.slice('/home/container'.length);
+            return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+        }
+        return value.startsWith('/') ? value : `/${value}`;
+    }
+
+    async function ensureConnectorDirectory(connectorWs, serverId, directoryPath) {
+        const normalized = String(directoryPath || '').trim() || '/';
+        if (normalized === '/' || !normalized) return true;
+        const parts = normalized.split('/').filter(Boolean);
+        let current = '/';
+        for (const part of parts) {
+            const list = await runConnectorFileAction(connectorWs, {
+                type: 'list_files',
+                serverId,
+                directory: current
+            }, current, serverId, 8000);
+            if (list && list.success && Array.isArray(list.files)) {
+                const exists = list.files.some((entry) => entry && entry.isDirectory && String(entry.name || '') === part);
+                if (!exists) {
+                    connectorWs.send(JSON.stringify({
+                        type: 'create_folder',
+                        serverId,
+                        directory: current,
+                        name: part
+                    }));
+                    await waitForConnectorMessage(connectorWs, (message) => {
+                        if (Number.parseInt(message.serverId, 10) !== Number.parseInt(serverId, 10)) return null;
+                        if (String(message.type || '') === 'file_list' && String(message.directory || '') === current) {
+                            return true;
+                        }
+                        if (String(message.type || '') === 'error') return true;
+                        return null;
+                    }, 8000);
+                }
+            }
+            current = current.endsWith('/') ? `${current}${part}` : `${current}/${part}`;
+        }
+        return true;
     }
 
     async function renameConnectorFile(connectorWs, serverId, directory, name, newName, timeoutMs = 12000) {
@@ -14350,14 +14460,17 @@ function registerServerPagesRoutes(ctx) {
                 return res.redirect(`/server/${server.containerId}/suspended`);
             }
 
-            const catalog = loadArchlightCatalog();
+            const catalog = {
+                archlight: loadArchlightCatalog(),
+                waterfall: loadWaterfallCatalog()
+            };
             return res.render('server/minecraft-installer', {
                 server,
                 user: req.session.user,
                 title: `Minecraft Installer · ${server.name}`,
                 path: '/servers',
                 active: 'mcinstaller',
-                archlightCatalog: catalog,
+                installerCatalog: catalog,
                 installerMessage: req.query.success ? { type: 'success', text: String(req.query.success) } : req.query.error ? { type: 'error', text: String(req.query.error) } : null
             });
         } catch (err) {
@@ -14391,17 +14504,47 @@ function registerServerPagesRoutes(ctx) {
                 return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent('Stop the server before installing a new version.')}`);
             }
 
-            const catalog = loadArchlightCatalog();
-            const loader = String(req.body.loader || '').trim();
-            const version = String(req.body.version || '').trim();
-            const buildName = String(req.body.build || '').trim();
-            const build = resolveArchlightBuild(catalog, loader, version, buildName);
-            if (!build) {
-                return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent('Invalid loader/version/build selection.')}`);
-            }
-            const downloadUrl = buildArchlightDownloadUrl(catalog.baseUrl, build.name);
-            if (!downloadUrl) {
-                return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent('Invalid download URL.')}`);
+            const distribution = String(req.body.distribution || 'archlight').trim().toLowerCase();
+            const catalog = {
+                archlight: loadArchlightCatalog(),
+                waterfall: loadWaterfallCatalog()
+            };
+
+            let loader = '';
+            let version = '';
+            let buildName = '';
+            let build = null;
+            let downloadUrl = '';
+            let installModules = false;
+            let modulesDirectory = '';
+            let modulesToInstall = [];
+
+            if (distribution === 'waterfall') {
+                version = String(req.body.version || '').trim();
+                buildName = String(req.body.build || '').trim();
+                build = resolveWaterfallBuild(catalog.waterfall, version, buildName);
+                if (!build) {
+                    return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent('Invalid Waterfall version/build selection.')}`);
+                }
+                downloadUrl = buildWaterfallDownloadUrl(catalog.waterfall.baseUrl, version, build.name);
+                if (!downloadUrl) {
+                    return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent('Invalid download URL.')}`);
+                }
+                installModules = String(req.body.installModules || '').trim().toLowerCase() === 'true';
+                modulesDirectory = normalizeModulesDirectory(catalog.waterfall.modulesFolder);
+                modulesToInstall = installModules ? build.modules : [];
+            } else {
+                loader = String(req.body.loader || '').trim();
+                version = String(req.body.version || '').trim();
+                buildName = String(req.body.build || '').trim();
+                build = resolveArchlightBuild(catalog.archlight, loader, version, buildName);
+                if (!build) {
+                    return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent('Invalid loader/version/build selection.')}`);
+                }
+                downloadUrl = buildArchlightDownloadUrl(catalog.archlight.baseUrl, build.name);
+                if (!downloadUrl) {
+                    return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent('Invalid download URL.')}`);
+                }
             }
 
             const featureFlags = getPanelFeatureFlagsFromMap(res.locals.settings || {});
@@ -14455,6 +14598,29 @@ function registerServerPagesRoutes(ctx) {
                 return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent(installResult.error || 'Failed to download installer file.')}`);
             }
 
+            if (distribution === 'waterfall' && installModules && modulesToInstall.length > 0) {
+                await ensureConnectorDirectory(connectorWs, server.id, modulesDirectory);
+                for (const moduleName of modulesToInstall) {
+                    const moduleUrl = buildWaterfallDownloadUrl(catalog.waterfall.baseUrl, version, moduleName);
+                    if (!moduleUrl) {
+                        return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent('Invalid module download URL.')}`);
+                    }
+                    const moduleReqId = createWsRequestId();
+                    connectorWs.send(JSON.stringify({
+                        type: 'download_file',
+                        serverId: server.id,
+                        requestId: moduleReqId,
+                        directory: modulesDirectory,
+                        url: moduleUrl,
+                        fileName: moduleName
+                    }));
+                    const moduleResult = await waitForConnectorDownloadResult(connectorWs, server.id, moduleReqId, 60000);
+                    if (!moduleResult.success) {
+                        return res.redirect(`/server/${server.containerId}/minecraft/installer?error=${encodeURIComponent(moduleResult.error || 'Failed to download Waterfall module.')}`);
+                    }
+                }
+            }
+
             await writeServerAuditSafe({
                 actorUserId: req.session && req.session.user ? req.session.user.id : null,
                 serverId: server.id,
@@ -14462,14 +14628,21 @@ function registerServerPagesRoutes(ctx) {
                 ip: req.headers['x-forwarded-for'] || req.ip || null,
                 userAgent: req.headers['user-agent'] || null,
                 metadata: {
+                    distribution,
                     loader,
                     version,
                     fileName: build.name,
-                    targetFile
+                    targetFile,
+                    installModules,
+                    modulesDirectory,
+                    modules: modulesToInstall
                 }
             });
 
-            return res.redirect(`/server/${server.containerId}/minecraft/installer?success=${encodeURIComponent(`Installed ${build.name} to ${targetFile}.`)}`);
+            const suffix = distribution === 'waterfall' && installModules && modulesToInstall.length > 0
+                ? ` + ${modulesToInstall.length} modules`
+                : '';
+            return res.redirect(`/server/${server.containerId}/minecraft/installer?success=${encodeURIComponent(`Installed ${build.name} to ${targetFile}${suffix}.`)}`);
         } catch (err) {
             console.error('Error installing minecraft version:', err);
             return res.redirect(`/server/${req.params.containerId}/minecraft/installer?error=${encodeURIComponent('Failed to install Minecraft version.')}`);

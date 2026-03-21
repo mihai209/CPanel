@@ -120,6 +120,18 @@ async function updateIncidentCenterRecordStatus(Settings, id, status) {
     return target;
 }
 
+async function clearIncidentCenterRecords(Settings) {
+    await setIncidentCenterRecords(Settings, []);
+    return [];
+}
+
+async function clearResolvedIncidentCenterRecords(Settings) {
+    const list = await getIncidentCenterRecords(Settings);
+    const remaining = list.filter((entry) => normalizeIncidentStatus(entry && entry.status) !== 'resolved');
+    await setIncidentCenterRecords(Settings, remaining);
+    return remaining;
+}
+
 module.exports = {
     INCIDENT_CENTER_SETTING_KEY,
     INCIDENT_CENTER_MAX_RECORDS,
@@ -130,5 +142,7 @@ module.exports = {
     getIncidentCenterRecords,
     setIncidentCenterRecords,
     appendIncidentCenterRecord,
-    updateIncidentCenterRecordStatus
+    updateIncidentCenterRecordStatus,
+    clearIncidentCenterRecords,
+    clearResolvedIncidentCenterRecords
 };

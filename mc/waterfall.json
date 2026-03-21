@@ -1,0 +1,153 @@
+{
+  "waterfall": {
+    "base_url": "https://mc-archive.freecore.dpdns.org/waterfall/",
+    "versions": {
+      "1.11": {
+        "builds": [
+          "waterfall-1.11-108.jar"
+        ],
+        "modules": [
+          "cmd_alert-1.11-108.jar",
+          "cmd_find-1.11-108.jar",
+          "cmd_list-1.11-108.jar",
+          "cmd_send-1.11-108.jar",
+          "cmd_server-1.11-108.jar",
+          "reconnect_yaml-1.11-108.jar"
+        ]
+      },
+      "1.12": {
+        "builds": [
+          "waterfall-1.12-185.jar"
+        ],
+        "modules": [
+          "cmd_alert-1.12-185.jar",
+          "cmd_find-1.12-185.jar",
+          "cmd_list-1.12-185.jar",
+          "cmd_send-1.12-185.jar",
+          "cmd_server-1.12-185.jar",
+          "reconnect_yaml-1.12-185.jar"
+        ]
+      },
+      "1.13": {
+        "builds": [
+          "waterfall-1.13-276.jar"
+        ],
+        "modules": [
+          "cmd_alert-1.13-276.jar",
+          "cmd_find-1.13-276.jar",
+          "cmd_list-1.13-276.jar",
+          "cmd_send-1.13-276.jar",
+          "cmd_server-1.13-276.jar",
+          "reconnect_yaml-1.13-276.jar"
+        ]
+      },
+      "1.14": {
+        "builds": [
+          "waterfall-1.14-301.jar"
+        ],
+        "modules": [
+          "cmd_alert-1.14-301.jar",
+          "cmd_find-1.14-301.jar",
+          "cmd_list-1.14-301.jar",
+          "cmd_send-1.14-301.jar",
+          "cmd_server-1.14-301.jar",
+          "reconnect_yaml-1.14-301.jar"
+        ]
+      },
+      "1.15": {
+        "builds": [
+          "waterfall-1.15-350.jar"
+        ],
+        "modules": [
+          "cmd_alert-1.15-350.jar",
+          "cmd_find-1.15-350.jar",
+          "cmd_list-1.15-350.jar",
+          "cmd_send-1.15-350.jar",
+          "cmd_server-1.15-350.jar",
+          "reconnect_yaml-1.15-350.jar"
+        ]
+      },
+      "1.16": {
+        "builds": [
+          "waterfall-1.16-431.jar"
+        ],
+        "modules": [
+          "cmd_alert-1.16-431.jar",
+          "cmd_find-1.16-431.jar",
+          "cmd_list-1.16-431.jar",
+          "cmd_send-1.16-431.jar",
+          "cmd_server-1.16-431.jar"
+        ]
+      },
+      "1.17": {
+        "builds": [
+          "waterfall-1.17-454.jar"
+        ],
+        "modules": [
+          "cmd_alert-1.17-454.jar",
+          "cmd_find-1.17-454.jar",
+          "cmd_list-1.17-454.jar",
+          "cmd_send-1.17-454.jar",
+          "cmd_server-1.17-454.jar",
+          "reconnect_yaml-1.17-454.jar"
+        ]
+      },
+      "1.18": {
+        "builds": [
+          "waterfall-1.18-488.jar"
+        ],
+        "modules": [
+          "cmd_alert-1.18-488.jar",
+          "cmd_find-1.18-488.jar",
+          "cmd_list-1.18-488.jar",
+          "cmd_send-1.18-488.jar",
+          "cmd_server-1.18-488.jar",
+          "reconnect_yaml-1.18-488.jar"
+        ]
+      },
+      "1.19": {
+        "builds": [
+          "waterfall-1.19-535.jar"
+        ],
+        "modules": [
+          "cmd_alert-1.19-535.jar",
+          "cmd_find-1.19-535.jar",
+          "cmd_kick-1.19-535.jar",
+          "cmd_list-1.19-535.jar",
+          "cmd_send-1.19-535.jar",
+          "cmd_server-1.19-535.jar",
+          "reconnect_yaml-1.19-535.jar"
+        ]
+      },
+      "1.20": {
+        "builds": [
+          "waterfall-1.20-578.jar"
+        ],
+        "modules": [
+          "cmd_alert-1.20-578.jar",
+          "cmd_find-1.20-578.jar",
+          "cmd_kick-1.20-578.jar",
+          "cmd_list-1.20-578.jar",
+          "cmd_send-1.20-578.jar",
+          "cmd_server-1.20-578.jar",
+          "reconnect_yaml-1.20-578.jar"
+        ]
+      },
+      "1.21": {
+        "builds": [
+          "waterfall-1.21-603.jar"
+        ],
+        "modules": [
+          "cmd_alert-1.21-603.jar",
+          "cmd_find-1.21-603.jar",
+          "cmd_kick-1.21-603.jar",
+          "cmd_list-1.21-603.jar",
+          "cmd_send-1.21-603.jar",
+          "cmd_server-1.21-603.jar",
+          "reconnect_yaml-1.21-603.jar"
+        ]
+      }
+    },
+    "modules_folder": "/home/container/modules/"
+  }
+}

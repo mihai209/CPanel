@@ -53,7 +53,27 @@
                 <div class="row g-4">
                     <div class="col-xl-8">
                         <div class="incident-card p-3">
-                            <h5 class="fs-6 fw-bold text-light mb-3"><i class="bi bi-exclamation-triangle me-2"></i>Runtime Incidents</h5>
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                                <h5 class="fs-6 fw-bold text-light mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Runtime Incidents</h5>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <a href="/admin/incidents/export.json" class="btn btn-outline-info btn-sm">
+                                        <i class="bi bi-download me-1"></i>Export JSON
+                                    </a>
+                                    <a href="/admin/incidents/export.html" class="btn btn-outline-info btn-sm">
+                                        <i class="bi bi-filetype-html me-1"></i>Export HTML
+                                    </a>
+                                    <form method="POST" action="/admin/incidents/clear-resolved" onsubmit="return confirm('Clear resolved incidents?');">
+                                        <button type="submit" class="btn btn-outline-warning btn-sm">
+                                            <i class="bi bi-check2-circle me-1"></i>Clear Resolved
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="/admin/incidents/clear" onsubmit="return confirm('Clear all runtime incidents? This cannot be undone.');">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                                            <i class="bi bi-trash3 me-1"></i>Clear All
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
                             <div class="d-grid gap-2">
                                 <% if (!incidentCenter || incidentCenter.length === 0) { %>
                                     <div class="incident-row muted-small">No runtime incidents recorded.</div>

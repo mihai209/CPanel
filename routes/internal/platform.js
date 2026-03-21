@@ -6,7 +6,9 @@ const {
 } = require('../../core/rbac');
 const {
     getIncidentCenterRecords,
-    updateIncidentCenterRecordStatus
+    updateIncidentCenterRecordStatus,
+    clearIncidentCenterRecords,
+    clearResolvedIncidentCenterRecords
 } = require('../../core/incidents');
 
 const EXTENSION_INCIDENTS_SETTING_KEY = 'extensionIncidentsRecords';
@@ -216,6 +218,102 @@ function registerPlatformRoutes(deps) {
             return res.redirect('/admin/incidents?error=' + encodeURIComponent('Incident not found.'));
         }
         return res.redirect('/admin/incidents?success=' + encodeURIComponent('Incident reopened.'));
+    });
+
+    app.post('/admin/incidents/clear', requireAuth, requireAdmin, requirePermission('admin.incidents.manage'), async (req, res) => {
+        await clearIncidentCenterRecords(Settings);
+        return res.redirect('/admin/incidents?success=' + encodeURIComponent('Incident Center cleared.'));
+    });
+
+    app.post('/admin/incidents/clear-resolved', requireAuth, requireAdmin, requirePermission('admin.incidents.manage'), async (req, res) => {
+        const remaining = await clearResolvedIncidentCenterRecords(Settings);
+        const removed = Math.max(0, (remaining ? 0 : 0));
+        return res.redirect('/admin/incidents?success=' + encodeURIComponent('Resolved incidents cleared.'));
+    });
+
+    app.get('/admin/incidents/export.json', requireAuth, requireAdmin, requirePermission('admin.incidents.view'), async (req, res) => {
+        const incidentCenter = await getIncidentCenterRecords(Settings);
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', 'attachment; filename="incident-center.json"');
+        return res.send(JSON.stringify(incidentCenter || [], null, 2));
+    });
+
+    app.get('/admin/incidents/export.html', requireAuth, requireAdmin, requirePermission('admin.incidents.view'), async (req, res) => {
+        const incidentCenter = await getIncidentCenterRecords(Settings);
+        const rows = (incidentCenter || []).map((item) => ({
+            id: item.id,
+            title: item.title,
+            message: item.message || '',
+            severity: item.severity,
+            status: item.status,
+            source: item.source || 'runtime',
+            serverId: item.serverId || '',
+            createdAt: new Date(Number(item.createdAtMs || Date.now())).toLocaleString(),
+            updatedAt: new Date(Number(item.updatedAtMs || Date.now())).toLocaleString()
+        }));
+
+        const escapeHtml = (value) => String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+
+        const htmlRows = rows.map((row) => `
+            <tr>
+                <td>${escapeHtml(row.id)}</td>
+                <td>${escapeHtml(row.title)}</td>
+                <td>${escapeHtml(row.message)}</td>
+                <td>${escapeHtml(row.severity)}</td>
+                <td>${escapeHtml(row.status)}</td>
+                <td>${escapeHtml(row.source)}</td>
+                <td>${escapeHtml(row.serverId)}</td>
+                <td>${escapeHtml(row.createdAt)}</td>
+                <td>${escapeHtml(row.updatedAt)}</td>
+            </tr>
+        `).join('');
+
+        const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Incident Center Export</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 24px; background: #111827; color: #e5e7eb; }
+        h1 { font-size: 20px; margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th, td { border: 1px solid #374151; padding: 6px 8px; vertical-align: top; }
+        th { background: #1f2937; text-align: left; }
+        tr:nth-child(even) td { background: #111827; }
+    </style>
+</head>
+<body>
+    <h1>Incident Center Export</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Message</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Source</th>
+                <th>Server</th>
+                <th>Created</th>
+                <th>Updated</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${htmlRows}
+        </tbody>
+    </table>
+</body>
+</html>`;
+
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="incident-center.html"');
+        return res.send(html);
     });
 
     app.get('/admin/platform/diagnostics', requireAuth, requireAdmin, requirePermission('admin.observability.view'), async (req, res) => {
