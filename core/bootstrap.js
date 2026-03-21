@@ -102,7 +102,14 @@ function bootstrapApp(deps) {
         }
     }));
 
-    app.use(csrf());
+    const csrfMiddleware = csrf();
+    app.use((req, res, next) => {
+        const path = String(req && (req.originalUrl || req.url) || '');
+        if (path.startsWith('/api/connector/')) {
+            return next();
+        }
+        return csrfMiddleware(req, res, next);
+    });
 
     if (!usingRedisSessionStore && typeof sessionStore.sync === 'function') {
         sessionStore.sync().catch((error) => {
