@@ -636,3 +636,63 @@ const navSections = [
         });
     })();
 </script>
+<script>
+    (() => {
+        if (window.__csrfInjected) return;
+        const token = <%- JSON.stringify(typeof csrfToken !== 'undefined' ? csrfToken : '') %>;
+        if (!token) return;
+        window.__csrfInjected = true;
+
+        const ensureFormToken = (form) => {
+            if (!form || !form.method || String(form.method).toLowerCase() === 'get') return;
+            if (form.querySelector('input[name="_csrf"]')) return;
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = '_csrf';
+            input.value = token;
+            form.appendChild(input);
+        };
+
+        document.querySelectorAll('form').forEach(ensureFormToken);
+        document.addEventListener('submit', (event) => ensureFormToken(event.target));
+
+        const isSameOrigin = (url) => {
+            try {
+                const u = new URL(url, window.location.origin);
+                return u.origin === window.location.origin;
+            } catch (_) {
+                return true;
+            }
+        };
+
+        if (typeof window.fetch === 'function') {
+            const originalFetch = window.fetch.bind(window);
+            window.fetch = (input, init = {}) => {
+                const url = typeof input === 'string' ? input : (input && input.url) || '';
+                if (isSameOrigin(url)) {
+                    const headers = new Headers((init && init.headers) || {});
+                    if (!headers.has('X-CSRF-Token') && !headers.has('CSRF-Token')) {
+                        headers.set('X-CSRF-Token', token);
+                    }
+                    init = Object.assign({}, init, { headers });
+                }
+                return originalFetch(input, init);
+            };
+        }
+
+        const originalOpen = XMLHttpRequest.prototype.open;
+        const originalSend = XMLHttpRequest.prototype.send;
+        XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+            this.__csrfUrl = url;
+            return originalOpen.call(this, method, url, ...rest);
+        };
+        XMLHttpRequest.prototype.send = function(body) {
+            if (this.__csrfUrl && isSameOrigin(this.__csrfUrl)) {
+                try {
+                    this.setRequestHeader('X-CSRF-Token', token);
+                } catch (_) {}
+            }
+            return originalSend.call(this, body);
+        };
+    })();
+</script>

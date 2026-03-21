@@ -84,9 +84,11 @@
     </script>
     <script>
     (() => {
+        if (window.__csrfInjected) return;
         const meta = document.querySelector('meta[name="csrf-token"]');
         const token = meta ? meta.getAttribute('content') : '';
         if (!token) return;
+        window.__csrfInjected = true;
 
         const ensureFormToken = (form) => {
             if (!form || !form.method || String(form.method).toLowerCase() === 'get') return;
