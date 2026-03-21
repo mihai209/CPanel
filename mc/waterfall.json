@@ -1,59 +1,7 @@
 {
   "waterfall": {
-    "base_url": "https://mc-archive.freecore.dpdns.org/waterfall/",
+    "base_url": "https://mc-archive-rocky.vercel.app/waterfall",
     "versions": {
-      "1.11": {
-        "builds": [
-          "waterfall-1.11-108.jar"
-        ],
-        "modules": [
-          "cmd_alert-1.11-108.jar",
-          "cmd_find-1.11-108.jar",
-          "cmd_list-1.11-108.jar",
-          "cmd_send-1.11-108.jar",
-          "cmd_server-1.11-108.jar",
-          "reconnect_yaml-1.11-108.jar"
-        ]
-      },
-      "1.12": {
-        "builds": [
-          "waterfall-1.12-185.jar"
-        ],
-        "modules": [
-          "cmd_alert-1.12-185.jar",
-          "cmd_find-1.12-185.jar",
-          "cmd_list-1.12-185.jar",
-          "cmd_send-1.12-185.jar",
-          "cmd_server-1.12-185.jar",
-          "reconnect_yaml-1.12-185.jar"
-        ]
-      },
-      "1.13": {
-        "builds": [
-          "waterfall-1.13-276.jar"
-        ],
-        "modules": [
-          "cmd_alert-1.13-276.jar",
-          "cmd_find-1.13-276.jar",
-          "cmd_list-1.13-276.jar",
-          "cmd_send-1.13-276.jar",
-          "cmd_server-1.13-276.jar",
-          "reconnect_yaml-1.13-276.jar"
-        ]
-      },
-      "1.14": {
-        "builds": [
-          "waterfall-1.14-301.jar"
-        ],
-        "modules": [
-          "cmd_alert-1.14-301.jar",
-          "cmd_find-1.14-301.jar",
-          "cmd_list-1.14-301.jar",
-          "cmd_send-1.14-301.jar",
-          "cmd_server-1.14-301.jar",
-          "reconnect_yaml-1.14-301.jar"
-        ]
-      },
       "1.15": {
         "builds": [
           "waterfall-1.15-350.jar"

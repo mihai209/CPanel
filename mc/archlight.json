@@ -1,6 +1,6 @@
 {
   "archlight": {
-    "base_url": "https://mc-archive.freecore.dpdns.org/arclight/",
+    "base_url": "https://mc-archive-rocky.vercel.app/archlight/",
     "loaders": {
       "fabric": {
         "1.20.4": [
