@@ -730,6 +730,14 @@ const navSections = [
 
         document.querySelectorAll('form').forEach(ensureFormToken);
         document.addEventListener('submit', (event) => ensureFormToken(event.target));
+        if (!HTMLFormElement.prototype.__csrfWrapped) {
+            const originalSubmit = HTMLFormElement.prototype.submit;
+            HTMLFormElement.prototype.submit = function() {
+                try { ensureFormToken(this); } catch (_) {}
+                return originalSubmit.call(this);
+            };
+            HTMLFormElement.prototype.__csrfWrapped = true;
+        }
 
         const isSameOrigin = (url) => {
             try {
