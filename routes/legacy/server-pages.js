@@ -2344,6 +2344,326 @@ function registerServerPagesRoutes(ctx) {
         return response || { success: false, error: 'No response from connector.' };
     }
 
+    async function runConnectorArchiveCreate(connectorWs, serverId, directory, archiveName, items, timeoutMs = 60000) {
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return { success: false, error: 'Connector is offline.' };
+        }
+        const normalizedDirectory = String(directory || '/').trim() || '/';
+        const requestedArchiveName = String(archiveName || '').trim();
+        const expectedArchiveName = requestedArchiveName.toLowerCase().endsWith('.zip')
+            ? requestedArchiveName
+            : `${requestedArchiveName}.zip`;
+        if (!requestedArchiveName) {
+            return { success: false, error: 'Archive name is required.' };
+        }
+        const requestedItems = Array.isArray(items) ? items.map((entry) => String(entry || '').trim()).filter(Boolean) : [];
+        if (!requestedItems.length) {
+            return { success: false, error: 'No items selected for archive.' };
+        }
+
+        try {
+            connectorWs.send(JSON.stringify({
+                type: 'create_archive',
+                serverId,
+                directory: normalizedDirectory,
+                archiveName: expectedArchiveName,
+                items: requestedItems
+            }));
+        } catch (error) {
+            return { success: false, error: String(error && error.message || 'Failed to dispatch archive create request.') };
+        }
+
+        const response = await waitForConnectorMessage(connectorWs, (message) => {
+            if (!message || Number.parseInt(message.serverId, 10) !== Number.parseInt(serverId, 10)) return null;
+            if (String(message.type || '') === 'archive_complete' && String(message.directory || '') === normalizedDirectory) {
+                const actualName = String(message.archiveName || '');
+                const requestedLower = requestedArchiveName.toLowerCase();
+                const actualLower = actualName.toLowerCase();
+                const expectedLower = requestedLower.endsWith('.zip') ? requestedLower : `${requestedLower}.zip`;
+                if (actualLower !== requestedLower && actualLower !== expectedLower) return null;
+                return {
+                    success: Boolean(message.success),
+                    archiveName: actualName || expectedArchiveName,
+                    directory: normalizedDirectory,
+                    error: String(message.error || '')
+                };
+            }
+            if (String(message.type || '') === 'error') {
+                return { success: false, error: String(message.message || 'Connector returned an error.') };
+            }
+            return null;
+        }, timeoutMs);
+
+        if (!response) {
+            return { success: false, error: 'Timed out waiting for archive creation.' };
+        }
+        if (!response.archiveName) {
+            response.archiveName = expectedArchiveName;
+        }
+        return response;
+    }
+
+    async function runConnectorArchiveExtract(connectorWs, serverId, directory, name, targetDirectory, timeoutMs = 60000) {
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return { success: false, error: 'Connector is offline.' };
+        }
+        const normalizedDirectory = String(directory || '/').trim() || '/';
+        const archiveName = String(name || '').trim();
+        const normalizedTargetDirectory = String(targetDirectory || '/').trim() || '/';
+        if (!archiveName) {
+            return { success: false, error: 'Archive name is required.' };
+        }
+        try {
+            connectorWs.send(JSON.stringify({
+                type: 'extract_archive',
+                serverId,
+                directory: normalizedDirectory,
+                name: archiveName,
+                targetDirectory: normalizedTargetDirectory
+            }));
+        } catch (error) {
+            return { success: false, error: String(error && error.message || 'Failed to dispatch archive extract request.') };
+        }
+
+        const response = await waitForConnectorMessage(connectorWs, (message) => {
+            if (!message || Number.parseInt(message.serverId, 10) !== Number.parseInt(serverId, 10)) return null;
+            if (String(message.type || '') === 'extract_complete'
+                && String(message.directory || '') === normalizedDirectory
+                && String(message.targetDirectory || '') === normalizedTargetDirectory) {
+                const archivePath = String(message.archivePath || '').replace(/\\/g, '/');
+                if (archivePath && !archivePath.endsWith(`/${archiveName}`) && archivePath !== (normalizedDirectory === '/' ? `/${archiveName}` : `${normalizedDirectory}/${archiveName}`)) {
+                    return null;
+                }
+                return {
+                    success: Boolean(message.success),
+                    error: String(message.error || '')
+                };
+            }
+            if (String(message.type || '') === 'error') {
+                return { success: false, error: String(message.message || 'Connector returned an error.') };
+            }
+            return null;
+        }, timeoutMs);
+
+        return response || { success: false, error: 'Timed out waiting for archive extraction.' };
+    }
+
+    function normalizeMinecraftWorldFolderName(value) {
+        const trimmed = String(value || '').trim();
+        if (!trimmed || trimmed === '.' || trimmed === '..') return '';
+        if (trimmed.length > 80) return '';
+        if (/[\\/]/.test(trimmed)) return '';
+        if (!/^[A-Za-z0-9._ -]+$/.test(trimmed)) return '';
+        return trimmed;
+    }
+
+    function updateMinecraftPropertiesValue(content, key, nextValue) {
+        const normalizedKey = String(key || '').trim();
+        if (!normalizedKey) return String(content || '');
+        const normalizedValue = String(nextValue === undefined || nextValue === null ? '' : nextValue);
+        const lines = String(content || '').replace(/\r\n/g, '\n').split('\n');
+        const keyRegex = new RegExp(`^(\\s*${normalizedKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*[:=]\\s*).*$`);
+        let replaced = false;
+        const nextLines = lines.map((line) => {
+            if (keyRegex.test(line)) {
+                replaced = true;
+                return `${normalizedKey}=${normalizedValue}`;
+            }
+            return line;
+        });
+        if (!replaced) {
+            nextLines.push(`${normalizedKey}=${normalizedValue}`);
+        }
+        return nextLines.join('\n');
+    }
+
+    function stringifyMinecraftSeedValue(value) {
+        if (value === undefined || value === null) return '';
+        if (typeof value === 'bigint') return value.toString();
+        if (typeof value === 'number' && Number.isFinite(value)) return `${Math.trunc(value)}`;
+        if (typeof value === 'string') return value.trim();
+        if (typeof value === 'object') {
+            if (Object.prototype.hasOwnProperty.call(value, 'value')) {
+                return stringifyMinecraftSeedValue(value.value);
+            }
+            if (Object.prototype.hasOwnProperty.call(value, 'low') && Object.prototype.hasOwnProperty.call(value, 'high')) {
+                const low = BigInt(Number(value.low) >>> 0);
+                const high = BigInt(Number(value.high) || 0);
+                return ((high << 32n) | low).toString();
+            }
+        }
+        return '';
+    }
+
+    function extractMinecraftWorldLevelInfo(parsedLevelDat) {
+        const root = parsedLevelDat && typeof parsedLevelDat === 'object' ? parsedLevelDat : {};
+        const data = root.Data && typeof root.Data === 'object' ? root.Data : root;
+        const worldGenSettings = data.WorldGenSettings && typeof data.WorldGenSettings === 'object' ? data.WorldGenSettings : {};
+        const seed = stringifyMinecraftSeedValue(worldGenSettings.seed !== undefined ? worldGenSettings.seed : data.RandomSeed);
+        return {
+            seed,
+            levelName: String(data.LevelName || '').trim(),
+            gameType: data.GameType !== undefined ? String(data.GameType) : '',
+            difficulty: data.Difficulty !== undefined ? String(data.Difficulty) : '',
+            lastPlayed: data.LastPlayed !== undefined ? String(data.LastPlayed) : ''
+        };
+    }
+
+    async function buildMinecraftWorldInventory(server, connectorWs) {
+        let levelName = 'world';
+        let propertiesContent = '';
+        const propertiesResult = await readConnectorTextFile(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.serverProperties, 8000);
+        if (propertiesResult && propertiesResult.success) {
+            propertiesContent = String(propertiesResult.content || '');
+            const parsed = parseMinecraftProperties(propertiesContent);
+            const configured = String(parsed['level-name'] || '').trim();
+            if (configured) levelName = configured;
+        }
+
+        const rootListing = await runConnectorFileAction(connectorWs, {
+            type: 'list_files',
+            serverId: server.id,
+            directory: '/'
+        }, '/', server.id, 12000);
+        if (!rootListing || !rootListing.success) {
+            return {
+                success: false,
+                error: rootListing && rootListing.error ? rootListing.error : 'Failed to list server root.',
+                levelName,
+                propertiesContent,
+                worlds: []
+            };
+        }
+
+        const rootDirectories = new Map();
+        (rootListing.files || []).forEach((entry) => {
+            if (!entry || !entry.isDirectory) return;
+            const name = String(entry.name || '').trim();
+            if (!name || name.startsWith('.')) return;
+            rootDirectories.set(name, entry);
+        });
+
+        const baseWorldNames = new Set();
+        if (rootDirectories.has(levelName)) {
+            baseWorldNames.add(levelName);
+        }
+
+        for (const name of Array.from(rootDirectories.keys()).slice(0, 40)) {
+            if (name.endsWith('_nether') || name.endsWith('_the_end')) continue;
+            const listing = await runConnectorFileAction(connectorWs, {
+                type: 'list_files',
+                serverId: server.id,
+                directory: `/${name}`
+            }, `/${name}`, server.id, 8000);
+            if (listing && listing.success) {
+                const hasLevelDat = (listing.files || []).some((file) => String(file && file.name || '') === 'level.dat');
+                if (hasLevelDat) baseWorldNames.add(name);
+            }
+        }
+
+        const worlds = [];
+        for (const worldName of Array.from(baseWorldNames).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))) {
+            const worldDir = `/${worldName}`;
+            const worldListing = await runConnectorFileAction(connectorWs, {
+                type: 'list_files',
+                serverId: server.id,
+                directory: worldDir
+            }, worldDir, server.id, 10000);
+            const worldFiles = worldListing && worldListing.success ? (worldListing.files || []) : [];
+            const hasLevelDat = worldFiles.some((file) => String(file && file.name || '') === 'level.dat');
+            const regionListing = await runConnectorFileAction(connectorWs, {
+                type: 'list_files',
+                serverId: server.id,
+                directory: `${worldDir}/region`
+            }, `${worldDir}/region`, server.id, 8000);
+            const regionFiles = regionListing && regionListing.success
+                ? (regionListing.files || []).filter((file) => file && !file.isDirectory && String(file.name || '').toLowerCase().endsWith('.mca'))
+                : [];
+            const playerDataListing = await runConnectorFileAction(connectorWs, {
+                type: 'list_files',
+                serverId: server.id,
+                directory: `${worldDir}/playerdata`
+            }, `${worldDir}/playerdata`, server.id, 8000);
+            const playerDataCount = playerDataListing && playerDataListing.success
+                ? (playerDataListing.files || []).filter((file) => file && !file.isDirectory && String(file.name || '').toLowerCase().endsWith('.dat')).length
+                : 0;
+            const totalBytes = regionFiles.reduce((sum, file) => sum + (Number.parseInt(file.size, 10) || 0), 0);
+            let levelInfo = { seed: '', levelName: '', gameType: '', difficulty: '', lastPlayed: '' };
+            if (hasLevelDat) {
+                const base64Result = await readConnectorFileContentBase64(connectorWs, server.id, `${worldDir}/level.dat`, 10000);
+                if (base64Result && base64Result.success && base64Result.contentBase64) {
+                    const parsed = await parseMinecraftPlayerNbt(base64Result.contentBase64);
+                    if (parsed) {
+                        levelInfo = extractMinecraftWorldLevelInfo(parsed);
+                    }
+                }
+            }
+            worlds.push({
+                name: worldName,
+                active: worldName === levelName,
+                hasLevelDat,
+                hasNether: rootDirectories.has(`${worldName}_nether`),
+                hasEnd: rootDirectories.has(`${worldName}_the_end`),
+                sizeMb: Number((totalBytes / (1024 * 1024)).toFixed(2)),
+                regionFiles: regionFiles.length,
+                chunkEstimate: regionFiles.length * 1024,
+                knownPlayers: playerDataCount,
+                lastModified: (rootDirectories.get(worldName) && rootDirectories.get(worldName).mtime) || null,
+                seed: levelInfo.seed,
+                levelDisplayName: levelInfo.levelName,
+                gameType: levelInfo.gameType,
+                difficulty: levelInfo.difficulty
+            });
+        }
+
+        worlds.sort((left, right) => {
+            if (left.active && !right.active) return -1;
+            if (!left.active && right.active) return 1;
+            return String(left.name || '').localeCompare(String(right.name || ''), undefined, { sensitivity: 'base' });
+        });
+
+        return {
+            success: true,
+            levelName,
+            propertiesContent,
+            worlds
+        };
+    }
+
+    async function resolveMinecraftWorldCenterContext(req, requiredPermissions = []) {
+        const server = await Server.findOne({
+            where: { containerId: req.params.containerId },
+            include: [
+                { model: Allocation, as: 'allocation', include: [{ model: Connector, as: 'connector' }] },
+                { model: Image, as: 'image' }
+            ]
+        });
+        if (!server) {
+            return { ok: false, status: 404, error: 'Server not found.' };
+        }
+        const access = await resolveServerAccess(server, req.session.user);
+        if (!hasServerPermission(access, 'server.minecraft')) {
+            return { ok: false, status: 403, error: 'Missing permission: server.minecraft.', server, access };
+        }
+        if (requiredPermissions.some((permission) => !hasServerPermission(access, permission))) {
+            return { ok: false, status: 403, error: `Missing permission: ${requiredPermissions.find((permission) => !hasServerPermission(access, permission))}.`, server, access };
+        }
+        if (!isServerLikelyMinecraft(server)) {
+            return { ok: false, status: 400, error: 'Minecraft tools are available only for Minecraft servers.', server, access };
+        }
+        if (server.isSuspended) {
+            return { ok: false, status: 423, error: 'Server is suspended.', server, access };
+        }
+        if (!server.allocation || !server.allocation.connectorId) {
+            return { ok: false, status: 400, error: 'Server allocation is missing.', server, access };
+        }
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return { ok: false, status: 503, error: 'Connector is offline.', server, access };
+        }
+        return { ok: true, server, access, connectorWs };
+    }
+
     function resolveModrinthProjectType(kind) {
         if (kind === 'plugin') return 'plugin';
         if (kind === 'mod') return 'mod';
@@ -14500,6 +14820,308 @@ function registerServerPagesRoutes(ctx) {
         } catch (err) {
             console.error('Error loading Minecraft center:', err);
             return res.redirect('/?error=' + encodeURIComponent('Failed to load Minecraft center.'));
+        }
+    });
+
+    app.get('/server/:containerId/minecraft/world-center', requireAuth, async (req, res) => {
+        try {
+            const context = await resolveMinecraftWorldCenterContext(req, ['server.files']);
+            if (!context.ok) {
+                if (context.status === 404) return res.redirect('/server/notfound');
+                if (context.status === 403) return res.redirect('/server/no-permissions');
+                if (context.status === 423) return res.redirect(`/server/${req.params.containerId}/suspended`);
+                return res.redirect(`/server/${req.params.containerId}/overview?error=${encodeURIComponent(context.error || 'Failed to load world center.')}`);
+            }
+
+            const inventory = await buildMinecraftWorldInventory(context.server, context.connectorWs);
+            if (!inventory.success) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft-center?error=${encodeURIComponent(inventory.error || 'Failed to inspect Minecraft worlds.')}`);
+            }
+
+            return res.render('server/minecraft-world-center', {
+                server: context.server,
+                user: req.session.user,
+                title: `World Center ${context.server.name}`,
+                path: '/servers',
+                active: 'mccenter',
+                worldData: inventory,
+                feedback: {
+                    success: String(req.query.success || '').trim(),
+                    error: String(req.query.error || '').trim(),
+                    warning: String(req.query.warning || '').trim(),
+                    exportFile: String(req.query.exportFile || '').trim()
+                }
+            });
+        } catch (err) {
+            console.error('Error loading Minecraft world center:', err);
+            return res.redirect(`/server/${req.params.containerId}/minecraft-center?error=${encodeURIComponent('Failed to load world center.')}`);
+        }
+    });
+
+    app.post('/server/:containerId/minecraft/world-center/swap', requireAuth, async (req, res) => {
+        try {
+            const context = await resolveMinecraftWorldCenterContext(req, ['server.files']);
+            if (!context.ok) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(context.error || 'Access denied.')}`);
+            }
+
+            const nextWorld = normalizeMinecraftWorldFolderName(req.body.activeWorld);
+            if (!nextWorld) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Invalid target world name.')}`);
+            }
+
+            const inventory = await buildMinecraftWorldInventory(context.server, context.connectorWs);
+            if (!inventory.success) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(inventory.error || 'Failed to inspect worlds.')}`);
+            }
+            if (!inventory.worlds.some((entry) => entry.name === nextWorld)) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Selected world does not exist.')}`);
+            }
+
+            const nextProperties = updateMinecraftPropertiesValue(inventory.propertiesContent || '', 'level-name', nextWorld);
+            const writeResult = await writeConnectorTextFile(context.connectorWs, context.server.id, MINECRAFT_CONFIG_PATHS.serverProperties, nextProperties, 15000);
+            if (!writeResult.success) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(writeResult.error || 'Failed to update server.properties.')}`);
+            }
+
+            const warning = String(context.server.status || '').toLowerCase() === 'running'
+                ? '&warning=' + encodeURIComponent('Active world updated in server.properties. Restart the server to load the new world.')
+                : '';
+            return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?success=${encodeURIComponent(`Active world set to ${nextWorld}.`)}${warning}`);
+        } catch (err) {
+            console.error('Error swapping active world:', err);
+            return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Failed to swap active world.')}`);
+        }
+    });
+
+    app.post('/server/:containerId/minecraft/world-center/clone', requireAuth, async (req, res) => {
+        try {
+            const context = await resolveMinecraftWorldCenterContext(req, ['server.files']);
+            if (!context.ok) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(context.error || 'Access denied.')}`);
+            }
+            if (String(context.server.status || '').toLowerCase() === 'running') {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Stop the server before cloning worlds to avoid inconsistent data.')}`);
+            }
+
+            const sourceWorld = normalizeMinecraftWorldFolderName(req.body.sourceWorld);
+            const targetWorld = normalizeMinecraftWorldFolderName(req.body.targetWorld);
+            if (!sourceWorld || !targetWorld) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Source and target world names are required.')}`);
+            }
+            if (sourceWorld === targetWorld) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Target world must be different from source world.')}`);
+            }
+
+            const inventory = await buildMinecraftWorldInventory(context.server, context.connectorWs);
+            if (!inventory.success) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(inventory.error || 'Failed to inspect worlds.')}`);
+            }
+            const sourceEntry = inventory.worlds.find((entry) => entry.name === sourceWorld);
+            if (!sourceEntry) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Source world does not exist.')}`);
+            }
+            if (inventory.worlds.some((entry) => entry.name === targetWorld)) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Target world already exists.')}`);
+            }
+
+            const dimensionTargets = [
+                { source: sourceWorld, target: targetWorld },
+                ...(sourceEntry.hasNether ? [{ source: `${sourceWorld}_nether`, target: `${targetWorld}_nether` }] : []),
+                ...(sourceEntry.hasEnd ? [{ source: `${sourceWorld}_the_end`, target: `${targetWorld}_the_end` }] : [])
+            ];
+
+            for (const pair of dimensionTargets) {
+                const sourceDirectory = `/${pair.source}`;
+                const listing = await runConnectorFileAction(context.connectorWs, {
+                    type: 'list_files',
+                    serverId: context.server.id,
+                    directory: sourceDirectory
+                }, sourceDirectory, context.server.id, 12000);
+                if (!listing.success) {
+                    return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(listing.error || `Failed to inspect ${pair.source}.`)}`);
+                }
+                const itemNames = (listing.files || []).map((entry) => String(entry && entry.name || '').trim()).filter(Boolean);
+                const tempArchiveBase = `.cpanel-worldclone-${pair.target}-${Date.now()}`;
+                const archiveResult = await runConnectorArchiveCreate(context.connectorWs, context.server.id, sourceDirectory, tempArchiveBase, itemNames, 60000);
+                if (!archiveResult.success) {
+                    return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(archiveResult.error || `Failed to archive ${pair.source}.`)}`);
+                }
+                const extractResult = await runConnectorArchiveExtract(context.connectorWs, context.server.id, sourceDirectory, archiveResult.archiveName, `/${pair.target}`, 60000);
+                await runConnectorFileAction(context.connectorWs, {
+                    type: 'delete_files',
+                    serverId: context.server.id,
+                    directory: sourceDirectory,
+                    files: [archiveResult.archiveName]
+                }, sourceDirectory, context.server.id, 12000);
+                if (!extractResult.success) {
+                    return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(extractResult.error || `Failed to extract clone for ${pair.target}.`)}`);
+                }
+            }
+
+            return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?success=${encodeURIComponent(`World ${sourceWorld} cloned to ${targetWorld}.`)}`);
+        } catch (err) {
+            console.error('Error cloning world:', err);
+            return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Failed to clone world.')}`);
+        }
+    });
+
+    app.post('/server/:containerId/minecraft/world-center/prune', requireAuth, async (req, res) => {
+        try {
+            const context = await resolveMinecraftWorldCenterContext(req, ['server.files']);
+            if (!context.ok) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(context.error || 'Access denied.')}`);
+            }
+            if (String(context.server.status || '').toLowerCase() === 'running') {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Stop the server before pruning worlds.')}`);
+            }
+
+            const requested = Array.isArray(req.body.worlds) ? req.body.worlds : [req.body.worlds];
+            const worldNames = requested.map(normalizeMinecraftWorldFolderName).filter(Boolean);
+            if (!worldNames.length) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Select at least one world to prune.')}`);
+            }
+
+            const inventory = await buildMinecraftWorldInventory(context.server, context.connectorWs);
+            if (!inventory.success) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(inventory.error || 'Failed to inspect worlds.')}`);
+            }
+
+            const activeWorld = inventory.levelName;
+            const available = new Map(inventory.worlds.map((entry) => [entry.name, entry]));
+            for (const worldName of worldNames) {
+                if (!available.has(worldName)) {
+                    return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(`World ${worldName} was not found.`)}`);
+                }
+                if (worldName === activeWorld) {
+                    return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(`Cannot prune active world ${worldName}.`)}`);
+                }
+            }
+
+            const deleteTargets = [];
+            worldNames.forEach((worldName) => {
+                const entry = available.get(worldName);
+                deleteTargets.push(worldName);
+                if (entry && entry.hasNether) deleteTargets.push(`${worldName}_nether`);
+                if (entry && entry.hasEnd) deleteTargets.push(`${worldName}_the_end`);
+            });
+
+            const deleteResult = await runConnectorFileAction(context.connectorWs, {
+                type: 'delete_files',
+                serverId: context.server.id,
+                directory: '/',
+                files: deleteTargets
+            }, '/', context.server.id, 20000);
+            if (!deleteResult.success) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(deleteResult.error || 'Failed to prune worlds.')}`);
+            }
+
+            return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?success=${encodeURIComponent(`Pruned ${worldNames.length} world${worldNames.length === 1 ? '' : 's'}.`)}`);
+        } catch (err) {
+            console.error('Error pruning worlds:', err);
+            return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Failed to prune worlds.')}`);
+        }
+    });
+
+    app.post('/server/:containerId/minecraft/world-center/export', requireAuth, async (req, res) => {
+        try {
+            const context = await resolveMinecraftWorldCenterContext(req, ['server.files']);
+            if (!context.ok) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(context.error || 'Access denied.')}`);
+            }
+
+            const worldName = normalizeMinecraftWorldFolderName(req.body.worldName);
+            let archiveName = String(req.body.archiveName || '').trim();
+            if (!worldName) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Select a world to export.')}`);
+            }
+            if (!archiveName) {
+                archiveName = `${worldName}-export.zip`;
+            }
+            archiveName = sanitizeDownloadFileName(archiveName, `${worldName}-export.zip`);
+            if (!archiveName.toLowerCase().endsWith('.zip')) {
+                archiveName += '.zip';
+            }
+
+            const inventory = await buildMinecraftWorldInventory(context.server, context.connectorWs);
+            if (!inventory.success) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(inventory.error || 'Failed to inspect worlds.')}`);
+            }
+            const worldEntry = inventory.worlds.find((entry) => entry.name === worldName);
+            if (!worldEntry) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('World was not found.')}`);
+            }
+
+            const items = [
+                worldName,
+                ...(worldEntry.hasNether ? [`${worldName}_nether`] : []),
+                ...(worldEntry.hasEnd ? [`${worldName}_the_end`] : [])
+            ];
+            const archiveResult = await runConnectorArchiveCreate(context.connectorWs, context.server.id, '/', archiveName, items, 60000);
+            if (!archiveResult.success) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(archiveResult.error || 'Failed to create export archive.')}`);
+            }
+
+            const exportPath = `/${archiveResult.archiveName}`;
+            return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?success=${encodeURIComponent(`Export created for ${worldName}.`)}&exportFile=${encodeURIComponent(exportPath)}`);
+        } catch (err) {
+            console.error('Error exporting world:', err);
+            return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Failed to export world.')}`);
+        }
+    });
+
+    app.post('/server/:containerId/minecraft/world-center/import', requireAuth, async (req, res) => {
+        try {
+            const context = await resolveMinecraftWorldCenterContext(req, ['server.files']);
+            if (!context.ok) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(context.error || 'Access denied.')}`);
+            }
+            if (String(context.server.status || '').toLowerCase() === 'running') {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Stop the server before importing worlds.')}`);
+            }
+
+            const archivePathInfo = parseServerAddonPath(req.body.archivePath);
+            const targetWorld = normalizeMinecraftWorldFolderName(req.body.targetWorld);
+            const importMode = String(req.body.importMode || 'contents').trim() === 'folder' ? 'folder' : 'contents';
+            if (!archivePathInfo || !isMinecraftAddonArchiveFileName(archivePathInfo.fileName)) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Archive path must point to a supported .zip/.tar world archive.')}`);
+            }
+            if (!targetWorld) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Target world name is required.')}`);
+            }
+
+            const inventory = await buildMinecraftWorldInventory(context.server, context.connectorWs);
+            if (!inventory.success) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(inventory.error || 'Failed to inspect worlds.')}`);
+            }
+            if (inventory.worlds.some((entry) => entry.name === targetWorld)) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Target world already exists.')}`);
+            }
+
+            let targetDirectory = `/${targetWorld}`;
+            let warning = '';
+            if (importMode === 'folder') {
+                targetDirectory = '/';
+                warning = 'Archive extracted to root. If the archive contains a top-level world folder, rename it to the exact world name you want if needed.';
+            }
+
+            const extractResult = await runConnectorArchiveExtract(
+                context.connectorWs,
+                context.server.id,
+                archivePathInfo.directory,
+                archivePathInfo.fileName,
+                targetDirectory,
+                60000
+            );
+            if (!extractResult.success) {
+                return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent(extractResult.error || 'Failed to import world archive.')}`);
+            }
+
+            const warningQuery = warning ? `&warning=${encodeURIComponent(warning)}` : '';
+            return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?success=${encodeURIComponent(`World archive imported for ${targetWorld}.`)}${warningQuery}`);
+        } catch (err) {
+            console.error('Error importing world:', err);
+            return res.redirect(`/server/${req.params.containerId}/minecraft/world-center?error=${encodeURIComponent('Failed to import world.')}`);
         }
     });
 
