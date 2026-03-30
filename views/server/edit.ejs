@@ -278,12 +278,34 @@
                 min-width: 0;
             }
 
-            #monaco-editor-container {
+            #monaco-editor-container,
+            #ace-editor-container,
+            #plain-editor-container {
                 position: absolute;
                 top: 0;
                 left: 0;
                 right: 0;
                 bottom: 0;
+            }
+
+            #ace-editor-container.d-none,
+            #monaco-editor-container.d-none,
+            #plain-editor-container.d-none {
+                display: none !important;
+            }
+
+            #plain-editor {
+                width: 100%;
+                height: 100%;
+                border: 0;
+                outline: none;
+                resize: none;
+                background: var(--bg-dark);
+                color: var(--text-primary);
+                font-family: 'JetBrains Mono', 'Fira Code', monospace;
+                font-size: 14px;
+                line-height: 1.55;
+                padding: 1rem;
             }
 
             .loading-overlay {
@@ -440,6 +462,11 @@
                         </div>
                     </div>
                     <div class="navbar-right">
+                        <select class="form-select form-select-sm bg-dark text-light border-secondary" id="editorModeSelect" style="width: 140px;">
+                            <option value="monaco">Monaco</option>
+                            <option value="ace">Ace</option>
+                            <option value="plain">Plain Text</option>
+                        </select>
                         <button type="button" class="btn-action" id="btnToggleTreeView">
                             <i class="bi bi-diagram-3"></i>
                             Tree
@@ -482,6 +509,10 @@
                             <h5 class="text-secondary fw-medium">Loading File Contents...</h5>
                         </div>
                         <div id="monaco-editor-container"></div>
+                        <div id="ace-editor-container" class="d-none"></div>
+                        <div id="plain-editor-container" class="d-none">
+                            <textarea id="plain-editor" spellcheck="false"></textarea>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -489,6 +520,7 @@
 
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
         <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ace.js"></script>
 
         <script>
             // Parse Hash for file path
@@ -500,12 +532,10 @@
                 return null;
             }
 
-            const filePath = getFilePathFromHash();
-            if (!filePath) {
+            const initialFilePath = getFilePathFromHash();
+            if (!initialFilePath) {
                 window.location.href = `/server/<%= server.containerId %>/files`;
             }
-
-            document.getElementById('displayFileName').textContent = filePath.split('/').pop() || filePath;
 
             // Return Button
             document.getElementById('btnReturn').addEventListener('click', () => {
@@ -527,14 +557,17 @@
             const wsUrl = window.location.protocol.replace('http', 'ws') + '//' + window.location.host + '/ws/server/' + serverId + '?token=' + encodeURIComponent(wsToken);
 
             let ws;
-            let editor;
+            let monacoEditor;
+            let aceEditor;
             let currentContent = '';
             let isUnsaved = false;
-            let monacoReady = false;
             let fileLanguage = 'plaintext';
+            let currentFilePath = initialFilePath;
+            let activeEditorMode = 'monaco';
             const wordWrapSettingKey = `cpanel_editor_wrap_${serverId}`;
             let wordWrapEnabled = localStorage.getItem(wordWrapSettingKey) !== '0';
             const treeViewSettingKey = `cpanel_editor_tree_${serverId}`;
+            const editorModeSettingKey = `cpanel_editor_mode_${serverId}`;
             let treeViewEnabled = false;
             const treeCache = new Map();
             const treeExpandedPaths = new Set();
@@ -618,7 +651,7 @@
             }
 
             function getCurrentDirectoryPath() {
-                const normalized = normalizeServerPath(filePath);
+                const normalized = normalizeServerPath(currentFilePath);
                 const lastSlash = normalized.lastIndexOf('/');
                 if (lastSlash <= 0) return '/';
                 return normalized.slice(0, lastSlash);
@@ -631,7 +664,7 @@
                     const childPath = joinServerPath(normalizedParent, entryName);
                     const isDirectory = Boolean(entry && entry.isDirectory);
                     const isExpanded = isDirectory && treeExpandedPaths.has(childPath);
-                    const isActive = normalizeServerPath(filePath) === childPath;
+                    const isActive = normalizeServerPath(currentFilePath) === childPath;
                     const loading = treeLoadingPaths.has(childPath);
                     return `
                         <div class="tree-entry">
@@ -659,11 +692,11 @@
                 toggleBtn.classList.toggle('active', treeViewEnabled);
 
                 if (currentPathLabel) {
-                    currentPathLabel.textContent = normalizeServerPath(filePath);
+                    currentPathLabel.textContent = normalizeServerPath(currentFilePath);
                 }
 
                 if (!treeAllowed) {
-                    if (editor) setTimeout(() => editor.layout(), 20);
+                    setTimeout(layoutActiveEditor, 20);
                     return;
                 }
 
@@ -682,17 +715,17 @@
                     ${treeExpandedPaths.has('/') ? `<div class="tree-children">${renderTreeChildren('/', rootEntries)}</div>` : ''}
                 `;
 
-                if (editor) setTimeout(() => editor.layout(), 20);
+                setTimeout(layoutActiveEditor, 20);
             }
 
             function goToFilePath(targetPath) {
                 const normalizedTarget = normalizeServerPath(targetPath);
-                if (normalizeServerPath(filePath) === normalizedTarget) return;
+                if (normalizeServerPath(currentFilePath) === normalizedTarget) return;
                 if (isUnsaved) {
                     const proceed = window.confirm('You have unsaved changes. Leave this file anyway?');
                     if (!proceed) return;
                 }
-                window.location.href = `/server/${serverId}/files/edit#file=${encodeURIComponent(normalizedTarget)}`;
+                window.location.hash = `file=${encodeURIComponent(normalizedTarget)}`;
             }
 
             function guessLanguage(fileExtension) {
@@ -708,6 +741,155 @@
                 if (['py'].includes(ext)) return 'python';
                 if (['php'].includes(ext)) return 'php';
                 return 'plaintext';
+            }
+
+            function guessAceMode(languageName) {
+                const lang = String(languageName || 'text').toLowerCase();
+                if (lang === 'javascript') return 'javascript';
+                if (lang === 'json') return 'json';
+                if (lang === 'html') return 'html';
+                if (lang === 'css') return 'css';
+                if (lang === 'yaml') return 'yaml';
+                if (lang === 'xml') return 'xml';
+                if (lang === 'markdown') return 'markdown';
+                if (lang === 'shell') return 'sh';
+                if (lang === 'python') return 'python';
+                if (lang === 'php') return 'php';
+                return 'text';
+            }
+
+            function updateDisplayedFileName() {
+                const nameEl = document.getElementById('displayFileName');
+                if (nameEl) {
+                    nameEl.textContent = currentFilePath.split('/').pop() || currentFilePath;
+                }
+            }
+
+            function setSuppressEditorChanges(value) {
+                window.__suppressEditorChanges = Boolean(value);
+            }
+
+            function isSuppressingEditorChanges() {
+                return Boolean(window.__suppressEditorChanges);
+            }
+
+            function handleEditorValueChanged(nextValue) {
+                if (isSuppressingEditorChanges()) return;
+                setUnsavedState(nextValue !== currentContent);
+                updateEditorMeta(nextValue);
+            }
+
+            function ensureMonacoEditor() {
+                return new Promise((resolve) => {
+                    if (monacoEditor) {
+                        resolve(monacoEditor);
+                        return;
+                    }
+                    require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+                    require(['vs/editor/editor.main'], function () {
+                        monaco.editor.defineTheme('cpanel-dark', {
+                            base: 'vs-dark',
+                            inherit: true,
+                            rules: [],
+                            colors: {
+                                'editor.background': '#0f0f12',
+                                'editor.lineHighlightBackground': '#1a1a20',
+                                'editorLineNumber.foreground': '#4b5563',
+                                'editorLineNumber.activeForeground': '#9ca3af',
+                                'editorIndentGuide.background': '#1f2937'
+                            }
+                        });
+                        monacoEditor = monaco.editor.create(document.getElementById('monaco-editor-container'), {
+                            value: '',
+                            language: fileLanguage,
+                            theme: 'cpanel-dark',
+                            automaticLayout: true,
+                            minimap: { enabled: true },
+                            fontSize: 14,
+                            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                            scrollBeyondLastLine: false,
+                            wordWrap: wordWrapEnabled ? 'on' : 'off',
+                            padding: { top: 16 }
+                        });
+                        monacoEditor.onDidChangeModelContent(() => {
+                            handleEditorValueChanged(monacoEditor.getValue());
+                        });
+                        resolve(monacoEditor);
+                    });
+                });
+            }
+
+            function ensureAceEditor() {
+                return new Promise((resolve) => {
+                    if (aceEditor) {
+                        resolve(aceEditor);
+                        return;
+                    }
+                    if (!window.ace) {
+                        resolve(null);
+                        return;
+                    }
+                    const aceContainer = document.getElementById('ace-editor-container');
+                    aceEditor = window.ace.edit(aceContainer);
+                    aceEditor.setTheme('ace/theme/monokai');
+                    aceEditor.session.setUseWrapMode(wordWrapEnabled);
+                    aceEditor.setFontSize(14);
+                    aceEditor.setOptions({
+                        showPrintMargin: false,
+                        useWorker: false
+                    });
+                    aceEditor.session.on('change', () => {
+                        handleEditorValueChanged(aceEditor.getValue());
+                    });
+                    resolve(aceEditor);
+                });
+            }
+
+            function ensurePlainEditor() {
+                const plainEditor = document.getElementById('plain-editor');
+                if (!plainEditor.dataset.bound) {
+                    plainEditor.addEventListener('input', () => {
+                        handleEditorValueChanged(plainEditor.value);
+                    });
+                    plainEditor.dataset.bound = '1';
+                }
+                plainEditor.wrap = wordWrapEnabled ? 'soft' : 'off';
+                return plainEditor;
+            }
+
+            function getActiveEditorValue() {
+                if (activeEditorMode === 'ace' && aceEditor) return aceEditor.getValue();
+                if (activeEditorMode === 'plain') return ensurePlainEditor().value;
+                if (monacoEditor) return monacoEditor.getValue();
+                return currentContent || '';
+            }
+
+            function setActiveEditorValue(value) {
+                const safeValue = typeof value === 'string' ? value : '';
+                setSuppressEditorChanges(true);
+                if (activeEditorMode === 'ace' && aceEditor) {
+                    aceEditor.setValue(safeValue, -1);
+                } else if (activeEditorMode === 'plain') {
+                    ensurePlainEditor().value = safeValue;
+                } else if (monacoEditor) {
+                    monacoEditor.setValue(safeValue);
+                }
+                setSuppressEditorChanges(false);
+                updateEditorMeta(safeValue);
+            }
+
+            function applyEditorLanguage() {
+                if (monacoEditor && window.monaco) {
+                    window.monaco.editor.setModelLanguage(monacoEditor.getModel(), fileLanguage);
+                }
+                if (aceEditor) {
+                    aceEditor.session.setMode(`ace/mode/${guessAceMode(fileLanguage)}`);
+                }
+            }
+
+            function layoutActiveEditor() {
+                if (monacoEditor) monacoEditor.layout();
+                if (aceEditor) aceEditor.resize();
             }
 
             function setSaveLoadingState(isLoading) {
@@ -745,7 +927,7 @@
                 }
                 if (pathChip) {
                     const text = pathChip.querySelector('span');
-                    if (text) text.textContent = filePath;
+                    if (text) text.textContent = currentFilePath;
                 }
             }
 
@@ -758,10 +940,19 @@
             }
 
             function applyWordWrap() {
-                if (!editor) return;
-                editor.updateOptions({
-                    wordWrap: wordWrapEnabled ? 'on' : 'off'
-                });
+                if (monacoEditor) {
+                    monacoEditor.updateOptions({
+                        wordWrap: wordWrapEnabled ? 'on' : 'off'
+                    });
+                }
+                if (aceEditor) {
+                    aceEditor.session.setUseWrapMode(wordWrapEnabled);
+                    aceEditor.resize();
+                }
+                const plainEditor = document.getElementById('plain-editor');
+                if (plainEditor) {
+                    plainEditor.wrap = wordWrapEnabled ? 'soft' : 'off';
+                }
                 updateWordWrapButton();
                 try {
                     localStorage.setItem(wordWrapSettingKey, wordWrapEnabled ? '1' : '0');
@@ -770,58 +961,81 @@
                 }
             }
 
-            function initMonaco(content, fileExtension) {
-                require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
-                require(['vs/editor/editor.main'], function () {
-                    monacoReady = true;
-                    monaco.editor.defineTheme('cpanel-dark', {
-                        base: 'vs-dark',
-                        inherit: true,
-                        rules: [],
-                        colors: {
-                            'editor.background': '#0f0f12',
-                            'editor.lineHighlightBackground': '#1a1a20',
-                            'editorLineNumber.foreground': '#4b5563',
-                            'editorLineNumber.activeForeground': '#9ca3af',
-                            'editorIndentGuide.background': '#1f2937'
-                        }
-                    });
+            async function switchEditorMode(nextMode, providedContent = null) {
+                const allowedMode = ['monaco', 'ace', 'plain'].includes(nextMode) ? nextMode : 'monaco';
+                const contentToPreserve = typeof providedContent === 'string' ? providedContent : getActiveEditorValue();
+                activeEditorMode = allowedMode;
+                document.getElementById('editorModeSelect').value = activeEditorMode;
+                document.getElementById('monaco-editor-container').classList.toggle('d-none', activeEditorMode !== 'monaco');
+                document.getElementById('ace-editor-container').classList.toggle('d-none', activeEditorMode !== 'ace');
+                document.getElementById('plain-editor-container').classList.toggle('d-none', activeEditorMode !== 'plain');
 
-                    fileLanguage = guessLanguage(fileExtension);
-                    if (!editor) {
-                        editor = monaco.editor.create(document.getElementById('monaco-editor-container'), {
-                            value: content,
-                            language: fileLanguage,
-                            theme: 'cpanel-dark',
-                            automaticLayout: true,
-                            minimap: { enabled: true },
-                            fontSize: 14,
-                            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                            scrollBeyondLastLine: false,
-                            wordWrap: wordWrapEnabled ? 'on' : 'off',
-                            padding: { top: 16 }
-                        });
-
-                        editor.onDidChangeModelContent(() => {
-                            const nextValue = editor.getValue();
-                            setUnsavedState(nextValue !== currentContent);
-                            updateEditorMeta(nextValue);
-                        });
-                    } else {
-                        editor.setValue(content);
+                if (activeEditorMode === 'monaco') {
+                    await ensureMonacoEditor();
+                } else if (activeEditorMode === 'ace') {
+                    const aceInstance = await ensureAceEditor();
+                    if (!aceInstance) {
+                        activeEditorMode = 'plain';
+                        document.getElementById('editorModeSelect').value = activeEditorMode;
+                        ensurePlainEditor();
                     }
+                } else {
+                    ensurePlainEditor();
+                }
 
-                    setUnsavedState(false);
-                    updateEditorMeta(content);
-                    updateWordWrapButton();
+                document.getElementById('editorModeSelect').value = activeEditorMode;
+                document.getElementById('monaco-editor-container').classList.toggle('d-none', activeEditorMode !== 'monaco');
+                document.getElementById('ace-editor-container').classList.toggle('d-none', activeEditorMode !== 'ace');
+                document.getElementById('plain-editor-container').classList.toggle('d-none', activeEditorMode !== 'plain');
 
-                    // Hide Loading
+                try {
+                    localStorage.setItem(editorModeSettingKey, activeEditorMode);
+                } catch {
+                    // Ignore localStorage issues.
+                }
+
+                applyEditorLanguage();
+                applyWordWrap();
+                setActiveEditorValue(contentToPreserve);
+                setUnsavedState(contentToPreserve !== currentContent);
+                layoutActiveEditor();
+            }
+
+            async function loadEditorContent(content, fileExtension) {
+                fileLanguage = guessLanguage(fileExtension);
+                await switchEditorMode(activeEditorMode, content);
+                setUnsavedState(false);
+                updateEditorMeta(content);
+                updateDisplayedFileName();
+                renderTreeView();
+
+                const overlay = document.getElementById('loadingOverlay');
+                if (overlay) {
                     setTimeout(() => {
-                        const overlay = document.getElementById('loadingOverlay');
                         overlay.style.opacity = '0';
                         setTimeout(() => overlay.remove(), 300);
                     }, 100);
-                });
+                }
+            }
+
+            function requestCurrentFileContent() {
+                updateDisplayedFileName();
+                updateEditorMeta(getActiveEditorValue());
+                renderTreeView();
+                if (!ws || ws.readyState !== WebSocket.OPEN) return;
+                ws.send(JSON.stringify({
+                    type: 'read_file',
+                    filePath: currentFilePath
+                }));
+            }
+
+            async function applyCurrentFilePath(nextPath) {
+                currentFilePath = normalizeServerPath(nextPath);
+                fileLanguage = guessLanguage(currentFilePath.split('.').pop() || '');
+                updateDisplayedFileName();
+                updateEditorMeta(getActiveEditorValue());
+                await ensureTreeContext(getCurrentDirectoryPath());
+                requestCurrentFileContent();
             }
 
             function connect() {
@@ -829,11 +1043,7 @@
 
                 ws.onopen = () => {
                     console.log('WS Connected');
-                    // Request file content
-                    ws.send(JSON.stringify({
-                        type: 'read_file',
-                        filePath: filePath
-                    }));
+                    requestCurrentFileContent();
                 };
 
                 ws.onmessage = (event) => {
@@ -841,14 +1051,14 @@
                         const data = JSON.parse(event.data);
 
                         if (data.type === 'file_content') {
-                            if (data.filePath === filePath) {
+                            if (normalizeServerPath(data.filePath) === normalizeServerPath(currentFilePath)) {
                                 currentContent = data.content || '';
-                                const ext = filePath.split('.').pop() || '';
-                                initMonaco(currentContent, ext);
+                                const ext = currentFilePath.split('.').pop() || '';
+                                loadEditorContent(currentContent, ext);
                             }
                         } else if (data.type === 'write_success') {
-                            if (data.filePath === filePath) {
-                                currentContent = editor.getValue();
+                            if (normalizeServerPath(data.filePath) === normalizeServerPath(currentFilePath)) {
+                                currentContent = getActiveEditorValue();
                                 setUnsavedState(false);
                                 setSaveLoadingState(false);
                                 updateEditorMeta(currentContent);
@@ -868,7 +1078,7 @@
                             setSaveLoadingState(false);
 
                             // If load failed, go back
-                            if (!editor) {
+                            if (!monacoEditor && !aceEditor) {
                                 setTimeout(() => {
                                     document.getElementById('btnReturn').click();
                                 }, 2000);
@@ -892,15 +1102,12 @@
                     return;
                 }
 
-                if (editor) {
-                    setSaveLoadingState(true);
-
-                    ws.send(JSON.stringify({
-                        type: 'write_file',
-                        filePath: filePath,
-                        content: editor.getValue()
-                    }));
-                }
+                setSaveLoadingState(true);
+                ws.send(JSON.stringify({
+                    type: 'write_file',
+                    filePath: currentFilePath,
+                    content: getActiveEditorValue()
+                }));
             });
 
             // Prevent closing unsaved changes
@@ -920,9 +1127,20 @@
                 treeViewEnabled = false;
             }
 
+            try {
+                const storedEditorMode = window.localStorage.getItem(editorModeSettingKey);
+                if (['monaco', 'ace', 'plain'].includes(storedEditorMode)) {
+                    activeEditorMode = storedEditorMode;
+                }
+            } catch {
+                activeEditorMode = 'monaco';
+            }
+
             if (treeViewEnabled) {
                 ensureTreeContext(getCurrentDirectoryPath());
             }
+            document.getElementById('editorModeSelect').value = activeEditorMode;
+            updateDisplayedFileName();
             renderTreeView();
 
             const wordWrapBtn = document.getElementById('btnWordWrapToggle');
@@ -930,6 +1148,13 @@
                 wordWrapBtn.addEventListener('click', () => {
                     wordWrapEnabled = !wordWrapEnabled;
                     applyWordWrap();
+                });
+            }
+
+            const editorModeSelect = document.getElementById('editorModeSelect');
+            if (editorModeSelect) {
+                editorModeSelect.addEventListener('change', async () => {
+                    await switchEditorMode(editorModeSelect.value);
                 });
             }
 
@@ -996,14 +1221,29 @@
             if (sidebarBtn) {
                 sidebarBtn.addEventListener('click', () => {
                     document.getElementById('sidebar').classList.toggle('collapsed');
-                    if (editor) setTimeout(() => editor.layout(), 350);
+                    setTimeout(layoutActiveEditor, 350);
                 });
             }
 
             // Layout editor strictly on window resize
             window.addEventListener('resize', () => {
                 renderTreeView();
-                if (editor) editor.layout();
+                layoutActiveEditor();
+            });
+
+            window.addEventListener('hashchange', async () => {
+                const nextHashPath = getFilePathFromHash();
+                if (!nextHashPath) return;
+                const normalizedNext = normalizeServerPath(nextHashPath);
+                if (normalizedNext === normalizeServerPath(currentFilePath)) return;
+                if (isUnsaved) {
+                    const proceed = window.confirm('You have unsaved changes. Leave this file anyway?');
+                    if (!proceed) {
+                        window.location.hash = `file=${encodeURIComponent(currentFilePath)}`;
+                        return;
+                    }
+                }
+                await applyCurrentFilePath(normalizedNext);
             });
         </script>
 </body>
