@@ -6,12 +6,25 @@ function createLegacyStartupHelpers(deps) {
     const STARTUP_DOUBLE_PLACEHOLDER_REGEX = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
 
 function normalizeClientVariables(rawVariables) {
-    if (!rawVariables || typeof rawVariables !== 'object' || Array.isArray(rawVariables)) {
+    let source = rawVariables;
+    if (typeof source === 'string') {
+        const trimmed = source.trim();
+        if (!trimmed) {
+            return {};
+        }
+        try {
+            source = JSON.parse(trimmed);
+        } catch {
+            return {};
+        }
+    }
+
+    if (!source || typeof source !== 'object' || Array.isArray(source)) {
         return {};
     }
 
     const normalized = {};
-    Object.entries(rawVariables).forEach(([key, value]) => {
+    Object.entries(source).forEach(([key, value]) => {
         normalized[key] = value === null || value === undefined ? '' : String(value);
     });
     return normalized;
