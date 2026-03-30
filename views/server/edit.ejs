@@ -131,8 +131,9 @@
 
             .file-info {
                 display: flex;
-                align-items: center;
-                gap: 0.5rem;
+                align-items: flex-start;
+                gap: 0.75rem;
+                flex-direction: column;
             }
 
             .file-name {
@@ -142,9 +143,32 @@
                 font-family: 'JetBrains Mono', monospace;
             }
 
+            .file-meta-row {
+                display: flex;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 0.55rem;
+            }
+
+            .file-path-pill,
+            .editor-chip {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.4rem;
+                padding: 0.35rem 0.7rem;
+                border-radius: 999px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                background: rgba(255, 255, 255, 0.04);
+                color: var(--text-secondary);
+                font-size: 0.78rem;
+                line-height: 1;
+            }
+
             .navbar-right {
                 display: flex;
                 gap: 0.5rem;
+                align-items: center;
+                flex-wrap: wrap;
             }
 
             .btn-action {
@@ -167,6 +191,12 @@
                 color: white;
             }
 
+            .btn-action.active {
+                background: rgba(59, 130, 246, 0.14);
+                border-color: rgba(59, 130, 246, 0.45);
+                color: #dbeafe;
+            }
+
             .btn-action-primary {
                 background: var(--accent-blue);
                 border-color: var(--accent-blue);
@@ -180,20 +210,75 @@
 
             .editor-container {
                 flex: 1;
-                position: relative;
                 width: 100%;
                 height: 100%;
+                border-top: 1px solid rgba(255, 255, 255, 0.05);
+                display: flex;
+                min-height: 0;
+            }
+
+            .editor-tree-panel {
+                width: 320px;
+                background: linear-gradient(180deg, rgba(18, 18, 22, 0.98), rgba(12, 12, 16, 0.98));
+                border-right: 1px solid var(--border-color);
+                display: flex;
+                flex-direction: column;
+                flex-shrink: 0;
+                min-width: 0;
+            }
+
+            .editor-tree-panel.d-none {
+                display: none !important;
+            }
+
+            .editor-tree-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.75rem;
+                padding: 0.85rem 1rem;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            }
+
+            .editor-tree-title {
+                display: flex;
+                flex-direction: column;
+                gap: 0.2rem;
+                min-width: 0;
+            }
+
+            .editor-tree-title strong {
+                font-size: 0.88rem;
+                color: var(--text-primary);
+            }
+
+            .editor-tree-title span {
+                font-size: 0.76rem;
+                color: var(--text-secondary);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .editor-tree-body {
+                flex: 1;
+                overflow: auto;
+                padding: 0.75rem;
+            }
+
+            .editor-tree-empty {
+                color: var(--text-secondary);
+                font-size: 0.84rem;
+                padding: 0.75rem 0.5rem;
+            }
+
+            .editor-main {
+                flex: 1;
+                position: relative;
+                min-width: 0;
             }
 
             #monaco-editor-container {
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-            }
-
-            #monaco-diff-container {
                 position: absolute;
                 top: 0;
                 left: 0;
@@ -222,6 +307,90 @@
             .monaco-editor-background {
                 background-color: var(--bg-dark) !important;
             }
+
+            .tree-entry {
+                display: block;
+            }
+
+            .tree-node {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                min-height: 36px;
+                padding: 0.4rem 0.55rem;
+                border-radius: 8px;
+                color: var(--text-secondary);
+                cursor: pointer;
+                user-select: none;
+                transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+                border: 1px solid transparent;
+            }
+
+            .tree-node:hover {
+                background: rgba(255, 255, 255, 0.04);
+                color: var(--text-primary);
+            }
+
+            .tree-node.active {
+                background: rgba(59, 130, 246, 0.12);
+                color: #bfdbfe;
+                border-color: rgba(59, 130, 246, 0.35);
+            }
+
+            .tree-toggle {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 18px;
+                min-width: 18px;
+                color: var(--text-secondary);
+            }
+
+            .tree-icon {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 18px;
+                min-width: 18px;
+            }
+
+            .tree-label {
+                flex: 1;
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                font-size: 0.84rem;
+            }
+
+            .tree-children {
+                margin-left: 1.35rem;
+                border-left: 1px dashed rgba(255, 255, 255, 0.08);
+                padding-left: 0.45rem;
+            }
+
+            @media (max-width: 900px) {
+                .top-navbar {
+                    align-items: flex-start;
+                    flex-direction: column;
+                    gap: 0.9rem;
+                }
+
+                .navbar-left,
+                .navbar-right {
+                    width: 100%;
+                }
+
+                .editor-tree-panel {
+                    width: 260px;
+                }
+            }
+
+            @media (max-width: 768px) {
+                .editor-tree-panel {
+                    display: none !important;
+                }
+            }
         </style>
     <link rel="stylesheet" href="/css/mobile-layout.css">
 </head>
@@ -245,31 +414,39 @@
                             <i class="bi bi-list"></i>
                         </button>
                         <div class="file-info">
-                            <a href="/server/<%= server.containerId %>/files"
-                                class="text-secondary text-decoration-none hover-white">
-                                <i class="bi bi-arrow-left me-1"></i> Files
-                            </a>
-                            <span class="text-secondary opacity-50 mx-2">/</span>
-                            <span class="file-name" id="displayFileName">Loading...</span>
-                            <span class="badge bg-warning text-dark ms-2 d-none" id="unsavedBadge">UNSAVED</span>
+                            <div class="file-meta-row">
+                                <a href="/server/<%= server.containerId %>/files"
+                                    class="text-secondary text-decoration-none hover-white">
+                                    <i class="bi bi-arrow-left me-1"></i> Files
+                                </a>
+                                <span class="text-secondary opacity-50">/</span>
+                                <span class="file-name" id="displayFileName">Loading...</span>
+                                <span class="badge bg-warning text-dark d-none" id="unsavedBadge">UNSAVED</span>
+                            </div>
+                            <div class="file-meta-row">
+                                <span class="file-path-pill" id="displayFilePath">
+                                    <i class="bi bi-folder2-open"></i>
+                                    <span>Loading path...</span>
+                                </span>
+                                <span class="editor-chip" id="editorLanguageChip">
+                                    <i class="bi bi-code-slash"></i>
+                                    <span>plaintext</span>
+                                </span>
+                                <span class="editor-chip" id="editorLengthChip">
+                                    <i class="bi bi-file-earmark-text"></i>
+                                    <span>0 chars</span>
+                                </span>
+                            </div>
                         </div>
                     </div>
                     <div class="navbar-right">
-                        <select id="versionSelect" class="form-select form-select-sm"
-                            style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); min-width: 220px;">
-                            <option value="">No snapshots</option>
-                        </select>
-                        <button type="button" class="btn-action" id="btnSafeModeToggle">
-                            <i class="bi bi-shield-lock"></i>
-                            Safe Mode Off
+                        <button type="button" class="btn-action" id="btnToggleTreeView">
+                            <i class="bi bi-diagram-3"></i>
+                            Tree
                         </button>
-                        <button type="button" class="btn-action d-none" id="btnRestoreSafeSnapshot">
-                            <i class="bi bi-clock-history"></i>
-                            Restore Draft
-                        </button>
-                        <button type="button" class="btn-action" id="btnDiffToggle">
-                            <i class="bi bi-columns-gap"></i>
-                            Diff Off
+                        <button type="button" class="btn-action" id="btnWordWrapToggle">
+                            <i class="bi bi-text-wrap"></i>
+                            Wrap On
                         </button>
                         <button type="button" class="btn-action" id="btnReturn">
                             Return
@@ -284,13 +461,28 @@
 
                 <!-- Editor Area -->
                 <div class="editor-container">
-                    <div class="loading-overlay" id="loadingOverlay">
-                        <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                    <aside class="editor-tree-panel d-none" id="editorTreePanel">
+                        <div class="editor-tree-header">
+                            <div class="editor-tree-title">
+                                <strong>Quick Tree</strong>
+                                <span id="editorTreeCurrentPath">/</span>
+                            </div>
+                            <button type="button" class="btn-action px-2 py-1" id="btnRefreshEditorTree" title="Refresh tree">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
                         </div>
-                        <h5 class="text-secondary fw-medium">Loading File Contents...</h5>
+                        <div class="editor-tree-body" id="editorTreeBody">
+                            <div class="editor-tree-empty">Tree disabled.</div>
+                        </div>
+                    </aside>
+                    <div class="editor-main">
+                        <div class="loading-overlay" id="loadingOverlay">
+                            <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                            </div>
+                            <h5 class="text-secondary fw-medium">Loading File Contents...</h5>
+                        </div>
+                        <div id="monaco-editor-container"></div>
                     </div>
-                    <div id="monaco-editor-container"></div>
-                    <div id="monaco-diff-container" class="d-none"></div>
                 </div>
             </div>
         </div>
@@ -317,7 +509,7 @@
 
             // Return Button
             document.getElementById('btnReturn').addEventListener('click', () => {
-                const parentDir = filePath.substring(0, filePath.lastIndexOf('/')) || '/';
+                const parentDir = getCurrentDirectoryPath();
                 window.location.href = `/server/<%= server.containerId %>/files?path=${encodeURIComponent(parentDir)}`;
             });
 
@@ -336,20 +528,172 @@
 
             let ws;
             let editor;
-            let diffEditor;
             let currentContent = '';
             let isUnsaved = false;
-            let isDiffMode = false;
             let monacoReady = false;
             let fileLanguage = 'plaintext';
-            let currentVersionContent = '';
-            let currentVersionId = '';
-            let pendingDiffVersionId = '';
-            const safeSnapshotKey = `cpanel_safe_edit_${serverId}_${filePath}`;
-            const safeModeSettingKey = `${safeSnapshotKey}:enabled`;
-            const safeAutosaveIntervalMs = 15000;
-            let safeModeEnabled = localStorage.getItem(safeModeSettingKey) === '1';
-            let safeAutosaveTimer = null;
+            const wordWrapSettingKey = `cpanel_editor_wrap_${serverId}`;
+            let wordWrapEnabled = localStorage.getItem(wordWrapSettingKey) !== '0';
+            const treeViewSettingKey = `cpanel_editor_tree_${serverId}`;
+            let treeViewEnabled = false;
+            const treeCache = new Map();
+            const treeExpandedPaths = new Set();
+            const treeLoadingPaths = new Set();
+
+            function escapeHtml(value) {
+                return String(value || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            function normalizeServerPath(pathValue) {
+                const raw = String(pathValue || '/').trim() || '/';
+                let normalized = raw.startsWith('/') ? raw : `/${raw}`;
+                normalized = normalized.replace(/\/+/g, '/');
+                if (normalized.length > 1 && normalized.endsWith('/')) {
+                    normalized = normalized.slice(0, -1);
+                }
+                return normalized || '/';
+            }
+
+            function joinServerPath(parentPath, entryName) {
+                const base = normalizeServerPath(parentPath);
+                return base === '/' ? `/${entryName}` : `${base}/${entryName}`;
+            }
+
+            function sortFileEntries(entries) {
+                return (Array.isArray(entries) ? [...entries] : []).sort((a, b) => {
+                    if (a.isDirectory && !b.isDirectory) return -1;
+                    if (!a.isDirectory && b.isDirectory) return 1;
+                    return String(a.name || '').localeCompare(String(b.name || ''));
+                });
+            }
+
+            async function fetchTreeEntries(path, force = false) {
+                const normalizedPath = normalizeServerPath(path);
+                if (!force && treeCache.has(normalizedPath)) {
+                    return treeCache.get(normalizedPath);
+                }
+                treeLoadingPaths.add(normalizedPath);
+                renderTreeView();
+                try {
+                    const response = await fetch(`/server/${serverId}/files-fetch?path=${encodeURIComponent(normalizedPath)}`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to load path ${normalizedPath}`);
+                    }
+                    const data = await response.json();
+                    const files = sortFileEntries(Array.isArray(data.files) ? data.files : []);
+                    treeCache.set(normalizedPath, files);
+                    return files;
+                } catch (error) {
+                    console.warn('Editor tree fetch failed:', error);
+                    return treeCache.get(normalizedPath) || [];
+                } finally {
+                    treeLoadingPaths.delete(normalizedPath);
+                    renderTreeView();
+                }
+            }
+
+            async function ensureTreeContext(path) {
+                if (!treeViewEnabled) return;
+                const normalizedPath = normalizeServerPath(path);
+                const segments = normalizedPath.split('/').filter(Boolean);
+                let walker = '/';
+                treeExpandedPaths.add('/');
+                await fetchTreeEntries('/', false);
+                for (const segment of segments) {
+                    const nextPath = walker === '/' ? `/${segment}` : `${walker}/${segment}`;
+                    treeExpandedPaths.add(walker);
+                    await fetchTreeEntries(walker, false);
+                    walker = nextPath;
+                }
+                if (normalizedPath !== '/') {
+                    treeExpandedPaths.add(normalizedPath);
+                    await fetchTreeEntries(normalizedPath, false);
+                }
+                renderTreeView();
+            }
+
+            function getCurrentDirectoryPath() {
+                const normalized = normalizeServerPath(filePath);
+                const lastSlash = normalized.lastIndexOf('/');
+                if (lastSlash <= 0) return '/';
+                return normalized.slice(0, lastSlash);
+            }
+
+            function renderTreeChildren(parentPath, entries) {
+                const normalizedParent = normalizeServerPath(parentPath);
+                return sortFileEntries(entries).map((entry) => {
+                    const entryName = String(entry && entry.name || '');
+                    const childPath = joinServerPath(normalizedParent, entryName);
+                    const isDirectory = Boolean(entry && entry.isDirectory);
+                    const isExpanded = isDirectory && treeExpandedPaths.has(childPath);
+                    const isActive = normalizeServerPath(filePath) === childPath;
+                    const loading = treeLoadingPaths.has(childPath);
+                    return `
+                        <div class="tree-entry">
+                            <div class="tree-node ${isActive ? 'active' : ''}" data-tree-path="${escapeHtml(childPath)}" data-tree-type="${isDirectory ? 'directory' : 'file'}">
+                                <span class="tree-toggle" data-tree-toggle="${escapeHtml(childPath)}">${isDirectory ? `<i class="bi ${isExpanded ? 'bi-caret-down-fill' : 'bi-caret-right-fill'}"></i>` : '<i class="bi bi-dot"></i>'}</span>
+                                <span class="tree-icon"><i class="bi ${isDirectory ? 'bi-folder-fill text-warning' : 'bi-file-earmark-text text-info'}"></i></span>
+                                <span class="tree-label">${escapeHtml(entryName)}</span>
+                                ${loading ? '<span class="spinner-border spinner-border-sm text-secondary ms-auto" role="status"></span>' : ''}
+                            </div>
+                            ${isDirectory && isExpanded ? `<div class="tree-children">${renderTreeChildren(childPath, treeCache.get(childPath) || [])}</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            function renderTreeView() {
+                const panel = document.getElementById('editorTreePanel');
+                const body = document.getElementById('editorTreeBody');
+                const currentPathLabel = document.getElementById('editorTreeCurrentPath');
+                const toggleBtn = document.getElementById('btnToggleTreeView');
+                if (!panel || !body || !toggleBtn) return;
+
+                const treeAllowed = treeViewEnabled && window.innerWidth > 768;
+                panel.classList.toggle('d-none', !treeAllowed);
+                toggleBtn.classList.toggle('active', treeViewEnabled);
+
+                if (currentPathLabel) {
+                    currentPathLabel.textContent = normalizeServerPath(filePath);
+                }
+
+                if (!treeAllowed) {
+                    if (editor) setTimeout(() => editor.layout(), 20);
+                    return;
+                }
+
+                const rootEntries = treeCache.get('/') || [];
+                if (!rootEntries.length && treeLoadingPaths.has('/')) {
+                    body.innerHTML = '<div class="editor-tree-empty">Loading tree...</div>';
+                    return;
+                }
+
+                body.innerHTML = `
+                    <div class="tree-node" data-tree-path="/" data-tree-type="directory">
+                        <span class="tree-toggle" data-tree-toggle="/"><i class="bi ${treeExpandedPaths.has('/') ? 'bi-caret-down-fill' : 'bi-caret-right-fill'}"></i></span>
+                        <span class="tree-icon"><i class="bi bi-hdd-stack-fill text-info"></i></span>
+                        <span class="tree-label">/root</span>
+                    </div>
+                    ${treeExpandedPaths.has('/') ? `<div class="tree-children">${renderTreeChildren('/', rootEntries)}</div>` : ''}
+                `;
+
+                if (editor) setTimeout(() => editor.layout(), 20);
+            }
+
+            function goToFilePath(targetPath) {
+                const normalizedTarget = normalizeServerPath(targetPath);
+                if (normalizeServerPath(filePath) === normalizedTarget) return;
+                if (isUnsaved) {
+                    const proceed = window.confirm('You have unsaved changes. Leave this file anyway?');
+                    if (!proceed) return;
+                }
+                window.location.href = `/server/${serverId}/files/edit#file=${encodeURIComponent(normalizedTarget)}`;
+            }
 
             function guessLanguage(fileExtension) {
                 const ext = String(fileExtension || '').toLowerCase();
@@ -386,183 +730,44 @@
                 document.getElementById('unsavedBadge').classList.toggle('d-none', !isUnsaved);
             }
 
-            function getSafeSnapshot() {
-                try {
-                    const raw = localStorage.getItem(safeSnapshotKey);
-                    if (!raw) return null;
-                    const parsed = JSON.parse(raw);
-                    if (!parsed || typeof parsed !== 'object') return null;
-                    if (String(parsed.filePath || '') !== String(filePath || '')) return null;
-                    if (typeof parsed.content !== 'string') return null;
-                    return parsed;
-                } catch {
-                    return null;
+            function updateEditorMeta(content) {
+                const safeContent = typeof content === 'string' ? content : '';
+                const languageChip = document.getElementById('editorLanguageChip');
+                const lengthChip = document.getElementById('editorLengthChip');
+                const pathChip = document.getElementById('displayFilePath');
+                if (languageChip) {
+                    const text = languageChip.querySelector('span');
+                    if (text) text.textContent = fileLanguage;
+                }
+                if (lengthChip) {
+                    const text = lengthChip.querySelector('span');
+                    if (text) text.textContent = `${safeContent.length.toLocaleString()} chars`;
+                }
+                if (pathChip) {
+                    const text = pathChip.querySelector('span');
+                    if (text) text.textContent = filePath;
                 }
             }
 
-            function setSafeSnapshot(content, source = 'auto') {
-                if (!safeModeEnabled) return;
-                if (typeof content !== 'string') return;
-                if (!content.length) return;
-                try {
-                    localStorage.setItem(safeSnapshotKey, JSON.stringify({
-                        filePath,
-                        content,
-                        source,
-                        language: fileLanguage,
-                        savedAt: new Date().toISOString()
-                    }));
-                } catch {
-                    // Ignore localStorage write failures.
-                }
-                updateSafeSnapshotButton();
+            function updateWordWrapButton() {
+                const btn = document.getElementById('btnWordWrapToggle');
+                if (!btn) return;
+                btn.innerHTML = wordWrapEnabled
+                    ? '<i class="bi bi-text-wrap"></i> Wrap On'
+                    : '<i class="bi bi-arrows-collapse"></i> Wrap Off';
             }
 
-            function clearSafeSnapshot() {
-                try {
-                    localStorage.removeItem(safeSnapshotKey);
-                } catch {
-                    // ignore
-                }
-                updateSafeSnapshotButton();
-            }
-
-            function updateSafeSnapshotButton() {
-                const restoreButton = document.getElementById('btnRestoreSafeSnapshot');
-                if (!restoreButton) return;
-                const snapshot = getSafeSnapshot();
-                const shouldShow = Boolean(snapshot && snapshot.content && snapshot.content !== currentContent);
-                restoreButton.classList.toggle('d-none', !shouldShow);
-                if (shouldShow && snapshot.savedAt) {
-                    restoreButton.title = `Snapshot: ${new Date(snapshot.savedAt).toLocaleString()}`;
-                } else {
-                    restoreButton.title = '';
-                }
-            }
-
-            function startSafeAutosaveLoop() {
-                if (!safeModeEnabled || safeAutosaveTimer) return;
-                safeAutosaveTimer = setInterval(() => {
-                    if (!editor) return;
-                    const value = editor.getValue();
-                    if (!value || value === currentContent) return;
-                    setSafeSnapshot(value, 'interval');
-                }, safeAutosaveIntervalMs);
-            }
-
-            function stopSafeAutosaveLoop() {
-                if (!safeAutosaveTimer) return;
-                clearInterval(safeAutosaveTimer);
-                safeAutosaveTimer = null;
-            }
-
-            function setSafeMode(nextValue) {
-                safeModeEnabled = Boolean(nextValue);
-                try {
-                    localStorage.setItem(safeModeSettingKey, safeModeEnabled ? '1' : '0');
-                } catch {
-                    // ignore
-                }
-                const toggleBtn = document.getElementById('btnSafeModeToggle');
-                if (toggleBtn) {
-                    toggleBtn.innerHTML = safeModeEnabled
-                        ? '<i class="bi bi-shield-check"></i> Safe Mode On'
-                        : '<i class="bi bi-shield-lock"></i> Safe Mode Off';
-                }
-                if (safeModeEnabled) {
-                    startSafeAutosaveLoop();
-                } else {
-                    stopSafeAutosaveLoop();
-                }
-                updateSafeSnapshotButton();
-            }
-
-            function populateVersionSelect(versions) {
-                const select = document.getElementById('versionSelect');
-                const previous = select.value;
-                select.innerHTML = '';
-
-                const placeholder = document.createElement('option');
-                placeholder.value = '';
-                placeholder.textContent = versions && versions.length > 0
-                    ? 'Select snapshot...'
-                    : 'No snapshots';
-                select.appendChild(placeholder);
-
-                (versions || []).forEach((version) => {
-                    const option = document.createElement('option');
-                    option.value = version.id;
-                    const date = version.mtime ? new Date(version.mtime).toLocaleString() : version.name;
-                    option.textContent = `${date} (${Math.max(1, Math.round((Number(version.size) || 0) / 1024))} KB)`;
-                    select.appendChild(option);
+            function applyWordWrap() {
+                if (!editor) return;
+                editor.updateOptions({
+                    wordWrap: wordWrapEnabled ? 'on' : 'off'
                 });
-
-                if (previous && Array.from(select.options).some((opt) => opt.value === previous)) {
-                    select.value = previous;
-                } else if (versions && versions.length > 0) {
-                    select.value = versions[0].id;
+                updateWordWrapButton();
+                try {
+                    localStorage.setItem(wordWrapSettingKey, wordWrapEnabled ? '1' : '0');
+                } catch {
+                    // Ignore localStorage issues.
                 }
-            }
-
-            function requestFileVersions() {
-                if (!ws || ws.readyState !== WebSocket.OPEN) return;
-                ws.send(JSON.stringify({
-                    type: 'list_file_versions',
-                    filePath: filePath
-                }));
-            }
-
-            function requestVersionContent(versionId) {
-                if (!versionId || !ws || ws.readyState !== WebSocket.OPEN) return;
-                ws.send(JSON.stringify({
-                    type: 'read_file_version',
-                    filePath: filePath,
-                    versionId: versionId
-                }));
-            }
-
-            function disableDiffMode() {
-                isDiffMode = false;
-                pendingDiffVersionId = '';
-                document.getElementById('btnDiffToggle').innerHTML = '<i class="bi bi-columns-gap"></i> Diff Off';
-                document.getElementById('monaco-diff-container').classList.add('d-none');
-                document.getElementById('monaco-editor-container').classList.remove('d-none');
-                if (editor) setTimeout(() => editor.layout(), 80);
-            }
-
-            function renderDiffMode() {
-                if (!monacoReady || !editor || !currentVersionContent) return;
-
-                const diffContainer = document.getElementById('monaco-diff-container');
-                const editorContainer = document.getElementById('monaco-editor-container');
-                editorContainer.classList.add('d-none');
-                diffContainer.classList.remove('d-none');
-
-                if (!diffEditor) {
-                    diffEditor = monaco.editor.createDiffEditor(diffContainer, {
-                        theme: 'cpanel-dark',
-                        readOnly: true,
-                        renderSideBySide: true,
-                        automaticLayout: true,
-                        minimap: { enabled: false }
-                    });
-                }
-
-                const previousModel = diffEditor.getModel();
-                if (previousModel) {
-                    previousModel.original.dispose();
-                    previousModel.modified.dispose();
-                }
-
-                const originalModel = monaco.editor.createModel(currentVersionContent, fileLanguage);
-                const modifiedModel = monaco.editor.createModel(editor.getValue(), fileLanguage);
-                diffEditor.setModel({
-                    original: originalModel,
-                    modified: modifiedModel
-                });
-
-                isDiffMode = true;
-                document.getElementById('btnDiffToggle').innerHTML = '<i class="bi bi-columns-gap"></i> Diff On';
             }
 
             function initMonaco(content, fileExtension) {
@@ -593,23 +798,22 @@
                             fontSize: 14,
                             fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                             scrollBeyondLastLine: false,
-                            wordWrap: 'on',
+                            wordWrap: wordWrapEnabled ? 'on' : 'off',
                             padding: { top: 16 }
                         });
 
                         editor.onDidChangeModelContent(() => {
-                            setUnsavedState(editor.getValue() !== currentContent);
+                            const nextValue = editor.getValue();
+                            setUnsavedState(nextValue !== currentContent);
+                            updateEditorMeta(nextValue);
                         });
                     } else {
                         editor.setValue(content);
                     }
 
                     setUnsavedState(false);
-                    updateSafeSnapshotButton();
-                    if (safeModeEnabled) {
-                        startSafeAutosaveLoop();
-                    }
-                    requestFileVersions();
+                    updateEditorMeta(content);
+                    updateWordWrapButton();
 
                     // Hide Loading
                     setTimeout(() => {
@@ -630,7 +834,6 @@
                         type: 'read_file',
                         filePath: filePath
                     }));
-                    requestFileVersions();
                 };
 
                 ws.onmessage = (event) => {
@@ -648,27 +851,10 @@
                                 currentContent = editor.getValue();
                                 setUnsavedState(false);
                                 setSaveLoadingState(false);
-                                clearSafeSnapshot();
-                                requestFileVersions();
-                                if (isDiffMode) disableDiffMode();
+                                updateEditorMeta(currentContent);
 
                                 if (window.showStatusModal) {
                                     window.showStatusModal('File saved successfully.', 'success');
-                                }
-                            }
-                        } else if (data.type === 'file_versions') {
-                            if (data.filePath === filePath) {
-                                populateVersionSelect(Array.isArray(data.versions) ? data.versions : []);
-                            }
-                        } else if (data.type === 'file_version_content') {
-                            if (data.filePath === filePath) {
-                                currentVersionId = data.versionId || '';
-                                currentVersionContent = data.content || '';
-                                if (isDiffMode) {
-                                    renderDiffMode();
-                                }
-                                if (pendingDiffVersionId && currentVersionId === pendingDiffVersionId) {
-                                    pendingDiffVersionId = '';
                                 }
                             }
                         } else if (data.type === 'error') {
@@ -717,89 +903,93 @@
                 }
             });
 
-            const safeModeToggleBtn = document.getElementById('btnSafeModeToggle');
-            if (safeModeToggleBtn) {
-                safeModeToggleBtn.addEventListener('click', () => {
-                    setSafeMode(!safeModeEnabled);
-                    if (window.showStatusModal) {
-                        window.showStatusModal(
-                            safeModeEnabled
-                                ? 'Safe edit mode enabled. Draft snapshots are saved locally.'
-                                : 'Safe edit mode disabled.',
-                            safeModeEnabled ? 'success' : 'error'
-                        );
-                    }
-                });
-            }
-
-            const restoreSafeSnapshotBtn = document.getElementById('btnRestoreSafeSnapshot');
-            if (restoreSafeSnapshotBtn) {
-                restoreSafeSnapshotBtn.addEventListener('click', () => {
-                    const snapshot = getSafeSnapshot();
-                    if (!snapshot || !editor) return;
-                    editor.setValue(snapshot.content || '');
-                    if (window.showStatusModal) {
-                        window.showStatusModal('Draft snapshot restored.', 'success');
-                    }
-                });
-            }
-
             // Prevent closing unsaved changes
             window.addEventListener('beforeunload', (e) => {
-                if (safeModeEnabled && editor) {
-                    setSafeSnapshot(editor.getValue(), 'beforeunload');
-                }
                 if (isUnsaved) {
                     e.preventDefault();
                     e.returnValue = '';
                 }
             });
 
-            window.addEventListener('pagehide', () => {
-                if (safeModeEnabled && editor) {
-                    setSafeSnapshot(editor.getValue(), 'pagehide');
-                }
-                stopSafeAutosaveLoop();
-            });
-
             // Start connection
-            setSafeMode(safeModeEnabled);
             connect();
 
-            document.getElementById('btnDiffToggle').addEventListener('click', () => {
-                if (isDiffMode) {
-                    disableDiffMode();
-                    return;
-                }
+            try {
+                treeViewEnabled = window.localStorage.getItem(treeViewSettingKey) === '1';
+            } catch {
+                treeViewEnabled = false;
+            }
 
-                const selectedVersion = document.getElementById('versionSelect').value;
-                if (!selectedVersion) {
-                    if (window.showStatusModal) {
-                        window.showStatusModal('Select a snapshot from Installed Versions first.', 'error');
+            if (treeViewEnabled) {
+                ensureTreeContext(getCurrentDirectoryPath());
+            }
+            renderTreeView();
+
+            const wordWrapBtn = document.getElementById('btnWordWrapToggle');
+            if (wordWrapBtn) {
+                wordWrapBtn.addEventListener('click', () => {
+                    wordWrapEnabled = !wordWrapEnabled;
+                    applyWordWrap();
+                });
+            }
+
+            const treeToggleBtn = document.getElementById('btnToggleTreeView');
+            if (treeToggleBtn) {
+                treeToggleBtn.addEventListener('click', async () => {
+                    treeViewEnabled = !treeViewEnabled;
+                    try {
+                        window.localStorage.setItem(treeViewSettingKey, treeViewEnabled ? '1' : '0');
+                    } catch {
+                        // Ignore localStorage issues.
                     }
-                    return;
-                }
+                    if (treeViewEnabled) {
+                        await ensureTreeContext(getCurrentDirectoryPath());
+                    }
+                    renderTreeView();
+                });
+            }
 
-                isDiffMode = true;
-                if (currentVersionId === selectedVersion && currentVersionContent) {
-                    renderDiffMode();
-                    return;
-                }
-                pendingDiffVersionId = selectedVersion;
-                requestVersionContent(selectedVersion);
-            });
+            const refreshTreeBtn = document.getElementById('btnRefreshEditorTree');
+            if (refreshTreeBtn) {
+                refreshTreeBtn.addEventListener('click', async () => {
+                    treeCache.clear();
+                    await ensureTreeContext(getCurrentDirectoryPath());
+                });
+            }
 
-            document.getElementById('versionSelect').addEventListener('change', (event) => {
-                const versionId = event.target.value;
-                if (!versionId) {
-                    currentVersionContent = '';
-                    currentVersionId = '';
-                    if (isDiffMode) disableDiffMode();
-                    return;
-                }
-                requestVersionContent(versionId);
-                pendingDiffVersionId = versionId;
-            });
+            const editorTreeBody = document.getElementById('editorTreeBody');
+            if (editorTreeBody) {
+                editorTreeBody.addEventListener('click', async (event) => {
+                    const toggleEl = event.target.closest('[data-tree-toggle]');
+                    if (toggleEl) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const targetPath = normalizeServerPath(toggleEl.getAttribute('data-tree-toggle'));
+                        if (treeExpandedPaths.has(targetPath)) {
+                            treeExpandedPaths.delete(targetPath);
+                            renderTreeView();
+                            return;
+                        }
+                        treeExpandedPaths.add(targetPath);
+                        await fetchTreeEntries(targetPath, false);
+                        renderTreeView();
+                        return;
+                    }
+
+                    const nodeEl = event.target.closest('[data-tree-path]');
+                    if (!nodeEl) return;
+                    event.preventDefault();
+                    const targetPath = normalizeServerPath(nodeEl.getAttribute('data-tree-path'));
+                    const targetType = String(nodeEl.getAttribute('data-tree-type') || 'directory');
+                    if (targetType === 'directory') {
+                        treeExpandedPaths.add(targetPath);
+                        await fetchTreeEntries(targetPath, false);
+                        renderTreeView();
+                        return;
+                    }
+                    goToFilePath(targetPath);
+                });
+            }
 
             // Sidebar toggle
             const sidebarBtn = document.getElementById('sidebarToggle');
@@ -807,14 +997,13 @@
                 sidebarBtn.addEventListener('click', () => {
                     document.getElementById('sidebar').classList.toggle('collapsed');
                     if (editor) setTimeout(() => editor.layout(), 350);
-                    if (diffEditor) setTimeout(() => diffEditor.layout(), 350);
                 });
             }
 
             // Layout editor strictly on window resize
             window.addEventListener('resize', () => {
+                renderTreeView();
                 if (editor) editor.layout();
-                if (diffEditor) diffEditor.layout();
             });
         </script>
 </body>

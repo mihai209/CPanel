@@ -297,6 +297,112 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             }
 
+            .files-workspace {
+                display: flex;
+                gap: 1rem;
+                align-items: stretch;
+            }
+
+            .files-main-panel {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .file-tree-panel {
+                width: 300px;
+                flex-shrink: 0;
+                background: linear-gradient(180deg, rgba(18, 18, 22, 0.98), rgba(10, 12, 16, 0.96));
+                border: 1px solid var(--border-color);
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+            }
+
+            .file-tree-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.75rem;
+                padding: 0.9rem 1rem;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+                background: rgba(255, 255, 255, 0.02);
+            }
+
+            .file-tree-title {
+                font-size: 0.8rem;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: var(--text-secondary);
+                font-weight: 700;
+            }
+
+            .file-tree-body {
+                max-height: calc(100vh - 260px);
+                overflow: auto;
+                padding: 0.5rem;
+            }
+
+            .file-tree-empty {
+                padding: 1rem;
+                color: var(--text-secondary);
+                font-size: 0.85rem;
+            }
+
+            .tree-node {
+                display: flex;
+                align-items: center;
+                gap: 0.45rem;
+                width: 100%;
+                padding: 0.45rem 0.5rem;
+                border-radius: 10px;
+                color: var(--text-primary);
+                transition: background 0.2s ease, color 0.2s ease;
+                cursor: pointer;
+                user-select: none;
+                font-size: 0.88rem;
+            }
+
+            .tree-node:hover {
+                background: rgba(255, 255, 255, 0.05);
+            }
+
+            .tree-node.active {
+                background: rgba(59, 130, 246, 0.16);
+                color: #bfdbfe;
+                box-shadow: inset 2px 0 0 rgba(96, 165, 250, 0.95);
+            }
+
+            .tree-toggle {
+                width: 20px;
+                color: var(--text-secondary);
+                text-align: center;
+                flex-shrink: 0;
+            }
+
+            .tree-icon {
+                width: 18px;
+                text-align: center;
+                flex-shrink: 0;
+            }
+
+            .tree-label {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .tree-children {
+                margin-left: 0.9rem;
+                padding-left: 0.55rem;
+                border-left: 1px dashed rgba(255, 255, 255, 0.08);
+            }
+
+            .btn-action.active {
+                background: rgba(59, 130, 246, 0.12);
+                border-color: rgba(59, 130, 246, 0.45);
+                color: #bfdbfe;
+            }
+
             .file-table {
                 width: 100%;
                 margin-bottom: 0;
@@ -396,6 +502,14 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
 
                 .file-actions span {
                     display: none;
+                }
+
+                .files-workspace {
+                    flex-direction: column;
+                }
+
+                .file-tree-panel {
+                    width: 100%;
                 }
             }
 
@@ -729,36 +843,58 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                                 <i class="bi bi-search"></i>
                                 <span>Search</span>
                             </a>
+                            <a href="#" id="btnToggleTreeView" class="btn-action">
+                                <i class="bi bi-diagram-3"></i>
+                                <span>Toggle View</span>
+                            </a>
                             <a href="#" class="btn-action" data-shortcuts-modal="filesShortcutsModal" title="Keyboard shortcuts">
                                 <i class="bi bi-keyboard"></i>
                                 <span>Shortcuts</span>
                             </a>
                         </div>
                     </div>
-                    <!-- File List -->
-                    <div class="file-list-container">
-                        <table class="file-table">
-                            <thead>
-                                <tr>
-                                    <th class="file-checkbox-col">
-                                        <input type="checkbox" id="selectAll" class="file-checkbox">
-                                    </th>
-                                    <th>Name</th>
-                                    <th class="d-none d-xl-table-cell" style="width: 130px;">Permissions</th>
-                                    <th class="d-none d-md-table-cell" style="width: 150px;">Size</th>
-                                    <th class="d-none d-lg-table-cell" style="width: 200px;">Last Modified</th>
-                                </tr>
-                            </thead>
-                            <tbody id="fileList">
-                                <tr>
-                                    <td colspan="5" class="text-center py-4">
-                                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
-                                        </div>
-                                        Loading files...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div class="files-workspace">
+                        <aside id="fileTreePanel" class="file-tree-panel d-none">
+                            <div class="file-tree-header">
+                                <div>
+                                    <div class="file-tree-title">Mini Tree</div>
+                                    <div class="small text-secondary" id="fileTreeCurrentPath">/</div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnRefreshTree">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </button>
+                            </div>
+                            <div class="file-tree-body" id="fileTreeBody">
+                                <div class="file-tree-empty">Tree view is loading.</div>
+                            </div>
+                        </aside>
+                        <div class="files-main-panel">
+                            <!-- File List -->
+                            <div class="file-list-container">
+                                <table class="file-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="file-checkbox-col">
+                                                <input type="checkbox" id="selectAll" class="file-checkbox">
+                                            </th>
+                                            <th>Name</th>
+                                            <th class="d-none d-xl-table-cell" style="width: 130px;">Permissions</th>
+                                            <th class="d-none d-md-table-cell" style="width: 150px;">Size</th>
+                                            <th class="d-none d-lg-table-cell" style="width: 200px;">Last Modified</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="fileList">
+                                        <tr>
+                                            <td colspan="5" class="text-center py-4">
+                                                <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                                </div>
+                                                Loading files...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                     <input type="file" id="uploadInput" class="d-none" multiple>
                     <% if (fileUploadEnabled) { %>
@@ -1478,6 +1614,11 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
 
             let fileIconMap = null;
             let lastRenderedFiles = [];
+            const TREE_VIEW_PREF_KEY = `cpanel.file.treeview.${serverId}`;
+            let treeViewEnabled = false;
+            const treeCache = new Map();
+            const treeExpandedPaths = new Set();
+            const treeLoadingPaths = new Set();
 
             async function loadFileIconMap() {
                 if (fileIconMap) return fileIconMap;
@@ -1516,12 +1657,127 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 return String(mapped).startsWith('/') ? String(mapped) : '/' + normalized;
             }
 
+            function sortFileEntries(entries) {
+                return (Array.isArray(entries) ? [...entries] : []).sort((a, b) => {
+                    if (a.isDirectory && !b.isDirectory) return -1;
+                    if (!a.isDirectory && b.isDirectory) return 1;
+                    return String(a.name || '').localeCompare(String(b.name || ''));
+                });
+            }
+
+            async function fetchTreeEntries(path, force = false) {
+                const normalizedPath = normalizeServerPath(path);
+                if (!force && treeCache.has(normalizedPath)) {
+                    return treeCache.get(normalizedPath);
+                }
+                treeLoadingPaths.add(normalizedPath);
+                renderTreeView();
+                try {
+                    const response = await fetch(`/server/${serverId}/files-fetch?path=${encodeURIComponent(normalizedPath)}`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to load tree path ${normalizedPath}`);
+                    }
+                    const data = await response.json();
+                    const files = sortFileEntries(Array.isArray(data.files) ? data.files : []);
+                    treeCache.set(normalizedPath, files);
+                    return files;
+                } catch (error) {
+                    console.warn('Tree fetch failed:', error);
+                    return treeCache.get(normalizedPath) || [];
+                } finally {
+                    treeLoadingPaths.delete(normalizedPath);
+                    renderTreeView();
+                }
+            }
+
+            async function ensureTreeContext(path) {
+                if (!treeViewEnabled) return;
+                const normalizedPath = normalizeServerPath(path);
+                const segments = normalizedPath.split('/').filter(Boolean);
+                let walker = '/';
+                treeExpandedPaths.add('/');
+                await fetchTreeEntries('/', false);
+                for (const segment of segments) {
+                    const nextPath = walker === '/' ? `/${segment}` : `${walker}/${segment}`;
+                    treeExpandedPaths.add(walker);
+                    await fetchTreeEntries(walker, false);
+                    walker = nextPath;
+                }
+                if (normalizedPath !== '/') {
+                    treeExpandedPaths.add(normalizedPath);
+                    await fetchTreeEntries(normalizedPath, false);
+                }
+                renderTreeView();
+            }
+
+            function renderTreeChildren(parentPath, entries) {
+                const normalizedParent = normalizeServerPath(parentPath);
+                return sortFileEntries(entries).map((entry) => {
+                    const entryName = String(entry && entry.name || '');
+                    const childPath = joinServerPath(normalizedParent, entryName);
+                    const isDirectory = Boolean(entry && entry.isDirectory);
+                    const isExpanded = isDirectory && treeExpandedPaths.has(childPath);
+                    const isActive = normalizeServerPath(currentPath) === childPath;
+                    const loading = treeLoadingPaths.has(childPath);
+                    const toggleIcon = isDirectory ? (isExpanded ? 'bi-caret-down-fill' : 'bi-caret-right-fill') : 'bi-dot';
+                    const entryIcon = isDirectory ? 'bi-folder-fill icon-folder' : 'bi-file-earmark-text icon-file';
+                    const iconPath = !isDirectory ? getIconPathForFile(entryName) : '';
+                    const childEntries = treeCache.get(childPath) || [];
+                    return `
+                        <div class="tree-entry">
+                            <div class="tree-node ${isActive ? 'active' : ''}" data-tree-path="${escapeHtml(childPath)}" data-tree-type="${isDirectory ? 'directory' : 'file'}">
+                                <span class="tree-toggle" data-tree-toggle="${escapeHtml(childPath)}">${isDirectory ? `<i class="bi ${toggleIcon}"></i>` : '<i class="bi bi-dot"></i>'}</span>
+                                <span class="tree-icon">
+                                    ${iconPath ? `<img class="file-icon-img" src="${escapeHtml(iconPath)}" alt="${escapeHtml(entryName)} icon">` : `<i class="bi ${entryIcon}"></i>`}
+                                </span>
+                                <span class="tree-label">${escapeHtml(entryName)}</span>
+                                ${loading ? '<span class="spinner-border spinner-border-sm text-secondary ms-auto" role="status"></span>' : ''}
+                            </div>
+                            ${isDirectory && isExpanded ? `<div class="tree-children">${renderTreeChildren(childPath, childEntries)}</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            function renderTreeView() {
+                const panel = document.getElementById('fileTreePanel');
+                const body = document.getElementById('fileTreeBody');
+                const currentPathLabel = document.getElementById('fileTreeCurrentPath');
+                const toggleBtn = document.getElementById('btnToggleTreeView');
+                if (!panel || !body || !toggleBtn) return;
+
+                panel.classList.toggle('d-none', !treeViewEnabled);
+                toggleBtn.classList.toggle('active', treeViewEnabled);
+                if (currentPathLabel) {
+                    currentPathLabel.textContent = normalizeServerPath(currentPath);
+                }
+
+                if (!treeViewEnabled) return;
+
+                const rootEntries = treeCache.get('/') || [];
+                if (!rootEntries.length && treeLoadingPaths.has('/')) {
+                    body.innerHTML = '<div class="file-tree-empty">Loading tree...</div>';
+                    return;
+                }
+
+                body.innerHTML = `
+                    <div class="tree-node ${normalizeServerPath(currentPath) === '/' ? 'active' : ''}" data-tree-path="/" data-tree-type="directory">
+                        <span class="tree-toggle" data-tree-toggle="/"><i class="bi ${treeExpandedPaths.has('/') ? 'bi-caret-down-fill' : 'bi-caret-right-fill'}"></i></span>
+                        <span class="tree-icon"><i class="bi bi-hdd-stack-fill text-info"></i></span>
+                        <span class="tree-label">/root</span>
+                    </div>
+                    ${treeExpandedPaths.has('/') ? `<div class="tree-children">${renderTreeChildren('/', rootEntries)}</div>` : ''}
+                `;
+            }
+
             function renderFiles(files) {
                 lastRenderedFiles = Array.isArray(files) ? files : [];
                 const container = document.getElementById('fileList');
                 container.innerHTML = '';
                 currentEntriesByName.clear();
                 refreshSearchHitsForCurrentPath();
+                treeCache.set(normalizeServerPath(currentPath), sortFileEntries(lastRenderedFiles));
+                renderTreeView();
 
                 if (files.length === 0) {
                     container.innerHTML = `
@@ -1536,11 +1792,7 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 }
 
                 // Sort: Folders first, then alphabetically
-                files.sort((a, b) => {
-                    if (a.isDirectory && !b.isDirectory) return -1;
-                    if (!a.isDirectory && b.isDirectory) return 1;
-                    return a.name.localeCompare(b.name);
-                });
+                files = sortFileEntries(files);
 
                 // Retain selected items that still exist in the current folder
                 const currentFileNames = new Set(files.map(f => f.name));
@@ -1688,6 +1940,9 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 selectedItems.clear();
                 document.getElementById('selectAll').checked = false;
                 updateBulkActionsUI();
+                if (treeViewEnabled) {
+                    ensureTreeContext(currentPath);
+                }
                 listFiles(currentPath);
 
                 // Sync browser URL
@@ -1706,9 +1961,15 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
             window.addEventListener('popstate', (event) => {
                 if (event.state && event.state.path) {
                     currentPath = event.state.path;
+                    if (treeViewEnabled) {
+                        ensureTreeContext(currentPath);
+                    }
                     listFiles(currentPath);
                 } else {
                     currentPath = '/';
+                    if (treeViewEnabled) {
+                        ensureTreeContext(currentPath);
+                    }
                     listFiles(currentPath);
                 }
             });
@@ -1872,6 +2133,8 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
             const btnUploadQueue = document.getElementById('btnUploadQueue');
             const uploadQueueCount = document.getElementById('uploadQueueCount');
             const btnSearchFiles = document.getElementById('btnSearchFiles');
+            const btnToggleTreeView = document.getElementById('btnToggleTreeView');
+            const btnRefreshTree = document.getElementById('btnRefreshTree');
             const btnRunFileSearch = document.getElementById('btnRunFileSearch');
             const searchFilesInput = document.getElementById('searchFilesInput');
             const searchFilesStatus = document.getElementById('searchFilesStatus');
@@ -1880,6 +2143,7 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
             const searchRememberChoice = document.getElementById('searchRememberChoice');
             const btnCancelFileSearch = document.getElementById('btnCancelFileSearch');
             const fileListContainerEl = document.querySelector('.file-list-container');
+            const fileTreeBody = document.getElementById('fileTreeBody');
 
             let selectedItems = new Set();
             let rightClickedItem = null; // { name, isDirectory }
@@ -2052,6 +2316,16 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                 }
             }
 
+            try {
+                treeViewEnabled = window.localStorage.getItem(TREE_VIEW_PREF_KEY) === '1';
+            } catch {
+                treeViewEnabled = false;
+            }
+            renderTreeView();
+            if (treeViewEnabled) {
+                ensureTreeContext(currentPath);
+            }
+
             if (searchRememberChoice) {
                 searchRememberChoice.addEventListener('change', () => {
                     if (searchRememberChoice.checked) {
@@ -2081,6 +2355,61 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                     setTimeout(() => {
                         if (searchFilesInput) searchFilesInput.focus();
                     }, 120);
+                });
+            }
+
+            if (btnToggleTreeView) {
+                btnToggleTreeView.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    treeViewEnabled = !treeViewEnabled;
+                    try {
+                        window.localStorage.setItem(TREE_VIEW_PREF_KEY, treeViewEnabled ? '1' : '0');
+                    } catch {
+                        // Ignore storage errors.
+                    }
+                    if (treeViewEnabled) {
+                        await ensureTreeContext(currentPath);
+                    }
+                    renderTreeView();
+                });
+            }
+
+            if (btnRefreshTree) {
+                btnRefreshTree.addEventListener('click', async () => {
+                    treeCache.delete('/');
+                    treeCache.delete(normalizeServerPath(currentPath));
+                    await ensureTreeContext(currentPath);
+                });
+            }
+
+            if (fileTreeBody) {
+                fileTreeBody.addEventListener('click', async (event) => {
+                    const toggleEl = event.target.closest('[data-tree-toggle]');
+                    if (toggleEl) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const targetPath = normalizeServerPath(toggleEl.getAttribute('data-tree-toggle'));
+                        if (treeExpandedPaths.has(targetPath)) {
+                            treeExpandedPaths.delete(targetPath);
+                            renderTreeView();
+                            return;
+                        }
+                        treeExpandedPaths.add(targetPath);
+                        await fetchTreeEntries(targetPath, false);
+                        renderTreeView();
+                        return;
+                    }
+
+                    const nodeEl = event.target.closest('[data-tree-path]');
+                    if (!nodeEl) return;
+                    event.preventDefault();
+                    const targetPath = normalizeServerPath(nodeEl.getAttribute('data-tree-path'));
+                    const targetType = String(nodeEl.getAttribute('data-tree-type') || 'directory');
+                    if (targetType === 'directory') {
+                        navigateTo(targetPath);
+                        return;
+                    }
+                    window.location.href = `/server/${serverId}/files/edit#file=${encodeURIComponent(targetPath)}`;
                 });
             }
 
