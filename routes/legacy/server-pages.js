@@ -15,6 +15,7 @@ function registerServerPagesRoutes(ctx) {
         hasGoogleDriveScope
     } = require('../../core/backups/google-drive');
     const { getUserThemeId } = require('../../core/themes');
+    const { recordServerChange } = require('../../core/server-change-log');
     const { pickSmartAllocation } = require('../../core/helpers/smart-allocation');
     const {
         STORE_DEALS_SETTING_KEY,
@@ -9199,7 +9200,17 @@ function registerServerPagesRoutes(ctx) {
                 allowStop: req.body.aiAllowStop === 'true' || req.body.aiAllowStop === 'on' || req.body.aiAllowStop === '1',
                 allowRestart: req.body.aiAllowRestart === 'true' || req.body.aiAllowRestart === 'on' || req.body.aiAllowRestart === '1'
             };
+            const previousAiPolicy = server.aiPolicy || {};
             await server.update({ aiPolicy });
+            await recordServerChange(ServerChangeLog, {
+                serverId: server.id,
+                actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                category: 'ai',
+                changeKey: 'ai_policy',
+                summary: 'AI policy changed',
+                beforeValue: previousAiPolicy,
+                afterValue: aiPolicy
+            }).catch(() => {});
             return res.redirect(`/server/${server.containerId}/ai-manage?success=` + encodeURIComponent('AI settings saved.'));
         } catch (err) {
             console.error('Error saving AI manage settings:', err);
@@ -9933,6 +9944,7 @@ function registerServerPagesRoutes(ctx) {
             const existing = await ServerSubuser.findOne({
                 where: { serverId: server.id, userId: targetUser.id }
             });
+            const previousPermissions = existing ? normalizeServerPermissionList(existing.permissions) : [];
 
             if (existing) {
                 await existing.update({
@@ -9947,6 +9959,20 @@ function registerServerPagesRoutes(ctx) {
                     permissions: requestedPermissions
                 });
             }
+
+            await recordServerChange(ServerChangeLog, {
+                serverId: server.id,
+                actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                category: 'permissions',
+                changeKey: 'subuser_permissions',
+                summary: `Permissions changed for ${targetUser.username}`,
+                beforeValue: previousPermissions,
+                afterValue: requestedPermissions,
+                metadata: {
+                    targetUserId: targetUser.id,
+                    username: targetUser.username
+                }
+            }).catch(() => {});
 
             return res.redirect(`/server/${server.containerId}/users?success=${encodeURIComponent(`Subuser updated for ${targetUser.username}.`)}`);
         } catch (error) {
@@ -9977,7 +10003,22 @@ function registerServerPagesRoutes(ctx) {
                 return res.redirect(`/server/${server.containerId}/users?error=${encodeURIComponent('Subuser not found.')}`);
             }
 
+            const previousPermissions = normalizeServerPermissionList(membership.permissions);
+            const targetUserId = membership.userId;
             await membership.destroy();
+            await recordServerChange(ServerChangeLog, {
+                serverId: server.id,
+                actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                category: 'permissions',
+                changeKey: 'subuser_removed',
+                summary: 'Subuser removed',
+                beforeValue: previousPermissions,
+                afterValue: [],
+                metadata: {
+                    subuserId,
+                    targetUserId
+                }
+            }).catch(() => {});
             return res.redirect(`/server/${server.containerId}/users?success=${encodeURIComponent('Subuser removed successfully.')}`);
         } catch (error) {
             console.error('Error removing subuser:', error);
@@ -10272,6 +10313,14 @@ function registerServerPagesRoutes(ctx) {
                 order: [['createdAt', 'DESC']],
                 limit: 250
             });
+            const changeLogs = ServerChangeLog
+                ? await ServerChangeLog.findAll({
+                    where: { serverId: server.id },
+                    include: [{ model: User, as: 'actor', attributes: ['id', 'username', 'email'], required: false }],
+                    order: [['createdAt', 'DESC']],
+                    limit: 250
+                })
+                : [];
 
             return res.render('server/activity', {
                 server,
@@ -10279,7 +10328,8 @@ function registerServerPagesRoutes(ctx) {
                 title: `Activity ${server.name}`,
                 path: '/servers',
                 active: 'activity',
-                logs
+                logs,
+                changeLogs
             });
         } catch (error) {
             console.error('Error loading server activity:', error);
@@ -10656,7 +10706,7 @@ function registerServerPagesRoutes(ctx) {
             });
             const nextPosition = Number.parseInt(maxPositionRow && maxPositionRow.maxPosition, 10);
 
-            await ServerCommandMacro.create({
+            const createdMacro = await ServerCommandMacro.create({
                 serverId: server.id,
                 createdByUserId: req.session.user.id,
                 name,
@@ -10665,6 +10715,21 @@ function registerServerPagesRoutes(ctx) {
                 position: Number.isInteger(nextPosition) ? nextPosition + 1 : 0,
                 visibility
             });
+            await recordServerChange(ServerChangeLog, {
+                serverId: server.id,
+                actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                category: 'macro',
+                changeKey: 'macro_created',
+                summary: `Macro created: ${name}`,
+                beforeValue: null,
+                afterValue: {
+                    id: createdMacro.id,
+                    name,
+                    description,
+                    command,
+                    visibility
+                }
+            }).catch(() => {});
 
             if (AuditLog) {
                 await AuditLog.create({
@@ -10722,6 +10787,13 @@ function registerServerPagesRoutes(ctx) {
                 return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro name and command are required.')}`);
             }
 
+            const previousMacro = {
+                name: macro.name,
+                description: macro.description,
+                command: macro.command,
+                position: macro.position,
+                visibility: macro.visibility
+            };
             await macro.update({
                 name,
                 description,
@@ -10729,6 +10801,22 @@ function registerServerPagesRoutes(ctx) {
                 position: Number.isInteger(requestedPosition) ? Math.max(0, requestedPosition) : macro.position,
                 visibility
             });
+            await recordServerChange(ServerChangeLog, {
+                serverId: server.id,
+                actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                category: 'macro',
+                changeKey: 'macro_updated',
+                summary: `Macro updated: ${name}`,
+                beforeValue: previousMacro,
+                afterValue: {
+                    name: macro.name,
+                    description: macro.description,
+                    command: macro.command,
+                    position: macro.position,
+                    visibility: macro.visibility
+                },
+                metadata: { macroId: macro.id }
+            }).catch(() => {});
 
             if (AuditLog) {
                 await AuditLog.create({
@@ -10771,7 +10859,25 @@ function registerServerPagesRoutes(ctx) {
                 return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro not found.')}`);
             }
 
+            const deletedMacroSnapshot = {
+                id: macro.id,
+                name: macro.name,
+                description: macro.description,
+                command: macro.command,
+                position: macro.position,
+                visibility: macro.visibility
+            };
             await macro.destroy();
+            await recordServerChange(ServerChangeLog, {
+                serverId: server.id,
+                actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                category: 'macro',
+                changeKey: 'macro_deleted',
+                summary: `Macro deleted: ${macro.name}`,
+                beforeValue: deletedMacroSnapshot,
+                afterValue: null,
+                metadata: { macroId: macro.id }
+            }).catch(() => {});
 
             if (AuditLog) {
                 await AuditLog.create({
@@ -18104,10 +18210,41 @@ function registerServerPagesRoutes(ctx) {
                 dockerImage: nextDockerImage,
                 startup: startupTemplate
             };
+            const previousStartupVariables = normalizeClientVariables(server.variables || {});
+            const previousDockerImage = String(server.dockerImage || '').trim();
+            const previousStartupTemplate = String(server.startup || '').trim();
 
             if (!shouldReinstall) {
                 await server.update(updatePayload);
                 await setServerStartupPresetSelection(server.id, selectedPresetId);
+                await recordServerChange(ServerChangeLog, {
+                    serverId: server.id,
+                    actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                    category: 'startup',
+                    changeKey: 'startup_variables',
+                    summary: 'Startup variables changed',
+                    beforeValue: previousStartupVariables,
+                    afterValue: resolvedVariables,
+                    metadata: { preset: selectedPresetId || 'custom' }
+                }).catch(() => {});
+                await recordServerChange(ServerChangeLog, {
+                    serverId: server.id,
+                    actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                    category: 'startup',
+                    changeKey: 'startup_template',
+                    summary: 'Startup script changed',
+                    beforeValue: previousStartupTemplate || null,
+                    afterValue: String(startupTemplate || '').trim() || null
+                }).catch(() => {});
+                await recordServerChange(ServerChangeLog, {
+                    serverId: server.id,
+                    actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                    category: 'image',
+                    changeKey: 'docker_image',
+                    summary: 'Runtime image changed',
+                    beforeValue: previousDockerImage || null,
+                    afterValue: String(nextDockerImage || '').trim() || null
+                }).catch(() => {});
 
                 let savedMessage = selectedPresetId
                     ? `Startup settings saved with preset "${selectedPresetId}".`
@@ -18138,6 +18275,36 @@ function registerServerPagesRoutes(ctx) {
             const connectorWs = connectorConnections.get(primaryAllocation.connectorId);
             if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
                 await server.update(updatePayload);
+                await recordServerChange(ServerChangeLog, {
+                    serverId: server.id,
+                    actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                    category: 'startup',
+                    changeKey: 'startup_variables',
+                    summary: 'Startup variables changed',
+                    beforeValue: previousStartupVariables,
+                    afterValue: resolvedVariables,
+                    metadata: { reinstall: true, preset: selectedPresetId || 'custom' }
+                }).catch(() => {});
+                await recordServerChange(ServerChangeLog, {
+                    serverId: server.id,
+                    actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                    category: 'startup',
+                    changeKey: 'startup_template',
+                    summary: 'Startup script changed',
+                    beforeValue: previousStartupTemplate || null,
+                    afterValue: String(startupTemplate || '').trim() || null,
+                    metadata: { reinstall: true }
+                }).catch(() => {});
+                await recordServerChange(ServerChangeLog, {
+                    serverId: server.id,
+                    actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                    category: 'image',
+                    changeKey: 'docker_image',
+                    summary: 'Runtime image changed',
+                    beforeValue: previousDockerImage || null,
+                    afterValue: String(nextDockerImage || '').trim() || null,
+                    metadata: { reinstall: true }
+                }).catch(() => {});
                 return res.redirect(`/server/${server.containerId}/startup?error=Connector is offline. Saved settings, but reinstall could not start.`);
             }
 
@@ -18196,6 +18363,36 @@ function registerServerPagesRoutes(ctx) {
                 isSuspended: false
             });
             await setServerStartupPresetSelection(server.id, selectedPresetId);
+            await recordServerChange(ServerChangeLog, {
+                serverId: server.id,
+                actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                category: 'startup',
+                changeKey: 'startup_variables',
+                summary: 'Startup variables changed',
+                beforeValue: previousStartupVariables,
+                afterValue: resolvedVariables,
+                metadata: { reinstall: true, preset: selectedPresetId || 'custom', jobId: installJob.id }
+            }).catch(() => {});
+            await recordServerChange(ServerChangeLog, {
+                serverId: server.id,
+                actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                category: 'startup',
+                changeKey: 'startup_template',
+                summary: 'Startup script changed',
+                beforeValue: previousStartupTemplate || null,
+                afterValue: String(startupTemplate || '').trim() || null,
+                metadata: { reinstall: true, jobId: installJob.id }
+            }).catch(() => {});
+            await recordServerChange(ServerChangeLog, {
+                serverId: server.id,
+                actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                category: 'image',
+                changeKey: 'docker_image',
+                summary: 'Runtime image changed',
+                beforeValue: previousDockerImage || null,
+                afterValue: String(nextDockerImage || '').trim() || null,
+                metadata: { reinstall: true, jobId: installJob.id }
+            }).catch(() => {});
 
             const applyMessage = selectedPresetId
                 ? `Startup settings saved with preset "${selectedPresetId}" and reinstall queued (job #${installJob.id}).`
@@ -18328,7 +18525,6 @@ function registerServerPagesRoutes(ctx) {
             if (!featureFlags.policyEngineEnabled) {
                 return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Policy engine is disabled by admin.')}`);
             }
-
             const policyConfig = await getServerPolicyEngineConfig(server.id);
 
             return res.render('server/policy', {
@@ -18363,6 +18559,7 @@ function registerServerPagesRoutes(ctx) {
             if (!featureFlags.policyEngineEnabled) {
                 return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Policy engine is disabled by admin.')}`);
             }
+            const previousPolicyConfig = await getServerPolicyEngineConfig(server.id);
 
             const anomalyActionRaw = String(req.body.anomalyAction || 'none').trim().toLowerCase();
             const anomalyAction = ['none', 'restart', 'stop'].includes(anomalyActionRaw) ? anomalyActionRaw : 'none';
@@ -18371,7 +18568,7 @@ function registerServerPagesRoutes(ctx) {
             const oomRecoveryActionRaw = String(req.body.playbookOomRecoveryAction || 'start').trim().toLowerCase();
             const oomRecoveryAction = ['none', 'start', 'restart'].includes(oomRecoveryActionRaw) ? oomRecoveryActionRaw : 'start';
 
-            await setServerPolicyEngineConfig(server.id, {
+            const nextPolicyConfig = {
                 enabled: parseBooleanInput(req.body.enabled, false),
                 restartOnCrash: parseBooleanInput(req.body.restartOnCrash, true),
                 anomalyAction,
@@ -18392,7 +18589,17 @@ function registerServerPagesRoutes(ctx) {
                         action: oomRecoveryAction
                     }
                 }
-            });
+            };
+            await setServerPolicyEngineConfig(server.id, nextPolicyConfig);
+            await recordServerChange(ServerChangeLog, {
+                serverId: server.id,
+                actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                category: 'policy',
+                changeKey: 'policy_engine',
+                summary: 'Policy engine changed',
+                beforeValue: previousPolicyConfig,
+                afterValue: nextPolicyConfig
+            }).catch(() => {});
 
             return res.redirect(`/server/${server.containerId}/policy?success=${encodeURIComponent('Policy engine updated successfully.')}`);
         } catch (err) {

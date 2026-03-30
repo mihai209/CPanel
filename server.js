@@ -55,7 +55,9 @@ const {
     ServerSubuser,
     ServerApiKey,
     ServerCommandMacro,
+    ServerChangeLog,
     ServerResourceSample,
+    AllocationPoolTemplate,
     AdminApiKey,
     AdminApiKeyAudit
 } = require('./core/db');
@@ -488,7 +490,9 @@ const legacyRouteContextData = {
     ServerSubuser,
     ServerApiKey,
     ServerCommandMacro,
+    ServerChangeLog,
     ServerResourceSample,
+    AllocationPoolTemplate,
     AdminApiKey,
     AdminApiKeyAudit,
     SERVER_API_KEY_PERMISSION_CATALOG,

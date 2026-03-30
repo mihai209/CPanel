@@ -250,6 +250,25 @@ const ServerCommandMacro = sequelize.define('ServerCommandMacro', {
     ]
 });
 
+const ServerChangeLog = sequelize.define('ServerChangeLog', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    serverId: { type: DataTypes.INTEGER, allowNull: false },
+    actorUserId: { type: DataTypes.INTEGER, allowNull: true },
+    category: { type: DataTypes.STRING(40), allowNull: false },
+    changeKey: { type: DataTypes.STRING(80), allowNull: false },
+    summary: { type: DataTypes.STRING(255), allowNull: false },
+    beforeValue: { type: DataTypes.JSON, allowNull: true },
+    afterValue: { type: DataTypes.JSON, allowNull: true },
+    metadata: { type: DataTypes.JSON, allowNull: true }
+}, {
+    indexes: [
+        { fields: ['serverId'] },
+        { fields: ['actorUserId'] },
+        { fields: ['createdAt'] },
+        { fields: ['serverId', 'changeKey'] }
+    ]
+});
+
 const ServerResourceSample = sequelize.define('ServerResourceSample', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     serverId: { type: DataTypes.INTEGER, allowNull: false },
@@ -393,6 +412,23 @@ const Mount = sequelize.define('Mount', {
     connectorId: { type: DataTypes.INTEGER, allowNull: true }
 });
 
+const AllocationPoolTemplate = sequelize.define('AllocationPoolTemplate', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    connectorId: { type: DataTypes.INTEGER, allowNull: false },
+    name: { type: DataTypes.STRING(80), allowNull: false },
+    description: { type: DataTypes.STRING(255), allowNull: true },
+    ip: { type: DataTypes.STRING(120), allowNull: false },
+    portStart: { type: DataTypes.INTEGER, allowNull: false },
+    portEnd: { type: DataTypes.INTEGER, allowNull: false },
+    aliasTemplate: { type: DataTypes.STRING(191), allowNull: true },
+    notesTemplate: { type: DataTypes.STRING(20), allowNull: true }
+}, {
+    indexes: [
+        { fields: ['connectorId'] },
+        { fields: ['connectorId', 'name'], unique: true }
+    ]
+});
+
 const ServerMount = sequelize.define('ServerMount', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     serverId: { type: DataTypes.INTEGER, allowNull: false },
@@ -490,6 +526,8 @@ ServerBackupPolicy.belongsTo(Server, { foreignKey: 'serverId', as: 'server' });
 
 Connector.hasMany(Mount, { foreignKey: 'connectorId', as: 'mounts' });
 Mount.belongsTo(Connector, { foreignKey: 'connectorId', as: 'connector' });
+Connector.hasMany(AllocationPoolTemplate, { foreignKey: 'connectorId', as: 'allocationTemplates', onDelete: 'CASCADE', onUpdate: 'CASCADE', hooks: true });
+AllocationPoolTemplate.belongsTo(Connector, { foreignKey: 'connectorId', as: 'connector', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
 
 Server.belongsToMany(Mount, { through: ServerMount, foreignKey: 'serverId', otherKey: 'mountId', as: 'mounts' });
 Mount.belongsToMany(Server, { through: ServerMount, foreignKey: 'mountId', otherKey: 'serverId', as: 'servers' });
@@ -555,6 +593,31 @@ User.hasMany(ServerCommandMacro, {
 ServerCommandMacro.belongsTo(User, {
     foreignKey: 'createdByUserId',
     as: 'creator',
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+});
+Server.hasMany(ServerChangeLog, {
+    foreignKey: 'serverId',
+    as: 'changeLogs',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+    hooks: true
+});
+ServerChangeLog.belongsTo(Server, {
+    foreignKey: 'serverId',
+    as: 'server',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
+});
+User.hasMany(ServerChangeLog, {
+    foreignKey: 'actorUserId',
+    as: 'serverChanges',
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+});
+ServerChangeLog.belongsTo(User, {
+    foreignKey: 'actorUserId',
+    as: 'actor',
     onDelete: 'SET NULL',
     onUpdate: 'CASCADE'
 });
@@ -774,6 +837,10 @@ async function upgrade() {
         await ServerCommandMacro.sync({ alter: true });
         console.log('ServerCommandMacro table synced.');
 
+        // Sync the ServerChangeLog model
+        await ServerChangeLog.sync({ alter: true });
+        console.log('ServerChangeLog table synced.');
+
         // Sync the ServerResourceSample model
         await ServerResourceSample.sync({ alter: true });
         console.log('ServerResourceSample table synced.');
@@ -809,6 +876,10 @@ async function upgrade() {
         // Sync the Mount model
         await Mount.sync({ alter: true });
         console.log('Mount table synced.');
+
+        // Sync the AllocationPoolTemplate model
+        await AllocationPoolTemplate.sync({ alter: true });
+        console.log('AllocationPoolTemplate table synced.');
 
         // Sync the ServerMount model
         await ServerMount.sync({ alter: true });

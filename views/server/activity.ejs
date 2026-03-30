@@ -13,6 +13,8 @@
         .content{flex:1;display:flex;flex-direction:column;min-width:0}.top{background:#121216;border-bottom:1px solid #2d2d35;padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem}
         .scroll{flex:1;overflow:auto;padding:1rem}.cardx{background:#121216;border:1px solid #2d2d35;border-radius:.8rem}.btn-icon{background:transparent;border:0;color:#8b8b9a;font-size:1.2rem}
         .table-dark{--bs-table-bg:transparent}
+        .section-title{font-size:.82rem;color:#8b8b9a;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+        .badge-soft{display:inline-block;padding:.2rem .55rem;border-radius:999px;font-size:.72rem;border:1px solid #2d2d35;background:#17171d;color:#d2d2db}
     </style>
     <link rel="stylesheet" href="/css/mobile-layout.css">
 </head>
@@ -27,7 +29,43 @@
             <h1 class="h5 mb-0">Activity / <span class="text-secondary"><%= server.name %></span></h1>
         </header>
         <section class="scroll">
+            <div class="cardx p-3 mb-3">
+                <div class="section-title mb-3">What Changed</div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>When</th>
+                                <th>Actor</th>
+                                <th>Category</th>
+                                <th>Summary</th>
+                                <th>Diff</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (!changeLogs || changeLogs.length === 0) { %>
+                                <tr><td colspan="5" class="text-secondary">No change entries yet.</td></tr>
+                            <% } else { changeLogs.forEach((entry) => { %>
+                                <tr>
+                                    <td><%= new Date(entry.createdAt).toLocaleString() %></td>
+                                    <td><%= entry.actor ? entry.actor.username : 'system' %></td>
+                                    <td><span class="badge-soft"><%= entry.category || '-' %></span></td>
+                                    <td>
+                                        <div><strong><%= entry.summary || entry.changeKey || '-' %></strong></div>
+                                        <% if (entry.changeKey) { %><div class="text-secondary small"><code><%= entry.changeKey %></code></div><% } %>
+                                    </td>
+                                    <td>
+                                        <div class="small text-secondary">Before: <code><%= JSON.stringify(entry.beforeValue) %></code></div>
+                                        <div class="small text-secondary mt-1">After: <code><%= JSON.stringify(entry.afterValue) %></code></div>
+                                    </td>
+                                </tr>
+                            <% }) } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
             <div class="cardx p-3">
+                <div class="section-title mb-3">Activity Log</div>
                 <div class="table-responsive">
                     <table class="table table-dark table-sm align-middle mb-0">
                         <thead>

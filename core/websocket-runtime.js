@@ -550,7 +550,8 @@ function markConnectorOffline(connectorId, reason = 'stale_heartbeat') {
         ...current,
         status: 'offline',
         lastSeen: current.lastSeen || new Date(),
-        usage: current.usage || null
+        usage: current.usage || null,
+        diagnostics: current.diagnostics || null
     };
 
     if (wasOnline) {
@@ -1643,7 +1644,8 @@ wss.on('connection', (ws, request) => {
                         connectorWs.send(JSON.stringify({
                             type: 'read_file',
                             serverId: serverId,
-                            filePath: data.filePath
+                            filePath: data.filePath,
+                            encoding: data.encoding
                         }));
                     } else if (data.type === 'write_file') {
                         if (!hasConsolePermission('server.files')) {
@@ -1740,7 +1742,8 @@ wss.on('connection', (ws, request) => {
                     global.connectorStatus[connectorId] = {
                         status: 'online',
                         lastSeen: new Date(),
-                        usage: null
+                        usage: null,
+                        diagnostics: null
                     };
                     ws.send(JSON.stringify({ type: 'auth_success' }));
                     try {
@@ -1799,7 +1802,8 @@ wss.on('connection', (ws, request) => {
                 global.connectorStatus[connectorId] = {
                     status: 'online',
                     lastSeen: new Date(),
-                    usage: data.usage
+                    usage: data.usage,
+                    diagnostics: data.diagnostics || null
                 };
 
                 broadcastToUI({
@@ -1807,7 +1811,8 @@ wss.on('connection', (ws, request) => {
                     connectorId: connectorId,
                     status: 'online',
                     lastSeen: new Date(),
-                    usage: data.usage
+                    usage: data.usage,
+                    diagnostics: data.diagnostics || null
                 });
             }
 
@@ -2217,7 +2222,9 @@ wss.on('connection', (ws, request) => {
                 sendToServerConsole(data.serverId, {
                     type: 'file_content',
                     filePath: data.filePath,
-                    content: data.content
+                    content: data.content,
+                    encoding: data.encoding,
+                    contentBase64: data.contentBase64
                 });
             }
             if (data.type === 'write_success') {

@@ -280,7 +280,8 @@
 
             #monaco-editor-container,
             #ace-editor-container,
-            #plain-editor-container {
+            #plain-editor-container,
+            #sqlite-editor-container {
                 position: absolute;
                 top: 0;
                 left: 0;
@@ -290,7 +291,8 @@
 
             #ace-editor-container.d-none,
             #monaco-editor-container.d-none,
-            #plain-editor-container.d-none {
+            #plain-editor-container.d-none,
+            #sqlite-editor-container.d-none {
                 display: none !important;
             }
 
@@ -306,6 +308,209 @@
                 font-size: 14px;
                 line-height: 1.55;
                 padding: 1rem;
+            }
+
+            #sqlite-editor-container {
+                display: flex;
+                flex-direction: column;
+                background: var(--bg-dark);
+                min-height: 0;
+            }
+
+            .sqlite-toolbar {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.75rem;
+                padding: 0.9rem 1rem;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+                background: rgba(255, 255, 255, 0.02);
+                flex-wrap: wrap;
+            }
+
+            .sqlite-toolbar-meta {
+                display: flex;
+                align-items: center;
+                gap: 0.55rem;
+                flex-wrap: wrap;
+            }
+
+            .sqlite-browser {
+                flex: 1;
+                min-height: 0;
+                display: flex;
+                overflow: hidden;
+            }
+
+            .sqlite-tables {
+                width: 260px;
+                border-right: 1px solid rgba(255, 255, 255, 0.06);
+                background: rgba(255, 255, 255, 0.02);
+                overflow: auto;
+                padding: 0.85rem;
+                flex-shrink: 0;
+            }
+
+            .sqlite-table-list {
+                display: flex;
+                flex-direction: column;
+                gap: 0.45rem;
+            }
+
+            .sqlite-table-btn {
+                width: 100%;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                background: rgba(255, 255, 255, 0.03);
+                color: var(--text-secondary);
+                border-radius: 10px;
+                padding: 0.65rem 0.8rem;
+                text-align: left;
+                font-size: 0.84rem;
+                transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+            }
+
+            .sqlite-table-btn:hover,
+            .sqlite-table-btn.active {
+                background: rgba(59, 130, 246, 0.14);
+                border-color: rgba(59, 130, 246, 0.35);
+                color: #dbeafe;
+            }
+
+            .sqlite-grid {
+                flex: 1;
+                min-width: 0;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+
+            .sqlite-grid-header {
+                padding: 0.85rem 1rem;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.75rem;
+                flex-wrap: wrap;
+            }
+
+            .sqlite-grid-controls {
+                display: flex;
+                align-items: center;
+                gap: 0.6rem;
+                flex-wrap: wrap;
+            }
+
+            .sqlite-search-input {
+                min-width: 220px;
+            }
+
+            .sqlite-grid-body {
+                flex: 1;
+                overflow: auto;
+                padding: 1rem;
+            }
+
+            .sqlite-empty {
+                color: var(--text-secondary);
+                font-size: 0.9rem;
+                padding: 1rem;
+            }
+
+            .sqlite-table-wrap {
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 12px;
+                overflow: hidden;
+                background: rgba(255, 255, 255, 0.02);
+            }
+
+            .sqlite-insert-panel {
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 12px;
+                background: rgba(255, 255, 255, 0.02);
+                padding: 1rem;
+                margin-bottom: 1rem;
+            }
+
+            .sqlite-insert-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 0.75rem;
+                margin-top: 0.85rem;
+            }
+
+            .sqlite-insert-field label {
+                display: block;
+                font-size: 0.78rem;
+                color: var(--text-secondary);
+                margin-bottom: 0.35rem;
+            }
+
+            .sqlite-row-actions {
+                min-width: 78px !important;
+                width: 78px;
+            }
+
+            .sqlite-table-view {
+                margin: 0;
+                color: var(--text-primary);
+            }
+
+            .sqlite-table-view th,
+            .sqlite-table-view td {
+                vertical-align: middle;
+                background: transparent !important;
+                border-color: rgba(255, 255, 255, 0.08);
+                min-width: 160px;
+            }
+
+            .sqlite-rowid-col {
+                min-width: 90px !important;
+                color: var(--text-secondary);
+                font-size: 0.76rem;
+            }
+
+            .sqlite-cell-editor {
+                display: flex;
+                align-items: center;
+                gap: 0.45rem;
+                min-width: 0;
+            }
+
+            .sqlite-cell-input {
+                min-width: 0;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.82rem;
+            }
+
+            .sqlite-cell-null {
+                border: 1px solid rgba(245, 158, 11, 0.3);
+                background: rgba(245, 158, 11, 0.12);
+                color: #fde68a;
+                border-radius: 6px;
+                padding: 0.3rem 0.45rem;
+                font-size: 0.72rem;
+                line-height: 1;
+                flex-shrink: 0;
+            }
+
+            .sqlite-cell-null:hover {
+                background: rgba(245, 158, 11, 0.18);
+            }
+
+            .sqlite-blob-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.35rem;
+                padding: 0.35rem 0.55rem;
+                border-radius: 999px;
+                background: rgba(239, 68, 68, 0.12);
+                color: #fecaca;
+                font-size: 0.72rem;
+            }
+
+            .sqlite-mode-lock {
+                opacity: 0.7;
             }
 
             .loading-overlay {
@@ -412,6 +617,14 @@
                 .editor-tree-panel {
                     display: none !important;
                 }
+
+                .sqlite-tables {
+                    width: 190px;
+                }
+
+                .sqlite-search-input {
+                    min-width: 160px;
+                }
             }
         </style>
     <link rel="stylesheet" href="/css/mobile-layout.css">
@@ -466,6 +679,7 @@
                             <option value="monaco">Monaco</option>
                             <option value="ace">Ace</option>
                             <option value="plain">Plain Text</option>
+                            <option value="sqlite">SQLite</option>
                         </select>
                         <button type="button" class="btn-action" id="btnToggleTreeView">
                             <i class="bi bi-diagram-3"></i>
@@ -513,6 +727,58 @@
                         <div id="plain-editor-container" class="d-none">
                             <textarea id="plain-editor" spellcheck="false"></textarea>
                         </div>
+                        <div id="sqlite-editor-container" class="d-none">
+                            <div class="sqlite-toolbar">
+                                <div class="sqlite-toolbar-meta">
+                                    <span class="editor-chip" id="sqliteDatabaseChip">
+                                        <i class="bi bi-database"></i>
+                                        <span>SQLite database</span>
+                                    </span>
+                                    <span class="editor-chip" id="sqliteTableCountChip">
+                                        <i class="bi bi-table"></i>
+                                        <span>0 tables</span>
+                                    </span>
+                                    <span class="editor-chip" id="sqliteRowMetaChip">
+                                        <i class="bi bi-grid-3x3-gap"></i>
+                                        <span>No table selected</span>
+                                    </span>
+                                </div>
+                                <div class="sqlite-toolbar-meta">
+                                    <span class="editor-chip">
+                                        <i class="bi bi-exclamation-triangle"></i>
+                                        <span>Editing first 200 rows per table</span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="sqlite-browser">
+                                <aside class="sqlite-tables">
+                                    <div class="sqlite-table-list" id="sqliteTablesList">
+                                        <div class="sqlite-empty">No tables loaded yet.</div>
+                                    </div>
+                                </aside>
+                                <section class="sqlite-grid">
+                                    <div class="sqlite-grid-header">
+                                        <div class="editor-chip" id="sqliteCurrentTableChip">
+                                            <i class="bi bi-table"></i>
+                                            <span>No table selected</span>
+                                        </div>
+                                        <div class="sqlite-grid-controls">
+                                            <input type="search" class="form-control form-control-sm bg-dark text-light border-secondary sqlite-search-input" id="sqliteSearchInput" placeholder="Search current table">
+                                            <button type="button" class="btn-action px-2 py-1" id="btnClearSQLiteSearch" title="Clear search">
+                                                <i class="bi bi-x-circle"></i>
+                                            </button>
+                                            <button type="button" class="btn-action px-2 py-1" id="btnInsertSQLiteRow" title="Insert row">
+                                                <i class="bi bi-plus-lg"></i>
+                                                Row
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="sqlite-grid-body" id="sqliteGridBody">
+                                        <div class="sqlite-empty">Open a SQLite file to inspect its tables.</div>
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -521,6 +787,7 @@
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
         <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.32.6/src-min-noconflict/ace.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/sql.js@1.13.0/dist/sql-wasm.js"></script>
 
         <script>
             // Parse Hash for file path
@@ -572,6 +839,18 @@
             const treeCache = new Map();
             const treeExpandedPaths = new Set();
             const treeLoadingPaths = new Set();
+            const sqliteExtensions = new Set(['sqlite', 'sqlite3', 'db', 'db3']);
+            let sqlJsPromise = null;
+            let sqliteDb = null;
+            let sqliteOriginalBase64 = '';
+            let sqliteCurrentTable = '';
+            let sqliteTableNames = [];
+            let sqliteTableColumns = [];
+            let sqliteTableRows = [];
+            let sqliteTableEditable = false;
+            let sqliteTableTotalRows = 0;
+            let sqliteSearchTerm = '';
+            let sqliteSearchDebounceTimer = null;
 
             function escapeHtml(value) {
                 return String(value || '')
@@ -580,6 +859,13 @@
                     .replace(/>/g, '&gt;')
                     .replace(/"/g, '&quot;')
                     .replace(/'/g, '&#39;');
+            }
+
+            function escapeCssAttributeValue(value) {
+                if (window.CSS && typeof window.CSS.escape === 'function') {
+                    return window.CSS.escape(String(value || ''));
+                }
+                return String(value || '').replace(/["\\]/g, '\\$&');
             }
 
             function normalizeServerPath(pathValue) {
@@ -758,6 +1044,568 @@
                 return 'text';
             }
 
+            function getSQLiteFileInfo(pathValue) {
+                const normalized = normalizeServerPath(pathValue);
+                const fileName = normalized.split('/').pop() || '';
+                const lowerName = fileName.toLowerCase();
+                const sidecarSuffix = lowerName.endsWith('-wal') ? '-wal' : (lowerName.endsWith('-shm') ? '-shm' : '');
+                const candidateName = sidecarSuffix ? fileName.slice(0, -sidecarSuffix.length) : fileName;
+                const dotIndex = candidateName.lastIndexOf('.');
+                if (dotIndex === -1) {
+                    return {
+                        isSQLite: false,
+                        isSidecar: false,
+                        sidecarType: '',
+                        basePath: normalized,
+                        targetPath: normalized,
+                        extension: ''
+                    };
+                }
+
+                const ext = candidateName.slice(dotIndex + 1).toLowerCase();
+                const isSQLite = sqliteExtensions.has(ext);
+                const basePath = sidecarSuffix
+                    ? `${normalized.slice(0, -fileName.length)}${candidateName}`
+                    : normalized;
+
+                return {
+                    isSQLite,
+                    isSidecar: Boolean(isSQLite && sidecarSuffix),
+                    sidecarType: sidecarSuffix ? sidecarSuffix.slice(1) : '',
+                    basePath,
+                    targetPath: isSQLite ? basePath : normalized,
+                    extension: ext
+                };
+            }
+
+            function isSQLitePath(pathValue) {
+                return getSQLiteFileInfo(pathValue).isSQLite;
+            }
+
+            function getSQLiteTargetPath(pathValue) {
+                return getSQLiteFileInfo(pathValue).targetPath;
+            }
+
+            function quoteSqlIdentifier(identifier) {
+                return `"${String(identifier || '').replace(/"/g, '""')}"`;
+            }
+
+            function base64ToUint8Array(base64Value) {
+                const normalized = String(base64Value || '').trim();
+                const binary = window.atob(normalized);
+                const bytes = new Uint8Array(binary.length);
+                for (let index = 0; index < binary.length; index += 1) {
+                    bytes[index] = binary.charCodeAt(index);
+                }
+                return bytes;
+            }
+
+            function uint8ArrayToBase64(bytes) {
+                const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+                let binary = '';
+                const chunkSize = 0x8000;
+                for (let offset = 0; offset < source.length; offset += chunkSize) {
+                    const chunk = source.subarray(offset, offset + chunkSize);
+                    binary += String.fromCharCode(...chunk);
+                }
+                return window.btoa(binary);
+            }
+
+            function syncEditorModeAvailability() {
+                const select = document.getElementById('editorModeSelect');
+                const saveBtn = document.getElementById('btnSave');
+                const wordWrapBtn = document.getElementById('btnWordWrapToggle');
+                const databaseChip = document.getElementById('sqliteDatabaseChip');
+                if (!select) return;
+                const sqliteInfo = getSQLiteFileInfo(currentFilePath);
+                const sqliteMode = sqliteInfo.isSQLite;
+                Array.from(select.options).forEach((option) => {
+                    if (option.value === 'sqlite') {
+                        option.disabled = !sqliteMode;
+                        option.hidden = !sqliteMode;
+                        return;
+                    }
+                    option.disabled = sqliteMode;
+                });
+                select.classList.toggle('sqlite-mode-lock', sqliteMode);
+                select.disabled = sqliteMode;
+                if (sqliteMode) {
+                    activeEditorMode = 'sqlite';
+                } else if (activeEditorMode === 'sqlite') {
+                    activeEditorMode = 'monaco';
+                }
+                select.value = activeEditorMode;
+                if (saveBtn) {
+                    saveBtn.innerHTML = `
+                        <span class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true" id="saveSpinner"></span>
+                        <i class="bi ${sqliteMode ? 'bi-database-check' : 'bi-save'} me-2" id="saveIcon"></i>${sqliteMode ? 'Save Database' : 'Save File'}
+                    `;
+                }
+                if (wordWrapBtn) {
+                    wordWrapBtn.disabled = sqliteMode;
+                    wordWrapBtn.classList.toggle('opacity-50', sqliteMode);
+                    wordWrapBtn.classList.toggle('disabled', sqliteMode);
+                }
+                if (databaseChip) {
+                    const text = databaseChip.querySelector('span');
+                    if (text) {
+                        if (sqliteInfo.isSidecar) {
+                            text.textContent = `SQLite via ${sqliteInfo.sidecarType.toUpperCase()} sidecar`;
+                        } else {
+                            text.textContent = 'SQLite database';
+                        }
+                    }
+                    databaseChip.title = sqliteInfo.isSidecar
+                        ? `Opened from companion file ${currentFilePath}, reading main database ${sqliteInfo.basePath}`
+                        : currentFilePath;
+                }
+            }
+
+            async function ensureSqlJs() {
+                if (sqlJsPromise) return sqlJsPromise;
+                if (typeof window.initSqlJs !== 'function') {
+                    throw new Error('sql.js is unavailable in this browser session.');
+                }
+                sqlJsPromise = window.initSqlJs({
+                    locateFile: (file) => `https://cdn.jsdelivr.net/npm/sql.js@1.13.0/dist/${file}`
+                });
+                return sqlJsPromise;
+            }
+
+            function formatSQLiteCellValue(value) {
+                if (value === null || value === undefined) return '';
+                if (value instanceof Uint8Array) return `[BLOB ${value.length} bytes]`;
+                return String(value);
+            }
+
+            function coerceSQLiteInputValue(rawValue, declaredType) {
+                if (rawValue === null || rawValue === undefined) return null;
+                const normalizedType = String(declaredType || '').toUpperCase();
+                const value = String(rawValue);
+                if (normalizedType.includes('INT')) {
+                    const parsedInt = Number.parseInt(value, 10);
+                    return Number.isFinite(parsedInt) ? parsedInt : value;
+                }
+                if (normalizedType.includes('REAL') || normalizedType.includes('FLOA') || normalizedType.includes('DOUB') || normalizedType.includes('NUM')) {
+                    const parsedFloat = Number.parseFloat(value);
+                    return Number.isFinite(parsedFloat) ? parsedFloat : value;
+                }
+                return value;
+            }
+
+            function renderSQLiteTableList() {
+                const listEl = document.getElementById('sqliteTablesList');
+                const countChip = document.getElementById('sqliteTableCountChip');
+                if (countChip) {
+                    const countText = countChip.querySelector('span');
+                    if (countText) countText.textContent = `${sqliteTableNames.length} table${sqliteTableNames.length === 1 ? '' : 's'}`;
+                }
+                if (!listEl) return;
+                if (!sqliteTableNames.length) {
+                    listEl.innerHTML = '<div class="sqlite-empty">This database has no user tables.</div>';
+                    return;
+                }
+                listEl.innerHTML = sqliteTableNames.map((tableName) => `
+                    <button type="button" class="sqlite-table-btn ${sqliteCurrentTable === tableName ? 'active' : ''}" data-sqlite-table="${escapeHtml(tableName)}">
+                        <i class="bi bi-table me-2"></i>${escapeHtml(tableName)}
+                    </button>
+                `).join('');
+            }
+
+            function renderSQLiteGrid() {
+                const gridBody = document.getElementById('sqliteGridBody');
+                const tableChip = document.getElementById('sqliteCurrentTableChip');
+                const rowMetaChip = document.getElementById('sqliteRowMetaChip');
+                const searchInput = document.getElementById('sqliteSearchInput');
+                const insertBtn = document.getElementById('btnInsertSQLiteRow');
+                if (tableChip) {
+                    const text = tableChip.querySelector('span');
+                    if (text) text.textContent = sqliteCurrentTable || 'No table selected';
+                }
+                if (searchInput && searchInput.value !== sqliteSearchTerm) {
+                    searchInput.value = sqliteSearchTerm;
+                }
+                if (insertBtn) {
+                    insertBtn.disabled = !sqliteCurrentTable || !sqliteTableEditable;
+                    insertBtn.classList.toggle('disabled', insertBtn.disabled);
+                }
+                if (rowMetaChip) {
+                    const text = rowMetaChip.querySelector('span');
+                    if (text) {
+                        if (!sqliteCurrentTable) {
+                            text.textContent = 'No table selected';
+                        } else if (sqliteSearchTerm) {
+                            text.textContent = `${Math.min(sqliteTableRows.length, 200)} visible / ${sqliteTableTotalRows} matching rows · ${sqliteTableEditable ? 'Editable' : 'Read-only'}`;
+                        } else {
+                            text.textContent = `${Math.min(sqliteTableRows.length, 200)} visible / ${sqliteTableTotalRows} rows · ${sqliteTableEditable ? 'Editable' : 'Read-only'}`;
+                        }
+                    }
+                }
+                if (!gridBody) return;
+                if (!sqliteCurrentTable) {
+                    gridBody.innerHTML = '<div class="sqlite-empty">Select a table from the left to inspect its rows.</div>';
+                    return;
+                }
+                if (!sqliteTableRows.length) {
+                    gridBody.innerHTML = `
+                        ${sqliteTableEditable ? renderSQLiteInsertPanel() : ''}
+                        <div class="sqlite-empty">${sqliteSearchTerm ? 'No rows match the current search.' : 'This table has no rows to display.'}</div>
+                    `;
+                    return;
+                }
+
+                const headerColumns = sqliteTableColumns.map((column) => `<th>${escapeHtml(column.name)}</th>`).join('');
+                const bodyRows = sqliteTableRows.map((row) => {
+                    const rowIdCell = `<td class="sqlite-rowid-col">${escapeHtml(row.__cpanelRowId)}</td>`;
+                    const cells = sqliteTableColumns.map((column) => {
+                        const rawValue = row[column.name];
+                        if (rawValue instanceof Uint8Array) {
+                            return `<td><span class="sqlite-blob-pill"><i class="bi bi-file-binary"></i> BLOB ${rawValue.length}b</span></td>`;
+                        }
+                        const safeValue = rawValue === null || rawValue === undefined ? '' : String(rawValue);
+                        const nullButton = sqliteTableEditable
+                            ? `<button type="button" class="sqlite-cell-null" data-sqlite-null="1" data-rowid="${escapeHtml(row.__cpanelRowId)}" data-column="${escapeHtml(column.name)}">NULL</button>`
+                            : '';
+                        return `
+                            <td>
+                                <div class="sqlite-cell-editor">
+                                    <input
+                                        type="text"
+                                        class="form-control form-control-sm bg-dark text-light border-secondary sqlite-cell-input"
+                                        value="${escapeHtml(safeValue)}"
+                                        data-rowid="${escapeHtml(row.__cpanelRowId)}"
+                                        data-column="${escapeHtml(column.name)}"
+                                        data-coltype="${escapeHtml(column.type || '')}"
+                                        ${sqliteTableEditable ? '' : 'disabled'}
+                                    >
+                                    ${nullButton}
+                                </div>
+                            </td>
+                        `;
+                    }).join('');
+                    const deleteCell = sqliteTableEditable
+                        ? `
+                            <td class="sqlite-row-actions">
+                                <button type="button" class="btn-action px-2 py-1 text-danger border-danger-subtle" data-sqlite-delete-row="${escapeHtml(row.__cpanelRowId)}" title="Delete row">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        `
+                        : '<td class="sqlite-row-actions text-secondary small">locked</td>';
+                    return `<tr>${rowIdCell}${cells}${deleteCell}</tr>`;
+                }).join('');
+
+                gridBody.innerHTML = `
+                    ${sqliteTableEditable ? renderSQLiteInsertPanel() : ''}
+                    <div class="sqlite-table-wrap">
+                        <div class="table-responsive">
+                            <table class="table table-dark table-sm sqlite-table-view">
+                                <thead>
+                                    <tr>
+                                        <th class="sqlite-rowid-col">rowid</th>
+                                        ${headerColumns}
+                                        <th class="sqlite-row-actions">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${bodyRows}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function renderSQLiteInsertPanel() {
+                if (!sqliteCurrentTable || !sqliteTableEditable) return '';
+                const fields = sqliteTableColumns.map((column) => `
+                    <div class="sqlite-insert-field">
+                        <label for="sqlite_insert_${escapeHtml(column.name)}">${escapeHtml(column.name)}${column.type ? ` <span class="text-secondary">(${escapeHtml(column.type)})</span>` : ''}</label>
+                        <input
+                            type="text"
+                            class="form-control form-control-sm bg-dark text-light border-secondary sqlite-insert-input"
+                            id="sqlite_insert_${escapeHtml(column.name)}"
+                            data-column="${escapeHtml(column.name)}"
+                            data-coltype="${escapeHtml(column.type || '')}"
+                            placeholder="blank = default/NULL"
+                        >
+                    </div>
+                `).join('');
+                return `
+                    <div class="sqlite-insert-panel">
+                        <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+                            <div>
+                                <div class="fw-semibold">Insert Row</div>
+                                <div class="text-secondary small">Leave a field blank to let SQLite use DEFAULT or NULL.</div>
+                            </div>
+                            <button type="button" class="btn-action px-3 py-2" id="btnSubmitSQLiteInsert">
+                                <i class="bi bi-plus-circle"></i>
+                                Insert Row
+                            </button>
+                        </div>
+                        <div class="sqlite-insert-grid">
+                            ${fields || '<div class="sqlite-empty">This table has no editable columns.</div>'}
+                        </div>
+                    </div>
+                `;
+            }
+
+            function buildSQLiteSearchQuery(columns, rawSearchTerm) {
+                const searchTerm = String(rawSearchTerm || '').trim();
+                if (!searchTerm) {
+                    return { whereClause: '', params: [] };
+                }
+                const expressions = columns.map((column) => `COALESCE(CAST(${quoteSqlIdentifier(column.name)} AS TEXT), '')`);
+                if (!expressions.length) {
+                    return { whereClause: '', params: [] };
+                }
+                const searchExpression = expressions.join(` || ' ' || `);
+                return {
+                    whereClause: ` WHERE (${searchExpression}) LIKE ? COLLATE NOCASE`,
+                    params: [`%${searchTerm}%`]
+                };
+            }
+
+            async function loadSQLiteTable(tableName, options = {}) {
+                const normalizedTable = String(tableName || '').trim();
+                if (Object.prototype.hasOwnProperty.call(options, 'searchTerm')) {
+                    sqliteSearchTerm = String(options.searchTerm || '').trim();
+                }
+                sqliteCurrentTable = normalizedTable;
+                renderSQLiteTableList();
+                if (!sqliteDb || !normalizedTable) {
+                    sqliteTableColumns = [];
+                    sqliteTableRows = [];
+                    sqliteTableEditable = false;
+                    sqliteTableTotalRows = 0;
+                    renderSQLiteGrid();
+                    return;
+                }
+
+                const tableIdentifier = quoteSqlIdentifier(normalizedTable);
+                const infoResult = sqliteDb.exec(`PRAGMA table_info(${tableIdentifier})`);
+                sqliteTableColumns = (infoResult[0] && Array.isArray(infoResult[0].values))
+                    ? infoResult[0].values.map((entry) => ({
+                        cid: entry[0],
+                        name: String(entry[1] || ''),
+                        type: String(entry[2] || ''),
+                        notNull: Boolean(entry[3]),
+                        defaultValue: entry[4],
+                        primaryKey: Boolean(entry[5])
+                    }))
+                    : [];
+
+                let rowResult = [];
+                let tableEditable = true;
+                const searchQuery = buildSQLiteSearchQuery(sqliteTableColumns, sqliteSearchTerm);
+                try {
+                    const rowStatement = sqliteDb.prepare(`SELECT rowid AS __cpanelRowId, * FROM ${tableIdentifier}${searchQuery.whereClause} LIMIT 200`);
+                    try {
+                        rowStatement.bind(searchQuery.params);
+                        const values = [];
+                        const columns = rowStatement.getColumnNames();
+                        while (rowStatement.step()) {
+                            values.push(rowStatement.get());
+                        }
+                        rowResult = values.length ? [{ columns, values }] : [];
+                    } finally {
+                        rowStatement.free();
+                    }
+                } catch (error) {
+                    console.warn('SQLite rowid mode unavailable, falling back to read-only table view:', error);
+                    tableEditable = false;
+                    const readOnlyStatement = sqliteDb.prepare(`SELECT * FROM ${tableIdentifier}${searchQuery.whereClause} LIMIT 200`);
+                    try {
+                        readOnlyStatement.bind(searchQuery.params);
+                        const values = [];
+                        const columns = readOnlyStatement.getColumnNames();
+                        while (readOnlyStatement.step()) {
+                            values.push(readOnlyStatement.get());
+                        }
+                        rowResult = values.length ? [{ columns, values }] : [];
+                    } finally {
+                        readOnlyStatement.free();
+                    }
+                }
+
+                const countStatement = sqliteDb.prepare(`SELECT COUNT(*) AS total FROM ${tableIdentifier}${searchQuery.whereClause}`);
+                try {
+                    countStatement.bind(searchQuery.params);
+                    sqliteTableTotalRows = countStatement.step() ? (Number.parseInt(countStatement.get()[0], 10) || 0) : 0;
+                } finally {
+                    countStatement.free();
+                }
+                sqliteTableEditable = tableEditable;
+
+                if (!rowResult[0]) {
+                    sqliteTableRows = [];
+                    renderSQLiteGrid();
+                    return;
+                }
+
+                const rowColumns = Array.isArray(rowResult[0].columns) ? rowResult[0].columns : [];
+                sqliteTableRows = Array.isArray(rowResult[0].values)
+                    ? rowResult[0].values.map((values) => {
+                        const row = {};
+                        rowColumns.forEach((columnName, columnIndex) => {
+                            row[columnName] = values[columnIndex];
+                        });
+                        return row;
+                    })
+                    : [];
+
+                renderSQLiteGrid();
+            }
+
+            async function loadSQLiteContent(contentBase64) {
+                const overlay = document.getElementById('loadingOverlay');
+                if (overlay) {
+                    overlay.style.opacity = '1';
+                }
+
+                const SQL = await ensureSqlJs();
+                const bytes = base64ToUint8Array(contentBase64);
+                if (sqliteDb) {
+                    try {
+                        sqliteDb.close();
+                    } catch {
+                        // Ignore close failures.
+                    }
+                }
+                sqliteDb = new SQL.Database(bytes);
+                sqliteOriginalBase64 = contentBase64;
+                sqliteTableNames = [];
+                sqliteCurrentTable = '';
+                sqliteTableColumns = [];
+                sqliteTableRows = [];
+                sqliteTableEditable = false;
+                sqliteTableTotalRows = 0;
+
+                const tablesResult = sqliteDb.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name ASC");
+                sqliteTableNames = (tablesResult[0] && Array.isArray(tablesResult[0].values))
+                    ? tablesResult[0].values.map((entry) => String(entry[0] || '')).filter(Boolean)
+                    : [];
+
+                fileLanguage = 'sqlite';
+                syncEditorModeAvailability();
+                await switchEditorMode('sqlite');
+                setUnsavedState(false);
+                updateEditorMeta('');
+                renderSQLiteTableList();
+                await loadSQLiteTable(sqliteTableNames[0] || '');
+                updateDisplayedFileName();
+                renderTreeView();
+
+                if (overlay) {
+                    setTimeout(() => {
+                        overlay.style.opacity = '0';
+                        setTimeout(() => overlay.remove(), 300);
+                    }, 100);
+                }
+            }
+
+            function exportCurrentSQLiteBase64() {
+                if (!sqliteDb) return '';
+                return uint8ArrayToBase64(sqliteDb.export());
+            }
+
+            function updateSQLiteCellValue(rowId, columnName, columnType, nextValue) {
+                if (!sqliteDb || !sqliteCurrentTable || !sqliteTableEditable) return;
+                const tableIdentifier = quoteSqlIdentifier(sqliteCurrentTable);
+                const columnIdentifier = quoteSqlIdentifier(columnName);
+                const statement = sqliteDb.prepare(`UPDATE ${tableIdentifier} SET ${columnIdentifier} = ? WHERE rowid = ?`);
+                try {
+                    statement.run([coerceSQLiteInputValue(nextValue, columnType), rowId]);
+                    setUnsavedState(exportCurrentSQLiteBase64() !== sqliteOriginalBase64);
+                } finally {
+                    statement.free();
+                }
+                if (sqliteSearchTerm) {
+                    loadSQLiteTable(sqliteCurrentTable, { searchTerm: sqliteSearchTerm });
+                }
+            }
+
+            function setSQLiteCellNull(rowId, columnName) {
+                if (!sqliteDb || !sqliteCurrentTable || !sqliteTableEditable) return;
+                const tableIdentifier = quoteSqlIdentifier(sqliteCurrentTable);
+                const columnIdentifier = quoteSqlIdentifier(columnName);
+                const statement = sqliteDb.prepare(`UPDATE ${tableIdentifier} SET ${columnIdentifier} = NULL WHERE rowid = ?`);
+                try {
+                    statement.run([rowId]);
+                    setUnsavedState(exportCurrentSQLiteBase64() !== sqliteOriginalBase64);
+                } finally {
+                    statement.free();
+                }
+                if (sqliteSearchTerm) {
+                    loadSQLiteTable(sqliteCurrentTable, { searchTerm: sqliteSearchTerm });
+                }
+            }
+
+            async function insertSQLiteRowFromInputs() {
+                if (!sqliteDb || !sqliteCurrentTable || !sqliteTableEditable) return;
+                const gridBody = document.getElementById('sqliteGridBody');
+                if (!gridBody) return;
+                const inputs = Array.from(gridBody.querySelectorAll('.sqlite-insert-input'));
+                const filledInputs = inputs.filter((input) => String(input.value || '').trim() !== '');
+                const tableIdentifier = quoteSqlIdentifier(sqliteCurrentTable);
+
+                try {
+                    if (!filledInputs.length) {
+                        sqliteDb.run(`INSERT INTO ${tableIdentifier} DEFAULT VALUES`);
+                    } else {
+                        const columnNames = filledInputs.map((input) => String(input.getAttribute('data-column') || ''));
+                        const columnTypes = filledInputs.map((input) => String(input.getAttribute('data-coltype') || ''));
+                        const placeholders = filledInputs.map(() => '?').join(', ');
+                        const columnsSql = columnNames.map((columnName) => quoteSqlIdentifier(columnName)).join(', ');
+                        const params = filledInputs.map((input, index) => coerceSQLiteInputValue(input.value, columnTypes[index]));
+                        const statement = sqliteDb.prepare(`INSERT INTO ${tableIdentifier} (${columnsSql}) VALUES (${placeholders})`);
+                        try {
+                            statement.run(params);
+                        } finally {
+                            statement.free();
+                        }
+                    }
+                    setUnsavedState(exportCurrentSQLiteBase64() !== sqliteOriginalBase64);
+                    await loadSQLiteTable(sqliteCurrentTable, { searchTerm: sqliteSearchTerm });
+                    if (window.showStatusModal) {
+                        window.showStatusModal('Row inserted locally. Save the database to persist it.', 'success');
+                    }
+                } catch (error) {
+                    console.error('SQLite insert failed:', error);
+                    if (window.showStatusModal) {
+                        window.showStatusModal(`Failed to insert row: ${error.message}`, 'error');
+                    }
+                }
+            }
+
+            async function deleteSQLiteRow(rowId) {
+                if (!sqliteDb || !sqliteCurrentTable || !sqliteTableEditable) return;
+                const parsedRowId = Number.parseInt(rowId, 10);
+                if (!Number.isFinite(parsedRowId)) return;
+                const proceed = window.confirm(`Delete row ${parsedRowId} from ${sqliteCurrentTable}?`);
+                if (!proceed) return;
+
+                const tableIdentifier = quoteSqlIdentifier(sqliteCurrentTable);
+                const statement = sqliteDb.prepare(`DELETE FROM ${tableIdentifier} WHERE rowid = ?`);
+                try {
+                    statement.run([parsedRowId]);
+                    setUnsavedState(exportCurrentSQLiteBase64() !== sqliteOriginalBase64);
+                } catch (error) {
+                    console.error('SQLite delete failed:', error);
+                    if (window.showStatusModal) {
+                        window.showStatusModal(`Failed to delete row: ${error.message}`, 'error');
+                    }
+                    return;
+                } finally {
+                    statement.free();
+                }
+
+                await loadSQLiteTable(sqliteCurrentTable, { searchTerm: sqliteSearchTerm });
+                if (window.showStatusModal) {
+                    window.showStatusModal('Row deleted locally. Save the database to persist it.', 'success');
+                }
+            }
+
             function updateDisplayedFileName() {
                 const nameEl = document.getElementById('displayFileName');
                 if (nameEl) {
@@ -858,6 +1706,7 @@
             }
 
             function getActiveEditorValue() {
+                if (activeEditorMode === 'sqlite') return '';
                 if (activeEditorMode === 'ace' && aceEditor) return aceEditor.getValue();
                 if (activeEditorMode === 'plain') return ensurePlainEditor().value;
                 if (monacoEditor) return monacoEditor.getValue();
@@ -865,6 +1714,10 @@
             }
 
             function setActiveEditorValue(value) {
+                if (activeEditorMode === 'sqlite') {
+                    updateEditorMeta('');
+                    return;
+                }
                 const safeValue = typeof value === 'string' ? value : '';
                 setSuppressEditorChanges(true);
                 if (activeEditorMode === 'ace' && aceEditor) {
@@ -879,6 +1732,9 @@
             }
 
             function applyEditorLanguage() {
+                if (activeEditorMode === 'sqlite') {
+                    return;
+                }
                 if (monacoEditor && window.monaco) {
                     window.monaco.editor.setModelLanguage(monacoEditor.getModel(), fileLanguage);
                 }
@@ -888,6 +1744,8 @@
             }
 
             function layoutActiveEditor() {
+                const sqliteContainer = document.getElementById('sqlite-editor-container');
+                if (sqliteContainer && !sqliteContainer.classList.contains('d-none')) return;
                 if (monacoEditor) monacoEditor.layout();
                 if (aceEditor) aceEditor.resize();
             }
@@ -923,7 +1781,13 @@
                 }
                 if (lengthChip) {
                     const text = lengthChip.querySelector('span');
-                    if (text) text.textContent = `${safeContent.length.toLocaleString()} chars`;
+                    if (text) {
+                        if (isSQLitePath(currentFilePath)) {
+                            text.textContent = `${sqliteTableNames.length.toLocaleString()} tables`;
+                        } else {
+                            text.textContent = `${safeContent.length.toLocaleString()} chars`;
+                        }
+                    }
                 }
                 if (pathChip) {
                     const text = pathChip.querySelector('span');
@@ -940,6 +1804,10 @@
             }
 
             function applyWordWrap() {
+                if (activeEditorMode === 'sqlite') {
+                    updateWordWrapButton();
+                    return;
+                }
                 if (monacoEditor) {
                     monacoEditor.updateOptions({
                         wordWrap: wordWrapEnabled ? 'on' : 'off'
@@ -962,15 +1830,23 @@
             }
 
             async function switchEditorMode(nextMode, providedContent = null) {
-                const allowedMode = ['monaco', 'ace', 'plain'].includes(nextMode) ? nextMode : 'monaco';
+                const sqliteMode = isSQLitePath(currentFilePath);
+                const allowedMode = sqliteMode
+                    ? 'sqlite'
+                    : (['monaco', 'ace', 'plain'].includes(nextMode) ? nextMode : 'monaco');
                 const contentToPreserve = typeof providedContent === 'string' ? providedContent : getActiveEditorValue();
                 activeEditorMode = allowedMode;
+                syncEditorModeAvailability();
                 document.getElementById('editorModeSelect').value = activeEditorMode;
                 document.getElementById('monaco-editor-container').classList.toggle('d-none', activeEditorMode !== 'monaco');
                 document.getElementById('ace-editor-container').classList.toggle('d-none', activeEditorMode !== 'ace');
                 document.getElementById('plain-editor-container').classList.toggle('d-none', activeEditorMode !== 'plain');
+                document.getElementById('sqlite-editor-container').classList.toggle('d-none', activeEditorMode !== 'sqlite');
 
-                if (activeEditorMode === 'monaco') {
+                if (activeEditorMode === 'sqlite') {
+                    renderSQLiteTableList();
+                    renderSQLiteGrid();
+                } else if (activeEditorMode === 'monaco') {
                     await ensureMonacoEditor();
                 } else if (activeEditorMode === 'ace') {
                     const aceInstance = await ensureAceEditor();
@@ -987,21 +1863,31 @@
                 document.getElementById('monaco-editor-container').classList.toggle('d-none', activeEditorMode !== 'monaco');
                 document.getElementById('ace-editor-container').classList.toggle('d-none', activeEditorMode !== 'ace');
                 document.getElementById('plain-editor-container').classList.toggle('d-none', activeEditorMode !== 'plain');
+                document.getElementById('sqlite-editor-container').classList.toggle('d-none', activeEditorMode !== 'sqlite');
 
                 try {
-                    localStorage.setItem(editorModeSettingKey, activeEditorMode);
+                    if (activeEditorMode !== 'sqlite') {
+                        localStorage.setItem(editorModeSettingKey, activeEditorMode);
+                    }
                 } catch {
                     // Ignore localStorage issues.
                 }
 
                 applyEditorLanguage();
                 applyWordWrap();
-                setActiveEditorValue(contentToPreserve);
-                setUnsavedState(contentToPreserve !== currentContent);
+                if (activeEditorMode !== 'sqlite') {
+                    setActiveEditorValue(contentToPreserve);
+                    setUnsavedState(contentToPreserve !== currentContent);
+                }
                 layoutActiveEditor();
             }
 
             async function loadEditorContent(content, fileExtension) {
+                if (isSQLitePath(currentFilePath)) {
+                    const binary = uint8ArrayToBase64(new TextEncoder().encode(String(content || '')));
+                    await loadSQLiteContent(binary);
+                    return;
+                }
                 fileLanguage = guessLanguage(fileExtension);
                 await switchEditorMode(activeEditorMode, content);
                 setUnsavedState(false);
@@ -1023,15 +1909,21 @@
                 updateEditorMeta(getActiveEditorValue());
                 renderTreeView();
                 if (!ws || ws.readyState !== WebSocket.OPEN) return;
-                ws.send(JSON.stringify({
+                const requestedPath = isSQLitePath(currentFilePath) ? getSQLiteTargetPath(currentFilePath) : currentFilePath;
+                const payload = {
                     type: 'read_file',
-                    filePath: currentFilePath
-                }));
+                    filePath: requestedPath
+                };
+                if (isSQLitePath(currentFilePath)) {
+                    payload.encoding = 'base64';
+                }
+                ws.send(JSON.stringify(payload));
             }
 
             async function applyCurrentFilePath(nextPath) {
                 currentFilePath = normalizeServerPath(nextPath);
                 fileLanguage = guessLanguage(currentFilePath.split('.').pop() || '');
+                syncEditorModeAvailability();
                 updateDisplayedFileName();
                 updateEditorMeta(getActiveEditorValue());
                 await ensureTreeContext(getCurrentDirectoryPath());
@@ -1051,20 +1943,42 @@
                         const data = JSON.parse(event.data);
 
                         if (data.type === 'file_content') {
-                            if (normalizeServerPath(data.filePath) === normalizeServerPath(currentFilePath)) {
-                                currentContent = data.content || '';
+                            const expectedPath = isSQLitePath(currentFilePath) ? getSQLiteTargetPath(currentFilePath) : currentFilePath;
+                            if (normalizeServerPath(data.filePath) === normalizeServerPath(expectedPath)) {
                                 const ext = currentFilePath.split('.').pop() || '';
-                                loadEditorContent(currentContent, ext);
+                                if (isSQLitePath(currentFilePath)) {
+                                    const sqliteBase64 = String(data.contentBase64 || '').trim();
+                                    if (!sqliteBase64) {
+                                        if (window.showStatusModal) {
+                                            window.showStatusModal('Failed to load SQLite database: connector did not return binary content.', 'error');
+                                        }
+                                        return;
+                                    }
+                                    loadSQLiteContent(sqliteBase64).catch((error) => {
+                                        console.error('SQLite load failed:', error);
+                                        if (window.showStatusModal) {
+                                            window.showStatusModal(`Failed to load SQLite database: ${error.message}`, 'error');
+                                        }
+                                    });
+                                } else {
+                                    currentContent = data.content || '';
+                                    loadEditorContent(currentContent, ext);
+                                }
                             }
                         } else if (data.type === 'write_success') {
-                            if (normalizeServerPath(data.filePath) === normalizeServerPath(currentFilePath)) {
-                                currentContent = getActiveEditorValue();
+                            const expectedPath = isSQLitePath(currentFilePath) ? getSQLiteTargetPath(currentFilePath) : currentFilePath;
+                            if (normalizeServerPath(data.filePath) === normalizeServerPath(expectedPath)) {
+                                if (isSQLitePath(currentFilePath)) {
+                                    sqliteOriginalBase64 = exportCurrentSQLiteBase64();
+                                } else {
+                                    currentContent = getActiveEditorValue();
+                                }
                                 setUnsavedState(false);
                                 setSaveLoadingState(false);
-                                updateEditorMeta(currentContent);
+                                updateEditorMeta(isSQLitePath(currentFilePath) ? '' : currentContent);
 
                                 if (window.showStatusModal) {
-                                    window.showStatusModal('File saved successfully.', 'success');
+                                    window.showStatusModal(isSQLitePath(currentFilePath) ? 'Database saved successfully.' : 'File saved successfully.', 'success');
                                 }
                             }
                         } else if (data.type === 'error') {
@@ -1103,6 +2017,16 @@
                 }
 
                 setSaveLoadingState(true);
+                if (isSQLitePath(currentFilePath)) {
+                    ws.send(JSON.stringify({
+                        type: 'write_file',
+                        filePath: getSQLiteTargetPath(currentFilePath),
+                        encoding: 'base64',
+                        contentBase64: exportCurrentSQLiteBase64()
+                    }));
+                    return;
+                }
+
                 ws.send(JSON.stringify({
                     type: 'write_file',
                     filePath: currentFilePath,
@@ -1140,6 +2064,7 @@
                 ensureTreeContext(getCurrentDirectoryPath());
             }
             document.getElementById('editorModeSelect').value = activeEditorMode;
+            syncEditorModeAvailability();
             updateDisplayedFileName();
             renderTreeView();
 
@@ -1213,6 +2138,89 @@
                         return;
                     }
                     goToFilePath(targetPath);
+                });
+            }
+
+            const sqliteTablesList = document.getElementById('sqliteTablesList');
+            if (sqliteTablesList) {
+                sqliteTablesList.addEventListener('click', async (event) => {
+                    const button = event.target.closest('[data-sqlite-table]');
+                    if (!button) return;
+                    event.preventDefault();
+                    await loadSQLiteTable(button.getAttribute('data-sqlite-table'));
+                });
+            }
+
+            const sqliteGridBody = document.getElementById('sqliteGridBody');
+            if (sqliteGridBody) {
+                sqliteGridBody.addEventListener('change', (event) => {
+                    const input = event.target.closest('.sqlite-cell-input');
+                    if (!input) return;
+                    const rowId = Number.parseInt(input.getAttribute('data-rowid'), 10);
+                    const columnName = String(input.getAttribute('data-column') || '');
+                    const columnType = String(input.getAttribute('data-coltype') || '');
+                    if (!Number.isFinite(rowId) || !columnName) return;
+                    updateSQLiteCellValue(rowId, columnName, columnType, input.value);
+                });
+
+                sqliteGridBody.addEventListener('click', (event) => {
+                    const nullBtn = event.target.closest('[data-sqlite-null]');
+                    if (nullBtn) {
+                        event.preventDefault();
+                        const rowId = Number.parseInt(nullBtn.getAttribute('data-rowid'), 10);
+                        const columnName = String(nullBtn.getAttribute('data-column') || '');
+                        if (!Number.isFinite(rowId) || !columnName) return;
+                        setSQLiteCellNull(rowId, columnName);
+                        const input = sqliteGridBody.querySelector(`.sqlite-cell-input[data-rowid="${rowId}"][data-column="${escapeCssAttributeValue(columnName)}"]`);
+                        if (input) {
+                            input.value = '';
+                        }
+                        return;
+                    }
+
+                    const deleteBtn = event.target.closest('[data-sqlite-delete-row]');
+                    if (deleteBtn) {
+                        event.preventDefault();
+                        deleteSQLiteRow(deleteBtn.getAttribute('data-sqlite-delete-row'));
+                        return;
+                    }
+
+                    const insertBtn = event.target.closest('#btnSubmitSQLiteInsert');
+                    if (insertBtn) {
+                        event.preventDefault();
+                        insertSQLiteRowFromInputs();
+                    }
+                });
+            }
+
+            const sqliteSearchInput = document.getElementById('sqliteSearchInput');
+            if (sqliteSearchInput) {
+                sqliteSearchInput.addEventListener('input', () => {
+                    window.clearTimeout(sqliteSearchDebounceTimer);
+                    sqliteSearchDebounceTimer = window.setTimeout(() => {
+                        loadSQLiteTable(sqliteCurrentTable, { searchTerm: sqliteSearchInput.value });
+                    }, 180);
+                });
+            }
+
+            const clearSQLiteSearchBtn = document.getElementById('btnClearSQLiteSearch');
+            if (clearSQLiteSearchBtn) {
+                clearSQLiteSearchBtn.addEventListener('click', () => {
+                    sqliteSearchTerm = '';
+                    if (sqliteSearchInput) {
+                        sqliteSearchInput.value = '';
+                    }
+                    loadSQLiteTable(sqliteCurrentTable, { searchTerm: '' });
+                });
+            }
+
+            const insertSQLiteRowBtn = document.getElementById('btnInsertSQLiteRow');
+            if (insertSQLiteRowBtn) {
+                insertSQLiteRowBtn.addEventListener('click', () => {
+                    const insertSubmit = document.getElementById('btnSubmitSQLiteInsert');
+                    if (insertSubmit) {
+                        insertSubmit.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
                 });
             }
 

@@ -4,6 +4,7 @@ function registerAdminServersRoutes(ctx) {
     const nodePath = require('node:path');
     const { spawn } = require('node:child_process');
     const { Sequelize } = require('sequelize');
+    const { recordServerChange } = require('../../core/server-change-log');
     const { pickSmartAllocation } = require('../../core/helpers/smart-allocation');
     const {
         app,
@@ -12,11 +13,13 @@ function registerAdminServersRoutes(ctx) {
         Server,
         ServerApiKey,
         ServerCommandMacro,
+        ServerChangeLog,
         ServerResourceSample,
         ServerSubuser,
         ServerBackupPolicy,
         ServerBackup,
         ServerMount,
+        AllocationPoolTemplate,
         User,
         Image,
         Settings,
@@ -1936,6 +1939,16 @@ app.post('/admin/servers/:containerId/allocations/assign', requireAuth, requireA
         }
 
         await allocation.update({ serverId: server.id });
+        await recordServerChange(ServerChangeLog, {
+            serverId: server.id,
+            actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+            category: 'allocation',
+            changeKey: 'allocation_assigned',
+            summary: `Allocation assigned: ${allocation.ip}:${allocation.port}`,
+            beforeValue: null,
+            afterValue: { id: allocation.id, ip: allocation.ip, port: allocation.port },
+            metadata: { connectorId: allocation.connectorId }
+        }).catch(() => {});
         return res.redirect(`/admin/servers/${server.containerId}/manage?success=Allocation assigned. Restart required to refresh port bindings.`);
     } catch (error) {
         console.error('Error assigning admin allocation:', error);
@@ -1970,6 +1983,15 @@ app.post('/admin/servers/:containerId/allocations/:allocationId/unassign', requi
         }
 
         await allocation.update({ serverId: null });
+        await recordServerChange(ServerChangeLog, {
+            serverId: server.id,
+            actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+            category: 'allocation',
+            changeKey: 'allocation_unassigned',
+            summary: `Allocation removed: ${allocation.ip}:${allocation.port}`,
+            beforeValue: { id: allocation.id, ip: allocation.ip, port: allocation.port },
+            afterValue: null
+        }).catch(() => {});
         return res.redirect(`/admin/servers/${server.containerId}/manage?success=Allocation removed. Restart required to refresh port bindings.`);
     } catch (error) {
         console.error('Error unassigning admin allocation:', error);
@@ -2006,7 +2028,21 @@ app.post('/admin/servers/:containerId/allocations/:allocationId/primary', requir
             return res.redirect(`/admin/servers/${server.containerId}/manage?success=Allocation already primary.`);
         }
 
+        const previousPrimaryId = currentPrimaryId || null;
         await server.update({ allocationId: allocation.id });
+        await recordServerChange(ServerChangeLog, {
+            serverId: server.id,
+            actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+            category: 'allocation',
+            changeKey: 'primary_allocation',
+            summary: `Primary allocation changed to ${allocation.ip}:${allocation.port}`,
+            beforeValue: previousPrimaryId,
+            afterValue: allocation.id,
+            metadata: {
+                previousAllocationId: previousPrimaryId,
+                nextAllocationId: allocation.id
+            }
+        }).catch(() => {});
         return res.redirect(`/admin/servers/${server.containerId}/manage?success=Primary allocation updated. Restart required to refresh port bindings.`);
     } catch (error) {
         console.error('Error switching admin primary allocation:', error);
@@ -2035,7 +2071,18 @@ app.post('/admin/servers/:containerId/allocations/:allocationId/notes', requireA
 
         const notesRaw = String(req.body.notes || '').trim();
         const notes = notesRaw.length > 20 ? notesRaw.slice(0, 20) : notesRaw;
+        const previousNotes = allocation.notes || null;
         await allocation.update({ notes: notes || null });
+        await recordServerChange(ServerChangeLog, {
+            serverId: server.id,
+            actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+            category: 'allocation',
+            changeKey: 'allocation_notes',
+            summary: `Allocation notes changed for ${allocation.ip}:${allocation.port}`,
+            beforeValue: previousNotes,
+            afterValue: notes || null,
+            metadata: { allocationId: allocation.id }
+        }).catch(() => {});
         return res.redirect(`/admin/servers/${server.containerId}/manage?success=Allocation notes updated.`);
     } catch (error) {
         console.error('Error updating allocation notes:', error);
@@ -2301,6 +2348,21 @@ app.post('/admin/servers/edit/:containerId', requireAuth, requireAdmin, async (r
         const safeDescription = safeDescriptionRaw.length > 0 ? safeDescriptionRaw : null;
         const server = await Server.findOne({ where: { containerId: req.params.containerId } });
         if (!server) return res.redirect('/admin/servers?error=Server not found.');
+        const previousServerState = {
+            name: server.name,
+            description: server.description,
+            ownerId: server.ownerId,
+            imageId: server.imageId,
+            memory: server.memory,
+            cpu: server.cpu,
+            disk: server.disk,
+            swapLimit: server.swapLimit,
+            ioWeight: server.ioWeight,
+            pidsLimit: server.pidsLimit,
+            oomKillDisable: server.oomKillDisable,
+            oomScoreAdj: server.oomScoreAdj,
+            startup: server.startup
+        };
         if (safeDescriptionRaw.length > 50) {
             return res.redirect(`/admin/servers/${req.params.containerId}/manage?error=${encodeURIComponent('Description must be at most 50 characters.')}`);
         }
@@ -2367,6 +2429,40 @@ app.post('/admin/servers/edit/:containerId', requireAuth, requireAdmin, async (r
             oomScoreAdj: advancedLimits.values.oomScoreAdj,
             startup: startup || null
         });
+        await recordServerChange(ServerChangeLog, {
+            serverId: server.id,
+            actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+            category: 'server',
+            changeKey: 'admin_server_edit',
+            summary: 'Server configuration changed',
+            beforeValue: previousServerState,
+            afterValue: {
+                name: server.name,
+                description: server.description,
+                ownerId: server.ownerId,
+                imageId: server.imageId,
+                memory: server.memory,
+                cpu: server.cpu,
+                disk: server.disk,
+                swapLimit: server.swapLimit,
+                ioWeight: server.ioWeight,
+                pidsLimit: server.pidsLimit,
+                oomKillDisable: server.oomKillDisable,
+                oomScoreAdj: server.oomScoreAdj,
+                startup: server.startup
+            }
+        }).catch(() => {});
+        if (String(previousServerState.imageId) !== String(server.imageId)) {
+            await recordServerChange(ServerChangeLog, {
+                serverId: server.id,
+                actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                category: 'image',
+                changeKey: 'image_id',
+                summary: 'Base image changed',
+                beforeValue: previousServerState.imageId,
+                afterValue: server.imageId
+            }).catch(() => {});
+        }
 
         res.redirect(`/admin/servers/${server.containerId}/manage?success=Server updated successfully!`);
     } catch (err) {

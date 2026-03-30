@@ -116,6 +116,53 @@
                                     </div>
                                     <% } else if (currentTab==='allocations' ) { %>
                                         <!-- ALLOCATIONS CONTENT -->
+                                        <div class="card border-0 shadow-sm mb-4" style="background-color: #1a1a20;">
+                                            <div class="card-header border-bottom border-secondary border-opacity-10 bg-transparent py-3 d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <h5 class="mb-0 text-light fw-bold">Allocation Pools / Port Templates</h5>
+                                                    <small class="text-muted">Save reusable IP + port ranges and apply them in one click.</small>
+                                                </div>
+                                                <button class="btn btn-outline-primary btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#createAllocationTemplateModal">
+                                                    <i class="bi bi-diagram-3 me-1"></i> New Template
+                                                </button>
+                                            </div>
+                                            <div class="card-body">
+                                                <% if (allocationTemplates && allocationTemplates.length > 0) { %>
+                                                    <div class="row g-3">
+                                                        <% allocationTemplates.forEach((template) => { %>
+                                                            <div class="col-xl-4 col-md-6">
+                                                                <div class="rounded p-3 h-100" style="background-color:#141419;border:1px solid #2d2d35;">
+                                                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                                                        <div>
+                                                                            <div class="fw-bold text-light"><%= template.name %></div>
+                                                                            <% if (template.description) { %>
+                                                                                <div class="text-muted small mt-1"><%= template.description %></div>
+                                                                            <% } %>
+                                                                        </div>
+                                                                        <form method="POST" action="/admin/connectors/<%= connector.id %>/allocation-templates/<%= template.id %>/delete">
+                                                                            <button type="submit" class="btn btn-link text-danger p-0"><i class="bi bi-trash"></i></button>
+                                                                        </form>
+                                                                    </div>
+                                                                    <div class="small text-secondary mt-3">
+                                                                        <div><code><%= template.ip %></code></div>
+                                                                        <div>Ports: <strong><%= template.portStart %></strong> - <strong><%= template.portEnd %></strong></div>
+                                                                        <% if (template.aliasTemplate) { %><div>Alias: <code><%= template.aliasTemplate %></code></div><% } %>
+                                                                        <% if (template.notesTemplate) { %><div>Notes: <code><%= template.notesTemplate %></code></div><% } %>
+                                                                    </div>
+                                                                    <form method="POST" action="/admin/connectors/<%= connector.id %>/allocation-templates/<%= template.id %>/apply" class="mt-3">
+                                                                        <button type="submit" class="btn btn-success btn-sm fw-bold">
+                                                                            <i class="bi bi-lightning-charge me-1"></i> Apply Template
+                                                                        </button>
+                                                                    </form>
+                                                                </div>
+                                                            </div>
+                                                        <% }) %>
+                                                    </div>
+                                                <% } else { %>
+                                                    <div class="text-muted">No allocation templates saved yet.</div>
+                                                <% } %>
+                                            </div>
+                                        </div>
                                         <div class="card border-0 shadow-sm" style="background-color: #1a1a20;">
                                             <div
                                                 class="card-header border-bottom border-secondary border-opacity-10 bg-transparent py-3 d-flex justify-content-between align-items-center">
@@ -451,6 +498,56 @@
                             <button type="button" class="btn btn-link text-muted text-decoration-none fw-medium"
                                 data-bs-dismiss="modal">Cancel</button>
                             <button type="submit" class="btn btn-primary px-4 fw-bold">Add Allocation</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="createAllocationTemplateModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg text-start" style="background-color: #1a1a20; border: 1px solid #2d2d35 !important;">
+                    <div class="modal-header border-bottom border-secondary border-opacity-10">
+                        <h5 class="modal-title fs-6 fw-bold text-light">Create Allocation Template</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form action="/admin/connectors/<%= connector.id %>/allocation-templates" method="POST">
+                        <div class="modal-body p-4">
+                            <div class="mb-3">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Name</label>
+                                <input type="text" name="name" maxlength="80" class="form-control" style="background-color: #141419; border-color: #2d2d35; color: white;" required placeholder="Minecraft pool">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Description</label>
+                                <input type="text" name="description" maxlength="255" class="form-control" style="background-color: #141419; border-color: #2d2d35; color: white;" placeholder="Lobby/proxy ports">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted small text-uppercase fw-bold">IP Address</label>
+                                <input type="text" name="ip" class="form-control" style="background-color: #141419; border-color: #2d2d35; color: white;" required placeholder="212.227.49.38">
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label text-muted small text-uppercase fw-bold">Start Port</label>
+                                    <input type="number" name="portStart" class="form-control" style="background-color: #141419; border-color: #2d2d35; color: white;" required placeholder="25565">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label text-muted small text-uppercase fw-bold">End Port</label>
+                                    <input type="number" name="portEnd" class="form-control" style="background-color: #141419; border-color: #2d2d35; color: white;" required placeholder="25575">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Alias Template</label>
+                                <input type="text" name="aliasTemplate" maxlength="191" class="form-control" style="background-color: #141419; border-color: #2d2d35; color: white;" placeholder="mc-{port}">
+                                <small class="text-muted d-block mt-2">Tokens: <code>{ip}</code>, <code>{port}</code>, <code>{id}</code>, <code>{alias}</code></small>
+                            </div>
+                            <div class="mb-1">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Notes Template</label>
+                                <input type="text" name="notesTemplate" maxlength="20" class="form-control" style="background-color: #141419; border-color: #2d2d35; color: white;" placeholder="proxy">
+                            </div>
+                        </div>
+                        <div class="modal-footer border-top border-secondary border-opacity-10">
+                            <button type="button" class="btn btn-link text-muted text-decoration-none fw-medium" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary px-4 fw-bold">Save Template</button>
                         </div>
                     </form>
                 </div>

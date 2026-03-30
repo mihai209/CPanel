@@ -90,6 +90,82 @@
                 padding: 0.75rem;
                 border: 1px solid rgba(255, 255, 255, 0.05);
             }
+
+            .diag-grid {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 0.55rem;
+            }
+
+            .diag-item {
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                border-radius: 0.9rem;
+                padding: 0.8rem 0.9rem;
+            }
+
+            .diag-top {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.75rem;
+                margin-bottom: 0.3rem;
+            }
+
+            .diag-name {
+                font-size: 0.78rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: rgba(255, 255, 255, 0.68);
+            }
+
+            .diag-badge {
+                border-radius: 999px;
+                padding: 0.2rem 0.55rem;
+                font-size: 0.68rem;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+                border: 1px solid transparent;
+            }
+
+            .diag-badge-ok {
+                color: #10b981;
+                background: rgba(16, 185, 129, 0.12);
+                border-color: rgba(16, 185, 129, 0.24);
+            }
+
+            .diag-badge-warn {
+                color: #f59e0b;
+                background: rgba(245, 158, 11, 0.12);
+                border-color: rgba(245, 158, 11, 0.24);
+            }
+
+            .diag-badge-fail {
+                color: #ef4444;
+                background: rgba(239, 68, 68, 0.12);
+                border-color: rgba(239, 68, 68, 0.24);
+            }
+
+            .diag-summary {
+                font-size: 0.9rem;
+                color: #fff;
+                font-weight: 600;
+            }
+
+            .diag-detail {
+                margin-top: 0.2rem;
+                color: rgba(255, 255, 255, 0.6);
+                font-size: 0.8rem;
+                line-height: 1.45;
+                word-break: break-word;
+            }
+
+            .diag-meta {
+                margin-top: 0.25rem;
+                color: rgba(255, 255, 255, 0.45);
+                font-size: 0.74rem;
+            }
         </style>
     <link rel="stylesheet" href="/css/mobile-layout.css">
 </head>
@@ -118,6 +194,8 @@
                                     <% const statusData=connectorStatus[conn.id]; const isOnline=statusData &&
                                         statusData.status==='online' && (new Date() - new Date(statusData.lastSeen)) <
                                         30000; const usage=statusData ? statusData.usage : null;
+                                        const diagnostics=statusData && statusData.diagnostics && statusData.diagnostics.checks ? statusData.diagnostics.checks : {};
+                                        const diagnosticEntries=Object.entries(diagnostics);
                                         const nodeUsage = nodeStats[conn.id] || {};
                                         const memAllocated = Number(nodeUsage.memoryAllocatedGb || 0);
                                         const diskAllocated = Number(nodeUsage.diskAllocatedGb || 0);
@@ -220,6 +298,44 @@
                                                             </span>
                                                         </div>
                                                     </div>
+                                                </div>
+
+                                                <div class="mb-4">
+                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                        <span class="metric-label">Connector Diagnostics</span>
+                                                        <% if (statusData && statusData.diagnostics && statusData.diagnostics.generatedAt) { %>
+                                                            <span class="small text-muted">
+                                                                Updated <%= new Date(statusData.diagnostics.generatedAt).toLocaleTimeString() %>
+                                                            </span>
+                                                        <% } %>
+                                                    </div>
+                                                    <% if (diagnosticEntries.length > 0) { %>
+                                                        <div class="diag-grid">
+                                                            <% diagnosticEntries.forEach(([diagKey, diag]) => { %>
+                                                                <% const diagStatus = String((diag && diag.status) || 'warn').toLowerCase(); %>
+                                                                <% const diagLabel = diagKey.replace(/_/g, ' '); %>
+                                                                <div class="diag-item">
+                                                                    <div class="diag-top">
+                                                                        <span class="diag-name"><%= diagLabel %></span>
+                                                                        <span class="diag-badge diag-badge-<%= ['ok', 'warn', 'fail'].includes(diagStatus) ? diagStatus : 'warn' %>">
+                                                                            <%= diagStatus.toUpperCase() %>
+                                                                        </span>
+                                                                    </div>
+                                                                    <div class="diag-summary"><%= (diag && diag.summary) || 'No summary' %></div>
+                                                                    <% if (diag && diag.detail) { %>
+                                                                        <div class="diag-detail"><%= diag.detail %></div>
+                                                                    <% } %>
+                                                                    <% if (diag && diag.metadata) { %>
+                                                                        <div class="diag-meta"><%= JSON.stringify(diag.metadata) %></div>
+                                                                    <% } %>
+                                                                </div>
+                                                            <% }) %>
+                                                        </div>
+                                                    <% } else { %>
+                                                        <div class="info-bit">
+                                                            <span class="text-muted small">No diagnostics received yet. Wait for the next connector heartbeat.</span>
+                                                        </div>
+                                                    <% } %>
                                                 </div>
 
                                                 <div

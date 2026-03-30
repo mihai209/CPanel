@@ -59,6 +59,15 @@ function normalizeAllocationAlias(raw) {
     return sliced || null;
 }
 
+function normalizeAllocationTemplateName(raw) {
+    return String(raw || '').trim().slice(0, 80);
+}
+
+function normalizeAllocationTemplateDescription(raw) {
+    const value = String(raw || '').trim();
+    return value ? value.slice(0, 255) : null;
+}
+
 function parseAllocationIds(rawIds, maxItems = 2000) {
     const values = Array.isArray(rawIds) ? rawIds : (rawIds === undefined || rawIds === null ? [] : [rawIds]);
     const seen = new Set();
@@ -411,12 +420,19 @@ app.get('/admin/connectors/:id/allocations', requireAuth, requireAdmin, async (r
         });
         const statusData = (global.connectorStatus && global.connectorStatus[req.params.id]) || { status: 'offline', lastSeen: null, usage: null };
         const allocatedUsage = await getConnectorAllocatedUsage(req.params.id);
+        const allocationTemplates = typeof AllocationPoolTemplate !== 'undefined' && AllocationPoolTemplate
+            ? await AllocationPoolTemplate.findAll({
+                where: { connectorId: req.params.id },
+                order: [['name', 'ASC'], ['id', 'ASC']]
+            })
+            : [];
 
         res.render('admin/manage-connector', {
             user: req.session.user,
             connector,
             currentTab: 'allocations',
             allocations,
+            allocationTemplates,
             statusData,
             allocatedUsage,
             path: '/admin/connectors',
@@ -600,6 +616,105 @@ app.post('/admin/connectors/:id/allocations', requireAuth, requireAdmin, async (
     } catch (error) {
         console.error("Error creating allocation:", error);
         res.redirect(`/admin/connectors/${req.params.id}/allocations?error=Failed to create allocation.`);
+    }
+});
+
+app.post('/admin/connectors/:id/allocation-templates', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        if (typeof AllocationPoolTemplate === 'undefined' || !AllocationPoolTemplate) {
+            return res.redirect(`/admin/connectors/${req.params.id}/allocations?error=Allocation templates are unavailable in this build.`);
+        }
+        const name = normalizeAllocationTemplateName(req.body.name);
+        if (!name) {
+            return res.redirect(`/admin/connectors/${req.params.id}/allocations?error=Template name is required.`);
+        }
+        const ip = String(req.body.ip || '').trim();
+        const portStart = Number.parseInt(req.body.portStart, 10);
+        const portEnd = Number.parseInt(req.body.portEnd || req.body.portStart, 10);
+        if (!ip || !Number.isInteger(portStart) || !Number.isInteger(portEnd) || portStart <= 0 || portEnd < portStart || portEnd > 65535) {
+            return res.redirect(`/admin/connectors/${req.params.id}/allocations?error=Invalid IP or port range for template.`);
+        }
+
+        await AllocationPoolTemplate.create({
+            connectorId: req.params.id,
+            name,
+            description: normalizeAllocationTemplateDescription(req.body.description),
+            ip,
+            portStart,
+            portEnd,
+            aliasTemplate: normalizeAllocationAlias(req.body.aliasTemplate),
+            notesTemplate: normalizeAllocationNotes(req.body.notesTemplate)
+        });
+        return res.redirect(`/admin/connectors/${req.params.id}/allocations?success=Allocation template saved.`);
+    } catch (error) {
+        console.error('Error creating allocation template:', error);
+        return res.redirect(`/admin/connectors/${req.params.id}/allocations?error=Failed to save allocation template.`);
+    }
+});
+
+app.post('/admin/connectors/:id/allocation-templates/:templateId/apply', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        if (typeof AllocationPoolTemplate === 'undefined' || !AllocationPoolTemplate) {
+            return res.redirect(`/admin/connectors/${req.params.id}/allocations?error=Allocation templates are unavailable in this build.`);
+        }
+        const templateId = Number.parseInt(req.params.templateId, 10);
+        if (!Number.isInteger(templateId) || templateId <= 0) {
+            return res.redirect(`/admin/connectors/${req.params.id}/allocations?error=Invalid template id.`);
+        }
+        const template = await AllocationPoolTemplate.findOne({
+            where: { id: templateId, connectorId: req.params.id }
+        });
+        if (!template) {
+            return res.redirect(`/admin/connectors/${req.params.id}/allocations?error=Allocation template not found.`);
+        }
+
+        const existing = await Allocation.findAll({
+            where: { connectorId: req.params.id, ip: template.ip, port: { [Op.between]: [template.portStart, template.portEnd] } },
+            attributes: ['port'],
+            raw: true
+        });
+        const existingPorts = new Set(existing.map((entry) => Number.parseInt(entry.port, 10)).filter((entry) => Number.isInteger(entry)));
+        const allocations = [];
+
+        for (let port = template.portStart; port <= template.portEnd; port += 1) {
+            if (existingPorts.has(port)) continue;
+            allocations.push({
+                connectorId: req.params.id,
+                ip: template.ip,
+                port,
+                alias: template.aliasTemplate ? renderAllocationAliasTemplate(template.aliasTemplate, { ip: template.ip, port, id: port, alias: '' }) : null,
+                notes: template.notesTemplate || null
+            });
+        }
+
+        if (!allocations.length) {
+            return res.redirect(`/admin/connectors/${req.params.id}/allocations?success=Template already fully applied. No new allocations were needed.`);
+        }
+
+        await Allocation.bulkCreate(allocations);
+        return res.redirect(`/admin/connectors/${req.params.id}/allocations?success=${encodeURIComponent(`Applied template "${template.name}" and created ${allocations.length} allocations.`)}`);
+    } catch (error) {
+        console.error('Error applying allocation template:', error);
+        return res.redirect(`/admin/connectors/${req.params.id}/allocations?error=Failed to apply allocation template.`);
+    }
+});
+
+app.post('/admin/connectors/:id/allocation-templates/:templateId/delete', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        if (typeof AllocationPoolTemplate === 'undefined' || !AllocationPoolTemplate) {
+            return res.redirect(`/admin/connectors/${req.params.id}/allocations?error=Allocation templates are unavailable in this build.`);
+        }
+        const templateId = Number.parseInt(req.params.templateId, 10);
+        if (!Number.isInteger(templateId) || templateId <= 0) {
+            return res.redirect(`/admin/connectors/${req.params.id}/allocations?error=Invalid template id.`);
+        }
+        await AllocationPoolTemplate.destroy({
+            where: { id: templateId, connectorId: req.params.id }
+        });
+        return res.redirect(`/admin/connectors/${req.params.id}/allocations?success=Allocation template deleted.`);
+    } catch (error) {
+        console.error('Error deleting allocation template:', error);
+        return res.redirect(`/admin/connectors/${req.params.id}/allocations?error=Failed to delete allocation template.`);
     }
 });
 
@@ -892,7 +1007,7 @@ app.post('/admin/connectors/:id/regenerate-token', requireAuth, requireAdmin, as
 // API Connector Heartbeat
 app.post('/api/connector/heartbeat', async (req, res) => {
     try {
-        const { id, token, status, usage } = req.body;
+        const { id, token, status, usage, diagnostics } = req.body;
 
         if (!id || !token) {
             return res.status(400).json({ error: 'Missing ID or Token' });
@@ -917,6 +1032,7 @@ app.post('/api/connector/heartbeat', async (req, res) => {
         global.connectorStatus[id] = {
             status,
             usage,
+            diagnostics: diagnostics || null,
             lastSeen: new Date()
         };
 
