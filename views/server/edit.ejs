@@ -328,6 +328,17 @@
                 flex-wrap: wrap;
             }
 
+            .sqlite-warning-banner {
+                margin: 0.9rem 1rem 0;
+                border: 1px solid rgba(245, 158, 11, 0.35);
+                background: rgba(245, 158, 11, 0.12);
+                color: #fde68a;
+                border-radius: 12px;
+                padding: 0.85rem 1rem;
+                font-size: 0.84rem;
+                line-height: 1.5;
+            }
+
             .sqlite-toolbar-meta {
                 display: flex;
                 align-items: center;
@@ -750,6 +761,7 @@
                                     </span>
                                 </div>
                             </div>
+                            <div class="sqlite-warning-banner d-none" id="sqliteWarningBanner"></div>
                             <div class="sqlite-browser">
                                 <aside class="sqlite-tables">
                                     <div class="sqlite-table-list" id="sqliteTablesList">
@@ -851,6 +863,12 @@
             let sqliteTableTotalRows = 0;
             let sqliteSearchTerm = '';
             let sqliteSearchDebounceTimer = null;
+            let sqliteJournalMode = '';
+            let sqliteViewerWarning = '';
+            let sqliteLoadError = '';
+            let sqliteRawPreview = '';
+            let fileReadOnly = false;
+            let fileReadOnlyReason = '';
 
             function escapeHtml(value) {
                 return String(value || '')
@@ -1111,6 +1129,42 @@
                 return window.btoa(binary);
             }
 
+            function decodeBase64ToText(base64Value) {
+                const bytes = base64ToUint8Array(base64Value);
+                try {
+                    return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+                } catch {
+                    let text = '';
+                    for (let index = 0; index < bytes.length; index += 1) {
+                        text += String.fromCharCode(bytes[index]);
+                    }
+                    return text;
+                }
+            }
+
+            function setReadOnlyState(nextValue, reason = '') {
+                fileReadOnly = Boolean(nextValue);
+                fileReadOnlyReason = fileReadOnly ? String(reason || '').trim() : '';
+
+                if (monacoEditor) {
+                    monacoEditor.updateOptions({ readOnly: fileReadOnly });
+                }
+                if (aceEditor && typeof aceEditor.setReadOnly === 'function') {
+                    aceEditor.setReadOnly(fileReadOnly);
+                }
+                const plainEditor = document.getElementById('plain-editor');
+                if (plainEditor) {
+                    plainEditor.readOnly = fileReadOnly;
+                }
+
+                const saveBtn = document.getElementById('btnSave');
+                if (saveBtn) {
+                    saveBtn.disabled = fileReadOnly;
+                    saveBtn.classList.toggle('disabled', fileReadOnly);
+                    saveBtn.title = fileReadOnlyReason || '';
+                }
+            }
+
             function syncEditorModeAvailability() {
                 const select = document.getElementById('editorModeSelect');
                 const saveBtn = document.getElementById('btnSave');
@@ -1123,28 +1177,27 @@
                     if (option.value === 'sqlite') {
                         option.disabled = !sqliteMode;
                         option.hidden = !sqliteMode;
-                        return;
                     }
-                    option.disabled = sqliteMode;
                 });
                 select.classList.toggle('sqlite-mode-lock', sqliteMode);
-                select.disabled = sqliteMode;
-                if (sqliteMode) {
-                    activeEditorMode = 'sqlite';
-                } else if (activeEditorMode === 'sqlite') {
+                if (!sqliteMode && activeEditorMode === 'sqlite') {
                     activeEditorMode = 'monaco';
                 }
                 select.value = activeEditorMode;
                 if (saveBtn) {
                     saveBtn.innerHTML = `
                         <span class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true" id="saveSpinner"></span>
-                        <i class="bi ${sqliteMode ? 'bi-database-check' : 'bi-save'} me-2" id="saveIcon"></i>${sqliteMode ? 'Save Database' : 'Save File'}
+                        <i class="bi ${activeEditorMode === 'sqlite' ? 'bi-database-check' : 'bi-save'} me-2" id="saveIcon"></i>${activeEditorMode === 'sqlite' ? 'Save Database' : 'Save File'}
                     `;
+                    saveBtn.disabled = fileReadOnly;
+                    saveBtn.classList.toggle('disabled', fileReadOnly);
+                    saveBtn.title = fileReadOnlyReason || '';
                 }
                 if (wordWrapBtn) {
-                    wordWrapBtn.disabled = sqliteMode;
-                    wordWrapBtn.classList.toggle('opacity-50', sqliteMode);
-                    wordWrapBtn.classList.toggle('disabled', sqliteMode);
+                    const disableWrap = activeEditorMode === 'sqlite';
+                    wordWrapBtn.disabled = disableWrap;
+                    wordWrapBtn.classList.toggle('opacity-50', disableWrap);
+                    wordWrapBtn.classList.toggle('disabled', disableWrap);
                 }
                 if (databaseChip) {
                     const text = databaseChip.querySelector('span');
@@ -1196,13 +1249,30 @@
             function renderSQLiteTableList() {
                 const listEl = document.getElementById('sqliteTablesList');
                 const countChip = document.getElementById('sqliteTableCountChip');
+                const warningBanner = document.getElementById('sqliteWarningBanner');
                 if (countChip) {
                     const countText = countChip.querySelector('span');
                     if (countText) countText.textContent = `${sqliteTableNames.length} table${sqliteTableNames.length === 1 ? '' : 's'}`;
                 }
+                if (warningBanner) {
+                    if (sqliteViewerWarning) {
+                        warningBanner.classList.remove('d-none');
+                        warningBanner.innerHTML = sqliteViewerWarning;
+                    } else {
+                        warningBanner.classList.add('d-none');
+                        warningBanner.innerHTML = '';
+                    }
+                }
                 if (!listEl) return;
                 if (!sqliteTableNames.length) {
-                    listEl.innerHTML = '<div class="sqlite-empty">This database has no user tables.</div>';
+                    const sqliteInfo = getSQLiteFileInfo(currentFilePath);
+                    listEl.innerHTML = `
+                        <div class="sqlite-empty">
+                            This database has no user tables visible.
+                            ${sqliteInfo.isSidecar ? '<br><br>Note: this file is a WAL/SHM sidecar. The viewer reads the main database file and may miss live WAL-only changes.' : '<br><br>If this server uses WAL mode, recent data may still live in the companion <code>-wal</code> file.'}
+                            <br><br>You can switch the editor dropdown back to <strong>Monaco</strong>, <strong>Ace</strong>, or <strong>Plain Text</strong> to inspect the raw file.
+                        </div>
+                    `;
                     return;
                 }
                 listEl.innerHTML = sqliteTableNames.map((tableName) => `
@@ -1242,8 +1312,25 @@
                     }
                 }
                 if (!gridBody) return;
+                if (sqliteLoadError) {
+                    gridBody.innerHTML = `
+                        <div class="sqlite-empty">
+                            ${escapeHtml(sqliteLoadError)}
+                            <br><br>This file stays in SQLite viewer mode, but editing is disabled.
+                        </div>
+                        <div class="sqlite-table-wrap">
+                            <textarea class="form-control bg-dark text-light border-0 rounded-0" style="min-height:420px; font-family:'JetBrains Mono', monospace;" readonly>${escapeHtml(sqliteRawPreview)}</textarea>
+                        </div>
+                    `;
+                    return;
+                }
                 if (!sqliteCurrentTable) {
-                    gridBody.innerHTML = '<div class="sqlite-empty">Select a table from the left to inspect its rows.</div>';
+                    gridBody.innerHTML = `
+                        <div class="sqlite-empty">
+                            Select a table from the left to inspect its rows.
+                            ${sqliteTableNames.length ? '' : '<br><br>No table list was detected. Try a raw editor mode if you need to inspect the underlying bytes/text.'}
+                        </div>
+                    `;
                     return;
                 }
                 if (!sqliteTableRows.length) {
@@ -1480,6 +1567,32 @@
                 sqliteTableRows = [];
                 sqliteTableEditable = false;
                 sqliteTableTotalRows = 0;
+                sqliteJournalMode = '';
+                sqliteViewerWarning = '';
+                sqliteLoadError = '';
+                sqliteRawPreview = '';
+
+                try {
+                    const journalResult = sqliteDb.exec('PRAGMA journal_mode;');
+                    sqliteJournalMode = (journalResult[0] && journalResult[0].values && journalResult[0].values[0] && String(journalResult[0].values[0][0] || '').toLowerCase()) || '';
+                } catch {
+                    sqliteJournalMode = '';
+                }
+
+                const sqliteInfo = getSQLiteFileInfo(currentFilePath);
+                const warningParts = [];
+                if (sqliteInfo.extension === 'db') {
+                    warningParts.push('Read-only mode is enforced for <code>.db</code> files in SQLite viewer to avoid damaging unknown database formats.');
+                    setReadOnlyState(true, '.db files are read-only in SQLite viewer.');
+                } else {
+                    setReadOnlyState(false, '');
+                }
+                if (sqliteInfo.isSidecar) {
+                    warningParts.push(`You opened a <strong>${sqliteInfo.sidecarType.toUpperCase()}</strong> companion file. The viewer reads the main database <code>${escapeHtml(sqliteInfo.basePath)}</code>, so unsynced sidecar-only changes may be missing. Switch to <strong>Monaco</strong> or <strong>Plain Text</strong> if you need raw inspection.`);
+                } else if (sqliteJournalMode === 'wal') {
+                    warningParts.push('WAL mode detected for this database. The browser viewer reads the main database file only, so recent rows that still live in the companion <code>-wal</code> file may not appear here yet. Use a raw editor mode if you need the file contents exactly as stored.');
+                }
+                sqliteViewerWarning = warningParts.join('<br><br>');
 
                 const tablesResult = sqliteDb.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name ASC");
                 sqliteTableNames = (tablesResult[0] && Array.isArray(tablesResult[0].values))
@@ -1656,6 +1769,7 @@
                             fontSize: 14,
                             fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                             scrollBeyondLastLine: false,
+                            readOnly: fileReadOnly,
                             wordWrap: wordWrapEnabled ? 'on' : 'off',
                             padding: { top: 16 }
                         });
@@ -1682,6 +1796,7 @@
                     aceEditor.setTheme('ace/theme/monokai');
                     aceEditor.session.setUseWrapMode(wordWrapEnabled);
                     aceEditor.setFontSize(14);
+                    aceEditor.setReadOnly(fileReadOnly);
                     aceEditor.setOptions({
                         showPrintMargin: false,
                         useWorker: false
@@ -1702,6 +1817,7 @@
                     plainEditor.dataset.bound = '1';
                 }
                 plainEditor.wrap = wordWrapEnabled ? 'soft' : 'off';
+                plainEditor.readOnly = fileReadOnly;
                 return plainEditor;
             }
 
@@ -1832,7 +1948,7 @@
             async function switchEditorMode(nextMode, providedContent = null) {
                 const sqliteMode = isSQLitePath(currentFilePath);
                 const allowedMode = sqliteMode
-                    ? 'sqlite'
+                    ? (['monaco', 'ace', 'plain', 'sqlite'].includes(nextMode) ? nextMode : 'sqlite')
                     : (['monaco', 'ace', 'plain'].includes(nextMode) ? nextMode : 'monaco');
                 const contentToPreserve = typeof providedContent === 'string' ? providedContent : getActiveEditorValue();
                 activeEditorMode = allowedMode;
@@ -1878,12 +1994,15 @@
                 if (activeEditorMode !== 'sqlite') {
                     setActiveEditorValue(contentToPreserve);
                     setUnsavedState(contentToPreserve !== currentContent);
+                } else {
+                    setUnsavedState(exportCurrentSQLiteBase64() !== sqliteOriginalBase64);
                 }
+                setReadOnlyState(fileReadOnly, fileReadOnlyReason);
                 layoutActiveEditor();
             }
 
             async function loadEditorContent(content, fileExtension) {
-                if (isSQLitePath(currentFilePath)) {
+                if (isSQLitePath(currentFilePath) && activeEditorMode === 'sqlite') {
                     const binary = uint8ArrayToBase64(new TextEncoder().encode(String(content || '')));
                     await loadSQLiteContent(binary);
                     return;
@@ -1894,6 +2013,7 @@
                 updateEditorMeta(content);
                 updateDisplayedFileName();
                 renderTreeView();
+                setReadOnlyState(fileReadOnly, fileReadOnlyReason);
 
                 const overlay = document.getElementById('loadingOverlay');
                 if (overlay) {
@@ -1914,7 +2034,7 @@
                     type: 'read_file',
                     filePath: requestedPath
                 };
-                if (isSQLitePath(currentFilePath)) {
+                if (isSQLitePath(currentFilePath) && activeEditorMode === 'sqlite') {
                     payload.encoding = 'base64';
                 }
                 ws.send(JSON.stringify(payload));
@@ -1923,6 +2043,10 @@
             async function applyCurrentFilePath(nextPath) {
                 currentFilePath = normalizeServerPath(nextPath);
                 fileLanguage = guessLanguage(currentFilePath.split('.').pop() || '');
+                setReadOnlyState(false, '');
+                if (isSQLitePath(currentFilePath) && !['monaco', 'ace', 'plain', 'sqlite'].includes(activeEditorMode)) {
+                    activeEditorMode = 'sqlite';
+                }
                 syncEditorModeAvailability();
                 updateDisplayedFileName();
                 updateEditorMeta(getActiveEditorValue());
@@ -1946,7 +2070,7 @@
                             const expectedPath = isSQLitePath(currentFilePath) ? getSQLiteTargetPath(currentFilePath) : currentFilePath;
                             if (normalizeServerPath(data.filePath) === normalizeServerPath(expectedPath)) {
                                 const ext = currentFilePath.split('.').pop() || '';
-                                if (isSQLitePath(currentFilePath)) {
+                                if (isSQLitePath(currentFilePath) && activeEditorMode === 'sqlite') {
                                     const sqliteBase64 = String(data.contentBase64 || '').trim();
                                     if (!sqliteBase64) {
                                         if (window.showStatusModal) {
@@ -1956,11 +2080,30 @@
                                     }
                                     loadSQLiteContent(sqliteBase64).catch((error) => {
                                         console.error('SQLite load failed:', error);
+                                        sqliteLoadError = `SQLite viewer could not parse this file: ${error.message}`;
+                                        sqliteRawPreview = decodeBase64ToText(sqliteBase64);
+                                        sqliteTableNames = [];
+                                        sqliteCurrentTable = '';
+                                        sqliteTableColumns = [];
+                                        sqliteTableRows = [];
+                                        sqliteTableEditable = false;
+                                        sqliteTableTotalRows = 0;
+                                        setReadOnlyState(true, 'This file could not be parsed as SQLite. Viewer is read-only.');
+                                        renderSQLiteTableList();
+                                        renderSQLiteGrid();
+                                        const overlay = document.getElementById('loadingOverlay');
+                                        if (overlay) {
+                                            setTimeout(() => {
+                                                overlay.style.opacity = '0';
+                                                setTimeout(() => overlay.remove(), 300);
+                                            }, 100);
+                                        }
                                         if (window.showStatusModal) {
-                                            window.showStatusModal(`Failed to load SQLite database: ${error.message}`, 'error');
+                                            window.showStatusModal(`SQLite viewer fallback: ${error.message}. Showing read-only raw preview inside SQLite mode.`, 'error');
                                         }
                                     });
                                 } else {
+                                    setReadOnlyState(false, '');
                                     currentContent = data.content || '';
                                     loadEditorContent(currentContent, ext);
                                 }
@@ -2015,6 +2158,12 @@
                     if (window.showStatusModal) window.showStatusModal('Not connected to server.', 'error');
                     return;
                 }
+                if (fileReadOnly) {
+                    if (window.showStatusModal) {
+                        window.showStatusModal(fileReadOnlyReason || 'This file is read-only in the current mode.', 'error');
+                    }
+                    return;
+                }
 
                 setSaveLoadingState(true);
                 if (isSQLitePath(currentFilePath)) {
@@ -2051,13 +2200,18 @@
                 treeViewEnabled = false;
             }
 
+            let storedEditorMode = '';
             try {
-                const storedEditorMode = window.localStorage.getItem(editorModeSettingKey);
-                if (['monaco', 'ace', 'plain'].includes(storedEditorMode)) {
+                storedEditorMode = window.localStorage.getItem(editorModeSettingKey) || '';
+                if (['monaco', 'ace', 'plain', 'sqlite'].includes(storedEditorMode)) {
                     activeEditorMode = storedEditorMode;
                 }
             } catch {
                 activeEditorMode = 'monaco';
+            }
+
+            if (isSQLitePath(currentFilePath) && !storedEditorMode) {
+                activeEditorMode = 'sqlite';
             }
 
             if (treeViewEnabled) {
