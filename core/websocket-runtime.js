@@ -52,6 +52,12 @@ function registerWebSocketRuntime(deps) {
         Image,
         Connector,
         Settings,
+        buildServerEnvironment,
+        buildStartupCommand,
+        resolveImagePorts,
+        buildDeploymentPorts,
+        shouldUseCommandStartup,
+        getServerMountsForInstall,
         connectorConnections,
         rememberServerPowerIntent,
         consumeServerPowerIntent,
@@ -1523,12 +1529,74 @@ wss.on('connection', (ws, request) => {
                         if (normalizedAction === 'start') {
                             consumeServerPowerIntent(serverId);
                         }
+                        let runtimeConfig = null;
+                        if (normalizedAction === 'start' && serverObj.image && serverObj.allocation) {
+                            try {
+                                const runtimeValues = {
+                                    SERVER_MEMORY: String(serverObj.memory || ''),
+                                    SERVER_IP: '0.0.0.0',
+                                    SERVER_PORT: String(serverObj.allocation.port || '')
+                                };
+                                const built = typeof buildServerEnvironment === 'function'
+                                    ? buildServerEnvironment(serverObj.image, serverObj.variables || {}, runtimeValues)
+                                    : { env: { ...runtimeValues } };
+                                const startup = typeof buildStartupCommand === 'function'
+                                    ? buildStartupCommand(serverObj.startup || serverObj.image.startup, built.env)
+                                    : String(serverObj.startup || (serverObj.image && serverObj.image.startup) || '').trim();
+                                const imagePorts = typeof resolveImagePorts === 'function'
+                                    ? resolveImagePorts(serverObj.image.ports)
+                                    : [];
+                                const startupMode = typeof shouldUseCommandStartup === 'function' && shouldUseCommandStartup(serverObj.image)
+                                    ? 'command'
+                                    : 'environment';
+                                const assignedAllocations = await Allocation.findAll({
+                                    where: { serverId: serverObj.id },
+                                    attributes: ['id', 'ip', 'port'],
+                                    order: [['port', 'ASC']]
+                                });
+                                const deploymentPorts = typeof buildDeploymentPorts === 'function'
+                                    ? buildDeploymentPorts({
+                                        imagePorts,
+                                        env: built.env,
+                                        primaryAllocation: serverObj.allocation,
+                                        allocations: assignedAllocations
+                                    })
+                                    : [];
+                                const mountConfig = typeof getServerMountsForInstall === 'function'
+                                    ? await getServerMountsForInstall(serverObj.id)
+                                    : [];
+                                runtimeConfig = {
+                                    image: serverObj.dockerImage || (serverObj.image && serverObj.image.dockerImage) || '',
+                                    memory: Number.parseInt(serverObj.memory, 10) || 0,
+                                    cpu: Number.parseInt(serverObj.cpu, 10) || 0,
+                                    disk: Number.parseInt(serverObj.disk, 10) || 0,
+                                    swapLimit: Number.parseInt(serverObj.swapLimit, 10) || 0,
+                                    ioWeight: Number.parseInt(serverObj.ioWeight, 10) || 0,
+                                    pidsLimit: Number.parseInt(serverObj.pidsLimit, 10) || 0,
+                                    oomKillDisable: Boolean(serverObj.oomKillDisable),
+                                    oomScoreAdj: Number.parseInt(serverObj.oomScoreAdj, 10) || 0,
+                                    env: built.env,
+                                    startup,
+                                    startupMode,
+                                    eggConfig: serverObj.image.eggConfig || null,
+                                    eggScripts: serverObj.image.eggScripts || null,
+                                    installation: serverObj.image.installation || null,
+                                    configFiles: serverObj.image.configFiles || null,
+                                    brandName: 'cpanel',
+                                    ports: deploymentPorts,
+                                    mounts: mountConfig
+                                };
+                            } catch (runtimeConfigError) {
+                                console.error('Failed to build runtime config for power start:', runtimeConfigError);
+                            }
+                        }
                         const requestId = `pwr_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
                         connectorWs.send(JSON.stringify({
                             type: 'server_power',
                             serverId: serverId,
                             action: data.action,
                             stopCommand: serverObj.image && serverObj.image.eggConfig ? serverObj.image.eggConfig.stop : null,
+                            runtimeConfig,
                             requestId
                         }));
                     } else if (data.type === 'accept_eula') {

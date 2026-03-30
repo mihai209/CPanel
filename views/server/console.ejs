@@ -364,6 +364,114 @@
                 font-size: 0.82rem;
             }
 
+            .admin-install-screen {
+                flex: 1 1 auto;
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
+                gap: 0.95rem;
+            }
+
+            .admin-install-header {
+                background: linear-gradient(180deg, rgba(18, 18, 22, 0.96), rgba(10, 10, 12, 0.98));
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 18px;
+                padding: 1.2rem 1.35rem;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 1rem;
+                flex-wrap: wrap;
+            }
+
+            .admin-install-title {
+                font-size: 1.15rem;
+                font-weight: 800;
+                color: #f8fafc;
+                margin: 0 0 0.3rem;
+            }
+
+            .admin-install-message {
+                color: rgba(255, 255, 255, 0.7);
+                font-size: 0.9rem;
+                margin: 0;
+            }
+
+            .admin-install-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.45rem;
+                border-radius: 999px;
+                padding: 0.45rem 0.9rem;
+                border: 1px solid rgba(96, 165, 250, 0.28);
+                background: rgba(59, 130, 246, 0.12);
+                color: #bfdbfe;
+                font-size: 0.76rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+            }
+
+            .admin-install-alert {
+                border: 1px solid rgba(245, 158, 11, 0.24);
+                background: rgba(245, 158, 11, 0.1);
+                color: #fde68a;
+                border-radius: 14px;
+                padding: 0.8rem 0.95rem;
+                font-size: 0.87rem;
+            }
+
+            .admin-install-log-card {
+                flex: 1 1 auto;
+                min-height: 0;
+                background: #0b0b0f;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 18px;
+                overflow: hidden;
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+                display: flex;
+                flex-direction: column;
+            }
+
+            .admin-install-log-header {
+                background: rgba(18, 18, 22, 0.98);
+                border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+                padding: 0.8rem 1rem;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 0.75rem;
+            }
+
+            .admin-install-log-title {
+                font-size: 0.78rem;
+                font-weight: 700;
+                color: #cbd5e1;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+            }
+
+            .admin-install-log-subtitle {
+                font-size: 0.76rem;
+                color: rgba(255, 255, 255, 0.46);
+            }
+
+            .admin-install-log {
+                flex: 1 1 auto;
+                min-height: 320px;
+                padding: 1rem 1.1rem;
+                overflow: auto;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+                font-size: 0.8rem;
+                line-height: 1.5;
+                color: #dbe4f0;
+                white-space: pre-wrap;
+                word-break: break-word;
+                background:
+                    linear-gradient(180deg, rgba(12, 14, 19, 0.98), rgba(8, 10, 14, 1)),
+                    radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 40%);
+            }
+
             .terminal-container {
                 background: var(--bg-darker);
                 border-radius: 12px;
@@ -809,6 +917,11 @@
                 .player-panel {
                     width: 100%;
                 }
+
+                .admin-install-header {
+                    flex-direction: column;
+                    align-items: flex-start;
+                }
             }
 
             @media (max-width: 520px) {
@@ -912,7 +1025,30 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                         </div>
                     </div>
 
-                    <div id="consoleGrid" class="console-grid <%= isRestrictedProvisioningViewer ? 'd-none' : '' %>">
+                    <div id="adminInstallScreen" class="admin-install-screen <%= user && user.isAdmin && ['installing', 'starting'].includes(String(server.status || '').toLowerCase()) ? '' : 'd-none' %>">
+                        <div class="admin-install-header">
+                            <div>
+                                <h2 class="admin-install-title" id="adminInstallTitle"><%= String(server.status || '').toLowerCase() === 'starting' ? 'Starting Runtime Container' : 'Running Installer' %></h2>
+                                <p class="admin-install-message" id="adminInstallMessage">Complete install output from the runtime builder is shown below.</p>
+                            </div>
+                            <div class="admin-install-badge">
+                                <i class="bi bi-hdd-stack"></i>
+                                <span id="adminInstallStatus"><%= String(server.status || 'installing').toUpperCase() %></span>
+                            </div>
+                        </div>
+                        <div class="admin-install-alert">
+                            This server is currently running its installation process and most actions are unavailable until provisioning finishes.
+                        </div>
+                        <div class="admin-install-log-card">
+                            <div class="admin-install-log-header">
+                                <div class="admin-install-log-title">Installer Output</div>
+                                <div class="admin-install-log-subtitle">Docker/runtime logs stream</div>
+                            </div>
+                            <div id="adminInstallLog" class="admin-install-log">Waiting for install output...</div>
+                        </div>
+                    </div>
+
+                    <div id="consoleGrid" class="console-grid <%= (isRestrictedProvisioningViewer || (user && user.isAdmin && ['installing', 'starting'].includes(String(server.status || '').toLowerCase()))) ? 'd-none' : '' %>">
                         <!-- Terminal Container -->
                         <div class="terminal-container">
                         <div class="terminal-header">
@@ -1318,6 +1454,11 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
             const provisioningScreenTitle = document.getElementById('provisioningScreenTitle');
             const provisioningScreenMessage = document.getElementById('provisioningScreenMessage');
             const provisioningScreenStatus = document.getElementById('provisioningScreenStatus');
+            const adminInstallScreen = document.getElementById('adminInstallScreen');
+            const adminInstallTitle = document.getElementById('adminInstallTitle');
+            const adminInstallMessage = document.getElementById('adminInstallMessage');
+            const adminInstallStatus = document.getElementById('adminInstallStatus');
+            const adminInstallLog = document.getElementById('adminInstallLog');
             const terminalWrapper = document.getElementById('terminalWrapper');
             const consoleGrid = document.getElementById('consoleGrid');
             const provisioningTitle = document.getElementById('provisioningTitle');
@@ -1339,6 +1480,7 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                 adminLines: [],
                 lastSummary: ''
             };
+            const adminInstallLogLines = [];
 
             const stripAnsiSequences = (value) => String(value || '').replace(/\x1B\[[0-9;]*[A-Za-z]/g, '');
             const isProvisioningStatus = (status) => ['installing', 'starting'].includes(String(status || '').toLowerCase());
@@ -1440,35 +1582,63 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                 return provisioningState.active || isProvisioningStatus(currentServerStatus);
             }
 
-            function renderProvisioningAccessState(status) {
-                if (!restrictedProvisioningViewer || isAdminConsoleViewer) return;
+            function appendAdminInstallLog(rawLine) {
+                if (!isAdminConsoleViewer || !adminInstallLog) return;
+                const normalized = String(rawLine || '').replace(/\r/g, '');
+                if (!normalized) return;
+                const pieces = normalized.split('\n').filter((entry, index, array) => entry.length > 0 || index < array.length - 1);
+                if (!pieces.length) return;
+                adminInstallLogLines.push(...pieces);
+                if (adminInstallLogLines.length > 600) {
+                    adminInstallLogLines.splice(0, adminInstallLogLines.length - 600);
+                }
+                adminInstallLog.textContent = adminInstallLogLines.join('\n');
+                adminInstallLog.scrollTop = adminInstallLog.scrollHeight;
+            }
 
+            function renderProvisioningAccessState(status) {
                 const lowerStatus = String(status || '').toLowerCase();
                 const blocked = ['installing', 'starting'].includes(lowerStatus);
+                const adminBlocked = isAdminConsoleViewer && blocked;
+                const userBlocked = restrictedProvisioningViewer && blocked;
                 if (terminalWrapper) {
-                    terminalWrapper.classList.toggle('provisioning-focused', blocked);
+                    terminalWrapper.classList.toggle('provisioning-focused', userBlocked);
                 }
                 if (provisioningScreen) {
-                    provisioningScreen.classList.toggle('d-none', !blocked);
+                    provisioningScreen.classList.toggle('d-none', !userBlocked);
+                }
+                if (adminInstallScreen) {
+                    adminInstallScreen.classList.toggle('d-none', !adminBlocked);
                 }
                 if (consoleGrid) {
-                    consoleGrid.classList.toggle('d-none', blocked);
+                    consoleGrid.classList.toggle('d-none', userBlocked || adminBlocked);
                 }
                 if (!blocked) {
                     requestAnimationFrame(() => fitAddon.fit());
                     return;
                 }
 
-                if (provisioningScreenStatus) {
+                if (provisioningScreenStatus && userBlocked) {
                     provisioningScreenStatus.textContent = lowerStatus.toUpperCase();
                 }
-                if (provisioningScreenTitle) {
+                if (provisioningScreenTitle && userBlocked) {
                     provisioningScreenTitle.textContent = lowerStatus === 'starting' ? 'Starting Server' : 'Running Installer';
                 }
-                if (provisioningScreenMessage) {
+                if (provisioningScreenMessage && userBlocked) {
                     provisioningScreenMessage.textContent = lowerStatus === 'starting'
                         ? 'Your server is starting for the first time. Most actions stay locked until the runtime container is ready.'
                         : 'Your server is being created and configured. This usually finishes in under a minute.';
+                }
+                if (adminInstallStatus && adminBlocked) {
+                    adminInstallStatus.textContent = lowerStatus.toUpperCase();
+                }
+                if (adminInstallTitle && adminBlocked) {
+                    adminInstallTitle.textContent = lowerStatus === 'starting' ? 'Starting Runtime Container' : 'Running Installer';
+                }
+                if (adminInstallMessage && adminBlocked) {
+                    adminInstallMessage.textContent = lowerStatus === 'starting'
+                        ? 'The runtime container is starting. Full connector and installer output is streamed below.'
+                        : 'Complete install output from the runtime builder is shown below.';
                 }
             }
 
@@ -1594,6 +1764,7 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                     switch (data.type) {
                         case 'console_output':
                             const cleanOutput = this.scrubAnsi(data.output);
+                            appendAdminInstallLog(stripAnsiSequences(cleanOutput));
                             const provisioningMatched = handleProvisioningLogLine(cleanOutput);
                             if (!provisioningMatched || isAdminConsoleViewer) {
                                 const mcStyledOutput = this.translateMinecraftFormatting(cleanOutput);
@@ -2154,11 +2325,6 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                 const text = document.getElementById('statusText');
                 badge.className = `status-badge status-${nextStatus}`;
                 text.textContent = nextStatus.toUpperCase();
-
-                // Clear terminal if server stops and was previously running/starting
-                if (nextStatus === 'stopped' && previousStatus !== 'stopped') {
-                    term.clear();
-                }
 
                 if (connectorOnline) {
                     const btnStart = document.getElementById('btnStart');
