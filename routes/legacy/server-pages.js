@@ -18941,11 +18941,25 @@ function registerServerPagesRoutes(ctx) {
                     if (!hasServerPermission(access, 'server.power')) {
                         savedMessage += ' Missing permission: server.power to restart.';
                     } else {
-                        const restartResult = await dispatchServerPowerSignal(server, 'restart');
-                        if (restartResult && restartResult.success) {
-                            savedMessage += ' Restart sent to connector.';
-                        } else {
-                            savedMessage += ` Restart failed: ${restartResult && restartResult.error ? restartResult.error : 'connector offline'}.`;
+                        const startAfter = String(server.status || '').trim().toLowerCase() === 'running';
+                        try {
+                            const redeployJob = await jobQueue.enqueue({
+                                type: 'server.redeploy.dispatch',
+                                payload: {
+                                    serverId: server.id,
+                                    startAfter,
+                                    brandName: String((res.locals.settings && res.locals.settings.brandName) || 'cpanel')
+                                },
+                                priority: 10,
+                                maxAttempts: 3,
+                                createdByUserId: req.session && req.session.user ? req.session.user.id : null
+                            });
+                            savedMessage += startAfter
+                                ? ` Runtime redeploy queued (job #${redeployJob.id}) and server will start with the new startup config.`
+                                : ` Runtime redeploy queued (job #${redeployJob.id}). Start the server when you want to use the new startup config.`;
+                        } catch (redeployError) {
+                            console.error('Failed to queue startup runtime redeploy:', redeployError);
+                            savedMessage += ' Runtime redeploy could not be queued.';
                         }
                     }
                 } else {
