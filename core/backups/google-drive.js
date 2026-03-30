@@ -342,7 +342,7 @@ async function uploadTarStreamToDriveMultipart({ accessToken, sourceDir, fileNam
 
     const bodyStream = new PassThrough();
     const hash = crypto.createHash('sha256');
-    const child = spawn('tar', ['-czf', '-', '-C', sourceDir, '.'], {
+    const child = spawn('tar', ['--exclude=.cpanel_runtime.json', '-czf', '-', '-C', sourceDir, '.'], {
         stdio: ['ignore', 'pipe', 'pipe']
     });
     const uploadStartedAt = Date.now();

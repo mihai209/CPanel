@@ -60,6 +60,7 @@ const POLICY_REMEDIATION_STATE = new Map(); // serverId -> remediation counters,
 const POLICY_PLAYBOOK_STATE = new Map(); // serverId -> { crashEvents: number[] }
 const FEATURE_FLAGS_CACHE_TTL_MS = 10 * 1000;
 const SERVER_POLICY_CACHE_TTL_MS = 10 * 1000;
+const PROTECTED_SERVER_RUNTIME_FILE = '.cpanel_runtime.json';
 let featureFlagsCache = null;
 let featureFlagsCacheTs = 0;
 const serverPolicyCache = new Map(); // serverId -> { ts, config }
@@ -126,6 +127,18 @@ const FEATURE_FLAG_SETTING_KEYS = [
     'storeRenewDays',
     'storeDeleteGraceDays'
 ];
+
+function isProtectedRuntimeFilePath(value) {
+    const raw = String(value || '').trim().replace(/\\/g, '/');
+    if (!raw) return false;
+    const normalized = path.posix.normalize(raw.startsWith('/') ? raw : `/${raw}`);
+    return normalized.split('/').some((segment) => segment === PROTECTED_SERVER_RUNTIME_FILE);
+}
+
+function filterProtectedRuntimeFiles(entries) {
+    if (!Array.isArray(entries)) return [];
+    return entries.filter((entry) => !isProtectedRuntimeFilePath(entry && entry.name ? entry.name : ''));
+}
 
 function parseIntegerInput(value, fallback) {
     if (value === undefined || value === null || String(value).trim() === '') {
@@ -1819,7 +1832,7 @@ function runConnectorFileAction(connectorWs, payload, expectedDirectory, expecte
                 if (message.type === 'file_list' && String(message.directory || '') === expectedDirectory) {
                     finish({
                         success: true,
-                        files: Array.isArray(message.files) ? message.files : [],
+                        files: filterProtectedRuntimeFiles(Array.isArray(message.files) ? message.files : []),
                         directory: String(message.directory || expectedDirectory)
                     });
                     return;
@@ -3004,6 +3017,8 @@ async function getConnectorAllowedOriginsMap(connectorIds, fallbackOrigin) {
         extractOriginFromUrl,
         parseStoredAllowedOrigins,
         parseAllowedOriginsInput,
+        isProtectedRuntimeFilePath,
+        filterProtectedRuntimeFiles,
         getConnectorAllowedOriginsSettingKey,
         getConnectorAllowedOrigins,
         setConnectorAllowedOrigins,

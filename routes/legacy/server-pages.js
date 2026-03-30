@@ -87,6 +87,20 @@ function registerServerPagesRoutes(ctx) {
         return INLINE_MEDIA_MIME_TYPES[ext] || null;
     }
 
+    const PROTECTED_SERVER_RUNTIME_FILE = '.cpanel_runtime.json';
+
+    function isProtectedServerRuntimePath(value) {
+        const raw = String(value || '').trim().replace(/\\/g, '/');
+        if (!raw) return false;
+        const normalized = nodePath.posix.normalize(raw.startsWith('/') ? raw : `/${raw}`);
+        return normalized.split('/').some((segment) => segment === PROTECTED_SERVER_RUNTIME_FILE);
+    }
+
+    function filterProtectedServerRuntimeEntries(entries) {
+        if (!Array.isArray(entries)) return [];
+        return entries.filter((entry) => !isProtectedServerRuntimePath(entry && entry.name ? entry.name : ''));
+    }
+
     // Login Page (GET)
     app.get('/ratelimited', (req, res) => {
         res.render('ratelimited');
@@ -2279,6 +2293,9 @@ function registerServerPagesRoutes(ctx) {
         if (!normalizedPath) {
             return { success: false, error: 'Missing file path.' };
         }
+        if (isProtectedServerRuntimePath(normalizedPath)) {
+            return { success: false, error: 'Access to protected runtime files is denied.' };
+        }
 
         try {
             connectorWs.send(JSON.stringify({
@@ -2311,6 +2328,9 @@ function registerServerPagesRoutes(ctx) {
         const normalizedPath = String(filePath || '').trim();
         if (!normalizedPath) {
             return { success: false, error: 'Missing file path.' };
+        }
+        if (isProtectedServerRuntimePath(normalizedPath)) {
+            return { success: false, error: 'Access to protected runtime files is denied.' };
         }
 
         try {
@@ -2359,6 +2379,9 @@ function registerServerPagesRoutes(ctx) {
         const requestedItems = Array.isArray(items) ? items.map((entry) => String(entry || '').trim()).filter(Boolean) : [];
         if (!requestedItems.length) {
             return { success: false, error: 'No items selected for archive.' };
+        }
+        if (isProtectedServerRuntimePath(expectedArchiveName) || requestedItems.some((entry) => isProtectedServerRuntimePath(entry))) {
+            return { success: false, error: 'Protected runtime files cannot be archived.' };
         }
 
         try {
@@ -19469,7 +19492,7 @@ function registerServerPagesRoutes(ctx) {
             return res.json({
                 success: true,
                 directory: result.directory || directory,
-                files: Array.isArray(result.files) ? result.files : []
+                files: filterProtectedServerRuntimeEntries(Array.isArray(result.files) ? result.files : [])
             });
         } catch (error) {
             console.error('Server API file list endpoint failed:', error);
@@ -19489,6 +19512,9 @@ function registerServerPagesRoutes(ctx) {
                 return res.status(400).json({ success: false, error: 'Query parameter "file" is required.' });
             }
             const filePath = filePathRaw.startsWith('/') ? filePathRaw : `/${filePathRaw}`;
+            if (isProtectedServerRuntimePath(filePath)) {
+                return res.status(403).json({ success: false, error: 'Access to protected runtime files is denied.' });
+            }
 
             const server = auth.server;
             if (!server.allocation || !server.allocation.connectorId) {
@@ -19551,6 +19577,9 @@ function registerServerPagesRoutes(ctx) {
                 return res.status(400).json({ success: false, error: 'Field "file" is required.' });
             }
             const filePath = filePathRaw.startsWith('/') ? filePathRaw : `/${filePathRaw}`;
+            if (isProtectedServerRuntimePath(filePath)) {
+                return res.status(403).json({ success: false, error: 'Access to protected runtime files is denied.' });
+            }
 
             const content = typeof req.body.content === 'string' ? req.body.content : String(req.body.content || '');
             if (Buffer.byteLength(content, 'utf8') > 2 * 1024 * 1024) {
@@ -19614,6 +19643,9 @@ function registerServerPagesRoutes(ctx) {
                 return res.status(400).json({ success: false, error: 'Query parameter "file" is required.' });
             }
             const filePath = filePathRaw.startsWith('/') ? filePathRaw : `/${filePathRaw}`;
+            if (isProtectedServerRuntimePath(filePath)) {
+                return res.status(403).json({ success: false, error: 'Access to protected runtime files is denied.' });
+            }
 
             const server = auth.server;
             const connector = server.allocation && server.allocation.connector ? server.allocation.connector : null;
@@ -19969,6 +20001,9 @@ function registerServerPagesRoutes(ctx) {
                 return res.status(400).send('File path is required');
             }
             const filePath = filePathRaw.startsWith('/') ? filePathRaw : `/${filePathRaw}`;
+            if (isProtectedServerRuntimePath(filePath)) {
+                return res.status(403).send('Forbidden');
+            }
             const mediaMimeType = resolveInlineMediaMimeType(filePath);
             if (!mediaMimeType) {
                 return res.status(415).send('Unsupported media type for inline preview');
@@ -20035,9 +20070,12 @@ function registerServerPagesRoutes(ctx) {
     // File Download API
     app.get('/server/:containerId/files/download', requireAuth, async (req, res) => {
         try {
-            const filePath = req.query.file;
+            const filePath = String(req.query.file || '').trim();
             if (!filePath) {
                 return res.status(400).send('File path is required');
+            }
+            if (isProtectedServerRuntimePath(filePath)) {
+                return res.status(403).send('Forbidden');
             }
 
             const server = await Server.findOne({
@@ -20141,6 +20179,9 @@ function registerServerPagesRoutes(ctx) {
             const directory = normalizeServerDirectoryInput(req.query.path || '/');
             const rawContent = await readBinaryRequestBody(req, uploadMaxBytes);
             const filePath = directory === '/' ? `/${fileName}` : `${directory}/${fileName}`;
+            if (isProtectedServerRuntimePath(filePath)) {
+                return res.status(403).json({ success: false, error: 'Access to protected runtime files is denied.' });
+            }
             const threatCheck = inspectUploadForMinerRisk(fileName, rawContent);
 
             if (threatCheck.flagged) {
@@ -20305,7 +20346,9 @@ function registerServerPagesRoutes(ctx) {
                 query: String(response.query || query),
                 filterMode: String(response.filterMode || filterMode),
                 directory: String(response.directory || directory),
-                results: Array.isArray(response.results) ? response.results : [],
+                results: Array.isArray(response.results)
+                    ? response.results.filter((entry) => !isProtectedServerRuntimePath(entry && entry.path ? entry.path : ''))
+                    : [],
                 truncated: Boolean(response.truncated),
                 scannedDirectories: Number.isFinite(Number(response.scannedDirectories)) ? Number(response.scannedDirectories) : 0,
                 durationMs: Number.isFinite(Number(response.durationMs)) ? Number(response.durationMs) : 0
@@ -20375,6 +20418,9 @@ function registerServerPagesRoutes(ctx) {
                 return res.status(500).json({ error: response.error });
             }
 
+            if (Array.isArray(response.files)) {
+                response.files = filterProtectedServerRuntimeEntries(response.files);
+            }
             res.json(response);
         } catch (err) {
             console.error("Error in files-fetch:", err);

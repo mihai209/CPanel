@@ -260,6 +260,19 @@
                 text-overflow: ellipsis;
             }
 
+            .editor-tree-actions {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.4rem;
+                flex-shrink: 0;
+            }
+
+            .editor-tree-actions .btn-action {
+                min-width: 34px;
+                min-height: 34px;
+                padding: 0.35rem 0.55rem;
+            }
+
             .editor-tree-body {
                 flex: 1;
                 overflow: auto;
@@ -794,9 +807,17 @@
                                 <strong>Quick Tree</strong>
                                 <span id="editorTreeCurrentPath">/</span>
                             </div>
-                            <button type="button" class="btn-action px-2 py-1" id="btnRefreshEditorTree" title="Refresh tree">
-                                <i class="bi bi-arrow-clockwise"></i>
-                            </button>
+                            <div class="editor-tree-actions">
+                                <button type="button" class="btn-action px-2 py-1" id="btnTreeNewFile" title="New file">
+                                    <i class="bi bi-file-earmark-plus"></i>
+                                </button>
+                                <button type="button" class="btn-action px-2 py-1" id="btnTreeNewFolder" title="New folder">
+                                    <i class="bi bi-folder-plus"></i>
+                                </button>
+                                <button type="button" class="btn-action px-2 py-1" id="btnRefreshEditorTree" title="Refresh tree">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="editor-tree-body" id="editorTreeBody">
                             <div class="editor-tree-empty">Tree disabled.</div>
@@ -926,6 +947,7 @@
             const treeCache = new Map();
             const treeExpandedPaths = new Set();
             const treeLoadingPaths = new Set();
+            let pendingTreeFocusPath = '';
             const sqliteExtensions = new Set(['sqlite', 'sqlite3', 'db', 'db3']);
             let sqlJsPromise = null;
             let sqliteDb = null;
@@ -981,6 +1003,61 @@
             function joinServerPath(parentPath, entryName) {
                 const base = normalizeServerPath(parentPath);
                 return base === '/' ? `/${entryName}` : `${base}/${entryName}`;
+            }
+
+            function validateTreeEntryName(value) {
+                const trimmed = String(value || '').trim();
+                if (!trimmed) {
+                    return { ok: false, error: 'Name is required.' };
+                }
+                if (trimmed === '.' || trimmed === '..') {
+                    return { ok: false, error: 'This name is not allowed.' };
+                }
+                if (/[\\/]/.test(trimmed)) {
+                    return { ok: false, error: 'Use a single file or folder name, not a path.' };
+                }
+                return { ok: true, value: trimmed };
+            }
+
+            function currentTreeDirectoryPath() {
+                return normalizeServerPath(getCurrentDirectoryPath());
+            }
+
+            function sendTreeCreateAction(type, name) {
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    if (window.showStatusModal) {
+                        window.showStatusModal('Not connected to server.', 'error');
+                    }
+                    return;
+                }
+
+                const validation = validateTreeEntryName(name);
+                if (!validation.ok) {
+                    if (window.showStatusModal) {
+                        window.showStatusModal(validation.error, 'error');
+                    }
+                    return;
+                }
+
+                const directory = currentTreeDirectoryPath();
+                pendingTreeFocusPath = joinServerPath(directory, validation.value);
+                ws.send(JSON.stringify({
+                    type,
+                    directory,
+                    name: validation.value
+                }));
+            }
+
+            function promptTreeCreateFile() {
+                const name = window.prompt('New file name');
+                if (name === null) return;
+                sendTreeCreateAction('create_file', name);
+            }
+
+            function promptTreeCreateFolder() {
+                const name = window.prompt('New folder name');
+                if (name === null) return;
+                sendTreeCreateAction('create_folder', name);
             }
 
             function sortFileEntries(entries) {
@@ -2570,7 +2647,38 @@
                                     window.showStatusModal(isSQLitePath(currentFilePath) ? 'Database saved successfully.' : 'File saved successfully.', 'success');
                                 }
                             }
+                        } else if (data.type === 'file_list') {
+                            const responseDirectory = normalizeServerPath(data.directory || '/');
+                            const files = sortFileEntries(Array.isArray(data.files) ? data.files : []);
+                            treeCache.set(responseDirectory, files);
+                            if (pendingTreeFocusPath) {
+                                const pendingPath = normalizeServerPath(pendingTreeFocusPath);
+                                const pendingDirectory = normalizeServerPath(pendingPath.slice(0, Math.max(1, pendingPath.lastIndexOf('/'))) || '/');
+                                if (pendingDirectory === responseDirectory) {
+                                    const createdEntry = files.find((entry) => normalizeServerPath(joinServerPath(responseDirectory, entry && entry.name ? entry.name : '')) === pendingPath);
+                                    if (createdEntry) {
+                                        if (createdEntry.isDirectory) {
+                                            treeExpandedPaths.add(responseDirectory);
+                                            treeExpandedPaths.add(pendingPath);
+                                            fetchTreeEntries(pendingPath, true).finally(() => renderTreeView());
+                                            if (window.showStatusModal) {
+                                                window.showStatusModal(`Folder "${createdEntry.name}" created.`, 'success');
+                                            }
+                                        } else {
+                                            if (window.showStatusModal) {
+                                                window.showStatusModal(`File "${createdEntry.name}" created.`, 'success');
+                                            }
+                                            goToFilePath(pendingPath);
+                                        }
+                                        pendingTreeFocusPath = '';
+                                        renderTreeView();
+                                    }
+                                }
+                            } else {
+                                renderTreeView();
+                            }
                         } else if (data.type === 'error') {
+                            pendingTreeFocusPath = '';
                             if (window.showStatusModal) {
                                 window.showStatusModal(data.message, 'error');
                             } else {
@@ -2707,6 +2815,22 @@
                 refreshTreeBtn.addEventListener('click', async () => {
                     treeCache.clear();
                     await ensureTreeContext(getCurrentDirectoryPath());
+                });
+            }
+
+            const treeNewFileBtn = document.getElementById('btnTreeNewFile');
+            if (treeNewFileBtn) {
+                treeNewFileBtn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    promptTreeCreateFile();
+                });
+            }
+
+            const treeNewFolderBtn = document.getElementById('btnTreeNewFolder');
+            if (treeNewFolderBtn) {
+                treeNewFolderBtn.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    promptTreeCreateFolder();
                 });
             }
 
