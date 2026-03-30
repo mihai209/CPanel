@@ -297,6 +297,73 @@
                 overflow: hidden;
             }
 
+            .terminal-wrapper.provisioning-focused {
+                justify-content: center;
+            }
+
+            .provisioning-screen {
+                flex: 1 1 auto;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 0;
+            }
+
+            .provisioning-screen-card {
+                width: min(640px, 100%);
+                background: linear-gradient(180deg, rgba(18, 18, 22, 0.96), rgba(10, 10, 12, 0.98));
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 22px;
+                padding: 2rem 2.2rem;
+                box-shadow: 0 24px 50px rgba(0, 0, 0, 0.45);
+                text-align: center;
+            }
+
+            .provisioning-screen-image {
+                width: 150px;
+                max-width: 40vw;
+                margin: 0 auto 1.35rem;
+                display: block;
+                filter: drop-shadow(0 14px 24px rgba(0, 0, 0, 0.35));
+            }
+
+            .provisioning-screen-title {
+                font-size: 1.7rem;
+                font-weight: 800;
+                color: #f8fafc;
+                margin: 0 0 0.65rem;
+                letter-spacing: -0.02em;
+            }
+
+            .provisioning-screen-message {
+                color: rgba(255, 255, 255, 0.72);
+                font-size: 0.98rem;
+                line-height: 1.65;
+                margin: 0 auto 1.1rem;
+                max-width: 480px;
+            }
+
+            .provisioning-screen-status {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.45rem;
+                background: rgba(59, 130, 246, 0.14);
+                color: #bfdbfe;
+                border: 1px solid rgba(96, 165, 250, 0.28);
+                border-radius: 999px;
+                padding: 0.48rem 0.95rem;
+                font-size: 0.78rem;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+            }
+
+            .provisioning-screen-note {
+                margin-top: 1rem;
+                color: rgba(255, 255, 255, 0.48);
+                font-size: 0.82rem;
+            }
+
             .terminal-container {
                 background: var(--bg-darker);
                 border-radius: 12px;
@@ -436,6 +503,132 @@
                 border: 1px solid rgba(255, 255, 255, 0.08);
                 border-radius: 999px;
                 padding: 0.25rem 0.6rem;
+            }
+
+            .provisioning-panel {
+                border-bottom: 1px solid var(--border-color);
+                background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(15, 23, 42, 0.92));
+                padding: 0.85rem 1.1rem 0.95rem;
+                display: flex;
+                flex-direction: column;
+                gap: 0.8rem;
+            }
+
+            .provisioning-panel.d-none {
+                display: none !important;
+            }
+
+            .provisioning-top {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 1rem;
+                flex-wrap: wrap;
+            }
+
+            .provisioning-title {
+                font-size: 0.95rem;
+                font-weight: 700;
+                color: #f8fafc;
+                margin-bottom: 0.15rem;
+            }
+
+            .provisioning-summary {
+                font-size: 0.82rem;
+                color: rgba(255, 255, 255, 0.72);
+                line-height: 1.45;
+            }
+
+            .provisioning-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.35rem;
+                padding: 0.3rem 0.7rem;
+                border-radius: 999px;
+                font-size: 0.72rem;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+                white-space: nowrap;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                background: rgba(15, 23, 42, 0.45);
+                color: #e2e8f0;
+            }
+
+            .provisioning-stages {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 0.6rem;
+            }
+
+            .provisioning-stage {
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                background: rgba(15, 23, 42, 0.4);
+                border-radius: 0.85rem;
+                padding: 0.65rem 0.75rem;
+                min-width: 0;
+            }
+
+            .provisioning-stage-label {
+                font-size: 0.72rem;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                color: rgba(255, 255, 255, 0.48);
+                margin-bottom: 0.3rem;
+            }
+
+            .provisioning-stage-value {
+                font-size: 0.84rem;
+                font-weight: 700;
+                color: #cbd5e1;
+            }
+
+            .provisioning-stage-note {
+                margin-top: 0.2rem;
+                font-size: 0.76rem;
+                color: rgba(255, 255, 255, 0.62);
+                line-height: 1.4;
+                overflow-wrap: anywhere;
+            }
+
+            .provisioning-stage.is-active {
+                border-color: rgba(96, 165, 250, 0.38);
+                background: rgba(59, 130, 246, 0.16);
+            }
+
+            .provisioning-stage.is-active .provisioning-stage-value {
+                color: #bfdbfe;
+            }
+
+            .provisioning-stage.is-done {
+                border-color: rgba(16, 185, 129, 0.28);
+                background: rgba(16, 185, 129, 0.12);
+            }
+
+            .provisioning-stage.is-done .provisioning-stage-value {
+                color: #86efac;
+            }
+
+            .provisioning-stage.is-fail {
+                border-color: rgba(239, 68, 68, 0.28);
+                background: rgba(239, 68, 68, 0.12);
+            }
+
+            .provisioning-stage.is-fail .provisioning-stage-value {
+                color: #fca5a5;
+            }
+
+            .provisioning-admin-log {
+                background: rgba(10, 10, 14, 0.8);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 0.85rem;
+                padding: 0.75rem 0.85rem;
+                max-height: 180px;
+                overflow: auto;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+                font-size: 0.76rem;
+                color: #cbd5e1;
+                white-space: pre-wrap;
+                word-break: break-word;
             }
 
             .terminal-title {
@@ -651,6 +844,7 @@ const consoleShortcuts = [
     { action: 'Restart server', keys: 'Ctrl + Shift + R' },
     { action: 'Start/Stop server', keys: 'Ctrl + Shift + S' }
 ];
+const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing', 'starting'].includes(String(server.status || '').toLowerCase());
 %>
         <div class="wrapper">
             <!-- Sidebar -->
@@ -687,7 +881,7 @@ const consoleShortcuts = [
                 </div>
 
                 <!-- Terminal Wrapper -->
-                <div class="terminal-wrapper">
+                <div class="terminal-wrapper <%= isRestrictedProvisioningViewer ? 'provisioning-focused' : '' %>" id="terminalWrapper">
                     <!-- Connection Toast (moved inside but absolute positioned) -->
                     <div id="connectionAlert" class="connection-toast d-none">
                         <div class="toast-icon">
@@ -701,7 +895,24 @@ const consoleShortcuts = [
                         </div>
                     </div>
 
-                    <div class="console-grid">
+                    <div id="provisioningScreen" class="provisioning-screen <%= isRestrictedProvisioningViewer ? '' : 'd-none' %>">
+                        <div class="provisioning-screen-card">
+                            <img src="/assets/welcoming-rocky.png" alt="Provisioning" class="provisioning-screen-image">
+                            <h2 class="provisioning-screen-title" id="provisioningScreenTitle"><%= String(server.status || '').toLowerCase() === 'starting' ? 'Starting Server' : 'Running Installer' %></h2>
+                            <p class="provisioning-screen-message" id="provisioningScreenMessage">
+                                <%= String(server.status || '').toLowerCase() === 'starting'
+                                    ? 'Your server is starting for the first time. Most actions stay locked until the runtime container is ready.'
+                                    : 'Your server is being created and configured. This usually finishes in under a minute.' %>
+                            </p>
+                            <div class="provisioning-screen-status">
+                                <i class="bi bi-hourglass-split"></i>
+                                <span id="provisioningScreenStatus"><%= String(server.status || 'installing').toUpperCase() %></span>
+                            </div>
+                            <div class="provisioning-screen-note">You can keep this page open. It will switch to the live console automatically when provisioning finishes.</div>
+                        </div>
+                    </div>
+
+                    <div id="consoleGrid" class="console-grid <%= isRestrictedProvisioningViewer ? 'd-none' : '' %>">
                         <!-- Terminal Container -->
                         <div class="terminal-container">
                         <div class="terminal-header">
@@ -775,6 +986,23 @@ const consoleShortcuts = [
                             <% if (server.allocation && (server.allocation.alias || server.allocation.ip)) { %>
                                 <div class="info-pill"><span class="info-label">Address</span><span><%= server.allocation.alias || server.allocation.ip %>:<%= server.allocation.port %></span></div>
                             <% } %>
+                        </div>
+                        <div id="provisioningPanel" class="provisioning-panel d-none">
+                            <div class="provisioning-top">
+                                <div>
+                                    <div class="provisioning-title" id="provisioningTitle">Creating server</div>
+                                    <div class="provisioning-summary" id="provisioningSummary">Preparing runtime environment.</div>
+                                </div>
+                                <span class="provisioning-badge" id="provisioningBadge">
+                                    <i class="bi bi-hourglass-split"></i>
+                                    <span id="provisioningBadgeText">Starting</span>
+                                </span>
+                            </div>
+                            <div id="provisioningStages" class="provisioning-stages"></div>
+                            <div id="provisioningAdminWrap" class="d-none">
+                                <div class="small text-secondary mb-2">Install activity</div>
+                                <div id="provisioningAdminLog" class="provisioning-admin-log"></div>
+                            </div>
                         </div>
                         <div id="terminal"></div>
                         <div class="terminal-footer">
@@ -885,7 +1113,9 @@ const consoleShortcuts = [
             const serverMemory = <%= server.memory || 0 %>;
             const serverDisk = <%= server.disk || 0 %>;
             let currentServerStatus = '<%= String(server.status || "stopped").toLowerCase() %>';
+            const restrictedProvisioningViewer = <%= isRestrictedProvisioningViewer ? 'true' : 'false' %>;
             const promptBrand = <%- JSON.stringify(String((settings && settings.brandName) ? settings.brandName : 'cpanel').toLowerCase()) %>;
+            const isAdminConsoleViewer = <%= user && user.isAdmin ? 'true' : 'false' %>;
             const showMinecraftEulaModal = <%- JSON.stringify(Boolean(showMinecraftEulaModal)) %>;
             const minecraftPanelEnabled = <%- JSON.stringify(Boolean(isMinecraftServer && canViewMinecraft)) %>;
             const minecraftStatusAddress = <%- JSON.stringify(minecraftStatusAddress || '') %>;
@@ -1083,6 +1313,227 @@ const consoleShortcuts = [
 
             fitAddon.fit();
 
+            const provisioningPanel = document.getElementById('provisioningPanel');
+            const provisioningScreen = document.getElementById('provisioningScreen');
+            const provisioningScreenTitle = document.getElementById('provisioningScreenTitle');
+            const provisioningScreenMessage = document.getElementById('provisioningScreenMessage');
+            const provisioningScreenStatus = document.getElementById('provisioningScreenStatus');
+            const terminalWrapper = document.getElementById('terminalWrapper');
+            const consoleGrid = document.getElementById('consoleGrid');
+            const provisioningTitle = document.getElementById('provisioningTitle');
+            const provisioningSummary = document.getElementById('provisioningSummary');
+            const provisioningBadgeText = document.getElementById('provisioningBadgeText');
+            const provisioningStagesEl = document.getElementById('provisioningStages');
+            const provisioningAdminWrap = document.getElementById('provisioningAdminWrap');
+            const provisioningAdminLog = document.getElementById('provisioningAdminLog');
+            const provisioningStageDefs = [
+                { key: 'prepare', label: 'Prepare Runtime' },
+                { key: 'install', label: isAdminConsoleViewer ? 'Install Packages' : 'Create Files' },
+                { key: 'config', label: 'Apply Config' },
+                { key: 'container', label: 'Create Container' },
+                { key: 'start', label: 'Start Server' }
+            ];
+            const provisioningState = {
+                active: ['installing', 'starting'].includes(currentServerStatus),
+                stages: Object.fromEntries(provisioningStageDefs.map((entry) => [entry.key, { status: 'pending', note: '' }])),
+                adminLines: [],
+                lastSummary: ''
+            };
+
+            const stripAnsiSequences = (value) => String(value || '').replace(/\x1B\[[0-9;]*[A-Za-z]/g, '');
+            const isProvisioningStatus = (status) => ['installing', 'starting'].includes(String(status || '').toLowerCase());
+
+            function renderProvisioningPanel() {
+                if (!provisioningPanel || !provisioningStagesEl) return;
+
+                const shouldShow = provisioningState.active;
+                provisioningPanel.classList.toggle('d-none', !shouldShow);
+                if (!shouldShow) return;
+
+                provisioningTitle.textContent = isAdminConsoleViewer ? 'Server Provisioning' : 'Creating server';
+                provisioningSummary.textContent = provisioningState.lastSummary || (isAdminConsoleViewer
+                    ? 'Waiting for connector install activity.'
+                    : 'The server is being prepared. This can take a minute.');
+
+                const failed = provisioningStageDefs.some((entry) => provisioningState.stages[entry.key].status === 'fail');
+                const done = provisioningStageDefs.every((entry) => {
+                    const current = provisioningState.stages[entry.key].status;
+                    return current === 'done' || current === 'pending';
+                }) && ['running', 'stopped'].includes(currentServerStatus) && !failed;
+
+                provisioningBadgeText.textContent = failed ? 'Failed' : (done ? 'Ready' : 'Working');
+                provisioningStagesEl.innerHTML = provisioningStageDefs.map((entry) => {
+                    const current = provisioningState.stages[entry.key] || { status: 'pending', note: '' };
+                    const cssClass = current.status === 'done'
+                        ? 'is-done'
+                        : current.status === 'active'
+                            ? 'is-active'
+                            : current.status === 'fail'
+                                ? 'is-fail'
+                                : '';
+                    const label = current.status === 'done'
+                        ? 'Done'
+                        : current.status === 'active'
+                            ? 'Working'
+                            : current.status === 'fail'
+                                ? 'Failed'
+                                : 'Pending';
+                    return `
+                        <div class="provisioning-stage ${cssClass}">
+                            <div class="provisioning-stage-label">${escapeHtml(entry.label)}</div>
+                            <div class="provisioning-stage-value">${label}</div>
+                            ${current.note ? `<div class="provisioning-stage-note">${escapeHtml(current.note)}</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+
+                if (provisioningAdminWrap && provisioningAdminLog) {
+                    provisioningAdminWrap.classList.toggle('d-none', !isAdminConsoleViewer);
+                    if (isAdminConsoleViewer) {
+                        provisioningAdminLog.textContent = provisioningState.adminLines.length
+                            ? provisioningState.adminLines.join('\n')
+                            : 'Waiting for install output...';
+                    }
+                }
+            }
+
+            function activateProvisioning(summary) {
+                provisioningState.active = true;
+                if (summary) provisioningState.lastSummary = summary;
+                renderProvisioningPanel();
+            }
+
+            function deactivateProvisioning() {
+                provisioningState.active = false;
+                renderProvisioningPanel();
+            }
+
+            function updateProvisioningStage(stageKey, status, note = '', summary = '') {
+                const current = provisioningState.stages[stageKey];
+                if (!current) return;
+                current.status = status;
+                if (note) current.note = note;
+                if (summary) provisioningState.lastSummary = summary;
+                activateProvisioning(provisioningState.lastSummary);
+            }
+
+            function completeProvisioningStage(stageKey, note = '', summary = '') {
+                updateProvisioningStage(stageKey, 'done', note, summary);
+            }
+
+            function failProvisioningStage(stageKey, note = '', summary = '') {
+                updateProvisioningStage(stageKey, 'fail', note, summary || 'Provisioning failed. Inspect the logs below.');
+            }
+
+            function appendProvisioningAdminLine(line) {
+                if (!isAdminConsoleViewer) return;
+                const trimmed = String(line || '').trim();
+                if (!trimmed) return;
+                provisioningState.adminLines.push(trimmed);
+                if (provisioningState.adminLines.length > 40) {
+                    provisioningState.adminLines = provisioningState.adminLines.slice(-40);
+                }
+                renderProvisioningPanel();
+            }
+
+            function isProvisioningContext() {
+                return provisioningState.active || isProvisioningStatus(currentServerStatus);
+            }
+
+            function renderProvisioningAccessState(status) {
+                if (!restrictedProvisioningViewer || isAdminConsoleViewer) return;
+
+                const lowerStatus = String(status || '').toLowerCase();
+                const blocked = ['installing', 'starting'].includes(lowerStatus);
+                if (terminalWrapper) {
+                    terminalWrapper.classList.toggle('provisioning-focused', blocked);
+                }
+                if (provisioningScreen) {
+                    provisioningScreen.classList.toggle('d-none', !blocked);
+                }
+                if (consoleGrid) {
+                    consoleGrid.classList.toggle('d-none', blocked);
+                }
+                if (!blocked) {
+                    requestAnimationFrame(() => fitAddon.fit());
+                    return;
+                }
+
+                if (provisioningScreenStatus) {
+                    provisioningScreenStatus.textContent = lowerStatus.toUpperCase();
+                }
+                if (provisioningScreenTitle) {
+                    provisioningScreenTitle.textContent = lowerStatus === 'starting' ? 'Starting Server' : 'Running Installer';
+                }
+                if (provisioningScreenMessage) {
+                    provisioningScreenMessage.textContent = lowerStatus === 'starting'
+                        ? 'Your server is starting for the first time. Most actions stay locked until the runtime container is ready.'
+                        : 'Your server is being created and configured. This usually finishes in under a minute.';
+                }
+            }
+
+            function handleProvisioningLogLine(line) {
+                if (!isProvisioningContext()) {
+                    return false;
+                }
+                const plain = stripAnsiSequences(line).trim();
+                if (!plain) return false;
+                let matched = false;
+
+                if (/running egg installation script/i.test(plain)) {
+                    matched = true;
+                    activateProvisioning(isAdminConsoleViewer ? 'Running egg installation script inside the installer container.' : 'Downloading files and preparing the server.');
+                    updateProvisioningStage('prepare', 'done', 'Volume ready');
+                    updateProvisioningStage('install', 'active', 'Installing packages');
+                } else if (/skipping egg installation script/i.test(plain)) {
+                    matched = true;
+                    activateProvisioning(isAdminConsoleViewer ? 'Install script skipped; using imported files/runtime config.' : 'Preparing server files.');
+                    completeProvisioningStage('prepare', 'Volume ready');
+                    completeProvisioningStage('install', 'Skipped');
+                } else if (/egg installation completed/i.test(plain)) {
+                    matched = true;
+                    completeProvisioningStage('install', 'Packages installed', isAdminConsoleViewer ? 'Egg installation completed successfully.' : 'Base server files are ready.');
+                } else if (/applying egg config file parsers/i.test(plain)) {
+                    matched = true;
+                    updateProvisioningStage('config', 'active', 'Writing config files', isAdminConsoleViewer ? 'Applying egg config file parsers.' : 'Applying server configuration.');
+                } else if (/sending start command/i.test(plain)) {
+                    matched = true;
+                    completeProvisioningStage('config', 'Config applied');
+                    completeProvisioningStage('container', 'Created');
+                    updateProvisioningStage('start', 'active', 'Dispatching start request', isAdminConsoleViewer ? 'Panel is sending the start command.' : 'Starting the server.');
+                } else if (/runtime container is missing\. rebuilding it from the last saved install config/i.test(plain)) {
+                    matched = true;
+                    updateProvisioningStage('container', 'active', 'Recreating missing container', 'Runtime container was missing and is being rebuilt automatically.');
+                } else if (/docker start .*no such container/i.test(plain) || /failed to start containers:/i.test(plain)) {
+                    matched = true;
+                    updateProvisioningStage('container', 'active', 'Container missing');
+                    updateProvisioningStage('start', 'active', 'Retrying start');
+                } else if (/power action 'start' accepted/i.test(plain)) {
+                    matched = true;
+                    completeProvisioningStage('config', 'Config applied');
+                    updateProvisioningStage('start', 'active', 'Start accepted', isAdminConsoleViewer ? 'Connector accepted the power start request.' : 'Server start was accepted.');
+                } else if (/install failed/i.test(plain)) {
+                    matched = true;
+                    failProvisioningStage('install', plain, 'Installation failed before the server could finish provisioning.');
+                } else if (/power action failed \(start\)/i.test(plain)) {
+                    matched = true;
+                    failProvisioningStage('start', plain, 'Start failed while provisioning the server.');
+                }
+
+                if (matched) {
+                    appendProvisioningAdminLine(plain);
+                }
+                return matched;
+            }
+
+            if (isProvisioningStatus(currentServerStatus)) {
+                activateProvisioning(isAdminConsoleViewer
+                    ? 'Waiting for connector install activity.'
+                    : 'Your server is being created. You can keep this page open while it finishes.');
+            }
+            renderProvisioningPanel();
+            renderProvisioningAccessState(currentServerStatus);
+
             // WebSocket Manager Class for Robust Connection
             class ConsoleClient {
                 constructor(url) {
@@ -1143,9 +1594,12 @@ const consoleShortcuts = [
                     switch (data.type) {
                         case 'console_output':
                             const cleanOutput = this.scrubAnsi(data.output);
-                            const mcStyledOutput = this.translateMinecraftFormatting(cleanOutput);
-                            const styledOutput = this.translateAdventureFormatting(mcStyledOutput);
-                            term.write(this.rewritePromptBrand(styledOutput));
+                            const provisioningMatched = handleProvisioningLogLine(cleanOutput);
+                            if (!provisioningMatched || isAdminConsoleViewer) {
+                                const mcStyledOutput = this.translateMinecraftFormatting(cleanOutput);
+                                const styledOutput = this.translateAdventureFormatting(mcStyledOutput);
+                                term.write(this.rewritePromptBrand(styledOutput));
+                            }
                             break;
                         case 'server_status_update':
                             updateUIStatus(data.status);
@@ -1157,12 +1611,26 @@ const consoleShortcuts = [
                             const phase = String(data.phase || '').toLowerCase();
                             const actionType = String(data.actionType || 'action');
                             const text = String(data.message || '').trim() || `${actionType} ${phase}`;
+                            const isProvisionStartAck = isProvisioningContext() && actionType === 'power' && /start/i.test(text);
+                            if (isProvisionStartAck) {
+                                completeProvisioningStage('container', 'Created');
+                                updateProvisioningStage('start', phase === 'failed' ? 'fail' : 'active', text, phase === 'failed'
+                                    ? 'Start request failed while provisioning the server.'
+                                    : (isAdminConsoleViewer ? 'Connector acknowledged the start request.' : 'Server start request accepted.'));
+                                if (phase === 'failed') {
+                                    failProvisioningStage('start', text, 'Start request failed while provisioning the server.');
+                                }
+                            }
                             if (phase === 'failed') {
                                 term.writeln(`\x1b[1;31m[ACK] ${actionType}: ${text}\x1b[0m`);
                             } else if (phase === 'executed') {
-                                term.writeln(`\x1b[1;32m[ACK] ${actionType}: ${text}\x1b[0m`);
+                                if (!isProvisionStartAck || isAdminConsoleViewer) {
+                                    term.writeln(`\x1b[1;32m[ACK] ${actionType}: ${text}\x1b[0m`);
+                                }
                             } else {
-                                term.writeln(`\x1b[1;34m[ACK] ${actionType}: ${text}\x1b[0m`);
+                                if (!isProvisionStartAck || isAdminConsoleViewer) {
+                                    term.writeln(`\x1b[1;34m[ACK] ${actionType}: ${text}\x1b[0m`);
+                                }
                             }
                             break;
                         }
@@ -1680,6 +2148,7 @@ const consoleShortcuts = [
                 const nextStatus = String(status || '').toLowerCase();
                 const previousStatus = currentServerStatus;
                 currentServerStatus = nextStatus;
+                renderProvisioningAccessState(nextStatus);
 
                 const badge = document.getElementById('statusBadge');
                 const text = document.getElementById('statusText');
@@ -1722,6 +2191,28 @@ const consoleShortcuts = [
                 }
 
                 if (previousStatus === nextStatus) return;
+
+                const provisioningContext = provisioningState.active || isProvisioningStatus(previousStatus) || isProvisioningStatus(nextStatus);
+                if (provisioningContext) {
+                    if (isProvisioningStatus(nextStatus)) {
+                        activateProvisioning(isAdminConsoleViewer
+                            ? 'Connector is provisioning the runtime container.'
+                            : 'Your server is being created. This usually takes less than a minute.');
+                    } else if (nextStatus === 'running') {
+                        completeProvisioningStage('prepare', 'Ready');
+                        completeProvisioningStage('install', 'Ready');
+                        completeProvisioningStage('config', 'Applied');
+                        completeProvisioningStage('container', 'Created');
+                        completeProvisioningStage('start', 'Running', 'Provisioning finished. Server is running.');
+                        setTimeout(() => {
+                            if (currentServerStatus === 'running') {
+                                deactivateProvisioning();
+                            }
+                        }, 2500);
+                    } else if (nextStatus === 'error') {
+                        failProvisioningStage('start', 'Provisioning error', 'Provisioning failed. Admins can inspect the detailed install activity above.');
+                    }
+                }
 
                 if (nextStatus === 'running') {
                     term.writeln('\x1b[1;32m[✓] Server is now running.\x1b[0m');

@@ -5855,6 +5855,16 @@ function registerServerPagesRoutes(ctx) {
         return access.permissions instanceof Set && access.permissions.has(permission);
     }
 
+    function isServerProvisioningRestrictedStatus(status) {
+        const normalized = String(status || '').trim().toLowerCase();
+        return normalized === 'installing' || normalized === 'starting';
+    }
+
+    function isAllowedProvisioningRoutePath(routePath) {
+        const normalized = String(routePath || '/').trim() || '/';
+        return normalized === '/' || normalized === '/status' || normalized === '/suspended';
+    }
+
     function getServerSchedulesSettingKey(serverId) {
         return `${SERVER_SCHEDULES_KEY_PREFIX}${serverId}`;
     }
@@ -9383,6 +9393,37 @@ function registerServerPagesRoutes(ctx) {
             title: 'No Permissions',
             path: '/servers'
         });
+    });
+
+    app.use('/server/:containerId', requireAuth, async (req, res, next) => {
+        try {
+            const routePath = String(req.path || '/').trim() || '/';
+            if (isAllowedProvisioningRoutePath(routePath)) {
+                return next();
+            }
+
+            const server = await Server.findOne({
+                where: { containerId: req.params.containerId },
+                attributes: ['id', 'containerId', 'ownerId', 'status', 'isSuspended']
+            });
+            if (!server) {
+                return next();
+            }
+
+            const access = await resolveServerAccess(server, req.session.user);
+            if (!access.allowed || access.isAdmin) {
+                return next();
+            }
+
+            if (!isServerProvisioningRestrictedStatus(server.status)) {
+                return next();
+            }
+
+            return res.redirect(`/server/${server.containerId}`);
+        } catch (error) {
+            console.error('Error enforcing provisioning route guard:', error);
+            return next();
+        }
     });
 
     // User Server Console
