@@ -14819,6 +14819,7 @@ function registerServerPagesRoutes(ctx) {
                 initialPath,
                 sftpDetails,
                 sftpFeatureEnabled: sftpEnabled,
+                canFixPermissions: hasServerPermission(access, 'server.files.write') || hasServerPermission(access, 'server.startup'),
                 webUploadEnabled,
                 webUploadMaxMb
             });

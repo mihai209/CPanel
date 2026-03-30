@@ -2,6 +2,7 @@
 const fileUploadEnabled = Boolean(webUploadEnabled);
 const fileUploadMaxMbValue = Math.max(1, Number.parseInt(webUploadMaxMb, 10) || 50);
 const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
+const canFixPermissionsSafe = typeof canFixPermissions !== 'undefined' ? Boolean(canFixPermissions) : false;
 %>
 <!DOCTYPE html>
 <html lang="en">
@@ -831,7 +832,7 @@ const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
                                 <span>SFTP</span>
                             </a>
                             <% } %>
-                            <% if (canFixPermissions) { %>
+                            <% if (canFixPermissionsSafe) { %>
                             <form method="POST" action="/server/<%= server.containerId %>/fix-permissions" class="d-inline me-2">
                                 <button type="submit" class="btn-action" style="background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.35); color: #fcd34d;">
                                     <i class="bi bi-tools"></i>
