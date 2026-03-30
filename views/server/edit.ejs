@@ -524,6 +524,81 @@
                 opacity: 0.7;
             }
 
+            .database-meta-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 0.9rem;
+            }
+
+            .database-meta-card {
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                background: rgba(255, 255, 255, 0.03);
+                border-radius: 12px;
+                padding: 0.9rem 1rem;
+            }
+
+            .database-meta-label {
+                color: var(--text-secondary);
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                margin-bottom: 0.35rem;
+            }
+
+            .database-meta-value {
+                color: var(--text-primary);
+                font-size: 0.9rem;
+                line-height: 1.45;
+                word-break: break-word;
+            }
+
+            .database-preview-box {
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 12px;
+                background: rgba(0, 0, 0, 0.18);
+                overflow: hidden;
+            }
+
+            .database-preview-box pre {
+                margin: 0;
+                padding: 1rem;
+                max-height: 560px;
+                overflow: auto;
+                color: #d1d5db;
+                font-size: 0.82rem;
+                line-height: 1.55;
+                font-family: 'JetBrains Mono', monospace;
+                white-space: pre-wrap;
+                word-break: break-word;
+            }
+
+            .database-preview-box textarea {
+                min-height: 560px;
+                resize: vertical;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.84rem;
+                line-height: 1.55;
+            }
+
+            .database-strings-list {
+                display: flex;
+                flex-direction: column;
+                gap: 0.7rem;
+            }
+
+            .database-string-item {
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                background: rgba(255, 255, 255, 0.03);
+                border-radius: 12px;
+                padding: 0.8rem 0.95rem;
+                color: var(--text-primary);
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.83rem;
+                line-height: 1.45;
+                white-space: pre-wrap;
+                word-break: break-word;
+            }
+
             .loading-overlay {
                 position: absolute;
                 top: 0;
@@ -690,7 +765,7 @@
                             <option value="monaco">Monaco</option>
                             <option value="ace">Ace</option>
                             <option value="plain">Plain Text</option>
-                            <option value="sqlite">SQLite</option>
+                            <option value="sqlite">Database</option>
                         </select>
                         <button type="button" class="btn-action" id="btnToggleTreeView">
                             <i class="bi bi-diagram-3"></i>
@@ -743,7 +818,7 @@
                                 <div class="sqlite-toolbar-meta">
                                     <span class="editor-chip" id="sqliteDatabaseChip">
                                         <i class="bi bi-database"></i>
-                                        <span>SQLite database</span>
+                                        <span>Database viewer</span>
                                     </span>
                                     <span class="editor-chip" id="sqliteTableCountChip">
                                         <i class="bi bi-table"></i>
@@ -755,9 +830,9 @@
                                     </span>
                                 </div>
                                 <div class="sqlite-toolbar-meta">
-                                    <span class="editor-chip">
+                                    <span class="editor-chip" id="databaseViewerModeChip">
                                         <i class="bi bi-exclamation-triangle"></i>
-                                        <span>Editing first 200 rows per table</span>
+                                        <span>Database viewer ready</span>
                                     </span>
                                 </div>
                             </div>
@@ -786,7 +861,7 @@
                                         </div>
                                     </div>
                                     <div class="sqlite-grid-body" id="sqliteGridBody">
-                                        <div class="sqlite-empty">Open a SQLite file to inspect its tables.</div>
+                                        <div class="sqlite-empty">Open a database file to inspect it here.</div>
                                     </div>
                                 </section>
                             </div>
@@ -867,6 +942,13 @@
             let sqliteViewerWarning = '';
             let sqliteLoadError = '';
             let sqliteRawPreview = '';
+            let h2Sections = [];
+            let h2CurrentSection = '';
+            let h2Metadata = [];
+            let h2PrintableStrings = [];
+            let h2TextPreview = '';
+            let h2HexPreview = '';
+            let h2IsTextLike = false;
             let fileReadOnly = false;
             let fileReadOnlyReason = '';
 
@@ -1062,25 +1144,113 @@
                 return 'text';
             }
 
+            function isLikelyTextBytes(bytes, sampleSize = 2048) {
+                const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+                const sample = Math.min(source.length, sampleSize);
+                if (!sample) return false;
+                let printable = 0;
+                for (let index = 0; index < sample; index += 1) {
+                    const code = source[index];
+                    if (code === 9 || code === 10 || code === 13 || (code >= 32 && code <= 126)) {
+                        printable += 1;
+                    }
+                }
+                return (printable / sample) >= 0.85;
+            }
+
+            function buildHexPreview(bytes, limit = 4096) {
+                const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+                const slice = source.subarray(0, Math.min(source.length, limit));
+                const lines = [];
+                for (let offset = 0; offset < slice.length; offset += 16) {
+                    const chunk = slice.subarray(offset, offset + 16);
+                    const hex = Array.from(chunk).map((value) => value.toString(16).padStart(2, '0')).join(' ');
+                    const ascii = Array.from(chunk).map((value) => ((value >= 32 && value <= 126) ? String.fromCharCode(value) : '.')).join('');
+                    lines.push(`${offset.toString(16).padStart(8, '0')}  ${hex.padEnd(16 * 3 - 1, ' ')}  ${ascii}`);
+                }
+                if (source.length > limit) {
+                    lines.push('');
+                    lines.push(`... truncated ${source.length - limit} bytes ...`);
+                }
+                return lines.join('\n');
+            }
+
+            function extractPrintableStrings(bytes, minLength = 4, maxCount = 200) {
+                const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+                const results = [];
+                let current = '';
+                for (let index = 0; index < source.length; index += 1) {
+                    const value = source[index];
+                    const isPrintable = value === 9 || value === 10 || value === 13 || (value >= 32 && value <= 126);
+                    if (isPrintable) {
+                        current += String.fromCharCode(value);
+                        continue;
+                    }
+                    if (current.length >= minLength) {
+                        results.push(current.trim());
+                        if (results.length >= maxCount) break;
+                    }
+                    current = '';
+                }
+                if (results.length < maxCount && current.length >= minLength) {
+                    results.push(current.trim());
+                }
+                return results.filter(Boolean);
+            }
+
             function getSQLiteFileInfo(pathValue) {
                 const normalized = normalizeServerPath(pathValue);
                 const fileName = normalized.split('/').pop() || '';
                 const lowerName = fileName.toLowerCase();
+                const lowerPath = normalized.toLowerCase();
+                const isLikelyLuckPerms = lowerPath.includes('/plugins/luckperms/') || lowerName.includes('luckperms');
+
+                if (lowerName.endsWith('.mv.db') || lowerName.endsWith('.trace.db')) {
+                    const extension = lowerName.endsWith('.mv.db') ? 'mv.db' : 'trace.db';
+                    return {
+                        isSQLite: false,
+                        isDatabase: true,
+                        family: 'h2',
+                        isSidecar: false,
+                        sidecarType: '',
+                        basePath: normalized,
+                        targetPath: normalized,
+                        extension,
+                        likelySource: isLikelyLuckPerms ? 'LuckPerms' : 'H2'
+                    };
+                }
+
                 const sidecarSuffix = lowerName.endsWith('-wal') ? '-wal' : (lowerName.endsWith('-shm') ? '-shm' : '');
                 const candidateName = sidecarSuffix ? fileName.slice(0, -sidecarSuffix.length) : fileName;
                 const dotIndex = candidateName.lastIndexOf('.');
                 if (dotIndex === -1) {
                     return {
                         isSQLite: false,
+                        isDatabase: false,
+                        family: '',
                         isSidecar: false,
                         sidecarType: '',
                         basePath: normalized,
                         targetPath: normalized,
-                        extension: ''
+                        extension: '',
+                        likelySource: ''
                     };
                 }
 
                 const ext = candidateName.slice(dotIndex + 1).toLowerCase();
+                if ((ext === 'db' || ext === 'db3') && isLikelyLuckPerms) {
+                    return {
+                        isSQLite: false,
+                        isDatabase: true,
+                        family: 'h2',
+                        isSidecar: false,
+                        sidecarType: '',
+                        basePath: normalized,
+                        targetPath: normalized,
+                        extension: ext,
+                        likelySource: 'LuckPerms'
+                    };
+                }
                 const isSQLite = sqliteExtensions.has(ext);
                 const basePath = sidecarSuffix
                     ? `${normalized.slice(0, -fileName.length)}${candidateName}`
@@ -1088,11 +1258,14 @@
 
                 return {
                     isSQLite,
+                    isDatabase: isSQLite,
+                    family: isSQLite ? 'sqlite' : '',
                     isSidecar: Boolean(isSQLite && sidecarSuffix),
                     sidecarType: sidecarSuffix ? sidecarSuffix.slice(1) : '',
                     basePath,
                     targetPath: isSQLite ? basePath : normalized,
-                    extension: ext
+                    extension: ext,
+                    likelySource: ''
                 };
             }
 
@@ -1100,7 +1273,19 @@
                 return getSQLiteFileInfo(pathValue).isSQLite;
             }
 
+            function isH2Path(pathValue) {
+                return getSQLiteFileInfo(pathValue).family === 'h2';
+            }
+
+            function isDatabasePath(pathValue) {
+                return Boolean(getSQLiteFileInfo(pathValue).isDatabase);
+            }
+
             function getSQLiteTargetPath(pathValue) {
+                return getSQLiteFileInfo(pathValue).targetPath;
+            }
+
+            function getDatabaseTargetPath(pathValue) {
                 return getSQLiteFileInfo(pathValue).targetPath;
             }
 
@@ -1170,17 +1355,21 @@
                 const saveBtn = document.getElementById('btnSave');
                 const wordWrapBtn = document.getElementById('btnWordWrapToggle');
                 const databaseChip = document.getElementById('sqliteDatabaseChip');
+                const databaseModeChip = document.getElementById('databaseViewerModeChip');
                 if (!select) return;
                 const sqliteInfo = getSQLiteFileInfo(currentFilePath);
-                const sqliteMode = sqliteInfo.isSQLite;
+                const databaseMode = sqliteInfo.isDatabase;
                 Array.from(select.options).forEach((option) => {
                     if (option.value === 'sqlite') {
-                        option.disabled = !sqliteMode;
-                        option.hidden = !sqliteMode;
+                        option.disabled = !databaseMode;
+                        option.hidden = !databaseMode;
+                        option.textContent = databaseMode
+                            ? (sqliteInfo.family === 'h2' ? 'H2 / Database' : 'SQLite / Database')
+                            : 'Database';
                     }
                 });
-                select.classList.toggle('sqlite-mode-lock', sqliteMode);
-                if (!sqliteMode && activeEditorMode === 'sqlite') {
+                select.classList.toggle('sqlite-mode-lock', databaseMode);
+                if (!databaseMode && activeEditorMode === 'sqlite') {
                     activeEditorMode = 'monaco';
                 }
                 select.value = activeEditorMode;
@@ -1202,15 +1391,35 @@
                 if (databaseChip) {
                     const text = databaseChip.querySelector('span');
                     if (text) {
-                        if (sqliteInfo.isSidecar) {
+                        if (sqliteInfo.family === 'h2') {
+                            text.textContent = sqliteInfo.likelySource
+                                ? `H2 database · ${sqliteInfo.likelySource}`
+                                : 'H2 database';
+                        } else if (sqliteInfo.isSidecar) {
                             text.textContent = `SQLite via ${sqliteInfo.sidecarType.toUpperCase()} sidecar`;
-                        } else {
+                        } else if (sqliteInfo.family === 'sqlite') {
                             text.textContent = 'SQLite database';
+                        } else {
+                            text.textContent = 'Database viewer';
                         }
                     }
-                    databaseChip.title = sqliteInfo.isSidecar
+                    databaseChip.title = sqliteInfo.family === 'h2'
+                        ? `${sqliteInfo.likelySource || 'H2'} database at ${currentFilePath}`
+                        : sqliteInfo.isSidecar
                         ? `Opened from companion file ${currentFilePath}, reading main database ${sqliteInfo.basePath}`
                         : currentFilePath;
+                }
+                if (databaseModeChip) {
+                    const text = databaseModeChip.querySelector('span');
+                    if (text) {
+                        if (sqliteInfo.family === 'h2') {
+                            text.textContent = 'Read-only H2 inspection';
+                        } else if (sqliteInfo.family === 'sqlite') {
+                            text.textContent = 'Editing first 200 rows per table';
+                        } else {
+                            text.textContent = 'Database viewer ready';
+                        }
+                    }
                 }
             }
 
@@ -1246,7 +1455,142 @@
                 return value;
             }
 
+            function renderH2TableList() {
+                const listEl = document.getElementById('sqliteTablesList');
+                const countChip = document.getElementById('sqliteTableCountChip');
+                const warningBanner = document.getElementById('sqliteWarningBanner');
+                if (countChip) {
+                    const countText = countChip.querySelector('span');
+                    if (countText) countText.textContent = `${h2Sections.length} panel${h2Sections.length === 1 ? '' : 's'}`;
+                }
+                if (warningBanner) {
+                    if (sqliteViewerWarning) {
+                        warningBanner.classList.remove('d-none');
+                        warningBanner.innerHTML = sqliteViewerWarning;
+                    } else {
+                        warningBanner.classList.add('d-none');
+                        warningBanner.innerHTML = '';
+                    }
+                }
+                if (!listEl) return;
+                if (!h2Sections.length) {
+                    listEl.innerHTML = '<div class="sqlite-empty">No H2 preview sections available.</div>';
+                    return;
+                }
+                listEl.innerHTML = h2Sections.map((section) => `
+                    <button type="button" class="sqlite-table-btn ${h2CurrentSection === section.key ? 'active' : ''}" data-sqlite-table="${escapeHtml(section.key)}">
+                        <i class="bi ${escapeHtml(section.icon)} me-2"></i>${escapeHtml(section.label)}
+                    </button>
+                `).join('');
+            }
+
+            function renderH2Grid() {
+                const gridBody = document.getElementById('sqliteGridBody');
+                const tableChip = document.getElementById('sqliteCurrentTableChip');
+                const rowMetaChip = document.getElementById('sqliteRowMetaChip');
+                const searchInput = document.getElementById('sqliteSearchInput');
+                const insertBtn = document.getElementById('btnInsertSQLiteRow');
+                const currentSection = h2Sections.find((section) => section.key === h2CurrentSection) || h2Sections[0] || null;
+                const searchEnabled = Boolean(currentSection && currentSection.key === 'strings');
+                const filteredStrings = searchEnabled && sqliteSearchTerm
+                    ? h2PrintableStrings.filter((entry) => entry.toLowerCase().includes(sqliteSearchTerm.toLowerCase()))
+                    : h2PrintableStrings;
+
+                if (tableChip) {
+                    const text = tableChip.querySelector('span');
+                    if (text) text.textContent = currentSection ? currentSection.label : 'H2 preview';
+                }
+                if (searchInput) {
+                    searchInput.disabled = !searchEnabled;
+                    searchInput.placeholder = searchEnabled ? 'Filter extracted strings' : 'Search is available for strings only';
+                    if (searchInput.value !== sqliteSearchTerm) {
+                        searchInput.value = sqliteSearchTerm;
+                    }
+                }
+                if (insertBtn) {
+                    insertBtn.disabled = true;
+                    insertBtn.classList.add('disabled');
+                }
+                if (rowMetaChip) {
+                    const text = rowMetaChip.querySelector('span');
+                    if (text) {
+                        if (!currentSection) {
+                            text.textContent = 'No preview section selected';
+                        } else if (currentSection.key === 'strings') {
+                            text.textContent = `${filteredStrings.length} visible / ${h2PrintableStrings.length} extracted strings · Read-only`;
+                        } else {
+                            text.textContent = 'Read-only H2 inspection';
+                        }
+                    }
+                }
+                if (!gridBody) return;
+                if (sqliteLoadError) {
+                    gridBody.innerHTML = `
+                        <div class="sqlite-empty">
+                            ${escapeHtml(sqliteLoadError)}
+                            <br><br>This H2/database preview stays read-only.
+                        </div>
+                        <div class="database-preview-box">
+                            ${h2IsTextLike
+                                ? `<textarea class="form-control bg-dark text-light border-0 rounded-0" readonly>${escapeHtml(sqliteRawPreview || h2TextPreview)}</textarea>`
+                                : `<pre>${escapeHtml(h2HexPreview || sqliteRawPreview)}</pre>`}
+                        </div>
+                    `;
+                    return;
+                }
+                if (!currentSection) {
+                    gridBody.innerHTML = '<div class="sqlite-empty">Open an H2 database file to inspect it here.</div>';
+                    return;
+                }
+
+                if (currentSection.key === 'metadata') {
+                    gridBody.innerHTML = `
+                        <div class="database-meta-grid">
+                            ${h2Metadata.map((entry) => `
+                                <div class="database-meta-card">
+                                    <div class="database-meta-label">${escapeHtml(entry.label)}</div>
+                                    <div class="database-meta-value">${escapeHtml(entry.value)}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                    return;
+                }
+
+                if (currentSection.key === 'strings') {
+                    if (!filteredStrings.length) {
+                        gridBody.innerHTML = '<div class="sqlite-empty">No printable strings matched the current filter.</div>';
+                        return;
+                    }
+                    gridBody.innerHTML = `
+                        <div class="database-strings-list">
+                            ${filteredStrings.map((entry) => `<div class="database-string-item">${escapeHtml(entry)}</div>`).join('')}
+                        </div>
+                    `;
+                    return;
+                }
+
+                if (h2IsTextLike) {
+                    gridBody.innerHTML = `
+                        <div class="database-preview-box">
+                            <textarea class="form-control bg-dark text-light border-0 rounded-0" readonly>${escapeHtml(h2TextPreview)}</textarea>
+                        </div>
+                    `;
+                    return;
+                }
+
+                gridBody.innerHTML = `
+                    <div class="database-preview-box">
+                        <pre>${escapeHtml(h2HexPreview)}</pre>
+                    </div>
+                `;
+            }
+
             function renderSQLiteTableList() {
+                if (isH2Path(currentFilePath)) {
+                    renderH2TableList();
+                    return;
+                }
                 const listEl = document.getElementById('sqliteTablesList');
                 const countChip = document.getElementById('sqliteTableCountChip');
                 const warningBanner = document.getElementById('sqliteWarningBanner');
@@ -1283,6 +1627,10 @@
             }
 
             function renderSQLiteGrid() {
+                if (isH2Path(currentFilePath)) {
+                    renderH2Grid();
+                    return;
+                }
                 const gridBody = document.getElementById('sqliteGridBody');
                 const tableChip = document.getElementById('sqliteCurrentTableChip');
                 const rowMetaChip = document.getElementById('sqliteRowMetaChip');
@@ -1458,6 +1806,12 @@
                 if (Object.prototype.hasOwnProperty.call(options, 'searchTerm')) {
                     sqliteSearchTerm = String(options.searchTerm || '').trim();
                 }
+                if (isH2Path(currentFilePath)) {
+                    h2CurrentSection = normalizedTable || 'metadata';
+                    renderSQLiteTableList();
+                    renderSQLiteGrid();
+                    return;
+                }
                 sqliteCurrentTable = normalizedTable;
                 renderSQLiteTableList();
                 if (!sqliteDb || !normalizedTable) {
@@ -1544,6 +1898,77 @@
                 renderSQLiteGrid();
             }
 
+            async function loadH2Content(contentBase64) {
+                const overlay = document.getElementById('loadingOverlay');
+                if (overlay) {
+                    overlay.style.opacity = '1';
+                }
+
+                if (sqliteDb) {
+                    try {
+                        sqliteDb.close();
+                    } catch {
+                        // Ignore close failures.
+                    }
+                    sqliteDb = null;
+                }
+
+                const h2Info = getSQLiteFileInfo(currentFilePath);
+                const bytes = base64ToUint8Array(contentBase64);
+                sqliteOriginalBase64 = contentBase64;
+                sqliteTableNames = [];
+                sqliteCurrentTable = '';
+                sqliteTableColumns = [];
+                sqliteTableRows = [];
+                sqliteTableEditable = false;
+                sqliteTableTotalRows = 0;
+                sqliteJournalMode = '';
+                sqliteLoadError = '';
+                sqliteRawPreview = '';
+                h2CurrentSection = 'metadata';
+                h2IsTextLike = h2Info.extension === 'trace.db' || isLikelyTextBytes(bytes);
+                h2TextPreview = decodeBase64ToText(contentBase64).slice(0, 24000);
+                h2HexPreview = buildHexPreview(bytes);
+                h2PrintableStrings = extractPrintableStrings(bytes);
+                h2Sections = [
+                    { key: 'metadata', label: 'Metadata', icon: 'bi-info-circle' },
+                    { key: 'strings', label: `Strings (${h2PrintableStrings.length})`, icon: 'bi-body-text' },
+                    { key: 'preview', label: h2IsTextLike ? 'Text Preview' : 'Hex Preview', icon: h2IsTextLike ? 'bi-file-text' : 'bi-file-binary' }
+                ];
+                h2Metadata = [
+                    { label: 'Format', value: h2Info.extension === 'trace.db' ? 'H2 trace database' : 'H2 MVStore database' },
+                    { label: 'Source', value: h2Info.likelySource || 'H2' },
+                    { label: 'Path', value: currentFilePath },
+                    { label: 'Target file', value: h2Info.targetPath },
+                    { label: 'Size', value: `${bytes.length.toLocaleString()} bytes` },
+                    { label: 'Preview mode', value: h2IsTextLike ? 'Text + strings' : 'Hex + strings' }
+                ];
+                sqliteViewerWarning = [
+                    `Detected an <strong>H2</strong> database file${h2Info.likelySource ? ` from <strong>${escapeHtml(h2Info.likelySource)}</strong>` : ''}.`,
+                    'Browser-side table parsing is not available for H2 here, so this viewer stays <strong>read-only</strong> and shows metadata, extracted strings, and a binary/text preview instead.',
+                    'If you need real table-level edits for LuckPerms/H2, that requires a backend Java bridge, not the SQLite browser runtime.'
+                ].join('<br><br>');
+
+                sqliteSearchTerm = '';
+                fileLanguage = 'plaintext';
+                setReadOnlyState(true, 'H2 databases are read-only in the browser viewer.');
+                syncEditorModeAvailability();
+                await switchEditorMode('sqlite');
+                setUnsavedState(false);
+                updateEditorMeta('');
+                renderSQLiteTableList();
+                renderSQLiteGrid();
+                updateDisplayedFileName();
+                renderTreeView();
+
+                if (overlay) {
+                    setTimeout(() => {
+                        overlay.style.opacity = '0';
+                        setTimeout(() => overlay.remove(), 300);
+                    }, 100);
+                }
+            }
+
             async function loadSQLiteContent(contentBase64) {
                 const overlay = document.getElementById('loadingOverlay');
                 if (overlay) {
@@ -1571,6 +1996,13 @@
                 sqliteViewerWarning = '';
                 sqliteLoadError = '';
                 sqliteRawPreview = '';
+                h2Sections = [];
+                h2CurrentSection = '';
+                h2Metadata = [];
+                h2PrintableStrings = [];
+                h2TextPreview = '';
+                h2HexPreview = '';
+                h2IsTextLike = false;
 
                 try {
                     const journalResult = sqliteDb.exec('PRAGMA journal_mode;');
@@ -1898,8 +2330,10 @@
                 if (lengthChip) {
                     const text = lengthChip.querySelector('span');
                     if (text) {
-                        if (isSQLitePath(currentFilePath)) {
+                        if (activeEditorMode === 'sqlite' && isSQLitePath(currentFilePath)) {
                             text.textContent = `${sqliteTableNames.length.toLocaleString()} tables`;
+                        } else if (activeEditorMode === 'sqlite' && isH2Path(currentFilePath)) {
+                            text.textContent = `${h2Sections.length.toLocaleString()} panels`;
                         } else {
                             text.textContent = `${safeContent.length.toLocaleString()} chars`;
                         }
@@ -1946,8 +2380,8 @@
             }
 
             async function switchEditorMode(nextMode, providedContent = null) {
-                const sqliteMode = isSQLitePath(currentFilePath);
-                const allowedMode = sqliteMode
+                const databaseMode = isDatabasePath(currentFilePath);
+                const allowedMode = databaseMode
                     ? (['monaco', 'ace', 'plain', 'sqlite'].includes(nextMode) ? nextMode : 'sqlite')
                     : (['monaco', 'ace', 'plain'].includes(nextMode) ? nextMode : 'monaco');
                 const contentToPreserve = typeof providedContent === 'string' ? providedContent : getActiveEditorValue();
@@ -2029,12 +2463,12 @@
                 updateEditorMeta(getActiveEditorValue());
                 renderTreeView();
                 if (!ws || ws.readyState !== WebSocket.OPEN) return;
-                const requestedPath = isSQLitePath(currentFilePath) ? getSQLiteTargetPath(currentFilePath) : currentFilePath;
+                const requestedPath = isDatabasePath(currentFilePath) ? getDatabaseTargetPath(currentFilePath) : currentFilePath;
                 const payload = {
                     type: 'read_file',
                     filePath: requestedPath
                 };
-                if (isSQLitePath(currentFilePath) && activeEditorMode === 'sqlite') {
+                if (isDatabasePath(currentFilePath) && activeEditorMode === 'sqlite') {
                     payload.encoding = 'base64';
                 }
                 ws.send(JSON.stringify(payload));
@@ -2044,7 +2478,7 @@
                 currentFilePath = normalizeServerPath(nextPath);
                 fileLanguage = guessLanguage(currentFilePath.split('.').pop() || '');
                 setReadOnlyState(false, '');
-                if (isSQLitePath(currentFilePath) && !['monaco', 'ace', 'plain', 'sqlite'].includes(activeEditorMode)) {
+                if (isDatabasePath(currentFilePath) && !['monaco', 'ace', 'plain', 'sqlite'].includes(activeEditorMode)) {
                     activeEditorMode = 'sqlite';
                 }
                 syncEditorModeAvailability();
@@ -2067,20 +2501,21 @@
                         const data = JSON.parse(event.data);
 
                         if (data.type === 'file_content') {
-                            const expectedPath = isSQLitePath(currentFilePath) ? getSQLiteTargetPath(currentFilePath) : currentFilePath;
+                            const expectedPath = isDatabasePath(currentFilePath) ? getDatabaseTargetPath(currentFilePath) : currentFilePath;
                             if (normalizeServerPath(data.filePath) === normalizeServerPath(expectedPath)) {
                                 const ext = currentFilePath.split('.').pop() || '';
-                                if (isSQLitePath(currentFilePath) && activeEditorMode === 'sqlite') {
+                                if (isDatabasePath(currentFilePath) && activeEditorMode === 'sqlite') {
                                     const sqliteBase64 = String(data.contentBase64 || '').trim();
                                     if (!sqliteBase64) {
                                         if (window.showStatusModal) {
-                                            window.showStatusModal('Failed to load SQLite database: connector did not return binary content.', 'error');
+                                            window.showStatusModal('Failed to load database viewer: connector did not return binary content.', 'error');
                                         }
                                         return;
                                     }
-                                    loadSQLiteContent(sqliteBase64).catch((error) => {
-                                        console.error('SQLite load failed:', error);
-                                        sqliteLoadError = `SQLite viewer could not parse this file: ${error.message}`;
+                                    const loader = isH2Path(currentFilePath) ? loadH2Content : loadSQLiteContent;
+                                    loader(sqliteBase64).catch((error) => {
+                                        console.error('Database viewer load failed:', error);
+                                        sqliteLoadError = `Database viewer could not parse this file: ${error.message}`;
                                         sqliteRawPreview = decodeBase64ToText(sqliteBase64);
                                         sqliteTableNames = [];
                                         sqliteCurrentTable = '';
@@ -2088,7 +2523,14 @@
                                         sqliteTableRows = [];
                                         sqliteTableEditable = false;
                                         sqliteTableTotalRows = 0;
-                                        setReadOnlyState(true, 'This file could not be parsed as SQLite. Viewer is read-only.');
+                                        h2Sections = [];
+                                        h2CurrentSection = '';
+                                        h2Metadata = [];
+                                        h2PrintableStrings = [];
+                                        h2TextPreview = decodeBase64ToText(sqliteBase64).slice(0, 24000);
+                                        h2HexPreview = buildHexPreview(base64ToUint8Array(sqliteBase64));
+                                        h2IsTextLike = isLikelyTextBytes(base64ToUint8Array(sqliteBase64));
+                                        setReadOnlyState(true, 'This database file could not be parsed in viewer mode. Viewer is read-only.');
                                         renderSQLiteTableList();
                                         renderSQLiteGrid();
                                         const overlay = document.getElementById('loadingOverlay');
@@ -2099,17 +2541,21 @@
                                             }, 100);
                                         }
                                         if (window.showStatusModal) {
-                                            window.showStatusModal(`SQLite viewer fallback: ${error.message}. Showing read-only raw preview inside SQLite mode.`, 'error');
+                                            window.showStatusModal(`Database viewer fallback: ${error.message}. Showing read-only preview inside database mode.`, 'error');
                                         }
                                     });
                                 } else {
-                                    setReadOnlyState(false, '');
+                                    if (isH2Path(currentFilePath)) {
+                                        setReadOnlyState(true, 'H2 databases are read-only in panel editors.');
+                                    } else {
+                                        setReadOnlyState(false, '');
+                                    }
                                     currentContent = data.content || '';
                                     loadEditorContent(currentContent, ext);
                                 }
                             }
                         } else if (data.type === 'write_success') {
-                            const expectedPath = isSQLitePath(currentFilePath) ? getSQLiteTargetPath(currentFilePath) : currentFilePath;
+                            const expectedPath = isDatabasePath(currentFilePath) ? getDatabaseTargetPath(currentFilePath) : currentFilePath;
                             if (normalizeServerPath(data.filePath) === normalizeServerPath(expectedPath)) {
                                 if (isSQLitePath(currentFilePath)) {
                                     sqliteOriginalBase64 = exportCurrentSQLiteBase64();
@@ -2169,7 +2615,7 @@
                 if (isSQLitePath(currentFilePath)) {
                     ws.send(JSON.stringify({
                         type: 'write_file',
-                        filePath: getSQLiteTargetPath(currentFilePath),
+                        filePath: getDatabaseTargetPath(currentFilePath),
                         encoding: 'base64',
                         contentBase64: exportCurrentSQLiteBase64()
                     }));
@@ -2210,7 +2656,7 @@
                 activeEditorMode = 'monaco';
             }
 
-            if (isSQLitePath(currentFilePath) && !storedEditorMode) {
+            if (isDatabasePath(currentFilePath) && !storedEditorMode) {
                 activeEditorMode = 'sqlite';
             }
 
@@ -2234,6 +2680,9 @@
             if (editorModeSelect) {
                 editorModeSelect.addEventListener('change', async () => {
                     await switchEditorMode(editorModeSelect.value);
+                    if (isDatabasePath(currentFilePath)) {
+                        requestCurrentFileContent();
+                    }
                 });
             }
 
