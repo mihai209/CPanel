@@ -17964,12 +17964,29 @@ function registerServerPagesRoutes(ctx) {
 
             let resolvedVariables = {};
             let resolvedStartup = image.startup;
+            const persistedStartupTemplate = String(server.startup || '').trim();
+            const injectStartupVariableFallback = (variables) => {
+                const nextVariables = normalizeClientVariables(variables || {});
+                const fallbackStartup = persistedStartupTemplate || String(image.startup || '').trim();
+                if (!fallbackStartup) return nextVariables;
+                variableDefinitions.forEach((entry) => {
+                    const key = String(entry && entry.env_variable ? entry.env_variable : '').trim();
+                    const normalizedKey = key.toUpperCase();
+                    if (normalizedKey !== 'STARTUP' && normalizedKey !== 'STARTUPSCRIPT') return;
+                    const currentValue = Object.prototype.hasOwnProperty.call(nextVariables, key)
+                        ? String(nextVariables[key] || '').trim()
+                        : '';
+                    if (currentValue) return;
+                    nextVariables[key] = fallbackStartup;
+                });
+                return nextVariables;
+            };
             try {
                 const built = buildServerEnvironment(image, server.variables || {}, runtimeValues);
-                resolvedVariables = built.resolvedVariables;
+                resolvedVariables = injectStartupVariableFallback(built.resolvedVariables);
                 resolvedStartup = buildStartupCommand(server.startup || image.startup, built.env);
             } catch (error) {
-                resolvedVariables = normalizeClientVariables(server.variables || {});
+                resolvedVariables = injectStartupVariableFallback(server.variables || {});
             }
 
             const selectedDockerImage = server.dockerImage || image.dockerImage;
@@ -18036,11 +18053,25 @@ function registerServerPagesRoutes(ctx) {
 
             const startupTemplateRaw = typeof req.body.startupTemplate === 'string' ? req.body.startupTemplate.trim() : '';
             const startupTemplate = startupTemplateRaw ? startupTemplateRaw : null;
-            const effectiveStartupTemplate = startupTemplate || image.startup;
+            const effectiveStartupTemplate = startupTemplate || server.startup || image.startup;
 
             const requestedVariables = normalizeClientVariables(req.body.variables || {});
             const existingVariables = normalizeClientVariables(server.variables || {});
             let mergedVariables = { ...existingVariables, ...requestedVariables };
+            const startupFallbackValue = String(effectiveStartupTemplate || '').trim();
+            if (startupFallbackValue) {
+                variableDefinitions.forEach((entry) => {
+                    const key = String(entry && entry.env_variable ? entry.env_variable : '').trim();
+                    if (!key) return;
+                    const normalizedKey = key.toUpperCase();
+                    if (normalizedKey !== 'STARTUP' && normalizedKey !== 'STARTUPSCRIPT') return;
+                    const currentValue = Object.prototype.hasOwnProperty.call(mergedVariables, key)
+                        ? String(mergedVariables[key] || '').trim()
+                        : '';
+                    if (currentValue) return;
+                    mergedVariables[key] = startupFallbackValue;
+                });
+            }
 
             const requestedPresetId = String(req.body.startupPreset || '').trim();
             let selectedPresetId = '';
