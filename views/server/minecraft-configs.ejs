@@ -453,7 +453,7 @@
                                     <% macros.forEach((macro) => { %>
                                         <button class="btn btn-sm btn-outline-light mc-macro-btn"
                                             type="button"
-                                            data-command="<%= macro.command || '' %>"
+                                            data-macro-id="<%= macro.id %>"
                                             title="<%= macro.description || macro.command || '' %>">
                                             <%= macro.name || 'Macro' %>
                                         </button>
@@ -1175,11 +1175,21 @@
 
         document.querySelectorAll('.mc-macro-btn').forEach((button) => {
             button.addEventListener('click', () => {
-                const command = button.getAttribute('data-command') || '';
-                if (mcMiniCommandInput) {
-                    mcMiniCommandInput.value = command;
-                }
-                sendMiniCommand(command);
+                const macroId = Number.parseInt(button.getAttribute('data-macro-id') || '', 10);
+                if (!Number.isInteger(macroId) || macroId <= 0) return;
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/server/<%= server.containerId %>/macros/${encodeURIComponent(String(macroId))}/run`;
+                form.style.display = 'none';
+
+                const returnInput = document.createElement('input');
+                returnInput.type = 'hidden';
+                returnInput.name = 'returnTo';
+                returnInput.value = `${window.location.pathname}${window.location.search || ''}`;
+                form.appendChild(returnInput);
+
+                document.body.appendChild(form);
+                form.submit();
             });
         });
     </script>

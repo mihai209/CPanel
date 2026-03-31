@@ -220,6 +220,87 @@
                     </div>
 
                     <div class="settings-card">
+                        <div class="settings-card-header">Edit Lock</div>
+                        <div class="settings-card-body row g-3">
+                            <div class="col-12">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="editLockEnabled" name="editLockEnabled" value="1" <%= policyConfig && policyConfig.editLock && policyConfig.editLock.enabled ? 'checked' : '' %>>
+                                    <label class="form-check-label ms-1" for="editLockEnabled">Lock edits for everyone except admins</label>
+                                </div>
+                                <div class="hint">Blocks startup changes, file writes, uploads, rename/delete/archive, and other write operations for non-admin users.</div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="editLockBannerEnabled" name="editLockBannerEnabled" value="1" <%= policyConfig && policyConfig.editLock && policyConfig.editLock.bannerEnabled ? 'checked' : '' %>>
+                                    <label class="form-check-label ms-1" for="editLockBannerEnabled">Show warning banner to users</label>
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Banner Text</label>
+                                <input type="text" class="form-control" id="editLockBannerText" name="editLockBannerText" maxlength="240" value="<%= policyConfig && policyConfig.editLock ? policyConfig.editLock.bannerText : '' %>">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-card">
+                        <div class="settings-card-header">Read-only Files</div>
+                        <div class="settings-card-body row g-3">
+                            <div class="col-12">
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="readOnlyFilesEnabled" name="readOnlyFilesEnabled" value="1" <%= policyConfig && policyConfig.readOnlyFiles && policyConfig.readOnlyFiles.enabled ? 'checked' : '' %>>
+                                    <label class="form-check-label ms-1" for="readOnlyFilesEnabled">Enable optional read-only file paths</label>
+                                </div>
+                                <div class="hint">Use wildcard patterns like <code>/plugins/**</code>, <code>/server.properties</code>, or <code>/mods/*.jar</code>. Matching paths stay readable but cannot be modified by non-admin users. Non-admin SFTP access is also blocked while this policy is active, so it cannot bypass path protection.</div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Path Patterns</label>
+                                <textarea class="form-control" id="readOnlyFilePatterns" name="readOnlyFilePatterns" rows="6" placeholder="/plugins/**&#10;/world/**&#10;/server.properties"><%= policyConfig && policyConfig.readOnlyFiles && Array.isArray(policyConfig.readOnlyFiles.patterns) ? policyConfig.readOnlyFiles.patterns.join('\n') : '' %></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-card">
+                        <div class="settings-card-header">Visible User Banner</div>
+                        <div class="settings-card-body row g-3">
+                            <div class="col-md-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="userBannerEnabled" name="userBannerEnabled" value="1" <%= policyConfig && policyConfig.userBanner && policyConfig.userBanner.enabled ? 'checked' : '' %>>
+                                    <label class="form-check-label ms-1" for="userBannerEnabled">Show custom banner on server pages</label>
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label text-muted small text-uppercase fw-bold">Banner Text</label>
+                                <input type="text" class="form-control" id="userBannerText" name="userBannerText" maxlength="240" value="<%= policyConfig && policyConfig.userBanner ? policyConfig.userBanner.text : '' %>" placeholder="Example: Maintenance tonight at 22:00 UTC+2.">
+                                <div class="hint">This banner is visible across server pages through the server menu/sidebar.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <% if (canQueueRestart) { %>
+                    <div class="settings-card">
+                        <div class="settings-card-header">Queued Restart After Players = 0</div>
+                        <div class="settings-card-body d-flex flex-column gap-3">
+                            <div class="hint">
+                                Queue a safe restart for Minecraft servers. The panel watches live player count and sends restart automatically once the server is empty.
+                            </div>
+                            <% if (policyConfig && policyConfig.queuedRestart && policyConfig.queuedRestart.enabled) { %>
+                                <div class="alert alert-warning border-0 mb-0" style="background: rgba(245, 158, 11, 0.12); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3);">
+                                    A restart is currently queued for this server.
+                                </div>
+                            <% } %>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="submit" class="btn btn-warning px-4 fw-medium" formmethod="POST" formaction="/server/<%= server.containerId %>/policy/queued-restart" name="action" value="queue">
+                                    Queue Restart After Empty
+                                </button>
+                                <button type="submit" class="btn btn-outline-light px-4 fw-medium" formmethod="POST" formaction="/server/<%= server.containerId %>/policy/queued-restart" name="action" value="cancel">
+                                    Cancel Queue
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <% } %>
+
+                    <div class="settings-card">
                         <div class="settings-card-header">Crash Remediation</div>
                         <div class="settings-card-body">
                             <div class="form-check form-switch mb-2">

@@ -15,6 +15,10 @@
         .btn-icon{background:transparent;border:0;color:#8b8b9a;font-size:1.2rem}
         .form-control,.form-select{background:#0f0f12;border-color:#2d2d35;color:#e5e7eb}
         .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+        .macro-sequence{min-height:112px;white-space:pre-wrap}
+        .macro-hint{font-size:.8rem;color:#9ca3af}
+        .macro-summary{font-size:.8rem;color:#93c5fd}
+        .tutorial-code{background:#0b1220;border:1px solid #24304a;border-radius:.65rem;padding:.85rem;white-space:pre-wrap;font-size:.83rem}
     </style>
     <link rel="stylesheet" href="/css/mobile-layout.css">
 </head>
@@ -27,6 +31,11 @@
         <header class="top">
             <button class="btn-icon" id="sidebarToggle"><i class="bi bi-list"></i></button>
             <h1 class="h5 mb-0">Command Macros / <span class="text-secondary"><%= server.name %></span></h1>
+            <div class="ms-auto">
+                <button class="btn btn-outline-info btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#macroTutorialModal">
+                    <i class="bi bi-journal-text me-1"></i>Tutorial
+                </button>
+            </div>
         </header>
         <section class="scroll">
             <% if (success) { %><div class="alert alert-success py-2"><%= success %></div><% } %>
@@ -38,10 +47,7 @@
                     <div class="col-md-3">
                         <input class="form-control" name="name" maxlength="80" placeholder="Macro name" required>
                     </div>
-                    <div class="col-md-5">
-                        <input class="form-control mono" name="command" maxlength="1024" placeholder="say Hello world" required>
-                    </div>
-                    <div class="col-md-2">
+                    <div class="col-md-3">
                         <input class="form-control" name="description" maxlength="160" placeholder="Optional description">
                     </div>
                     <div class="col-md-2">
@@ -55,6 +61,32 @@
                                 <option value="subuser">Subusers only</option>
                             <% } %>
                         </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select class="form-select" name="runCondition">
+                            <option value="always">Always run</option>
+                            <option value="online">Run only if server online</option>
+                            <option value="offline">Run only if server offline</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input class="form-control" type="number" min="0" max="300000" name="defaultDelayMs" placeholder="Delay ms">
+                    </div>
+                    <div class="col-md-4">
+                        <input class="form-control mono" name="rollbackCommand" maxlength="1024" placeholder="Rollback command if dispatch fails">
+                    </div>
+                    <div class="col-md-8">
+                        <textarea class="form-control mono macro-sequence" name="sequence" placeholder="say Preparing update&#10;@delay 1500&#10;whitelist on&#10;@delay 1000&#10;stop" required></textarea>
+                    </div>
+                    <input type="hidden" name="command" value="">
+                    <div class="col-md-12 macro-hint">
+                        One step per line. Use <code>@delay 1500</code> for explicit wait steps. Default delay applies only between consecutive command steps.
+                    </div>
+                    <div class="col-md-12 macro-hint">
+                        Conditions are evaluated before the flow starts. Rollback runs only if command dispatch/ack fails, not if the game/plugin command itself reports an in-server error.
+                    </div>
+                    <div class="col-md-12 macro-hint">
+                        Per-step syntax: <code>@onsuccess ...</code>, <code>@onfail ...</code>, <code>@if server_empty ...</code>, <code>@if previous_succeeded ...</code>, <code>@if previous_failed ...</code>, <code>@stop_if_offline</code>.
                     </div>
                     <div class="col-12 d-flex justify-content-end">
                         <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-circle me-1"></i>Create Macro</button>
@@ -70,17 +102,17 @@
                     <div class="d-grid gap-2">
                         <% macros.forEach((macro) => { %>
                             <div class="border rounded p-2" style="border-color:#2d2d35 !important;background:#0f0f12;">
+                                <div class="macro-summary mb-2">
+                                    <i class="bi bi-diagram-3 me-1"></i><%= macro.stepCount || 0 %> step(s) • <%= macro.flowSummary || 'simple command flow' %>
+                                </div>
                                 <form method="POST" action="/server/<%= server.containerId %>/macros/<%= macro.id %>/update" class="row g-2 align-items-center">
                                     <div class="col-md-2">
                                         <input class="form-control form-control-sm" name="name" maxlength="80" value="<%= macro.name || '' %>" required>
                                     </div>
                                     <div class="col-md-3">
-                                        <input class="form-control form-control-sm mono" name="command" maxlength="1024" value="<%= macro.command || '' %>" required>
+                                        <input class="form-control form-control-sm" name="description" maxlength="160" value="<%= macro.description || '' %>" placeholder="Description">
                                     </div>
                                     <div class="col-md-3">
-                                        <input class="form-control form-control-sm" name="description" maxlength="160" value="<%= macro.description || '' %>">
-                                    </div>
-                                    <div class="col-md-2">
                                         <select class="form-select form-select-sm" name="visibility">
                                             <option value="all" <%= macro.visibility === 'all' ? 'selected' : '' %>>All with macros</option>
                                             <% if (canManageVisibility) { %>
@@ -92,12 +124,29 @@
                                             <% } %>
                                         </select>
                                     </div>
+                                    <div class="col-md-2">
+                                        <select class="form-select form-select-sm" name="runCondition">
+                                            <option value="always" <%= macro.runCondition === 'always' ? 'selected' : '' %>>Always run</option>
+                                            <option value="online" <%= macro.runCondition === 'online' ? 'selected' : '' %>>Only if online</option>
+                                            <option value="offline" <%= macro.runCondition === 'offline' ? 'selected' : '' %>>Only if offline</option>
+                                        </select>
+                                    </div>
                                     <div class="col-md-1">
                                         <input class="form-control form-control-sm" type="number" min="0" name="position" value="<%= Number.parseInt(macro.position, 10) || 0 %>" title="Order">
                                     </div>
                                     <div class="col-md-1 d-flex justify-content-end">
                                         <button class="btn btn-outline-info btn-sm" type="submit" title="Save"><i class="bi bi-save"></i></button>
                                     </div>
+                                    <div class="col-md-2">
+                                        <input class="form-control form-control-sm" type="number" min="0" max="300000" name="defaultDelayMs" value="<%= Number.parseInt(macro.defaultDelayMs, 10) || 0 %>" placeholder="Delay ms">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <input class="form-control form-control-sm mono" name="rollbackCommand" maxlength="1024" value="<%= macro.rollbackCommand || '' %>" placeholder="Rollback command if dispatch fails">
+                                    </div>
+                                    <div class="col-md-12">
+                                        <textarea class="form-control form-control-sm mono macro-sequence" name="sequence" placeholder="One step per line. Use @delay 1500 for waits." required><%= macro.sequenceText || macro.command || '' %></textarea>
+                                    </div>
+                                    <input type="hidden" name="command" value="<%= macro.command || '' %>">
                                 </form>
                                 <div class="d-flex gap-1 justify-content-end mt-2">
                                     <% if (canRunCommands) { %>
@@ -119,6 +168,55 @@
             </div>
         </section>
     </main>
+</div>
+<div class="modal fade" id="macroTutorialModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content bg-dark text-light border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Macro Flow Tutorial</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-secondary mb-3">Use one step per line. The engine executes steps in order and waits for connector command acknowledgements before moving forward.</p>
+
+                <h6>Supported syntax</h6>
+                <ul class="text-secondary">
+                    <li><code>say Hello</code>: normal command step</li>
+                    <li><code>@delay 1500</code>: wait 1500 ms</li>
+                    <li><code>@onsuccess say previous worked</code>: run only if the previous command step succeeded</li>
+                    <li><code>@onfail say previous failed</code>: run only if the previous command step failed</li>
+                    <li><code>@if server_empty stop</code>: run only when Minecraft status reports 0 online players</li>
+                    <li><code>@if previous_succeeded save-all</code>: explicit success condition</li>
+                    <li><code>@if previous_failed say rollback branch</code>: explicit failure condition</li>
+                    <li><code>@if server_online say runtime ready</code>: run only if server status is online</li>
+                    <li><code>@if server_offline say still offline</code>: run only if server status is offline</li>
+                    <li><code>@stop_if_offline</code>: stop the remaining flow immediately if the server goes offline</li>
+                </ul>
+
+                <h6 class="mt-4">Example: maintenance flow</h6>
+                <div class="tutorial-code mono">say Maintenance starts in 10 seconds
+@delay 10000
+@if server_empty whitelist on
+@onsuccess stop
+@onfail say Could not stop cleanly</div>
+
+                <h6 class="mt-4">Example: guarded restart</h6>
+                <div class="tutorial-code mono">@if server_online say Saving world
+save-all
+@onsuccess restart
+@stop_if_offline
+@if previous_failed say Restart dispatch failed</div>
+
+                <h6 class="mt-4">Behavior notes</h6>
+                <ul class="text-secondary mb-0">
+                    <li>Flow-level conditions still run before the first step.</li>
+                    <li>Rollback command is global and runs when a command dispatch fails.</li>
+                    <li>If a command fails and the flow contains later <code>@onfail</code> or <code>@if previous_failed</code> steps, only that failure branch continues.</li>
+                    <li><code>server_empty</code> relies on the Minecraft status endpoint, so it is meaningful only for Minecraft servers with a valid address.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
 </div>
 <script>document.getElementById('sidebarToggle')?.addEventListener('click',()=>document.getElementById('sidebar')?.classList.toggle('collapsed'));</script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>

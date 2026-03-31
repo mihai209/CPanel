@@ -52,6 +52,9 @@ function registerWebSocketRuntime(deps) {
         Image,
         Connector,
         Settings,
+        getServerPolicyEngineConfig,
+        isServerPolicyEditLocked,
+        isServerPolicyPathReadOnly,
         buildServerEnvironment,
         buildStartupCommand,
         resolveImagePorts,
@@ -125,6 +128,15 @@ const RESOURCE_TIMELINE_LAST_WRITE_TS = new Map(); // serverId -> timestamp
 const RESOURCE_TIMELINE_WRITE_INTERVAL_MS = 10 * 1000;
 const RESOURCE_TIMELINE_RETENTION_MS = 12 * 60 * 60 * 1000;
 let resourceTimelineLastCleanupTs = 0;
+
+const buildPolicyTargetPath = (directory, name = '') => {
+    const dirRaw = String(directory || '/').trim().replace(/\\/g, '/');
+    const normalizedDir = require('path').posix.normalize(dirRaw.startsWith('/') ? dirRaw : `/${dirRaw}`);
+    const cleanName = String(name || '').trim().replace(/\\/g, '/').replace(/^\/+/, '');
+    return cleanName
+        ? require('path').posix.normalize(require('path').posix.join(normalizedDir, cleanName))
+        : normalizedDir;
+};
 
 const parseCrashBool = (value, fallback = false) => {
     if (value === undefined || value === null || value === '') return fallback;
@@ -1472,6 +1484,23 @@ wss.on('connection', (ws, request) => {
                         ws.send(JSON.stringify({ type: 'error', message: 'Server or connector not found.' }));
                         return;
                     }
+                    const policyConfig = typeof getServerPolicyEngineConfig === 'function'
+                        ? await getServerPolicyEngineConfig(serverObj.id).catch(() => null)
+                        : null;
+                    const editsLocked = typeof isServerPolicyEditLocked === 'function'
+                        ? isServerPolicyEditLocked(policyConfig, consolePerms.has('*'))
+                        : false;
+                    const isReadOnlyPath = (targetPath) => {
+                        if (!targetPath) return false;
+                        if (typeof isServerPolicyPathReadOnly !== 'function') return false;
+                        return isServerPolicyPathReadOnly(policyConfig, targetPath, consolePerms.has('*'));
+                    };
+                    const blockLockedEdit = () => {
+                        ws.send(JSON.stringify({ type: 'error', message: 'Edits are locked for this server. Only admins can modify files right now.' }));
+                    };
+                    const blockReadOnlyPath = () => {
+                        ws.send(JSON.stringify({ type: 'error', message: 'This path is read-only by server policy.' }));
+                    };
                     const supportsMinecraftEula = await canHandleMinecraftEula(serverObj);
 
                     if (serverObj.isSuspended && (data.type === 'power_action' || data.type === 'console_input')) {
@@ -1628,6 +1657,14 @@ wss.on('connection', (ws, request) => {
                             ws.send(JSON.stringify({ type: 'error', message: 'Missing permission: server.files' }));
                             return;
                         }
+                        if (editsLocked) {
+                            blockLockedEdit();
+                            return;
+                        }
+                        if (isReadOnlyPath(buildPolicyTargetPath(data.directory, data.name))) {
+                            blockReadOnlyPath();
+                            return;
+                        }
                         connectorWs.send(JSON.stringify({
                             type: 'create_folder',
                             serverId: serverId,
@@ -1639,6 +1676,14 @@ wss.on('connection', (ws, request) => {
                             ws.send(JSON.stringify({ type: 'error', message: 'Missing permission: server.files' }));
                             return;
                         }
+                        if (editsLocked) {
+                            blockLockedEdit();
+                            return;
+                        }
+                        if (isReadOnlyPath(buildPolicyTargetPath(data.directory, data.name))) {
+                            blockReadOnlyPath();
+                            return;
+                        }
                         connectorWs.send(JSON.stringify({
                             type: 'create_file',
                             serverId: serverId,
@@ -1648,6 +1693,14 @@ wss.on('connection', (ws, request) => {
                     } else if (data.type === 'rename_file') {
                         if (!hasConsolePermission('server.files')) {
                             ws.send(JSON.stringify({ type: 'error', message: 'Missing permission: server.files' }));
+                            return;
+                        }
+                        if (editsLocked) {
+                            blockLockedEdit();
+                            return;
+                        }
+                        if (isReadOnlyPath(buildPolicyTargetPath(data.directory, data.name)) || isReadOnlyPath(buildPolicyTargetPath(data.directory, data.newName))) {
+                            blockReadOnlyPath();
                             return;
                         }
                         connectorWs.send(JSON.stringify({
@@ -1662,6 +1715,14 @@ wss.on('connection', (ws, request) => {
                             ws.send(JSON.stringify({ type: 'error', message: 'Missing permission: server.files' }));
                             return;
                         }
+                        if (editsLocked) {
+                            blockLockedEdit();
+                            return;
+                        }
+                        if (Array.isArray(data.files) && data.files.some((entry) => isReadOnlyPath(buildPolicyTargetPath(data.directory, entry)))) {
+                            blockReadOnlyPath();
+                            return;
+                        }
                         connectorWs.send(JSON.stringify({
                             type: 'delete_files',
                             serverId: serverId,
@@ -1671,6 +1732,14 @@ wss.on('connection', (ws, request) => {
                     } else if (data.type === 'set_permissions') {
                         if (!hasConsolePermission('server.files')) {
                             ws.send(JSON.stringify({ type: 'error', message: 'Missing permission: server.files' }));
+                            return;
+                        }
+                        if (editsLocked) {
+                            blockLockedEdit();
+                            return;
+                        }
+                        if (isReadOnlyPath(buildPolicyTargetPath(data.directory, data.name))) {
+                            blockReadOnlyPath();
                             return;
                         }
                         connectorWs.send(JSON.stringify({
@@ -1685,6 +1754,14 @@ wss.on('connection', (ws, request) => {
                             ws.send(JSON.stringify({ type: 'error', message: 'Missing permission: server.files' }));
                             return;
                         }
+                        if (editsLocked) {
+                            blockLockedEdit();
+                            return;
+                        }
+                        if (isReadOnlyPath(buildPolicyTargetPath(data.directory, data.name)) || isReadOnlyPath(data.targetDirectory || data.directory)) {
+                            blockReadOnlyPath();
+                            return;
+                        }
                         connectorWs.send(JSON.stringify({
                             type: 'extract_archive',
                             serverId: serverId,
@@ -1695,6 +1772,14 @@ wss.on('connection', (ws, request) => {
                     } else if (data.type === 'create_archive') {
                         if (!hasConsolePermission('server.files')) {
                             ws.send(JSON.stringify({ type: 'error', message: 'Missing permission: server.files' }));
+                            return;
+                        }
+                        if (editsLocked) {
+                            blockLockedEdit();
+                            return;
+                        }
+                        if (isReadOnlyPath(buildPolicyTargetPath(data.directory, data.archiveName))) {
+                            blockReadOnlyPath();
                             return;
                         }
                         connectorWs.send(JSON.stringify({
@@ -1718,6 +1803,14 @@ wss.on('connection', (ws, request) => {
                     } else if (data.type === 'write_file') {
                         if (!hasConsolePermission('server.files')) {
                             ws.send(JSON.stringify({ type: 'error', message: 'Missing permission: server.files' }));
+                            return;
+                        }
+                        if (editsLocked) {
+                            blockLockedEdit();
+                            return;
+                        }
+                        if (isReadOnlyPath(data.filePath)) {
+                            blockReadOnlyPath();
                             return;
                         }
                         connectorWs.send(JSON.stringify({

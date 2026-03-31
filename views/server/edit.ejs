@@ -929,6 +929,8 @@
             // WebSocket & Editor Init
             const serverId = '<%= server.containerId %>';
             const wsToken = '<%= wsToken %>';
+            const editWriteLocked = <%= editWriteLocked ? 'true' : 'false' %>;
+            const policyReadOnlyPatterns = <%- JSON.stringify(Array.isArray(policyReadOnlyPatterns) ? policyReadOnlyPatterns : []) %>;
             const wsUrl = window.location.protocol.replace('http', 'ws') + '//' + window.location.host + '/ws/server/' + serverId + '?token=' + encodeURIComponent(wsToken);
 
             let ws;
@@ -1000,6 +1002,49 @@
                 return normalized || '/';
             }
 
+            function escapePolicyPatternRegExp(value) {
+                return String(value || '').replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+            }
+
+            function compilePolicyPattern(pattern) {
+                const normalized = String(pattern || '').trim().replace(/\\/g, '/');
+                if (!normalized) return null;
+                let regexSource = '';
+                for (let index = 0; index < normalized.length; index += 1) {
+                    const current = normalized[index];
+                    const next = normalized[index + 1];
+                    if (current === '*' && next === '*') {
+                        regexSource += '.*';
+                        index += 1;
+                        continue;
+                    }
+                    if (current === '*') {
+                        regexSource += '[^/]*';
+                        continue;
+                    }
+                    regexSource += escapePolicyPatternRegExp(current);
+                }
+                try {
+                    return new RegExp(`^${regexSource}$`, 'i');
+                } catch {
+                    return null;
+                }
+            }
+
+            function getPolicyReadOnlyReason(targetPath) {
+                const normalizedPath = normalizeServerPath(targetPath || currentFilePath || '/');
+                if (editWriteLocked) {
+                    return 'Edits are locked for this server. Only admins can modify files right now.';
+                }
+                for (const pattern of policyReadOnlyPatterns) {
+                    const matcher = compilePolicyPattern(pattern);
+                    if (matcher && matcher.test(normalizedPath)) {
+                        return 'This file is read-only by server policy.';
+                    }
+                }
+                return '';
+            }
+
             function joinServerPath(parentPath, entryName) {
                 const base = normalizeServerPath(parentPath);
                 return base === '/' ? `/${entryName}` : `${base}/${entryName}`;
@@ -1040,6 +1085,13 @@
                 }
 
                 const directory = currentTreeDirectoryPath();
+                const policyReason = getPolicyReadOnlyReason(joinServerPath(directory, validation.value));
+                if (policyReason) {
+                    if (window.showStatusModal) {
+                        window.showStatusModal(policyReason, 'error');
+                    }
+                    return;
+                }
                 pendingTreeFocusPath = joinServerPath(directory, validation.value);
                 ws.send(JSON.stringify({
                     type,
@@ -2094,7 +2146,12 @@
                     warningParts.push('Read-only mode is enforced for <code>.db</code> files in SQLite viewer to avoid damaging unknown database formats.');
                     setReadOnlyState(true, '.db files are read-only in SQLite viewer.');
                 } else {
-                    setReadOnlyState(false, '');
+                    const policyReason = getPolicyReadOnlyReason(currentFilePath);
+                    if (policyReason) {
+                        setReadOnlyState(true, policyReason);
+                    } else {
+                        setReadOnlyState(false, '');
+                    }
                 }
                 if (sqliteInfo.isSidecar) {
                     warningParts.push(`You opened a <strong>${sqliteInfo.sidecarType.toUpperCase()}</strong> companion file. The viewer reads the main database <code>${escapeHtml(sqliteInfo.basePath)}</code>, so unsynced sidecar-only changes may be missing. Switch to <strong>Monaco</strong> or <strong>Plain Text</strong> if you need raw inspection.`);
@@ -2554,7 +2611,12 @@
             async function applyCurrentFilePath(nextPath) {
                 currentFilePath = normalizeServerPath(nextPath);
                 fileLanguage = guessLanguage(currentFilePath.split('.').pop() || '');
-                setReadOnlyState(false, '');
+                const policyReason = getPolicyReadOnlyReason(currentFilePath);
+                if (policyReason) {
+                    setReadOnlyState(true, policyReason);
+                } else {
+                    setReadOnlyState(false, '');
+                }
                 if (isDatabasePath(currentFilePath) && !['monaco', 'ace', 'plain', 'sqlite'].includes(activeEditorMode)) {
                     activeEditorMode = 'sqlite';
                 }
@@ -2622,8 +2684,11 @@
                                         }
                                     });
                                 } else {
+                                    const policyReason = getPolicyReadOnlyReason(currentFilePath);
                                     if (isH2Path(currentFilePath)) {
                                         setReadOnlyState(true, 'H2 databases are read-only in panel editors.');
+                                    } else if (policyReason) {
+                                        setReadOnlyState(true, policyReason);
                                     } else {
                                         setReadOnlyState(false, '');
                                     }

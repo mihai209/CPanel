@@ -101,6 +101,156 @@ function registerServerPagesRoutes(ctx) {
         return entries.filter((entry) => !isProtectedServerRuntimePath(entry && entry.name ? entry.name : ''));
     }
 
+    function buildServerPolicyTargetPath(directory, name = '') {
+        const dirRaw = String(directory || '/').trim().replace(/\\/g, '/');
+        const cleanDir = nodePath.posix.normalize(dirRaw.startsWith('/') ? dirRaw : `/${dirRaw}`);
+        const cleanName = String(name || '').trim().replace(/\\/g, '/').replace(/^\/+/, '');
+        return cleanName
+            ? nodePath.posix.normalize(nodePath.posix.join(cleanDir, cleanName))
+            : cleanDir;
+    }
+
+    function getServerPolicyConfigSafe(serverId) {
+        if (typeof getServerPolicyEngineConfig !== 'function' || !serverId) {
+            return Promise.resolve(typeof defaultServerPolicyEngineConfig === 'function' ? defaultServerPolicyEngineConfig() : {});
+        }
+        return getServerPolicyEngineConfig(serverId).catch(() => (
+            typeof defaultServerPolicyEngineConfig === 'function' ? defaultServerPolicyEngineConfig() : {}
+        ));
+    }
+
+    function isServerEditLockedForAccess(policyConfig, access) {
+        if (typeof isServerPolicyEditLocked === 'function') {
+            return isServerPolicyEditLocked(policyConfig, Boolean(access && access.isAdmin));
+        }
+        return false;
+    }
+
+    function isPolicyReadOnlyPathForAccess(policyConfig, targetPath, access) {
+        if (typeof isServerPolicyPathReadOnly === 'function') {
+            return isServerPolicyPathReadOnly(policyConfig, targetPath, Boolean(access && access.isAdmin));
+        }
+        return false;
+    }
+
+    async function getApiServerPolicyDenial(server, access, targetPath = '') {
+        const policyConfig = await getServerPolicyConfigSafe(server && server.id);
+        if (isServerEditLockedForAccess(policyConfig, access)) {
+            return {
+                denied: true,
+                status: 423,
+                error: 'Edits are locked for this server. Only admins can modify files right now.',
+                policyConfig
+            };
+        }
+        if (targetPath && isPolicyReadOnlyPathForAccess(policyConfig, targetPath, access)) {
+            return {
+                denied: true,
+                status: 423,
+                error: 'This path is read-only by server policy.',
+                policyConfig
+            };
+        }
+        return { denied: false, status: 200, error: '', policyConfig };
+    }
+
+    async function setServerQueuedRestartState(serverId, enabled, requestedByUserId = null) {
+        const currentPolicyConfig = await getServerPolicyConfigSafe(serverId);
+        return setServerPolicyEngineConfig(serverId, {
+            ...currentPolicyConfig,
+            queuedRestart: {
+                enabled: Boolean(enabled),
+                requestedAt: enabled ? new Date().toISOString() : null,
+                requestedByUserId: enabled ? (Number.parseInt(requestedByUserId, 10) || null) : null
+            }
+        });
+    }
+
+    async function dispatchQueuedRestartForServer(server) {
+        if (!server || !server.allocation || !server.allocation.connectorId) {
+            throw new Error('Server allocation is missing.');
+        }
+        const connectorWs = connectorConnections.get(server.allocation.connectorId);
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            throw new Error('Connector is offline.');
+        }
+        rememberServerPowerIntent(server.id, 'restart');
+        connectorWs.send(JSON.stringify({
+            type: 'server_power',
+            serverId: server.id,
+            action: 'restart',
+            stopCommand: server.image && server.image.eggConfig ? server.image.eggConfig.stop : null,
+            requestId: `queued_restart_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`
+        }));
+        return true;
+    }
+
+    async function runQueuedRestartSweep() {
+        if (!Settings || typeof Settings.findAll !== 'function') return;
+        const policyRows = await Settings.findAll({
+            where: {
+                key: {
+                    [Op.like]: `${SERVER_POLICY_ENGINE_KEY_PREFIX}%`
+                }
+            },
+            attributes: ['key', 'value']
+        });
+        for (const row of policyRows) {
+            try {
+                const key = String(row && row.key || '');
+                const serverId = Number.parseInt(key.slice(String(SERVER_POLICY_ENGINE_KEY_PREFIX).length), 10);
+                if (!serverId) continue;
+                const policyConfig = normalizeServerPolicyEngineConfig(row && row.value);
+                if (!policyConfig || !policyConfig.queuedRestart || !policyConfig.queuedRestart.enabled) continue;
+
+                const server = await Server.findByPk(serverId, {
+                    include: [
+                        { model: Allocation, as: 'allocation', include: [{ model: Connector, as: 'connector' }] },
+                        { model: Image, as: 'image' }
+                    ]
+                });
+                if (!server || server.isSuspended) {
+                    await setServerQueuedRestartState(serverId, false, null);
+                    continue;
+                }
+                if (String(server.status || '').trim().toLowerCase() !== 'running') {
+                    await setServerQueuedRestartState(serverId, false, null);
+                    continue;
+                }
+                if (!isServerLikelyMinecraft(server)) continue;
+
+                const statusAddress = resolveMinecraftStatusAddress(server);
+                if (!statusAddress) continue;
+                const preview = await fetchMinecraftServerStatusPreview({
+                    address: statusAddress,
+                    bedrockMode: inferMinecraftBedrockMode(server),
+                    settingsMap: {}
+                }).catch(() => null);
+                const playersOnline = Number.parseInt(preview && preview.playersOnline, 10) || 0;
+                if (playersOnline > 0) continue;
+
+                await dispatchQueuedRestartForServer(server);
+                await setServerQueuedRestartState(serverId, false, null);
+            } catch (error) {
+                console.error('Queued restart sweep failed for one server:', error);
+            }
+        }
+    }
+
+    if (!global.__cpanelQueuedRestartSweepStarted) {
+        global.__cpanelQueuedRestartSweepStarted = true;
+        setInterval(() => {
+            runQueuedRestartSweep().catch((error) => {
+                console.error('Queued restart sweep failed:', error);
+            });
+        }, 60 * 1000);
+        setTimeout(() => {
+            runQueuedRestartSweep().catch((error) => {
+                console.error('Initial queued restart sweep failed:', error);
+            });
+        }, 15000);
+    }
+
     // Login Page (GET)
     app.get('/ratelimited', (req, res) => {
         res.render('ratelimited');
@@ -1107,6 +1257,7 @@ function registerServerPagesRoutes(ctx) {
     const SERVER_PERFORMANCE_REPORT_KEY_PREFIX = 'server_performance_report_';
     const USER_MOTD_PRESETS_KEY_PREFIX = 'user_motd_presets_';
     const MACRO_VISIBILITY_VALUES = new Set(['all', 'owner', 'admin', 'subuser']);
+    const MACRO_RUN_CONDITION_VALUES = new Set(['always', 'online', 'offline']);
 
     function getServerPerformanceReportSettingKey(serverId) {
         return `${SERVER_PERFORMANCE_REPORT_KEY_PREFIX}${serverId}`;
@@ -1179,6 +1330,337 @@ function registerServerPagesRoutes(ctx) {
         const visibility = normalizeMacroVisibility(macro && macro.visibility);
         if (access && (access.isAdmin || access.isOwner)) return true;
         return visibility === 'all' || visibility === 'subuser';
+    }
+
+    const MACRO_STEP_CONDITION_VALUES = new Set([
+        'always',
+        'previous_succeeded',
+        'previous_failed',
+        'server_empty',
+        'server_online',
+        'server_offline'
+    ]);
+
+    function resolveSafeReturnTo(value, fallback = '/') {
+        const raw = String(value || '').trim();
+        if (!raw) return fallback;
+        if (!raw.startsWith('/') || raw.startsWith('//')) return fallback;
+        return raw;
+    }
+
+    function normalizeMacroStepCondition(value) {
+        const normalized = String(value || '').trim().toLowerCase().replace(/-/g, '_');
+        const aliases = {
+            previous_success: 'previous_succeeded',
+            previous_ok: 'previous_succeeded',
+            previous_succeeded: 'previous_succeeded',
+            previous_fail: 'previous_failed',
+            previous_failed: 'previous_failed',
+            previous_error: 'previous_failed',
+            server_empty: 'server_empty',
+            empty: 'server_empty',
+            server_online: 'server_online',
+            online: 'server_online',
+            server_offline: 'server_offline',
+            offline: 'server_offline',
+            always: 'always'
+        };
+        const resolved = aliases[normalized] || normalized;
+        if (MACRO_STEP_CONDITION_VALUES.has(resolved)) return resolved;
+        return 'always';
+    }
+
+    function normalizeMacroRunCondition(value) {
+        const normalized = String(value || '').trim().toLowerCase();
+        if (MACRO_RUN_CONDITION_VALUES.has(normalized)) return normalized;
+        return 'always';
+    }
+
+    function normalizeMacroDelayMs(value, fallback = 0) {
+        const parsed = Number.parseInt(value, 10);
+        if (!Number.isInteger(parsed)) return fallback;
+        return Math.max(0, Math.min(300000, parsed));
+    }
+
+    function parseMacroSequenceText(rawValue) {
+        const text = String(rawValue || '').replace(/\r\n/g, '\n');
+        const lines = text.split('\n');
+        const steps = [];
+        const commands = [];
+
+        for (const rawLine of lines) {
+            const line = String(rawLine || '').trim();
+            if (!line || line.startsWith('#')) continue;
+
+            const delayMatch = line.match(/^(?:@delay|delay)\s+(\d{1,6})$/i);
+            if (delayMatch) {
+                const delayMs = normalizeMacroDelayMs(delayMatch[1], 0);
+                if (delayMs > 0) {
+                    steps.push({ type: 'delay', delayMs });
+                }
+                continue;
+            }
+
+            if (/^(?:@stop_if_offline|stop_if_offline)$/i.test(line)) {
+                steps.push({ type: 'guard', guard: 'stop_if_offline' });
+                if (steps.length >= 50) break;
+                continue;
+            }
+
+            const onSuccessMatch = line.match(/^(?:@onsuccess|onsuccess)\s+(.+)$/i);
+            if (onSuccessMatch) {
+                const command = String(onSuccessMatch[1] || '').trim().slice(0, 1024);
+                if (command) {
+                    steps.push({ type: 'command', command, when: 'previous_succeeded' });
+                    commands.push(command);
+                }
+                if (steps.length >= 50) break;
+                continue;
+            }
+
+            const onFailMatch = line.match(/^(?:@onfail|onfail)\s+(.+)$/i);
+            if (onFailMatch) {
+                const command = String(onFailMatch[1] || '').trim().slice(0, 1024);
+                if (command) {
+                    steps.push({ type: 'command', command, when: 'previous_failed' });
+                    commands.push(command);
+                }
+                if (steps.length >= 50) break;
+                continue;
+            }
+
+            const conditionalCommandMatch = line.match(/^(?:@if|if)\s+([a-zA-Z0-9_-]+)\s+(.+)$/i);
+            if (conditionalCommandMatch) {
+                const when = normalizeMacroStepCondition(conditionalCommandMatch[1]);
+                const command = String(conditionalCommandMatch[2] || '').trim().slice(0, 1024);
+                if (command) {
+                    steps.push({ type: 'command', command, when });
+                    commands.push(command);
+                }
+                if (steps.length >= 50) break;
+                continue;
+            }
+
+            const command = line.slice(0, 1024);
+            if (!command) continue;
+            steps.push({ type: 'command', command, when: 'always' });
+            commands.push(command);
+            if (steps.length >= 50) break;
+        }
+
+        return {
+            steps,
+            commands,
+            primaryCommand: commands[0] || ''
+        };
+    }
+
+    function normalizeMacroFlowConfig(rawConfig, fallbackCommand = '') {
+        let parsed = rawConfig;
+        if (typeof parsed === 'string') {
+            try {
+                parsed = JSON.parse(parsed);
+            } catch {
+                parsed = null;
+            }
+        }
+
+        const config = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+        const defaultDelayMs = normalizeMacroDelayMs(config.defaultDelayMs, 0);
+        const runCondition = normalizeMacroRunCondition(config.runCondition || config.condition);
+        const rollbackCommandRaw = String(config.rollbackCommand || '').trim();
+        const rollbackCommand = rollbackCommandRaw ? rollbackCommandRaw.slice(0, 1024) : null;
+
+        const steps = [];
+        const sourceSteps = Array.isArray(config.steps) ? config.steps : [];
+        sourceSteps.forEach((entry) => {
+            if (!entry || typeof entry !== 'object') return;
+            const type = String(entry.type || '').trim().toLowerCase();
+            if (type === 'delay') {
+                const delayMs = normalizeMacroDelayMs(entry.delayMs, 0);
+                if (delayMs > 0) {
+                    steps.push({ type: 'delay', delayMs });
+                }
+                return;
+            }
+            if (type === 'guard') {
+                const guard = String(entry.guard || '').trim().toLowerCase();
+                if (guard === 'stop_if_offline') {
+                    steps.push({ type: 'guard', guard: 'stop_if_offline' });
+                }
+                return;
+            }
+            if (type === 'command') {
+                const command = String(entry.command || '').trim().slice(0, 1024);
+                if (command) {
+                    steps.push({
+                        type: 'command',
+                        command,
+                        when: normalizeMacroStepCondition(entry.when || entry.condition)
+                    });
+                }
+            }
+        });
+
+        if (steps.length === 0) {
+            const fallback = String(fallbackCommand || '').trim().slice(0, 1024);
+            if (fallback) {
+                steps.push({ type: 'command', command: fallback, when: 'always' });
+            }
+        }
+
+        const commands = steps.filter((entry) => entry.type === 'command').map((entry) => entry.command);
+        return {
+            version: 2,
+            runCondition,
+            defaultDelayMs,
+            rollbackCommand,
+            steps,
+            commands,
+            primaryCommand: commands[0] || String(fallbackCommand || '').trim().slice(0, 1024) || ''
+        };
+    }
+
+    function macroFlowToSequenceText(flowConfig) {
+        const flow = normalizeMacroFlowConfig(flowConfig);
+        return flow.steps.map((entry) => {
+            if (entry.type === 'delay') {
+                return `@delay ${entry.delayMs}`;
+            }
+            if (entry.type === 'guard' && entry.guard === 'stop_if_offline') {
+                return '@stop_if_offline';
+            }
+            if (entry.type === 'command' && entry.when === 'previous_succeeded') {
+                return `@onsuccess ${String(entry.command || '')}`;
+            }
+            if (entry.type === 'command' && entry.when === 'previous_failed') {
+                return `@onfail ${String(entry.command || '')}`;
+            }
+            if (entry.type === 'command' && entry.when && entry.when !== 'always') {
+                return `@if ${entry.when} ${String(entry.command || '')}`;
+            }
+            return String(entry.command || '');
+        }).join('\n');
+    }
+
+    function summarizeMacroFlow(flowConfig) {
+        const flow = normalizeMacroFlowConfig(flowConfig);
+        const summary = [];
+        if (flow.runCondition !== 'always') {
+            summary.push(`run if ${flow.runCondition}`);
+        }
+        if (flow.defaultDelayMs > 0) {
+            summary.push(`${flow.defaultDelayMs}ms between commands`);
+        }
+        if (flow.steps.some((entry) => entry.type === 'delay')) {
+            summary.push('explicit delays');
+        }
+        if (flow.steps.some((entry) => entry.type === 'guard' && entry.guard === 'stop_if_offline')) {
+            summary.push('stop if server goes offline');
+        }
+        if (flow.steps.some((entry) => entry.type === 'command' && entry.when === 'previous_succeeded')) {
+            summary.push('success branch');
+        }
+        if (flow.steps.some((entry) => entry.type === 'command' && entry.when === 'previous_failed')) {
+            summary.push('failure branch');
+        }
+        if (flow.steps.some((entry) => entry.type === 'command' && entry.when === 'server_empty')) {
+            summary.push('empty-server checks');
+        }
+        if (flow.steps.some((entry) => entry.type === 'command' && ['server_online', 'server_offline'].includes(entry.when))) {
+            summary.push('runtime state checks');
+        }
+        if (flow.rollbackCommand) {
+            summary.push('rollback on dispatch fail');
+        }
+        if (summary.length === 0) {
+            summary.push('simple command flow');
+        }
+        return summary.join(' • ');
+    }
+
+    async function dispatchMacroCommandWithAck(connectorWs, serverId, command, requestId) {
+        connectorWs.send(JSON.stringify({
+            type: 'server_command',
+            serverId,
+            command,
+            requestId
+        }));
+
+        const ack = await waitForConnectorMessage(connectorWs, (message) => {
+            if (!message || String(message.type || '') !== 'server_action_ack') return false;
+            if (Number.parseInt(message.serverId, 10) !== Number.parseInt(serverId, 10)) return false;
+            if (String(message.requestId || '').trim() !== String(requestId || '').trim()) return false;
+            if (String(message.actionType || '').trim() !== 'command') return false;
+            return message;
+        }, 8000);
+
+        if (!ack) {
+            return { success: false, error: 'Timed out waiting for connector command acknowledgement.' };
+        }
+        if (String(ack.phase || '').trim() === 'failed') {
+            return { success: false, error: String(ack.message || 'Connector command dispatch failed.') };
+        }
+        return { success: true, ack };
+    }
+
+    async function getMacroServerRuntimeStatus(serverId) {
+        const serverState = await Server.findByPk(serverId, {
+            attributes: ['id', 'status'],
+            raw: true
+        });
+        return String(serverState && serverState.status || '').trim().toLowerCase();
+    }
+
+    async function getMacroMinecraftStatusPreview(serverLike, settingsMap) {
+        if (!isServerLikelyMinecraft(serverLike)) return null;
+        const address = resolveMinecraftStatusAddress(serverLike);
+        if (!address) return null;
+        return fetchMinecraftServerStatusPreview({
+            address,
+            bedrockMode: inferMinecraftBedrockMode(serverLike),
+            settingsMap: settingsMap || {}
+        });
+    }
+
+    async function shouldRunMacroStep(step, context) {
+        if (!step || step.type !== 'command') {
+            return { run: true };
+        }
+
+        const when = normalizeMacroStepCondition(step.when || step.condition);
+        if (when === 'always') return { run: true };
+        if (when === 'previous_succeeded') {
+            return { run: context.lastCommandStatus === 'succeeded' };
+        }
+        if (when === 'previous_failed') {
+            return { run: context.lastCommandStatus === 'failed' };
+        }
+        if (when === 'server_online' || when === 'server_offline') {
+            const status = await getMacroServerRuntimeStatus(context.server.id);
+            const online = status === 'running';
+            return { run: when === 'server_online' ? online : !online };
+        }
+        if (when === 'server_empty') {
+            const preview = await getMacroMinecraftStatusPreview(context.server, context.settingsMap);
+            if (!preview) {
+                return { run: false, reason: 'Server empty check is only available for Minecraft servers with a valid status address.' };
+            }
+            return { run: Number.parseInt(preview.playersOnline, 10) === 0 };
+        }
+        return { run: true };
+    }
+
+    async function shouldStopMacroFlow(step, context) {
+        if (!step || step.type !== 'guard') return { stop: false };
+        if (String(step.guard || '').trim().toLowerCase() !== 'stop_if_offline') {
+            return { stop: false };
+        }
+        const status = await getMacroServerRuntimeStatus(context.server.id);
+        if (status !== 'running') {
+            return { stop: true, reason: 'Macro stopped because the server is offline.' };
+        }
+        return { stop: false };
     }
     const SERVER_API_KEY_PERMISSIONS = Array.isArray(SERVER_API_KEY_PERMISSION_CATALOG)
         ? SERVER_API_KEY_PERMISSION_CATALOG
@@ -9435,8 +9917,21 @@ function registerServerPagesRoutes(ctx) {
 
             const access = await resolveServerAccess(server, req.session.user);
             if (!access.allowed || access.isAdmin) {
+                if (access.allowed) {
+                    const policyConfig = await getServerPolicyConfigSafe(server.id);
+                    res.locals.serverPolicyConfig = policyConfig;
+                    res.locals.serverPolicyBanner = typeof buildServerPolicyBanner === 'function'
+                        ? buildServerPolicyBanner(policyConfig)
+                        : { visible: false, tone: 'info', text: '' };
+                }
                 return next();
             }
+
+            const policyConfig = await getServerPolicyConfigSafe(server.id);
+            res.locals.serverPolicyConfig = policyConfig;
+            res.locals.serverPolicyBanner = typeof buildServerPolicyBanner === 'function'
+                ? buildServerPolicyBanner(policyConfig)
+                : { visible: false, tone: 'info', text: '' };
 
             if (!isServerProvisioningRestrictedStatus(server.status)) {
                 return next();
@@ -9528,7 +10023,9 @@ function registerServerPagesRoutes(ctx) {
                     enabled: aiChatEnabled,
                     disabledReason: aiDisabledReason,
                     policy: aiPolicy
-                }
+                },
+                success: req.query.success || null,
+                error: req.query.error || null
             });
         } catch (err) {
             console.error("Error fetching console:", err);
@@ -10108,6 +10605,10 @@ function registerServerPagesRoutes(ctx) {
             }
             if (!access.isOwner && !access.isAdmin && !hasServerPermission(access, 'server.tags.manage')) {
                 return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('You are not allowed to edit this server metadata.')}`);
+            }
+            const policyConfig = await getServerPolicyConfigSafe(server.id);
+            if (isServerEditLockedForAccess(policyConfig, access)) {
+                return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Server edits are locked right now. Only admins can modify this server.')}`);
             }
             const canEditIdentity = access.isOwner || access.isAdmin;
 
@@ -11035,7 +11536,22 @@ function registerServerPagesRoutes(ctx) {
                     order: [['position', 'ASC'], ['id', 'ASC']]
                 })
                 : [];
-            const macros = (macrosRaw || []).filter((macro) => canAccessMacroByVisibility(macro, access));
+            const macros = (macrosRaw || [])
+                .filter((macro) => canAccessMacroByVisibility(macro, access))
+                .map((macro) => {
+                    const raw = macro && typeof macro.toJSON === 'function' ? macro.toJSON() : macro;
+                    const flowConfig = normalizeMacroFlowConfig(raw && raw.flowConfig ? raw.flowConfig : null, raw && raw.command ? raw.command : '');
+                    return {
+                        ...raw,
+                        flowConfig,
+                        sequenceText: macroFlowToSequenceText(flowConfig),
+                        runCondition: flowConfig.runCondition,
+                        defaultDelayMs: flowConfig.defaultDelayMs,
+                        rollbackCommand: flowConfig.rollbackCommand || '',
+                        stepCount: flowConfig.steps.length,
+                        flowSummary: summarizeMacroFlow(flowConfig)
+                    };
+                });
 
             return res.render('server/macros', {
                 server,
@@ -11074,13 +11590,22 @@ function registerServerPagesRoutes(ctx) {
             const descriptionRaw = String(req.body.description || '').trim();
             const description = descriptionRaw ? descriptionRaw.slice(0, 160) : null;
             const command = String(req.body.command || '').trim().slice(0, 1024);
+            const sequenceText = String(req.body.sequence || '').replace(/\r\n/g, '\n');
+            const parsedSequence = parseMacroSequenceText(sequenceText);
+            const primaryCommand = parsedSequence.primaryCommand || command;
             const visibility = resolveMacroVisibilityForAccess(req.body.visibility, access);
+            const flowConfig = normalizeMacroFlowConfig({
+                runCondition: req.body.runCondition,
+                defaultDelayMs: req.body.defaultDelayMs,
+                rollbackCommand: String(req.body.rollbackCommand || '').trim(),
+                steps: parsedSequence.steps
+            }, primaryCommand);
 
             if (!name) {
                 return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro name is required.')}`);
             }
-            if (!command) {
-                return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro command is required.')}`);
+            if (!primaryCommand) {
+                return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro needs at least one command step.')}`);
             }
 
             const maxPositionRow = await ServerCommandMacro.findOne({
@@ -11095,7 +11620,8 @@ function registerServerPagesRoutes(ctx) {
                 createdByUserId: req.session.user.id,
                 name,
                 description,
-                command,
+                command: primaryCommand,
+                flowConfig,
                 position: Number.isInteger(nextPosition) ? nextPosition + 1 : 0,
                 visibility
             });
@@ -11110,8 +11636,9 @@ function registerServerPagesRoutes(ctx) {
                     id: createdMacro.id,
                     name,
                     description,
-                    command,
-                    visibility
+                    command: primaryCommand,
+                    visibility,
+                    flowConfig
                 }
             }).catch(() => {});
 
@@ -11125,7 +11652,15 @@ function registerServerPagesRoutes(ctx) {
                     path: req.originalUrl,
                     ip: String(getRequestIp(req) || '').slice(0, 120) || null,
                     userAgent: req.headers && req.headers['user-agent'] ? String(req.headers['user-agent']).slice(0, 1000) : null,
-                    metadata: { name, hasDescription: Boolean(description), visibility }
+                    metadata: {
+                        name,
+                        hasDescription: Boolean(description),
+                        visibility,
+                        runCondition: flowConfig.runCondition,
+                        defaultDelayMs: flowConfig.defaultDelayMs,
+                        hasRollback: Boolean(flowConfig.rollbackCommand),
+                        stepCount: flowConfig.steps.length
+                    }
                 }).catch(() => { });
             }
 
@@ -11164,24 +11699,35 @@ function registerServerPagesRoutes(ctx) {
             const descriptionRaw = String(req.body.description || '').trim();
             const description = descriptionRaw ? descriptionRaw.slice(0, 160) : null;
             const command = String(req.body.command || '').trim().slice(0, 1024);
+            const sequenceText = String(req.body.sequence || '').replace(/\r\n/g, '\n');
+            const parsedSequence = parseMacroSequenceText(sequenceText);
+            const primaryCommand = parsedSequence.primaryCommand || command;
             const requestedPosition = Number.parseInt(req.body.position, 10);
             const visibility = resolveMacroVisibilityForAccess(req.body.visibility, access);
+            const flowConfig = normalizeMacroFlowConfig({
+                runCondition: req.body.runCondition,
+                defaultDelayMs: req.body.defaultDelayMs,
+                rollbackCommand: String(req.body.rollbackCommand || '').trim(),
+                steps: parsedSequence.steps
+            }, primaryCommand);
 
-            if (!name || !command) {
-                return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro name and command are required.')}`);
+            if (!name || !primaryCommand) {
+                return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro name and at least one command are required.')}`);
             }
 
             const previousMacro = {
                 name: macro.name,
                 description: macro.description,
                 command: macro.command,
+                flowConfig: normalizeMacroFlowConfig(macro.flowConfig, macro.command),
                 position: macro.position,
                 visibility: macro.visibility
             };
             await macro.update({
                 name,
                 description,
-                command,
+                command: primaryCommand,
+                flowConfig,
                 position: Number.isInteger(requestedPosition) ? Math.max(0, requestedPosition) : macro.position,
                 visibility
             });
@@ -11196,6 +11742,7 @@ function registerServerPagesRoutes(ctx) {
                     name: macro.name,
                     description: macro.description,
                     command: macro.command,
+                    flowConfig: normalizeMacroFlowConfig(macro.flowConfig, macro.command),
                     position: macro.position,
                     visibility: macro.visibility
                 },
@@ -11212,7 +11759,16 @@ function registerServerPagesRoutes(ctx) {
                     path: req.originalUrl,
                     ip: String(getRequestIp(req) || '').slice(0, 120) || null,
                     userAgent: req.headers && req.headers['user-agent'] ? String(req.headers['user-agent']).slice(0, 1000) : null,
-                    metadata: { macroId: macro.id, name, position: macro.position, visibility }
+                    metadata: {
+                        macroId: macro.id,
+                        name,
+                        position: macro.position,
+                        visibility,
+                        runCondition: flowConfig.runCondition,
+                        defaultDelayMs: flowConfig.defaultDelayMs,
+                        hasRollback: Boolean(flowConfig.rollbackCommand),
+                        stepCount: flowConfig.steps.length
+                    }
                 }).catch(() => { });
             }
 
@@ -11248,6 +11804,7 @@ function registerServerPagesRoutes(ctx) {
                 name: macro.name,
                 description: macro.description,
                 command: macro.command,
+                flowConfig: normalizeMacroFlowConfig(macro.flowConfig, macro.command),
                 position: macro.position,
                 visibility: macro.visibility
             };
@@ -11291,13 +11848,15 @@ function registerServerPagesRoutes(ctx) {
                 include: [{ model: Allocation, as: 'allocation' }]
             });
             if (!server) return res.redirect('/server/notfound');
+            const defaultReturnTo = `/server/${server.containerId}/macros`;
+            const returnTo = resolveSafeReturnTo(req.body.returnTo, defaultReturnTo);
 
             const access = await resolveServerAccess(server, req.session.user);
             if (!hasServerPermission(access, 'server.macros') || !hasServerPermission(access, 'server.console')) {
                 return res.redirect('/server/no-permissions');
             }
             if (typeof ServerCommandMacro === 'undefined' || !ServerCommandMacro) {
-                return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro storage is unavailable.')}`);
+                return res.redirect(`${returnTo}?error=${encodeURIComponent('Macro storage is unavailable.')}`);
             }
 
             const macroId = Number.parseInt(req.params.macroId, 10);
@@ -11305,27 +11864,100 @@ function registerServerPagesRoutes(ctx) {
                 where: { id: macroId, serverId: server.id }
             });
             if (!macro) {
-                return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro not found.')}`);
+                return res.redirect(`${returnTo}?error=${encodeURIComponent('Macro not found.')}`);
             }
             if (!canAccessMacroByVisibility(macro, access)) {
-                return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Macro is not accessible for your role.')}`);
+                return res.redirect(`${returnTo}?error=${encodeURIComponent('Macro is not accessible for your role.')}`);
             }
             if (!server.allocation || !server.allocation.connectorId) {
-                return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Server allocation is missing.')}`);
+                return res.redirect(`${returnTo}?error=${encodeURIComponent('Server allocation is missing.')}`);
             }
 
             const connectorWs = connectorConnections.get(server.allocation.connectorId);
             if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
-                return res.redirect(`/server/${server.containerId}/macros?error=${encodeURIComponent('Connector is offline.')}`);
+                return res.redirect(`${returnTo}?error=${encodeURIComponent('Connector is offline.')}`);
             }
 
-            const requestId = `macro_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`;
-            connectorWs.send(JSON.stringify({
-                type: 'server_command',
-                serverId: server.id,
-                command: macro.command,
-                requestId
-            }));
+            const flowConfig = normalizeMacroFlowConfig(macro.flowConfig, macro.command);
+            const serverStatus = String(server.status || '').trim().toLowerCase();
+            if (flowConfig.runCondition === 'online' && serverStatus !== 'running') {
+                return res.redirect(`${returnTo}?error=${encodeURIComponent('This macro runs only when the server is online.')}`);
+            }
+            if (flowConfig.runCondition === 'offline' && serverStatus === 'running') {
+                return res.redirect(`${returnTo}?error=${encodeURIComponent('This macro runs only when the server is offline.')}`);
+            }
+
+            let executedCommands = 0;
+            let lastCommand = '';
+            let lastCommandStatus = null;
+            let flowFailed = false;
+            let flowFailureMessage = '';
+            let rollbackTriggered = false;
+            for (let index = 0; index < flowConfig.steps.length; index += 1) {
+                const step = flowConfig.steps[index];
+                if (!step) continue;
+
+                if (flowFailed && step.type === 'command' && normalizeMacroStepCondition(step.when || step.condition) !== 'previous_failed') {
+                    continue;
+                }
+
+                if (step.type === 'delay') {
+                    await waitMilliseconds(step.delayMs);
+                    continue;
+                }
+
+                const guardResult = await shouldStopMacroFlow(step, {
+                    server,
+                    settingsMap: res.locals.settings || {},
+                    lastCommandStatus
+                });
+                if (guardResult && guardResult.stop) {
+                    return res.redirect(`${returnTo}?success=${encodeURIComponent(guardResult.reason || 'Macro stopped.')}`);
+                }
+                if (step.type === 'guard') {
+                    continue;
+                }
+
+                const conditionResult = await shouldRunMacroStep(step, {
+                    server,
+                    settingsMap: res.locals.settings || {},
+                    lastCommandStatus
+                });
+                if (!conditionResult || !conditionResult.run) {
+                    continue;
+                }
+
+                const commandText = String(step.command || '').trim();
+                if (!commandText) continue;
+                lastCommand = commandText;
+                const requestId = `macro_${macro.id}_${Date.now()}_${index}_${nodeCrypto.randomBytes(3).toString('hex')}`;
+                const dispatchResult = await dispatchMacroCommandWithAck(connectorWs, server.id, commandText, requestId);
+                if (!dispatchResult.success) {
+                    lastCommandStatus = 'failed';
+                    const hasFailureBranch = flowConfig.steps.slice(index + 1).some((candidate) => (
+                        candidate
+                        && candidate.type === 'command'
+                        && normalizeMacroStepCondition(candidate.when || candidate.condition) === 'previous_failed'
+                    ));
+                    if (flowConfig.rollbackCommand) {
+                        const rollbackRequestId = `macro_rb_${macro.id}_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`;
+                        await dispatchMacroCommandWithAck(connectorWs, server.id, flowConfig.rollbackCommand, rollbackRequestId).catch(() => null);
+                        rollbackTriggered = true;
+                    }
+                    if (!hasFailureBranch || flowFailed) {
+                        return res.redirect(`${returnTo}?error=${encodeURIComponent(`Macro failed on step ${index + 1}: ${dispatchResult.error || 'command dispatch failed'}`)}`);
+                    }
+                    flowFailed = true;
+                    flowFailureMessage = String(dispatchResult.error || `Macro failed on step ${index + 1}.`);
+                    continue;
+                }
+                lastCommandStatus = 'succeeded';
+                executedCommands += 1;
+                const nextStep = flowConfig.steps[index + 1];
+                if (flowConfig.defaultDelayMs > 0 && nextStep && nextStep.type === 'command') {
+                    await waitMilliseconds(flowConfig.defaultDelayMs);
+                }
+            }
 
             if (AuditLog) {
                 await AuditLog.create({
@@ -11337,14 +11969,29 @@ function registerServerPagesRoutes(ctx) {
                     path: req.originalUrl,
                     ip: String(getRequestIp(req) || '').slice(0, 120) || null,
                     userAgent: req.headers && req.headers['user-agent'] ? String(req.headers['user-agent']).slice(0, 1000) : null,
-                    metadata: { macroId: macro.id, name: macro.name, command: macro.command.slice(0, 512), requestId }
+                    metadata: {
+                        macroId: macro.id,
+                        name: macro.name,
+                        command: String(lastCommand || macro.command || '').slice(0, 512),
+                        runCondition: flowConfig.runCondition,
+                        defaultDelayMs: flowConfig.defaultDelayMs,
+                        hasRollback: Boolean(flowConfig.rollbackCommand),
+                        rollbackTriggered,
+                        stepCount: flowConfig.steps.length,
+                        executedCommands,
+                        flowFailed
+                    }
                 }).catch(() => { });
             }
 
-            return res.redirect(`/server/${server.containerId}/macros?success=${encodeURIComponent(`Macro "${macro.name}" sent.`)}`);
+            if (flowFailed) {
+                return res.redirect(`${returnTo}?success=${encodeURIComponent(`Macro "${macro.name}" handled a failure branch after ${executedCommands} command${executedCommands === 1 ? '' : 's'}. ${flowFailureMessage}`)}`);
+            }
+            return res.redirect(`${returnTo}?success=${encodeURIComponent(`Macro "${macro.name}" executed (${executedCommands} command${executedCommands === 1 ? '' : 's'}).`)}`);
         } catch (error) {
             console.error('Error executing macro:', error);
-            return res.redirect(`/server/${req.params.containerId}/macros?error=${encodeURIComponent('Failed to run macro.')}`);
+            const fallbackReturnTo = resolveSafeReturnTo(req.body && req.body.returnTo, `/server/${req.params.containerId}/macros`);
+            return res.redirect(`${fallbackReturnTo}?error=${encodeURIComponent('Failed to run macro.')}`);
         }
     });
 
@@ -11677,6 +12324,10 @@ function registerServerPagesRoutes(ctx) {
             const access = await resolveServerAccess(server, req.session.user);
             if (!hasServerPermission(access, 'server.files.write') && !hasServerPermission(access, 'server.startup')) {
                 return res.redirect('/server/no-permissions');
+            }
+            const policyConfig = await getServerPolicyConfigSafe(server.id);
+            if (isServerEditLockedForAccess(policyConfig, access)) {
+                return res.redirect(`/server/${server.containerId}/debug-logs?error=${encodeURIComponent('Server edits are locked right now. Only admins can modify files.')}`);
             }
 
             if (!server.allocation || !server.allocation.connectorId) {
@@ -14751,6 +15402,18 @@ function registerServerPagesRoutes(ctx) {
                 return res.status(401).json({ success: false, error: 'Invalid SFTP credentials.' });
             }
 
+            if (!matchedUser.isAdmin) {
+                const policyConfig = await getServerPolicyConfigSafe(matchedServer.id);
+                if (isServerEditLockedForAccess(policyConfig, { isAdmin: false })) {
+                    await recordSftpAttempt('failed', { connectorId, username: presentedUsername, serverId: matchedServer.id, reason: 'edit_lock_active' });
+                    return res.status(423).json({ success: false, error: 'SFTP access is temporarily locked by server policy.' });
+                }
+                if (policyConfig && policyConfig.readOnlyFiles && policyConfig.readOnlyFiles.enabled && Array.isArray(policyConfig.readOnlyFiles.patterns) && policyConfig.readOnlyFiles.patterns.length > 0) {
+                    await recordSftpAttempt('failed', { connectorId, username: presentedUsername, serverId: matchedServer.id, reason: 'readonly_policy_active' });
+                    return res.status(423).json({ success: false, error: 'SFTP access is disabled for non-admin users while read-only file policy is active on this server.' });
+                }
+            }
+
             await recordSftpAttempt('success', { connectorId, username: presentedUsername, serverId: matchedServer.id });
             return res.json({
                 success: true,
@@ -14796,6 +15459,8 @@ function registerServerPagesRoutes(ctx) {
             if (!hasServerPermission(access, 'server.files')) {
                 return res.redirect('/server/no-permissions');
             }
+            const policyConfig = await getServerPolicyConfigSafe(server.id);
+            const filesWriteLocked = isServerEditLockedForAccess(policyConfig, access);
 
             let initialPath = req.query.path || '/';
 
@@ -14844,7 +15509,9 @@ function registerServerPagesRoutes(ctx) {
                 sftpFeatureEnabled: sftpEnabled,
                 canFixPermissions: hasServerPermission(access, 'server.files.write') || hasServerPermission(access, 'server.startup'),
                 webUploadEnabled,
-                webUploadMaxMb
+                webUploadMaxMb,
+                filesWriteLocked,
+                policyReadOnlyPatterns: policyConfig && policyConfig.readOnlyFiles ? policyConfig.readOnlyFiles.patterns || [] : []
             });
         } catch (err) {
             console.error("Error fetching file manager:", err);
@@ -18732,6 +19399,8 @@ function registerServerPagesRoutes(ctx) {
             if (server.isSuspended) {
                 return res.redirect(`/server/${server.containerId}/suspended`);
             }
+            const policyConfig = await getServerPolicyConfigSafe(server.id);
+            const startupWriteLocked = isServerEditLockedForAccess(policyConfig, access);
 
             const primaryAllocation = await resolvePrimaryAllocationForServer(server, { includeConnector: true });
             if (!primaryAllocation) {
@@ -18796,7 +19465,8 @@ function registerServerPagesRoutes(ctx) {
                 selectedDockerImage,
                 resolvedStartup,
                 startupPresets,
-                selectedStartupPresetId
+                selectedStartupPresetId,
+                startupWriteLocked
             });
         } catch (err) {
             console.error('Error loading startup page:', err);
@@ -18821,6 +19491,10 @@ function registerServerPagesRoutes(ctx) {
             }
             if (server.isSuspended) {
                 return res.redirect(`/server/${server.containerId}/suspended`);
+            }
+            const policyConfig = await getServerPolicyConfigSafe(server.id);
+            if (isServerEditLockedForAccess(policyConfig, access)) {
+                return res.redirect(`/server/${server.containerId}/startup?error=${encodeURIComponent('Startup edits are locked right now. Only admins can change runtime settings.')}`);
             }
 
             const primaryAllocation = await resolvePrimaryAllocationForServer(server, { includeConnector: true });
@@ -19234,6 +19908,7 @@ function registerServerPagesRoutes(ctx) {
                 title: `Policy Engine ${server.name}`,
                 path: '/servers',
                 policyConfig,
+                canQueueRestart: hasServerPermission(access, 'server.power'),
                 playbooksFeatureEnabled: Boolean(featureFlags.playbooksAutomationEnabled),
                 success: req.query.success || null,
                 error: req.query.error || null
@@ -19261,6 +19936,9 @@ function registerServerPagesRoutes(ctx) {
                 return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Policy engine is disabled by admin.')}`);
             }
             const previousPolicyConfig = await getServerPolicyEngineConfig(server.id);
+            if (isServerEditLockedForAccess(previousPolicyConfig, access)) {
+                return res.redirect(`/server/${server.containerId}/policy?error=${encodeURIComponent('Policy edits are locked right now. Only admins can change this configuration.')}`);
+            }
 
             const anomalyActionRaw = String(req.body.anomalyAction || 'none').trim().toLowerCase();
             const anomalyAction = ['none', 'restart', 'stop'].includes(anomalyActionRaw) ? anomalyActionRaw : 'none';
@@ -19289,6 +19967,24 @@ function registerServerPagesRoutes(ctx) {
                         enabled: featureFlags.playbooksAutomationEnabled && parseBooleanInput(req.body.playbookOomRecoveryEnabled, true),
                         action: oomRecoveryAction
                     }
+                },
+                editLock: {
+                    enabled: parseBooleanInput(req.body.editLockEnabled, previousPolicyConfig && previousPolicyConfig.editLock && previousPolicyConfig.editLock.enabled),
+                    bannerEnabled: parseBooleanInput(req.body.editLockBannerEnabled, previousPolicyConfig && previousPolicyConfig.editLock && previousPolicyConfig.editLock.bannerEnabled),
+                    bannerText: String(req.body.editLockBannerText || '').trim()
+                },
+                readOnlyFiles: {
+                    enabled: parseBooleanInput(req.body.readOnlyFilesEnabled, previousPolicyConfig && previousPolicyConfig.readOnlyFiles && previousPolicyConfig.readOnlyFiles.enabled),
+                    patterns: String(req.body.readOnlyFilePatterns || '')
+                },
+                queuedRestart: previousPolicyConfig && previousPolicyConfig.queuedRestart ? previousPolicyConfig.queuedRestart : {
+                    enabled: false,
+                    requestedAt: null,
+                    requestedByUserId: null
+                },
+                userBanner: {
+                    enabled: parseBooleanInput(req.body.userBannerEnabled, previousPolicyConfig && previousPolicyConfig.userBanner && previousPolicyConfig.userBanner.enabled),
+                    text: String(req.body.userBannerText || '').trim()
                 }
             };
             await setServerPolicyEngineConfig(server.id, nextPolicyConfig);
@@ -19309,6 +20005,93 @@ function registerServerPagesRoutes(ctx) {
         }
     });
 
+    app.post('/server/:containerId/policy/queued-restart', requireAuth, async (req, res) => {
+        try {
+            const server = await Server.findOne({
+                where: { containerId: req.params.containerId },
+                include: [
+                    { model: Allocation, as: 'allocation', include: [{ model: Connector, as: 'connector' }] },
+                    { model: Image, as: 'image' }
+                ]
+            });
+
+            if (!server) return res.redirect('/server/notfound');
+            const access = await resolveServerAccess(server, req.session.user);
+            if (!hasServerPermission(access, 'server.power')) {
+                return res.redirect('/server/no-permissions');
+            }
+            if (server.isSuspended) {
+                return res.redirect(`/server/${server.containerId}/suspended`);
+            }
+            if (!isServerLikelyMinecraft(server)) {
+                return res.redirect(`/server/${server.containerId}/policy?error=${encodeURIComponent('Queued restart after players=0 is available only for Minecraft servers.')}`);
+            }
+
+            const action = String(req.body.action || 'queue').trim().toLowerCase();
+            const previousPolicyConfig = await getServerPolicyEngineConfig(server.id);
+            if (action === 'cancel') {
+                const nextPolicyConfig = await setServerQueuedRestartState(server.id, false, null);
+                await recordServerChange(ServerChangeLog, {
+                    serverId: server.id,
+                    actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                    category: 'policy',
+                    changeKey: 'queued_restart',
+                    summary: 'Queued restart cleared',
+                    beforeValue: previousPolicyConfig,
+                    afterValue: nextPolicyConfig
+                }).catch(() => {});
+                return res.redirect(`/server/${server.containerId}/policy?success=${encodeURIComponent('Queued restart was cancelled.')}`);
+            }
+
+            if (String(server.status || '').trim().toLowerCase() !== 'running') {
+                return res.redirect(`/server/${server.containerId}/policy?error=${encodeURIComponent('Server must be running before you can queue a restart for players=0.')}`);
+            }
+
+            const statusAddress = resolveMinecraftStatusAddress(server);
+            if (!statusAddress) {
+                return res.redirect(`/server/${server.containerId}/policy?error=${encodeURIComponent('Could not resolve a Minecraft status address for this server.')}`);
+            }
+
+            const preview = await fetchMinecraftServerStatusPreview({
+                address: statusAddress,
+                bedrockMode: inferMinecraftBedrockMode(server),
+                settingsMap: res.locals.settings || {}
+            });
+            const playersOnline = Number.parseInt(preview && preview.playersOnline, 10) || 0;
+
+            if (playersOnline === 0) {
+                await dispatchQueuedRestartForServer(server);
+                const nextPolicyConfig = await setServerQueuedRestartState(server.id, false, null);
+                await recordServerChange(ServerChangeLog, {
+                    serverId: server.id,
+                    actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                    category: 'policy',
+                    changeKey: 'queued_restart',
+                    summary: 'Immediate restart sent because server was already empty',
+                    beforeValue: previousPolicyConfig,
+                    afterValue: nextPolicyConfig
+                }).catch(() => {});
+                return res.redirect(`/server/${server.containerId}/policy?success=${encodeURIComponent('Server was already empty. Restart command was sent immediately.')}`);
+            }
+
+            const nextPolicyConfig = await setServerQueuedRestartState(server.id, true, req.session.user && req.session.user.id ? req.session.user.id : null);
+            await recordServerChange(ServerChangeLog, {
+                serverId: server.id,
+                actorUserId: req.session.user && req.session.user.id ? req.session.user.id : null,
+                category: 'policy',
+                changeKey: 'queued_restart',
+                summary: 'Restart queued until players reach 0',
+                beforeValue: previousPolicyConfig,
+                afterValue: nextPolicyConfig,
+                metadata: { playersOnline }
+            }).catch(() => {});
+            return res.redirect(`/server/${server.containerId}/policy?success=${encodeURIComponent(`Restart queued. It will run automatically when online players reach 0 (currently ${playersOnline}).`)}`);
+        } catch (err) {
+            console.error('Error queueing restart after empty:', err);
+            return res.redirect(`/server/${req.params.containerId}/policy?error=${encodeURIComponent('Failed to update queued restart state.')}`);
+        }
+    });
+
     // File Editor
     app.get('/server/:containerId/files/edit', requireAuth, async (req, res) => {
         try {
@@ -19322,6 +20105,7 @@ function registerServerPagesRoutes(ctx) {
             if (!hasServerPermission(access, 'server.files')) {
                 return res.redirect('/server/no-permissions');
             }
+            const policyConfig = await getServerPolicyConfigSafe(server.id);
 
             const wsToken = jwt.sign({
                 serverId: server.id,
@@ -19335,7 +20119,9 @@ function registerServerPagesRoutes(ctx) {
                 user: req.session.user,
                 title: `File Editor - ${server.name}`,
                 path: '/servers',
-                wsToken
+                wsToken,
+                editWriteLocked: isServerEditLockedForAccess(policyConfig, access),
+                policyReadOnlyPatterns: policyConfig && policyConfig.readOnlyFiles ? policyConfig.readOnlyFiles.patterns || [] : []
             });
         } catch (err) {
             console.error('Error loading file editor:', err);
@@ -19594,6 +20380,10 @@ function registerServerPagesRoutes(ctx) {
             if (isProtectedServerRuntimePath(filePath)) {
                 return res.status(403).json({ success: false, error: 'Access to protected runtime files is denied.' });
             }
+            const policyDecision = await getApiServerPolicyDenial(auth.server, { isAdmin: false }, filePath);
+            if (policyDecision.denied) {
+                return res.status(policyDecision.status).json({ success: false, error: policyDecision.error });
+            }
 
             const content = typeof req.body.content === 'string' ? req.body.content : String(req.body.content || '');
             if (Buffer.byteLength(content, 'utf8') > 2 * 1024 * 1024) {
@@ -19721,6 +20511,11 @@ function registerServerPagesRoutes(ctx) {
             if (name === '.' || name === '..' || /[\\/]/.test(name)) {
                 return res.status(400).json({ success: false, error: 'Invalid folder name.' });
             }
+            const targetPath = buildServerPolicyTargetPath(directory, name);
+            const policyDecision = await getApiServerPolicyDenial(auth.server, { isAdmin: false }, targetPath);
+            if (policyDecision.denied) {
+                return res.status(policyDecision.status).json({ success: false, error: policyDecision.error });
+            }
 
             const server = auth.server;
             if (!server.allocation || !server.allocation.connectorId) {
@@ -19788,6 +20583,16 @@ function registerServerPagesRoutes(ctx) {
             }
             if ([name, newName].some((value) => value === '.' || value === '..' || /[\\/]/.test(value))) {
                 return res.status(400).json({ success: false, error: 'Invalid file/folder name.' });
+            }
+            const sourcePath = buildServerPolicyTargetPath(directory, name);
+            const targetPath = buildServerPolicyTargetPath(directory, newName);
+            let policyDecision = await getApiServerPolicyDenial(auth.server, { isAdmin: false }, sourcePath);
+            if (policyDecision.denied) {
+                return res.status(policyDecision.status).json({ success: false, error: policyDecision.error });
+            }
+            policyDecision = await getApiServerPolicyDenial(auth.server, { isAdmin: false }, targetPath);
+            if (policyDecision.denied) {
+                return res.status(policyDecision.status).json({ success: false, error: policyDecision.error });
             }
 
             const server = auth.server;
@@ -19860,6 +20665,17 @@ function registerServerPagesRoutes(ctx) {
             if (files.length === 0) {
                 return res.status(400).json({ success: false, error: 'Field "files" must contain at least one valid entry.' });
             }
+            const policyBaseDecision = await getApiServerPolicyDenial(auth.server, { isAdmin: false });
+            if (policyBaseDecision.denied) {
+                return res.status(policyBaseDecision.status).json({ success: false, error: policyBaseDecision.error });
+            }
+            for (const entry of files) {
+                const targetPath = buildServerPolicyTargetPath(directory, entry);
+                const fileDecision = await getApiServerPolicyDenial(auth.server, { isAdmin: false }, targetPath);
+                if (fileDecision.denied) {
+                    return res.status(fileDecision.status).json({ success: false, error: fileDecision.error });
+                }
+            }
 
             const server = auth.server;
             if (!server.allocation || !server.allocation.connectorId) {
@@ -19931,6 +20747,11 @@ function registerServerPagesRoutes(ctx) {
             }
             if (!/^[0-7]{3,4}$/.test(permissions)) {
                 return res.status(400).json({ success: false, error: 'Field "permissions" must match octal format (e.g. 644, 755, 0755).' });
+            }
+            const targetPath = buildServerPolicyTargetPath(directory, name);
+            const policyDecision = await getApiServerPolicyDenial(auth.server, { isAdmin: false }, targetPath);
+            if (policyDecision.denied) {
+                return res.status(policyDecision.status).json({ success: false, error: policyDecision.error });
             }
 
             const server = auth.server;
@@ -20164,6 +20985,10 @@ function registerServerPagesRoutes(ctx) {
             if (!hasServerPermission(access, 'server.files')) {
                 return res.status(403).json({ success: false, error: 'Forbidden' });
             }
+            const policyBaseDecision = await getApiServerPolicyDenial(server, access);
+            if (policyBaseDecision.denied) {
+                return res.status(policyBaseDecision.status).json({ success: false, error: policyBaseDecision.error });
+            }
 
             const uploadEnabledRaw = String((res.locals.settings && res.locals.settings.featureWebUploadEnabled) || 'true').trim().toLowerCase();
             const uploadEnabled = uploadEnabledRaw === 'true' || uploadEnabledRaw === '1' || uploadEnabledRaw === 'on' || uploadEnabledRaw === 'yes';
@@ -20195,6 +21020,10 @@ function registerServerPagesRoutes(ctx) {
             const filePath = directory === '/' ? `/${fileName}` : `${directory}/${fileName}`;
             if (isProtectedServerRuntimePath(filePath)) {
                 return res.status(403).json({ success: false, error: 'Access to protected runtime files is denied.' });
+            }
+            const policyDecision = await getApiServerPolicyDenial(server, access, filePath);
+            if (policyDecision.denied) {
+                return res.status(policyDecision.status).json({ success: false, error: policyDecision.error });
             }
             const threatCheck = inspectUploadForMinerRisk(fileName, rawContent);
 

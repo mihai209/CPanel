@@ -2061,8 +2061,79 @@ function defaultServerPolicyEngineConfig() {
                 enabled: true,
                 action: 'start' // none|start|restart
             }
+        },
+        editLock: {
+            enabled: false,
+            bannerEnabled: true,
+            bannerText: 'Server edits are locked while maintenance is in progress. Contact an administrator if you need changes.'
+        },
+        readOnlyFiles: {
+            enabled: false,
+            patterns: []
+        },
+        queuedRestart: {
+            enabled: false,
+            requestedAt: null,
+            requestedByUserId: null
+        },
+        userBanner: {
+            enabled: false,
+            text: ''
         }
     };
+}
+
+function normalizePolicyPathPatterns(value) {
+    let source = value;
+    if (typeof source === 'string') {
+        source = source.split(/[\n,;]+/g);
+    }
+    if (!Array.isArray(source)) return [];
+    const seen = new Set();
+    const output = [];
+    for (const entry of source) {
+        const normalized = String(entry || '').trim().replace(/\\/g, '/');
+        if (!normalized || seen.has(normalized)) continue;
+        seen.add(normalized);
+        output.push(normalized.slice(0, 240));
+    }
+    return output.slice(0, 100);
+}
+
+function escapePolicyPatternRegExp(value) {
+    return String(value || '').replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+}
+
+function compilePolicyPathPattern(pattern) {
+    const normalized = String(pattern || '').trim().replace(/\\/g, '/');
+    if (!normalized) return null;
+    let regexSource = '';
+    for (let index = 0; index < normalized.length; index += 1) {
+        const current = normalized[index];
+        const next = normalized[index + 1];
+        if (current === '*' && next === '*') {
+            regexSource += '.*';
+            index += 1;
+            continue;
+        }
+        if (current === '*') {
+            regexSource += '[^/]*';
+            continue;
+        }
+        regexSource += escapePolicyPatternRegExp(current);
+    }
+    try {
+        return new RegExp(`^${regexSource}$`, 'i');
+    } catch {
+        return null;
+    }
+}
+
+function normalizePolicyTargetPath(value) {
+    const raw = String(value || '').trim().replace(/\\/g, '/');
+    if (!raw) return '/';
+    const normalized = path.posix.normalize(raw.startsWith('/') ? raw : `/${raw}`);
+    return normalized.startsWith('/') ? normalized : `/${normalized}`;
 }
 
 function normalizeServerPolicyEngineConfig(raw) {
@@ -2088,6 +2159,18 @@ function normalizeServerPolicyEngineConfig(raw) {
         : {};
     const oomRecoveryRaw = playbooksRaw.oomRecovery && typeof playbooksRaw.oomRecovery === 'object'
         ? playbooksRaw.oomRecovery
+        : {};
+    const editLockRaw = parsed.editLock && typeof parsed.editLock === 'object'
+        ? parsed.editLock
+        : {};
+    const readOnlyFilesRaw = parsed.readOnlyFiles && typeof parsed.readOnlyFiles === 'object'
+        ? parsed.readOnlyFiles
+        : {};
+    const queuedRestartRaw = parsed.queuedRestart && typeof parsed.queuedRestart === 'object'
+        ? parsed.queuedRestart
+        : {};
+    const userBannerRaw = parsed.userBanner && typeof parsed.userBanner === 'object'
+        ? parsed.userBanner
         : {};
     const crashLoopActionRaw = String(crashLoopRaw.action || base.playbooks.crashLoop.action).trim().toLowerCase();
     const crashLoopAction = ['none', 'start', 'restart', 'stop'].includes(crashLoopActionRaw)
@@ -2118,6 +2201,24 @@ function normalizeServerPolicyEngineConfig(raw) {
                 enabled: parseBooleanInput(oomRecoveryRaw.enabled, base.playbooks.oomRecovery.enabled),
                 action: oomRecoveryAction
             }
+        },
+        editLock: {
+            enabled: parseBooleanInput(editLockRaw.enabled, base.editLock.enabled),
+            bannerEnabled: parseBooleanInput(editLockRaw.bannerEnabled, base.editLock.bannerEnabled),
+            bannerText: String(editLockRaw.bannerText || base.editLock.bannerText || '').trim().slice(0, 240)
+        },
+        readOnlyFiles: {
+            enabled: parseBooleanInput(readOnlyFilesRaw.enabled, base.readOnlyFiles.enabled),
+            patterns: normalizePolicyPathPatterns(readOnlyFilesRaw.patterns)
+        },
+        queuedRestart: {
+            enabled: parseBooleanInput(queuedRestartRaw.enabled, base.queuedRestart.enabled),
+            requestedAt: queuedRestartRaw.requestedAt ? String(queuedRestartRaw.requestedAt).trim().slice(0, 80) : null,
+            requestedByUserId: Math.max(0, Number.parseInt(queuedRestartRaw.requestedByUserId, 10) || 0) || null
+        },
+        userBanner: {
+            enabled: parseBooleanInput(userBannerRaw.enabled, base.userBanner.enabled),
+            text: String(userBannerRaw.text || '').trim().slice(0, 240)
         }
     };
 }
@@ -2148,6 +2249,49 @@ async function setServerPolicyEngineConfig(serverId, config) {
     });
     serverPolicyCache.set(serverId, { ts: Date.now(), config: normalized });
     return normalized;
+}
+
+function isServerPolicyEditLocked(policyConfig, isAdmin = false) {
+    const policy = normalizeServerPolicyEngineConfig(policyConfig);
+    if (!policy.editLock || !policy.editLock.enabled) return false;
+    return !Boolean(isAdmin);
+}
+
+function isServerPolicyPathReadOnly(policyConfig, targetPath, isAdmin = false) {
+    if (Boolean(isAdmin)) return false;
+    const policy = normalizeServerPolicyEngineConfig(policyConfig);
+    if (!policy.readOnlyFiles || !policy.readOnlyFiles.enabled) return false;
+    const normalizedPath = normalizePolicyTargetPath(targetPath);
+    return (policy.readOnlyFiles.patterns || []).some((pattern) => {
+        const matcher = compilePolicyPathPattern(pattern);
+        return matcher ? matcher.test(normalizedPath) : false;
+    });
+}
+
+function buildServerPolicyBanner(policyConfig) {
+    const policy = normalizeServerPolicyEngineConfig(policyConfig);
+    if (policy.queuedRestart && policy.queuedRestart.enabled) {
+        return {
+            visible: true,
+            tone: 'warning',
+            text: 'A restart is queued and will run automatically once online players reach 0.'
+        };
+    }
+    if (policy.userBanner && policy.userBanner.enabled && policy.userBanner.text) {
+        return {
+            visible: true,
+            tone: 'info',
+            text: policy.userBanner.text
+        };
+    }
+    if (policy.editLock && policy.editLock.enabled && policy.editLock.bannerEnabled) {
+        return {
+            visible: true,
+            tone: 'warning',
+            text: policy.editLock.bannerText || 'Server edits are locked while maintenance is in progress.'
+        };
+    }
+    return { visible: false, tone: 'info', text: '' };
 }
 
 function getPolicyRemediationState(serverId) {
@@ -2995,6 +3139,9 @@ async function getConnectorAllowedOriginsMap(connectorIds, fallbackOrigin) {
         normalizeServerPolicyEngineConfig,
         getServerPolicyEngineConfig,
         setServerPolicyEngineConfig,
+        isServerPolicyEditLocked,
+        isServerPolicyPathReadOnly,
+        buildServerPolicyBanner,
         handlePolicyPlaybooksOnStop,
         handleCrashAutoRemediation,
         handlePolicyAnomalyRemediation,

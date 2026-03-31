@@ -1048,6 +1048,13 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                         </div>
                     </div>
 
+                    <% if (success) { %>
+                        <div class="alert alert-success py-2 mb-3"><%= success %></div>
+                    <% } %>
+                    <% if (error) { %>
+                        <div class="alert alert-danger py-2 mb-3"><%= error %></div>
+                    <% } %>
+
                     <div id="consoleGrid" class="console-grid <%= (isRestrictedProvisioningViewer || (user && user.isAdmin && ['installing', 'starting'].includes(String(server.status || '').toLowerCase()))) ? 'd-none' : '' %>">
                         <!-- Terminal Container -->
                         <div class="terminal-container">
@@ -1147,7 +1154,7 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                                     <select id="macroSelect" class="form-select form-select-sm bg-dark text-light border-secondary" style="max-width: 340px;">
                                         <option value="">Select macro...</option>
                                         <% commandMacros.forEach((macro) => { %>
-                                            <option value="<%= macro.command %>"><%= macro.name %> - <%= macro.command %></option>
+                                            <option value="<%= macro.id %>"><%= macro.name %><%= macro.description ? ` - ${macro.description}` : '' %></option>
                                         <% }); %>
                                     </select>
                                     <button id="btnRunMacro" class="btn btn-outline-info btn-sm" type="button">
@@ -2185,6 +2192,24 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
             const consoleInput = document.getElementById('consoleInput');
             const macroSelect = document.getElementById('macroSelect');
             const btnRunMacro = document.getElementById('btnRunMacro');
+            function submitMacroRun(macroId) {
+                const id = Number.parseInt(macroId, 10);
+                if (!Number.isInteger(id) || id <= 0) return false;
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/server/<%= server.containerId %>/macros/${encodeURIComponent(String(id))}/run`;
+                form.style.display = 'none';
+
+                const returnInput = document.createElement('input');
+                returnInput.type = 'hidden';
+                returnInput.name = 'returnTo';
+                returnInput.value = `${window.location.pathname}${window.location.search || ''}`;
+                form.appendChild(returnInput);
+
+                document.body.appendChild(form);
+                form.submit();
+                return true;
+            }
             consoleInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter' && connectorOnline) {
                     const command = consoleInput.value;
@@ -2251,10 +2276,10 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                         term.writeln('\x1b[1;31m[!] Cannot run macro: connector is offline.\x1b[0m');
                         return;
                     }
-                    const command = String(macroSelect.value || '').trim();
-                    if (!command) return;
-                    client.send('console_input', { command });
-                    term.writeln(`\x1b[1;36m[*] Macro command sent: ${command}\x1b[0m`);
+                    const macroId = String(macroSelect.value || '').trim();
+                    if (!macroId) return;
+                    term.writeln('\x1b[1;36m[*] Running macro flow...\x1b[0m');
+                    submitMacroRun(macroId);
                 });
             }
 

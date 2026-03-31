@@ -3,6 +3,8 @@ const fileUploadEnabled = Boolean(webUploadEnabled);
 const fileUploadMaxMbValue = Math.max(1, Number.parseInt(webUploadMaxMb, 10) || 50);
 const sftpUiEnabled = Boolean(sftpFeatureEnabled !== false);
 const canFixPermissionsSafe = typeof canFixPermissions !== 'undefined' ? Boolean(canFixPermissions) : false;
+const filesWriteLockedSafe = typeof filesWriteLocked !== 'undefined' ? Boolean(filesWriteLocked) : false;
+const policyReadOnlyPatternsSafe = Array.isArray(policyReadOnlyPatterns) ? policyReadOnlyPatterns.filter(Boolean) : [];
 %>
 <!DOCTYPE html>
 <html lang="en">
@@ -789,31 +791,42 @@ const canFixPermissionsSafe = typeof canFixPermissions !== 'undefined' ? Boolean
 
                 <!-- Scroll Area -->
                 <div class="scroll-area">
+                    <% if (filesWriteLockedSafe) { %>
+                    <div class="alert alert-warning border-0 mb-3" style="background: rgba(245, 158, 11, 0.12); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3);">
+                        <i class="bi bi-lock-fill me-2"></i>
+                        File edits are locked for this server. Only admins can create, upload, rename, delete, archive, or change permissions right now.
+                    </div>
+                    <% } else if (policyReadOnlyPatternsSafe.length > 0) { %>
+                    <div class="alert alert-info border-0 mb-3" style="background: rgba(59, 130, 246, 0.12); color: #bfdbfe; border: 1px solid rgba(59, 130, 246, 0.28);">
+                        <i class="bi bi-shield-lock-fill me-2"></i>
+                        Read-only file policy is active for <strong><%= policyReadOnlyPatternsSafe.length %></strong> path pattern<%= policyReadOnlyPatternsSafe.length === 1 ? '' : 's' %>. Matching files stay viewable but cannot be modified.
+                    </div>
+                    <% } %>
                     <div class="file-manager-header">
                         <div id="breadcrumb" class="breadcrumb-container mb-0">
                             <!-- Dynamic breadcrumbs will be rendered here -->
                         </div>
                         <div class="file-actions">
                             <div id="bulkActions" class="me-2">
-                                <a href="#" id="btnBulkRename" class="btn-action me-2">
+                                <a href="#" id="btnBulkRename" class="btn-action me-2 <%= filesWriteLockedSafe ? 'disabled opacity-50' : '' %>" <%= filesWriteLockedSafe ? 'aria-disabled="true"' : '' %>>
                                     <i class="bi bi-input-cursor-text"></i>
                                     <span>Bulk Rename</span>
                                 </a>
-                                <a href="#" id="btnBulkPermissions" class="btn-action me-2">
+                                <a href="#" id="btnBulkPermissions" class="btn-action me-2 <%= filesWriteLockedSafe ? 'disabled opacity-50' : '' %>" <%= filesWriteLockedSafe ? 'aria-disabled="true"' : '' %>>
                                     <i class="bi bi-shield-lock"></i>
                                     <span>Bulk CHMOD</span>
                                 </a>
-                                <a href="#" id="btnBulkArchive" class="btn-action me-2">
+                                <a href="#" id="btnBulkArchive" class="btn-action me-2 <%= filesWriteLockedSafe ? 'disabled opacity-50' : '' %>" <%= filesWriteLockedSafe ? 'aria-disabled="true"' : '' %>>
                                     <i class="bi bi-file-zip"></i>
                                     <span>Archive</span>
                                 </a>
-                                <a href="#" id="btnBulkDelete" class="btn-action btn-danger-soft">
+                                <a href="#" id="btnBulkDelete" class="btn-action btn-danger-soft <%= filesWriteLockedSafe ? 'disabled opacity-50' : '' %>" <%= filesWriteLockedSafe ? 'aria-disabled="true"' : '' %>>
                                     <i class="bi bi-trash3"></i>
                                     <span>Delete <b id="selectedCount">0</b> items</span>
                                 </a>
                             </div>
                             <% if (fileUploadEnabled) { %>
-                            <a href="#" id="btnUploadFiles" class="btn-action me-2">
+                            <a href="#" id="btnUploadFiles" class="btn-action me-2 <%= filesWriteLockedSafe ? 'disabled opacity-50' : '' %>" <%= filesWriteLockedSafe ? 'aria-disabled="true"' : '' %>>
                                 <i class="bi bi-cloud-upload"></i>
                                 <span>Upload</span>
                             </a>
@@ -832,7 +845,7 @@ const canFixPermissionsSafe = typeof canFixPermissions !== 'undefined' ? Boolean
                                 <span>SFTP</span>
                             </a>
                             <% } %>
-                            <% if (canFixPermissionsSafe) { %>
+                            <% if (canFixPermissionsSafe && !filesWriteLockedSafe) { %>
                             <form method="POST" action="/server/<%= server.containerId %>/fix-permissions" class="d-inline me-2">
                                 <button type="submit" class="btn-action" style="background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.35); color: #fcd34d;">
                                     <i class="bi bi-tools"></i>
@@ -840,11 +853,11 @@ const canFixPermissionsSafe = typeof canFixPermissions !== 'undefined' ? Boolean
                                 </button>
                             </form>
                             <% } %>
-                            <a href="#" id="btnNewFile" class="btn-action me-2">
+                            <a href="#" id="btnNewFile" class="btn-action me-2 <%= filesWriteLockedSafe ? 'disabled opacity-50' : '' %>" <%= filesWriteLockedSafe ? 'aria-disabled="true"' : '' %>>
                                 <i class="bi bi-file-earmark-plus"></i>
                                 <span>New File</span>
                             </a>
-                            <a href="#" id="btnNewFolder" class="btn-action">
+                            <a href="#" id="btnNewFolder" class="btn-action <%= filesWriteLockedSafe ? 'disabled opacity-50' : '' %>" <%= filesWriteLockedSafe ? 'aria-disabled="true"' : '' %>>
                                 <i class="bi bi-folder-plus"></i>
                                 <span>New Folder</span>
                             </a>
@@ -1468,6 +1481,7 @@ const canFixPermissionsSafe = typeof canFixPermissions !== 'undefined' ? Boolean
             let lastListRequestId = null;
             const serverId = '<%= server.containerId %>';
             const webUploadEnabled = <%= fileUploadEnabled ? 'true' : 'false' %>;
+            const filesWriteLocked = <%= filesWriteLockedSafe ? 'true' : 'false' %>;
             const webUploadMaxMb = <%= fileUploadMaxMbValue %>;
             const webUploadMaxBytes = webUploadMaxMb * 1024 * 1024;
             const wsToken = '<%= wsToken || "" %>';
@@ -1476,6 +1490,12 @@ const canFixPermissionsSafe = typeof canFixPermissions !== 'undefined' ? Boolean
             let ws;
             let pollingTimer = null;
             let isConnectorOnline = true; // Assume online on load
+
+            function guardWriteLocked(message = 'File edits are locked for this server. Only admins can modify files right now.') {
+                if (!filesWriteLocked) return false;
+                showError(message);
+                return true;
+            }
 
             function startStatusCheck() {
                 if (pollingTimer) return;
@@ -2176,6 +2196,7 @@ const canFixPermissionsSafe = typeof canFixPermissions !== 'undefined' ? Boolean
             if (btnUploadFiles && uploadInput) {
                 btnUploadFiles.addEventListener('click', (e) => {
                     e.preventDefault();
+                    if (guardWriteLocked()) return;
                     if (!webUploadEnabled) {
                         showError('Web upload is disabled by admin.');
                         return;
@@ -3102,6 +3123,7 @@ const canFixPermissionsSafe = typeof canFixPermissions !== 'undefined' ? Boolean
             // New File Handlers
             document.getElementById('btnNewFile').addEventListener('click', (e) => {
                 e.preventDefault();
+                if (guardWriteLocked()) return;
                 if (!newFileModal) return;
                 fileNameInput.value = '';
                 newFileModal.show();
@@ -3109,6 +3131,7 @@ const canFixPermissionsSafe = typeof canFixPermissions !== 'undefined' ? Boolean
             });
 
             document.getElementById('btnConfirmNewFile').addEventListener('click', () => {
+                if (guardWriteLocked()) return;
                 const fileName = fileNameInput.value.trim();
                 if (fileName) {
                     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -3133,6 +3156,7 @@ const canFixPermissionsSafe = typeof canFixPermissions !== 'undefined' ? Boolean
             // New Folder Handlers
             document.getElementById('btnNewFolder').addEventListener('click', (e) => {
                 e.preventDefault();
+                if (guardWriteLocked()) return;
                 if (!newFolderModal) return;
                 folderNameInput.value = '';
                 newFolderModal.show();
@@ -3140,6 +3164,7 @@ const canFixPermissionsSafe = typeof canFixPermissions !== 'undefined' ? Boolean
             });
 
             document.getElementById('btnConfirmNewFolder').addEventListener('click', () => {
+                if (guardWriteLocked()) return;
                 const folderName = folderNameInput.value.trim();
                 if (folderName) {
                     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -3421,6 +3446,7 @@ const canFixPermissionsSafe = typeof canFixPermissions !== 'undefined' ? Boolean
             // Bulk Delete Handler
             document.getElementById('btnBulkDelete').addEventListener('click', (e) => {
                 e.preventDefault();
+                if (guardWriteLocked()) return;
                 if (selectedItems.size === 0 || !deleteModal) return;
                 deleteModalTitle.innerText = `Delete ${selectedItems.size} items?`;
                 deleteModalBody.innerText = `Are you sure you want to permanently delete these ${selectedItems.size} selected items?`;
@@ -3431,6 +3457,7 @@ const canFixPermissionsSafe = typeof canFixPermissions !== 'undefined' ? Boolean
             if (btnBulkRename) {
                 btnBulkRename.addEventListener('click', (e) => {
                     e.preventDefault();
+                    if (guardWriteLocked()) return;
                     if (selectedItems.size === 0 || !bulkRenameModal) return;
                     bulkRenamePrefixInput.value = '';
                     bulkRenameSuffixInput.value = '';
@@ -3444,6 +3471,7 @@ const canFixPermissionsSafe = typeof canFixPermissions !== 'undefined' ? Boolean
             if (btnBulkPermissions) {
                 btnBulkPermissions.addEventListener('click', (e) => {
                     e.preventDefault();
+                    if (guardWriteLocked()) return;
                     if (selectedItems.size === 0 || !bulkPermissionsModal) return;
                     bulkPermissionsInput.value = '644';
                     bulkPermissionsModal.show();
@@ -3455,6 +3483,7 @@ const canFixPermissionsSafe = typeof canFixPermissions !== 'undefined' ? Boolean
             if (btnBulkArchive) {
                 btnBulkArchive.addEventListener('click', (e) => {
                     e.preventDefault();
+                    if (guardWriteLocked()) return;
                     if (selectedItems.size === 0) return;
                     openArchiveModal(Array.from(selectedItems));
                 });

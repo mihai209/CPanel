@@ -1,8 +1,25 @@
 {
   "name": "panel",
-  "version": "0.1-dev",
+  "version": "1.8.0",
+  "public":"true",
   "main": "server.js",
-  "scripts": {
+  "keywords": ["game panel", "minecraft", "server management", "web panel", "docker", "cloud hosting"],
+  "author": "mihai209",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mihai209/panel/issues"
+  },
+  "homepage": "https://cpanel-rocky.netlify.app/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mihai209/panel.git"
+  },
+  "sponsors": {
+    "ko-fi": "https://ko-fi.com/mihai14launcher",
+    "buy-me-a-coffee": "https://www.buymeacoffee.com/mihai14launcher",
+    "github": "https://github.com/sponsors/mihai209"
+  },
+    "scripts": {
     "create-user": "node scripts/create-user.js",
     "start": "node server.js",
     "dev": "nodemon server.js",
@@ -16,10 +33,6 @@
     "kill3000": "npx kill-port 3000",
     "update-panel": "bash ./scripts/update-panel-safe.sh"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
     "axios": "^1.13.5",
     "bcrypt": "^6.0.0",

@@ -66,6 +66,12 @@ const navSections = [
             <button type="button" class="nav-mode-btn" data-server-nav-mode="navbar">Navbar</button>
         </div>
     </div>
+    <% if (typeof serverPolicyBanner !== 'undefined' && serverPolicyBanner && serverPolicyBanner.visible && serverPolicyBanner.text) { %>
+        <div class="server-policy-banner server-policy-banner-<%= serverPolicyBanner.tone === 'warning' ? 'warning' : 'info' %>">
+            <i class="bi <%= serverPolicyBanner.tone === 'warning' ? 'bi-shield-exclamation' : 'bi-info-circle' %>"></i>
+            <span><%= serverPolicyBanner.text %></span>
+        </div>
+    <% } %>
     <% navSections.forEach((section) => { %>
         <div class="sidebar-section">
             <div class="sidebar-section-title"><%= section.title %></div>
@@ -85,6 +91,13 @@ const navSections = [
     <i class="bi bi-grid"></i>
     <span>Server Menu</span>
 </button>
+
+<% if (typeof serverPolicyBanner !== 'undefined' && serverPolicyBanner && serverPolicyBanner.visible && serverPolicyBanner.text) { %>
+    <div class="server-policy-inline-banner server-policy-banner-<%= serverPolicyBanner.tone === 'warning' ? 'warning' : 'info' %>">
+        <i class="bi <%= serverPolicyBanner.tone === 'warning' ? 'bi-shield-exclamation' : 'bi-info-circle' %>"></i>
+        <span><%= serverPolicyBanner.text %></span>
+    </div>
+<% } %>
 
 <div class="server-nav-bar">
     <div class="server-nav-bar-inner">
@@ -216,6 +229,67 @@ const navSections = [
 
     .server-sidebar-panel {
         padding: 0.75rem 0.5rem 1.5rem;
+    }
+
+    .server-policy-banner {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.65rem;
+        margin: 0 0.75rem 1rem;
+        padding: 0.85rem 0.9rem;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        font-size: 0.82rem;
+        line-height: 1.45;
+    }
+
+    .server-policy-banner i {
+        font-size: 1rem;
+        margin-top: 0.08rem;
+        flex-shrink: 0;
+    }
+
+    .server-policy-banner-warning {
+        background: rgba(245, 158, 11, 0.11);
+        border-color: rgba(245, 158, 11, 0.32);
+        color: #fcd34d;
+    }
+
+    .server-policy-banner-info {
+        background: rgba(59, 130, 246, 0.11);
+        border-color: rgba(59, 130, 246, 0.28);
+        color: #bfdbfe;
+    }
+
+    .server-policy-inline-banner {
+        position: fixed;
+        right: 1.2rem;
+        bottom: 5.8rem;
+        max-width: min(420px, calc(100vw - 2.4rem));
+        z-index: 1035;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    :root[data-server-nav="sidebar"] .server-policy-inline-banner {
+        display: none;
+    }
+
+    :root[data-server-nav="navbar"] .server-policy-inline-banner {
+        top: 4.7rem;
+        bottom: auto;
+        left: 1rem;
+        right: 1rem;
+        max-width: none;
+        margin: 0 auto;
+    }
+
+    @media (max-width: 768px) {
+        .server-policy-inline-banner {
+            left: 1rem;
+            right: 1rem;
+            bottom: 5.2rem;
+            max-width: none;
+        }
     }
 
     .server-sidebar-header {
