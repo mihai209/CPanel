@@ -378,15 +378,36 @@
                                                                         currentValue=Object.prototype.hasOwnProperty.call(resolvedVariables
                                                                         || {}, key) ? resolvedVariables[key] :
                                                                         (variable.default_value ?? '' ); %>
+                                                                    <% const selectOptions=Array.isArray(variable.options)
+                                                                        ? variable.options
+                                                                        : (Array.isArray(variable.select_options) ? variable.select_options : []); %>
+                                                                    <% const isSelectField=String(variable.field_type || '').toLowerCase()==='select' && selectOptions.length > 0; %>
                                                                         <div class="col-md-6">
                                                                             <label class="form-label">
                                                                                 <%= label %>
                                                                             </label>
-                                                                            <input type="text"
-                                                                                name="variables[<%= key %>]"
-                                                                                class="form-control"
-                                                                                value="<%= String(currentValue === null || currentValue === undefined ? '' : currentValue) %>"
-                                                                                <%=isEditable ? '' : 'readonly' %>>
+                                                                            <% if (isSelectField) { %>
+                                                                                <select
+                                                                                    name="variables[<%= key %>]"
+                                                                                    class="form-select"
+                                                                                    data-env-variable="<%= key %>"
+                                                                                    <%=isEditable ? '' : 'disabled' %>>
+                                                                                    <% selectOptions.forEach((option) => { %>
+                                                                                        <% const optionValue=typeof option==='object' && option !==null ? (option.value ?? '') : option; %>
+                                                                                        <% const optionLabel=typeof option==='object' && option !==null ? (option.label ?? option.value ?? '') : option; %>
+                                                                                        <option value="<%= String(optionValue) %>" <%= String(currentValue === null || currentValue === undefined ? '' : currentValue)===String(optionValue) ? 'selected' : '' %>>
+                                                                                            <%= String(optionLabel) %>
+                                                                                        </option>
+                                                                                    <% }) %>
+                                                                                </select>
+                                                                            <% } else { %>
+                                                                                <input type="text"
+                                                                                    name="variables[<%= key %>]"
+                                                                                    class="form-control"
+                                                                                    data-env-variable="<%= key %>"
+                                                                                    value="<%= String(currentValue === null || currentValue === undefined ? '' : currentValue) %>"
+                                                                                    <%=isEditable ? '' : 'readonly' %>>
+                                                                            <% } %>
                                                                             <% if (variable.description ||
                                                                                 variable.rules) { %>
                                                                                 <div class="hint mt-2">
@@ -396,9 +417,9 @@
                                                                                                 <code><%= variable.rules %></code></span>
                                                                                             <% } %>
                                                                                 </div>
-                                                                                <% } %>
+                                                                            <% } %>
                                                                         </div>
-                                                                        <% } %>
+                                                            <% } %>
                                                                             <% }) %>
                                                                                 <% } %>
                                 </div>
@@ -453,6 +474,12 @@
 
             const presetSelect = document.getElementById('startupPreset');
             const presetCards = Array.from(document.querySelectorAll('.preset-preview'));
+            const startupVarFields = Array.from(document.querySelectorAll('[data-env-variable]'));
+            const startupVarMap = startupVarFields.reduce((acc, field) => {
+                const key = field.getAttribute('data-env-variable');
+                if (key) acc[key] = field;
+                return acc;
+            }, {});
             function renderPresetPreview() {
                 if (!presetSelect || presetCards.length === 0) return;
                 const selected = presetSelect.value;
@@ -468,6 +495,21 @@
             if (presetSelect) {
                 presetSelect.addEventListener('change', renderPresetPreview);
                 renderPresetPreview();
+            }
+
+            const vpsPresetField = startupVarMap.VPS_PRESET;
+            const vpsDistroField = startupVarMap.VPS_DISTRO;
+            const vpsReleaseField = startupVarMap.VPS_RELEASE;
+            if (vpsPresetField && vpsDistroField && vpsReleaseField) {
+                const syncPresetToFields = () => {
+                    const raw = String(vpsPresetField.value || '').trim();
+                    if (!raw || !raw.includes('|')) return;
+                    const [distro, release] = raw.split('|', 2);
+                    if (distro) vpsDistroField.value = distro;
+                    if (release) vpsReleaseField.value = release;
+                };
+                vpsPresetField.addEventListener('change', syncPresetToFields);
+                syncPresetToFields();
             }
 
             const reinstallBtn = document.getElementById('reinstallBtn');

@@ -754,6 +754,23 @@
                 flex-wrap: wrap;
             }
 
+            .console-state-cluster,
+            .console-power-cluster {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.45rem;
+                padding: 0.28rem 0.35rem;
+                border-radius: 999px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                background: rgba(255, 255, 255, 0.04);
+            }
+
+            .console-power-cluster .btn,
+            .console-state-cluster .btn,
+            .console-state-cluster .badge {
+                border-radius: 999px;
+            }
+
             #terminal {
                 flex: 1;
                 padding: 0.5rem;
@@ -766,6 +783,105 @@
                 padding: 0.6rem 1.1rem;
                 border-top: 1px solid var(--border-color);
                 flex-shrink: 0;
+            }
+
+            .terminal-searchbar {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                padding: 0.55rem 1.1rem;
+                border-bottom: 1px solid var(--border-color);
+                background: rgba(10, 14, 20, 0.92);
+            }
+
+            .terminal-searchbar.d-none {
+                display: none !important;
+            }
+
+            .terminal-searchbar .form-control {
+                max-width: 320px;
+                min-width: 0;
+            }
+
+            .terminal-search-hint {
+                color: var(--text-secondary);
+                font-size: 0.78rem;
+            }
+
+            .terminal-search-count {
+                color: #bfdbfe;
+                font-size: 0.78rem;
+                font-weight: 600;
+            }
+
+            .follow-active {
+                border-color: rgba(16, 185, 129, 0.45) !important;
+                background: rgba(16, 185, 129, 0.12) !important;
+                color: #86efac !important;
+            }
+
+            .terminal-shell {
+                position: relative;
+                flex: 1 1 auto;
+                min-height: 0;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .terminal-jump {
+                position: absolute;
+                right: 1rem;
+                bottom: 1rem;
+                z-index: 7;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.45rem;
+                border-radius: 999px;
+                padding: 0.45rem 0.8rem;
+                border: 1px solid rgba(59, 130, 246, 0.35);
+                background: rgba(13, 17, 23, 0.92);
+                color: #bfdbfe;
+                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+            }
+
+            .terminal-jump .badge {
+                margin-left: 0.1rem;
+            }
+
+            .terminal-context-menu {
+                position: fixed;
+                z-index: 12000;
+                min-width: 180px;
+                padding: 0.45rem;
+                border-radius: 14px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                background: rgba(10, 14, 20, 0.96);
+                box-shadow: 0 18px 42px rgba(0, 0, 0, 0.4);
+                backdrop-filter: blur(10px);
+            }
+
+            .terminal-context-menu.d-none {
+                display: none !important;
+            }
+
+            .terminal-context-item {
+                width: 100%;
+                display: flex;
+                align-items: center;
+                gap: 0.55rem;
+                background: transparent;
+                border: none;
+                color: var(--text-primary);
+                padding: 0.6rem 0.7rem;
+                border-radius: 10px;
+                text-align: left;
+                font-size: 0.88rem;
+            }
+
+            .terminal-context-item:hover {
+                background: rgba(59, 130, 246, 0.12);
+                color: #dbeafe;
             }
 
             .input-group-text {
@@ -954,6 +1070,8 @@ const consoleShortcuts = [
     { action: 'Focus command input', keys: 'Ctrl + K' },
     { action: 'Send command', keys: 'Ctrl + Enter' },
     { action: 'Clear console output', keys: 'Ctrl + L' },
+    { action: 'Search console', keys: 'Ctrl + F' },
+    { action: 'Browse command history', keys: 'Arrow Up / Arrow Down' },
     { action: 'Restart server', keys: 'Ctrl + Shift + R' },
     { action: 'Start/Stop server', keys: 'Ctrl + Shift + S' }
 ];
@@ -1074,10 +1192,11 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                                 </button>
                             </div>
                             <div class="terminal-controls">
-                                <span id="wsStatusBadge" class="badge bg-secondary" title="Panel status">
-                                    <i class="bi bi-arrow-repeat"></i> Connecting...
-                                </span>
-                                <div id="consoleTools" class="d-flex gap-2">
+                                <div class="console-state-cluster">
+                                    <span id="wsStatusBadge" class="badge bg-secondary" title="Panel status">
+                                        <i class="bi bi-arrow-repeat"></i> Connecting...
+                                    </span>
+                                    <div id="consoleTools" class="d-flex gap-2">
                                     <button id="btnFontMinus" class="btn btn-outline-secondary btn-sm" title="Font size -">
                                         <i class="bi bi-dash-lg"></i>
                                     </button>
@@ -1086,6 +1205,12 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                                     </button>
                                     <button id="btnClear" class="btn btn-outline-secondary btn-sm" title="Clear console">
                                         <i class="bi bi-trash3"></i>
+                                    </button>
+                                    <button id="btnSearch" class="btn btn-outline-secondary btn-sm" title="Search console">
+                                        <i class="bi bi-search"></i>
+                                    </button>
+                                    <button id="btnFollow" class="btn btn-outline-secondary btn-sm" title="Follow output">
+                                        <i class="bi bi-arrow-down-circle"></i>
                                     </button>
                                     <button class="btn btn-outline-secondary btn-sm" title="Keyboard shortcuts" data-shortcuts-modal="consoleShortcutsModal">
                                         <i class="bi bi-keyboard"></i>
@@ -1097,7 +1222,8 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                                         <i class="bi bi-robot"></i>
                                     </button>
                                 </div>
-                                <div id="powerActions" class="d-flex gap-2">
+                                </div>
+                                <div id="powerActions" class="console-power-cluster">
                                     <button id="btnPopout" class="btn btn-outline-secondary btn-sm"
                                         data-server-id="<%= server.containerId %>">
                                         <i class="bi bi-box-arrow-up-right"></i> Popout
@@ -1147,7 +1273,46 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                                 <div id="provisioningAdminLog" class="provisioning-admin-log"></div>
                             </div>
                         </div>
-                        <div id="terminal"></div>
+                        <div id="terminalSearchbar" class="terminal-searchbar d-none">
+                            <input type="text" id="terminalSearchInput" class="form-control form-control-sm" placeholder="Search console...">
+                            <button id="btnSearchPrev" class="btn btn-outline-secondary btn-sm" type="button">
+                                <i class="bi bi-chevron-up"></i>
+                            </button>
+                            <button id="btnSearchNext" class="btn btn-outline-secondary btn-sm" type="button">
+                                <i class="bi bi-chevron-down"></i>
+                            </button>
+                            <button id="btnSearchClose" class="btn btn-outline-secondary btn-sm" type="button">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                            <span id="terminalSearchCount" class="terminal-search-count">0 matches</span>
+                            <span class="terminal-search-hint">Ctrl+F to search</span>
+                        </div>
+                        <div class="terminal-shell">
+                            <div id="terminal"></div>
+                            <button id="btnJumpLatest" class="terminal-jump d-none" type="button">
+                                <i class="bi bi-arrow-down-circle"></i>
+                                <span>Jump to latest</span>
+                                <span id="terminalUnreadCount" class="badge bg-primary">0</span>
+                            </button>
+                        </div>
+                        <div id="terminalContextMenu" class="terminal-context-menu d-none">
+                            <button type="button" class="terminal-context-item" data-terminal-action="copy-selection">
+                                <i class="bi bi-copy"></i>
+                                <span>Copy selection</span>
+                            </button>
+                            <button type="button" class="terminal-context-item" data-terminal-action="paste-input">
+                                <i class="bi bi-clipboard"></i>
+                                <span>Paste into command</span>
+                            </button>
+                            <button type="button" class="terminal-context-item" data-terminal-action="search-console">
+                                <i class="bi bi-search"></i>
+                                <span>Search console</span>
+                            </button>
+                            <button type="button" class="terminal-context-item" data-terminal-action="clear-console">
+                                <i class="bi bi-trash3"></i>
+                                <span>Clear console</span>
+                            </button>
+                        </div>
                         <div class="terminal-footer">
                             <% if (canUseMacros && Array.isArray(commandMacros) && commandMacros.length > 0) { %>
                                 <div class="d-flex flex-wrap gap-2 mb-2">
@@ -1220,6 +1385,9 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
         <script src="https://cdn.jsdelivr.net/npm/xterm@5.2.1/lib/xterm.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.7.0/lib/xterm-addon-fit.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm-addon-search@0.13.0/lib/xterm-addon-search.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.8.0/lib/xterm-addon-web-links.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm-addon-unicode11@0.6.0/lib/xterm-addon-unicode11.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/xterm-addon-webgl@0.16.0/lib/xterm-addon-webgl.js"></script>
 
         <script>
@@ -1256,6 +1424,7 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
             const serverMemory = <%= server.memory || 0 %>;
             const serverDisk = <%= server.disk || 0 %>;
             let currentServerStatus = '<%= String(server.status || "stopped").toLowerCase() %>';
+            const consoleReplayStorageKey = `cpanel.console.replay.<%= server.containerId %>`;
             const restrictedProvisioningViewer = <%= isRestrictedProvisioningViewer ? 'true' : 'false' %>;
             const promptBrand = <%- JSON.stringify(String((settings && settings.brandName) ? settings.brandName : 'cpanel').toLowerCase()) %>;
             const isAdminConsoleViewer = <%= user && user.isAdmin ? 'true' : 'false' %>;
@@ -1436,14 +1605,49 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                 fontFamily: 'Menlo, Monaco, "Courier New", monospace',
                 fontSize: 13,
                 cursorBlink: true,
-                scrollback: 1000,
+                scrollback: 5000,
                 convertEol: true
             });
-            let consoleFontSize = 13;
+            const consoleStateStorageKey = `cpanel.console.state.<%= server.containerId %>`;
+            const commandHistoryStorageKey = `cpanel.console.history.<%= server.containerId %>`;
+            const persistedConsoleState = (() => {
+                try {
+                    return JSON.parse(localStorage.getItem(consoleStateStorageKey) || '{}') || {};
+                } catch (error) {
+                    return {};
+                }
+            })();
+            let consoleFontSize = Number(persistedConsoleState.fontSize) || 13;
+            let followConsoleOutput = persistedConsoleState.follow !== false;
+            let hasReceivedLiveConsoleOutput = false;
+            let consoleReplayCache = '';
+            const maxReplayChars = 250000;
+            let consolePlainBuffer = '';
+            let commandHistory = (() => {
+                try {
+                    const parsed = JSON.parse(localStorage.getItem(commandHistoryStorageKey) || '[]');
+                    return Array.isArray(parsed) ? parsed.filter((entry) => typeof entry === 'string' && entry.trim()).slice(0, 32) : [];
+                } catch (error) {
+                    return [];
+                }
+            })();
+            let commandHistoryIndex = -1;
+            let unreadConsoleLines = 0;
 
             const fitAddon = new FitAddon.FitAddon();
+            const searchAddon = new SearchAddon.SearchAddon();
+            const webLinksAddon = new WebLinksAddon.WebLinksAddon();
+            const unicode11Addon = new Unicode11Addon.Unicode11Addon();
             term.loadAddon(fitAddon);
+            term.loadAddon(searchAddon);
+            term.loadAddon(webLinksAddon);
+            term.loadAddon(unicode11Addon);
             term.open(document.getElementById('terminal'));
+            try {
+                term.unicode.activeVersion = '11';
+            } catch (error) {
+                console.warn('Unicode11 addon could not be activated.', error);
+            }
 
             try {
                 const webglAddon = new WebglAddon.WebglAddon();
@@ -1454,6 +1658,7 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                 console.warn('xterm WebGL addon could not load. Falling back to default renderer.', e);
             }
 
+            term.options.fontSize = consoleFontSize;
             fitAddon.fit();
 
             const provisioningPanel = document.getElementById('provisioningPanel');
@@ -1771,12 +1976,25 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                     switch (data.type) {
                         case 'console_output':
                             const cleanOutput = this.scrubAnsi(data.output);
+                            hasReceivedLiveConsoleOutput = true;
                             appendAdminInstallLog(stripAnsiSequences(cleanOutput));
                             const provisioningMatched = handleProvisioningLogLine(cleanOutput);
                             if (!provisioningMatched || isAdminConsoleViewer) {
                                 const mcStyledOutput = this.translateMinecraftFormatting(cleanOutput);
                                 const styledOutput = this.translateAdventureFormatting(mcStyledOutput);
-                                term.write(this.rewritePromptBrand(styledOutput));
+                                const finalOutput = this.rewritePromptBrand(styledOutput);
+                                term.write(finalOutput);
+                                appendReplayChunk(finalOutput);
+                                appendPlainBuffer(stripAnsiSequences(finalOutput));
+                                updateSearchMatchCount(terminalSearchInput?.value || '');
+                                if (followConsoleOutput || isTerminalAtBottom()) {
+                                    term.scrollToBottom();
+                                    resetUnreadConsole();
+                                } else {
+                                    unreadConsoleLines += Math.max(1, String(cleanOutput || '').split('\n').filter(Boolean).length);
+                                    if (terminalUnreadCount) terminalUnreadCount.textContent = String(unreadConsoleLines);
+                                    btnJumpLatest?.classList.remove('d-none');
+                                }
                             }
                             break;
                         case 'server_status_update':
@@ -2192,6 +2410,197 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
             const consoleInput = document.getElementById('consoleInput');
             const macroSelect = document.getElementById('macroSelect');
             const btnRunMacro = document.getElementById('btnRunMacro');
+            const btnSearch = document.getElementById('btnSearch');
+            const btnFollow = document.getElementById('btnFollow');
+            const btnJumpLatest = document.getElementById('btnJumpLatest');
+            const terminalUnreadCount = document.getElementById('terminalUnreadCount');
+            const terminalSearchbar = document.getElementById('terminalSearchbar');
+            const terminalSearchInput = document.getElementById('terminalSearchInput');
+            const btnSearchPrev = document.getElementById('btnSearchPrev');
+            const btnSearchNext = document.getElementById('btnSearchNext');
+            const btnSearchClose = document.getElementById('btnSearchClose');
+            const terminalSearchCount = document.getElementById('terminalSearchCount');
+            const terminalContextMenu = document.getElementById('terminalContextMenu');
+
+            function persistConsoleState() {
+                localStorage.setItem(consoleStateStorageKey, JSON.stringify({
+                    fontSize: consoleFontSize,
+                    follow: followConsoleOutput
+                }));
+            }
+
+            function persistReplayCache() {
+                try {
+                    sessionStorage.setItem(consoleReplayStorageKey, consoleReplayCache);
+                } catch (error) {
+                    console.warn('Failed to persist console replay cache.', error);
+                }
+            }
+
+            function appendReplayChunk(chunk) {
+                if (!chunk) return;
+                consoleReplayCache += String(chunk);
+                if (consoleReplayCache.length > maxReplayChars) {
+                    consoleReplayCache = consoleReplayCache.slice(-maxReplayChars);
+                }
+                persistReplayCache();
+            }
+
+            function clearReplayCache() {
+                consoleReplayCache = '';
+                consolePlainBuffer = '';
+                try {
+                    sessionStorage.removeItem(consoleReplayStorageKey);
+                } catch (error) {
+                    console.warn('Failed to clear console replay cache.', error);
+                }
+            }
+
+            function appendPlainBuffer(chunk) {
+                if (!chunk) return;
+                consolePlainBuffer += String(chunk);
+                if (consolePlainBuffer.length > maxReplayChars) {
+                    consolePlainBuffer = consolePlainBuffer.slice(-maxReplayChars);
+                }
+            }
+
+            function updateSearchMatchCount(query) {
+                if (!terminalSearchCount) return;
+                const needle = String(query || '');
+                if (!needle) {
+                    terminalSearchCount.textContent = '0 matches';
+                    return;
+                }
+                try {
+                    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const matches = consolePlainBuffer.match(new RegExp(escaped, 'gi'));
+                    terminalSearchCount.textContent = `${matches ? matches.length : 0} matches`;
+                } catch (error) {
+                    terminalSearchCount.textContent = '0 matches';
+                }
+            }
+
+            function persistCommandHistory() {
+                localStorage.setItem(commandHistoryStorageKey, JSON.stringify(commandHistory.slice(0, 32)));
+            }
+
+            function resetUnreadConsole() {
+                unreadConsoleLines = 0;
+                if (terminalUnreadCount) terminalUnreadCount.textContent = '0';
+                btnJumpLatest?.classList.add('d-none');
+            }
+
+            function isTerminalAtBottom() {
+                return term.buffer.active.viewportY >= term.buffer.active.baseY;
+            }
+
+            function setFollowConsoleOutput(nextValue) {
+                followConsoleOutput = Boolean(nextValue);
+                btnFollow?.classList.toggle('follow-active', followConsoleOutput);
+                btnFollow?.setAttribute('title', followConsoleOutput ? 'Following output' : 'Follow output');
+                if (followConsoleOutput) {
+                    term.scrollToBottom();
+                    resetUnreadConsole();
+                }
+                persistConsoleState();
+            }
+
+            function recordCommandHistory(command) {
+                const trimmed = String(command || '').trim();
+                if (!trimmed) return;
+                commandHistory = [trimmed, ...commandHistory.filter((entry) => entry !== trimmed)].slice(0, 32);
+                commandHistoryIndex = -1;
+                persistCommandHistory();
+            }
+
+            function sendConsoleCommand(command) {
+                const value = String(command || '').trim();
+                if (!connectorOnline || !value) return false;
+                client.send('console_input', { command: value });
+                recordCommandHistory(value);
+                if (consoleInput) consoleInput.value = '';
+                return true;
+            }
+
+            function setCommandInputFromHistory(direction) {
+                if (!consoleInput || !commandHistory.length) return;
+                if (direction === 'up') {
+                    commandHistoryIndex = Math.min(commandHistoryIndex + 1, commandHistory.length - 1);
+                } else {
+                    commandHistoryIndex = Math.max(commandHistoryIndex - 1, -1);
+                }
+                consoleInput.value = commandHistoryIndex >= 0 ? (commandHistory[commandHistoryIndex] || '') : '';
+                requestAnimationFrame(() => {
+                    const len = consoleInput.value.length;
+                    consoleInput.setSelectionRange(len, len);
+                });
+            }
+
+            function toggleTerminalSearch(forceOpen = null) {
+                if (!terminalSearchbar) return;
+                const shouldOpen = forceOpen === null ? terminalSearchbar.classList.contains('d-none') : Boolean(forceOpen);
+                terminalSearchbar.classList.toggle('d-none', !shouldOpen);
+                if (shouldOpen) {
+                    updateSearchMatchCount(terminalSearchInput?.value || '');
+                    terminalSearchInput?.focus();
+                    terminalSearchInput?.select();
+                } else {
+                    consoleInput?.focus();
+                }
+            }
+
+            async function copyTerminalSelection() {
+                const selected = term.getSelection();
+                if (!selected) return false;
+                try {
+                    await navigator.clipboard.writeText(selected);
+                    showConsoleStatus('Selection copied to clipboard.');
+                    return true;
+                } catch (error) {
+                    showConsoleStatus('Clipboard copy failed.');
+                    return false;
+                }
+            }
+
+            function hideTerminalContextMenu() {
+                terminalContextMenu?.classList.add('d-none');
+            }
+
+            function showTerminalContextMenu(x, y) {
+                if (!terminalContextMenu) return;
+                terminalContextMenu.classList.remove('d-none');
+                const maxX = window.innerWidth - terminalContextMenu.offsetWidth - 12;
+                const maxY = window.innerHeight - terminalContextMenu.offsetHeight - 12;
+                terminalContextMenu.style.left = `${Math.max(12, Math.min(x, maxX))}px`;
+                terminalContextMenu.style.top = `${Math.max(12, Math.min(y, maxY))}px`;
+            }
+
+            function restoreReplayCacheIfNeeded() {
+                if (currentServerStatus !== 'stopped') return;
+                try {
+                    const saved = sessionStorage.getItem(consoleReplayStorageKey) || '';
+                    if (!saved || hasReceivedLiveConsoleOutput) return;
+                    consoleReplayCache = saved.slice(-maxReplayChars);
+                    term.write(consoleReplayCache);
+                    appendPlainBuffer(stripAnsiSequences(consoleReplayCache));
+                    updateSearchMatchCount(terminalSearchInput?.value || '');
+                    if (followConsoleOutput) {
+                        term.scrollToBottom();
+                    }
+                } catch (error) {
+                    console.warn('Failed to restore console replay cache.', error);
+                }
+            }
+
+            term.onScroll(() => {
+                if (isTerminalAtBottom()) {
+                    resetUnreadConsole();
+                }
+            });
+
+            setFollowConsoleOutput(followConsoleOutput);
+            restoreReplayCacheIfNeeded();
+
             function submitMacroRun(macroId) {
                 const id = Number.parseInt(macroId, 10);
                 if (!Number.isInteger(id) || id <= 0) return false;
@@ -2212,11 +2621,17 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
             }
             consoleInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter' && connectorOnline) {
-                    const command = consoleInput.value;
-                    if (command) {
-                        client.send('console_input', { command });
-                        consoleInput.value = '';
-                    }
+                    sendConsoleCommand(consoleInput.value);
+                }
+            });
+
+            consoleInput.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setCommandInputFromHistory('up');
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setCommandInputFromHistory('down');
                 }
             });
 
@@ -2241,14 +2656,14 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                     }
                     return;
                 }
+                if ((e.ctrlKey || e.metaKey) && key === 'f') {
+                    e.preventDefault();
+                    toggleTerminalSearch(true);
+                    return;
+                }
                 if ((e.ctrlKey || e.metaKey) && key === 'enter') {
                     e.preventDefault();
-                    if (!connectorOnline) return;
-                    const command = consoleInput ? consoleInput.value : '';
-                    if (command) {
-                        client.send('console_input', { command });
-                        if (consoleInput) consoleInput.value = '';
-                    }
+                    sendConsoleCommand(consoleInput ? consoleInput.value : '');
                     return;
                 }
                 if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 'r') {
@@ -2299,6 +2714,7 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                 consoleFontSize = size;
                 term.options.fontSize = size;
                 fitAddon.fit();
+                persistConsoleState();
             }
 
             if (btnFontMinus) {
@@ -2310,8 +2726,79 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
             }
 
             if (btnClear) {
-                btnClear.addEventListener('click', () => term.clear());
+                btnClear.addEventListener('click', () => {
+                    term.clear();
+                    clearReplayCache();
+                    updateSearchMatchCount(terminalSearchInput?.value || '');
+                });
             }
+
+            btnSearch?.addEventListener('click', () => toggleTerminalSearch());
+            btnFollow?.addEventListener('click', () => setFollowConsoleOutput(!followConsoleOutput));
+            btnJumpLatest?.addEventListener('click', () => {
+                term.scrollToBottom();
+                setFollowConsoleOutput(true);
+            });
+            btnSearchPrev?.addEventListener('click', () => {
+                searchAddon.findPrevious(terminalSearchInput?.value || '', { incremental: true, decorations: true });
+            });
+            btnSearchNext?.addEventListener('click', () => {
+                searchAddon.findNext(terminalSearchInput?.value || '', { incremental: true, decorations: true });
+            });
+            btnSearchClose?.addEventListener('click', () => toggleTerminalSearch(false));
+            terminalSearchInput?.addEventListener('input', () => {
+                updateSearchMatchCount(terminalSearchInput.value || '');
+                searchAddon.findNext(terminalSearchInput.value || '', { incremental: true, decorations: true });
+            });
+            terminalSearchInput?.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    searchAddon.findNext(terminalSearchInput.value || '', { incremental: true, decorations: true });
+                } else if (event.key === 'Escape') {
+                    event.preventDefault();
+                    toggleTerminalSearch(false);
+                }
+            });
+
+            const terminalHost = document.getElementById('terminal');
+            terminalHost?.addEventListener('mouseup', () => {
+                if (term.getSelection()) {
+                    copyTerminalSelection();
+                }
+            });
+            terminalHost?.addEventListener('contextmenu', (event) => {
+                event.preventDefault();
+                showTerminalContextMenu(event.clientX, event.clientY);
+            });
+            terminalContextMenu?.addEventListener('click', async (event) => {
+                const target = event.target && event.target.closest ? event.target.closest('[data-terminal-action]') : null;
+                if (!target) return;
+                const action = target.getAttribute('data-terminal-action');
+                hideTerminalContextMenu();
+                if (action === 'copy-selection') {
+                    await copyTerminalSelection();
+                } else if (action === 'paste-input') {
+                    try {
+                        const text = await navigator.clipboard.readText();
+                        if (consoleInput) {
+                            consoleInput.value += text;
+                            consoleInput.focus();
+                        }
+                    } catch (error) {
+                        showConsoleStatus('Clipboard paste failed.');
+                    }
+                } else if (action === 'search-console') {
+                    toggleTerminalSearch(true);
+                } else if (action === 'clear-console') {
+                    btnClear?.click();
+                }
+            });
+            document.addEventListener('click', (event) => {
+                if (!terminalContextMenu || terminalContextMenu.classList.contains('d-none')) return;
+                if (terminalContextMenu.contains(event.target)) return;
+                hideTerminalContextMenu();
+            });
+            window.addEventListener('blur', hideTerminalContextMenu);
 
             document.getElementById('btnStart').addEventListener('click', () => sendPower('start'));
             document.getElementById('btnRestart').addEventListener('click', () => sendPower('restart'));
@@ -2382,6 +2869,9 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                 }
 
                 if (previousStatus === nextStatus) return;
+                if (nextStatus === 'running') {
+                    clearReplayCache();
+                }
 
                 const provisioningContext = provisioningState.active || isProvisioningStatus(previousStatus) || isProvisioningStatus(nextStatus);
                 if (provisioningContext) {
