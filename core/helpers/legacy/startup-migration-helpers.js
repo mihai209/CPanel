@@ -269,7 +269,7 @@ function parseRuleTokens(rulesString) {
     }
 
     const regexTokens = [];
-    const placeholderSafe = rulesString.replace(/regex:\/(?:\\.|[^/])+\/[a-z]*/gi, (match) => {
+    const placeholderSafe = rulesString.replace(/regex:\/(?:\\.|[^/\\])+\/[a-z]*/gi, (match) => {
         const tokenId = regexTokens.length;
         regexTokens.push(match);
         return `__REGEX_TOKEN_${tokenId}__`;
