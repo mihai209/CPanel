@@ -1,0 +1,44 @@
+name: Build VPS Rootfs Archives
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to publish to
+        required: true
+        default: latest
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - distro: ubuntu
+            release: "24.04"
+            arch: amd64
+          - distro: debian
+            release: "12"
+            arch: amd64
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install debootstrap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y debootstrap
+
+      - name: Build rootfs archive
+        run: |
+          chmod +x images/misc/cpanel-vps-rootfs/build-rootfs.sh
+          images/misc/cpanel-vps-rootfs/build-rootfs.sh "${{ matrix.distro }}" "${{ matrix.release }}" "${{ matrix.arch }}" "${{ github.workspace }}/dist"
+
+      - name: Publish release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          files: dist/*.tar.xz
+

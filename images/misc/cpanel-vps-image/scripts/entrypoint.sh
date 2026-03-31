@@ -18,6 +18,8 @@ internalip=${SERVER_IP:-127.0.0.1}
 port=${SERVER_PORT:-}
 hostname=${VPS_HOSTNAME:-my-vps}
 timezone=${TIMEZONE:-UTC}
+distro=${VPS_DISTRO:-ubuntu}
+release=${VPS_RELEASE:-24.04}
 EOF
 fi
 
