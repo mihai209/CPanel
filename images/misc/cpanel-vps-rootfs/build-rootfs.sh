@@ -7,6 +7,21 @@ RELEASE="${2:-24.04}"
 ARCH="${3:-amd64}"
 OUT_DIR="${4:-$(pwd)/dist}"
 
+resolve_suite() {
+    local distro="$1"
+    local release="$2"
+    case "${distro}:${release}" in
+        ubuntu:22.04) echo "jammy" ;;
+        ubuntu:24.04) echo "noble" ;;
+        debian:12) echo "bookworm" ;;
+        debian:13) echo "trixie" ;;
+        *)
+            echo "Unsupported distro/release pair: ${distro} ${release}" >&2
+            return 1
+            ;;
+    esac
+}
+
 case "${DISTRO}" in
     ubuntu|debian) ;;
     *)
@@ -29,6 +44,7 @@ if ! command -v debootstrap >/dev/null 2>&1; then
 fi
 
 ROOTFS_NAME="${DISTRO}-${RELEASE}-${ARCH}"
+SUITE="$(resolve_suite "${DISTRO}" "${RELEASE}")"
 WORK_DIR="$(mktemp -d)"
 ROOTFS_DIR="${WORK_DIR}/rootfs"
 
@@ -54,7 +70,7 @@ sudo debootstrap \
     --arch="${ARCH}" \
     --variant=minbase \
     "${FOREIGN_ARGS[@]}" \
-    "${RELEASE}" \
+    "${SUITE}" \
     "${ROOTFS_DIR}" \
     "${MIRROR}"
 
