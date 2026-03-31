@@ -1,14 +1,22 @@
 <%
 const currentAdminPath = String(path || '');
+const adminSidebarRuntimeBadges = (typeof adminSidebarBadges !== 'undefined' && adminSidebarBadges) ? adminSidebarBadges : {};
+const buildAdminBadge = (label, tone = 'info') => label ? { label, tone } : null;
+const adminRedisEnabled = Boolean(typeof redisInfo !== 'undefined' && redisInfo && redisInfo.enabled);
+const adminRedisReady = Boolean(typeof redisInfo !== 'undefined' && redisInfo && redisInfo.enabled && redisInfo.ready);
+const navBadgeForItem = (item) => {
+    if (isAdminNavActive(item)) return buildAdminBadge('Open', 'info');
+    return item.badge || null;
+};
 const adminNavSections = [
     {
         title: 'Core',
         items: [
             { href: '/', icon: 'bi-house', label: 'Exit admin mode' },
-            { href: '/admin/overview', icon: 'bi-house-door', label: 'Overview' },
+            { href: '/admin/overview', icon: 'bi-house-door', label: 'Overview', badge: buildAdminBadge('Home', 'info') },
             { href: '/admin/settings', icon: 'bi-gear', label: 'Settings' },
             { href: '/admin/platform', icon: 'bi-command', label: 'Platform Ops' },
-            { href: '/admin/incidents', icon: 'bi-exclamation-triangle', label: 'Incident Center' },
+            { href: '/admin/incidents', icon: 'bi-exclamation-triangle', label: 'Incident Center', badge: adminSidebarRuntimeBadges.incidents || buildAdminBadge('Live', 'danger') },
             { href: '/admin/logs', icon: 'bi-file-text', label: 'Logs' }
         ]
     },
@@ -25,24 +33,24 @@ const adminNavSections = [
     {
         title: 'Infrastructure',
         items: [
-            { href: '/admin/connectors', icon: 'bi-diagram-3', label: 'Connectors' },
+            { href: '/admin/connectors', icon: 'bi-diagram-3', label: 'Connectors', badge: buildAdminBadge('Ops', 'info') },
             { href: '/admin/allocations/drift', icon: 'bi-wrench-adjustable', label: 'Allocation Drift' },
-            { href: '/admin/connect-info', icon: 'bi-activity', label: 'Connector(s) Health' },
+            { href: '/admin/connect-info', icon: 'bi-activity', label: 'Connector(s) Health', badge: buildAdminBadge('Live', 'success') },
             { href: '/admin/locations', icon: 'bi-geo-alt', label: 'Locations' },
             { href: '/admin/users', icon: 'bi-people', label: 'Users' },
             { href: '/admin/servers', icon: 'bi-hdd-stack', label: 'Servers' },
             { href: '/admin/databases', icon: 'bi-database', label: 'Databases' },
             { href: '/admin/mounts', icon: 'bi-link-45deg', label: 'Mounts' },
-            { href: '/admin/redis', icon: 'bi-hdd-network', label: 'Redis' },
-            { href: '/admin/ai-agents', icon: 'bi-robot', label: 'AI Agents' }
+            { href: '/admin/redis', icon: 'bi-hdd-network', label: 'Redis', badge: adminRedisReady ? buildAdminBadge('Ready', 'success') : (adminRedisEnabled ? buildAdminBadge('Config', 'warning') : buildAdminBadge('Setup', 'muted')) },
+            { href: '/admin/ai-agents', icon: 'bi-robot', label: 'AI Agents', badge: buildAdminBadge('AI', 'violet') }
         ]
     },
     {
         title: 'Security',
         items: [
             { href: '/admin/abuse-scores', icon: 'bi-shield-exclamation', label: 'Abuse Scores' },
-            { href: '/admin/sentry-seeker', icon: 'bi-shield-lock-fill', label: 'Sentry Seeker' },
-            { href: '/admin/service-health-checks', icon: 'bi-heart-pulse', label: 'Health Checks' },
+            { href: '/admin/sentry-seeker', icon: 'bi-shield-lock-fill', label: 'Sentry Seeker', badge: buildAdminBadge('Shield', 'danger') },
+            { href: '/admin/service-health-checks', icon: 'bi-heart-pulse', label: 'Health Checks', badge: buildAdminBadge('Live', 'success') },
             { href: '/admin/auth-providers', icon: 'bi-shield-lock', label: 'Auth Providers' },
             { href: '/admin/captcha', icon: 'bi-robot', label: 'Captcha' },
             { href: '/admin/api', icon: 'bi-code-square', label: 'CPanel API' }
@@ -55,7 +63,7 @@ const adminNavSections = [
             { href: '/admin/packages', icon: 'bi-box', label: 'Packages' },
             { href: '/admin/migrations/pterodactyl', icon: 'bi-arrow-left-right', label: 'Migrations' },
             { href: '/admin/extensions', icon: 'bi-puzzle', label: 'Extensions' },
-            { href: '/admin/themes', icon: 'bi-palette', label: 'Themes' },
+            { href: '/admin/themes', icon: 'bi-palette', label: 'Themes', badge: buildAdminBadge('UI', 'violet') },
             { href: '/admin/lang', icon: 'bi-translate', label: 'Languages' }
         ]
     }
@@ -72,26 +80,56 @@ const isAdminNavActive = (item) => {
 %>
 
 <div id="adminSidebar" class="admin-sidebar-modal-host" aria-hidden="true">
-    <div class="sidebar-header">
-        <span class="sidebar-brand"><%= (settings.brandName || 'CPanel').toUpperCase() %></span>
+    <div class="sidebar-header admin-sidebar-header">
+        <div class="admin-sidebar-brand-wrap">
+            <div class="admin-sidebar-brand-mark">
+                <img src="<%= settings.faviconUrl %>" alt="Brand" width="28" height="28">
+            </div>
+            <div class="admin-sidebar-brand-copy">
+                <span class="sidebar-brand"><%= (settings.brandName || 'CPanel').toUpperCase() %></span>
+                <small>Admin control surface</small>
+            </div>
+        </div>
     </div>
     <div class="admin-sidebar-panel">
         <% adminNavSections.forEach((section) => { %>
-            <div class="small-heading px-3"><%= section.title %></div>
-            <div class="nav flex-column px-2 mb-2">
+            <section class="admin-sidebar-section">
+                <div class="admin-section-head px-3">
+                    <div class="small-heading mb-0"><%= section.title %></div>
+                    <span class="admin-section-count"><%= section.items.length %></span>
+                </div>
+                <div class="nav flex-column px-2 mb-2 admin-sidebar-links">
                 <% section.items.forEach((item) => { %>
                     <a href="<%= item.href %>" class="nav-link <%= isAdminNavActive(item) ? 'active' : '' %>">
-                        <i class="bi <%= item.icon %>"></i>
-                        <span class="sidebar-text"><%= item.label %></span>
+                        <span class="admin-nav-icon-box"><i class="bi <%= item.icon %>"></i></span>
+                        <span class="admin-nav-copy">
+                            <span class="sidebar-text"><%= item.label %></span>
+                            <small><%= item.href === '/' ? 'Back to user panel' : item.href.replace('/admin/', '').replaceAll('-', ' ') %></small>
+                        </span>
+                        <% const adminBadge = navBadgeForItem(item); %>
+                        <% if (adminBadge) { %>
+                            <span class="admin-item-badge admin-item-badge-<%= adminBadge.tone || 'info' %>"><%= adminBadge.label %></span>
+                        <% } %>
+                        <i class="bi bi-chevron-right admin-nav-chevron"></i>
                     </a>
                 <% }) %>
-            </div>
+                </div>
+            </section>
         <% }) %>
         <div class="admin-sidebar-mode px-3 py-3">
             <div class="nav-mode-switch admin-nav-mode-switch">
                 <button type="button" class="nav-mode-btn" data-admin-nav-mode="modal">Popup</button>
                 <button type="button" class="nav-mode-btn" data-admin-nav-mode="sidebar">Sidebar</button>
                 <button type="button" class="nav-mode-btn" data-admin-nav-mode="navbar">Navbar</button>
+            </div>
+        </div>
+        <div class="admin-sidebar-footer px-3 pb-3">
+            <div class="admin-sidebar-user-chip">
+                <img src="<%= user.avatarUrl || `https://www.gravatar.com/avatar/${user.gravatarHash}?d=retro` %>" alt="<%= user.username %>" width="34" height="34">
+                <div>
+                    <strong>@<%= user.username %></strong>
+                    <small>Administrator</small>
+                </div>
             </div>
         </div>
     </div>
@@ -187,6 +225,10 @@ const isAdminNavActive = (item) => {
                         <a href="<%= item.href %>" class="admin-nav-link <%= isAdminNavActive(item) ? 'active' : '' %>">
                             <i class="bi <%= item.icon %>"></i>
                             <span><%= item.label %></span>
+                            <% const adminNavbarBadge = navBadgeForItem(item); %>
+                            <% if (adminNavbarBadge) { %>
+                                <span class="admin-navbar-badge admin-item-badge-<%= adminNavbarBadge.tone || 'info' %>"><%= adminNavbarBadge.label %></span>
+                            <% } %>
                         </a>
                     <% }) %>
                 </div>
@@ -220,6 +262,10 @@ const isAdminNavActive = (item) => {
                                         <div class="admin-menu-label"><%= item.label %></div>
                                         <div class="admin-menu-desc">Open <%= item.label.toLowerCase() %></div>
                                     </div>
+                                    <% const adminMenuBadge = navBadgeForItem(item); %>
+                                    <% if (adminMenuBadge) { %>
+                                        <span class="admin-menu-badge admin-item-badge-<%= adminMenuBadge.tone || 'info' %>"><%= adminMenuBadge.label %></span>
+                                    <% } %>
                                 </a>
                             <% }) %>
                         </div>
@@ -308,7 +354,254 @@ const isAdminNavActive = (item) => {
     }
 
     .admin-sidebar-panel {
-        padding: 0.75rem 0.5rem 1.5rem;
+        padding: 0.75rem 0.55rem 1.1rem;
+    }
+
+    .admin-sidebar-header {
+        padding: 1rem 1rem 0.35rem;
+        border-bottom: 0;
+    }
+
+    .admin-sidebar-brand-wrap {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+    }
+
+    .admin-sidebar-brand-mark {
+        width: 48px;
+        height: 48px;
+        border-radius: 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background:
+            radial-gradient(circle at 30% 25%, rgba(255,255,255,0.18), transparent 30%),
+            linear-gradient(180deg, rgba(93,126,255,0.28), rgba(93,126,255,0.12));
+        border: 1px solid rgba(255,255,255,0.09);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+        overflow: hidden;
+    }
+
+    .admin-sidebar-brand-mark img {
+        width: 28px;
+        height: 28px;
+        object-fit: cover;
+        border-radius: 10px;
+    }
+
+    .admin-sidebar-brand-copy {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .admin-sidebar-brand-copy .sidebar-brand {
+        letter-spacing: 0.04em;
+    }
+
+    .admin-sidebar-brand-copy small {
+        color: rgba(255, 255, 255, 0.48);
+        font-size: 0.73rem;
+        margin-top: 0.18rem;
+    }
+
+    .admin-sidebar-section + .admin-sidebar-section {
+        margin-top: 0.2rem;
+    }
+
+    .admin-section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.45rem;
+    }
+
+    .admin-section-count {
+        min-width: 22px;
+        height: 22px;
+        padding: 0 0.35rem;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(79, 124, 255, 0.14);
+        border: 1px solid rgba(79, 124, 255, 0.2);
+        color: #a8bcff;
+        font-size: 0.68rem;
+        font-weight: 700;
+    }
+
+    .admin-sidebar-links {
+        gap: 0.18rem;
+    }
+
+    .admin-sidebar-links .nav-link {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 0.72rem;
+        border-radius: 16px;
+        padding: 0.7rem 0.78rem;
+        min-height: 56px;
+        color: #d7def5;
+        border: 1px solid transparent;
+        transition: all 0.18s ease;
+    }
+
+    .admin-sidebar-links .nav-link:hover {
+        background: rgba(79, 124, 255, 0.08);
+        border-color: rgba(79, 124, 255, 0.18);
+        color: #fff;
+        transform: translateX(1px);
+    }
+
+    .admin-sidebar-links .nav-link.active {
+        background:
+            linear-gradient(135deg, rgba(79, 124, 255, 0.22), rgba(79, 124, 255, 0.08));
+        border-color: rgba(115, 150, 255, 0.28);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+    }
+
+    .admin-nav-icon-box {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        color: #b8c7f6;
+        flex-shrink: 0;
+    }
+
+    .admin-sidebar-links .nav-link.active .admin-nav-icon-box {
+        background: rgba(79, 124, 255, 0.18);
+        border-color: rgba(115, 150, 255, 0.22);
+        color: #fff;
+    }
+
+    .admin-nav-copy {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.12rem;
+    }
+
+    .admin-nav-copy .sidebar-text {
+        font-weight: 700;
+        line-height: 1.1;
+    }
+
+    .admin-nav-copy small {
+        color: rgba(255, 255, 255, 0.42);
+        font-size: 0.72rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .admin-nav-chevron {
+        color: rgba(255,255,255,0.26);
+        font-size: 0.82rem;
+    }
+
+    .admin-item-badge,
+    .admin-navbar-badge,
+    .admin-menu-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 20px;
+        padding: 0 0.45rem;
+        border-radius: 999px;
+        border: 1px solid rgba(79, 124, 255, 0.24);
+        background: rgba(79, 124, 255, 0.14);
+        color: #bfd1ff;
+        font-size: 0.64rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        flex-shrink: 0;
+    }
+
+    .admin-item-badge-info {
+        border-color: rgba(79, 124, 255, 0.24);
+        background: rgba(79, 124, 255, 0.14);
+        color: #bfd1ff;
+    }
+
+    .admin-item-badge-success {
+        border-color: rgba(53, 211, 138, 0.26);
+        background: rgba(53, 211, 138, 0.14);
+        color: #bdf5d3;
+    }
+
+    .admin-item-badge-warning {
+        border-color: rgba(255, 191, 77, 0.26);
+        background: rgba(255, 191, 77, 0.14);
+        color: #ffe2a6;
+    }
+
+    .admin-item-badge-danger {
+        border-color: rgba(255, 114, 114, 0.26);
+        background: rgba(255, 114, 114, 0.14);
+        color: #ffc4c4;
+    }
+
+    .admin-item-badge-violet {
+        border-color: rgba(144, 128, 255, 0.26);
+        background: rgba(144, 128, 255, 0.14);
+        color: #dad2ff;
+    }
+
+    .admin-item-badge-muted {
+        border-color: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.06);
+        color: #d7def0;
+    }
+
+    .admin-sidebar-links .nav-link.active .admin-nav-chevron,
+    .admin-sidebar-links .nav-link:hover .admin-nav-chevron {
+        color: rgba(255,255,255,0.7);
+    }
+
+    .admin-sidebar-footer {
+        margin-top: 0.35rem;
+    }
+
+    .admin-sidebar-user-chip {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.8rem 0.85rem;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .admin-sidebar-user-chip img {
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+        object-fit: cover;
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .admin-sidebar-user-chip strong {
+        display: block;
+        font-size: 0.88rem;
+        color: #eef3ff;
+        line-height: 1.1;
+    }
+
+    .admin-sidebar-user-chip small {
+        display: block;
+        margin-top: 0.14rem;
+        color: rgba(255,255,255,0.45);
+        font-size: 0.72rem;
     }
 
     .nav-mode-switch {
@@ -352,17 +645,17 @@ const isAdminNavActive = (item) => {
         gap: 0.6rem;
         padding: 0.65rem 1rem;
         border-radius: 999px;
-        background: rgba(15, 15, 18, 0.92);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        color: #e1e1e6;
+        background: rgba(10, 16, 31, 0.94);
+        border: 1px solid rgba(112, 146, 255, 0.18);
+        color: #edf2ff;
         font-weight: 600;
         font-size: 0.9rem;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
-        backdrop-filter: blur(10px);
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
+        backdrop-filter: blur(14px);
     }
 
     .admin-menu-toggle:hover {
-        border-color: rgba(99, 102, 241, 0.6);
+        border-color: rgba(112, 146, 255, 0.42);
         color: #fff;
     }
 
@@ -371,7 +664,7 @@ const isAdminNavActive = (item) => {
     }
 
     .admin-menu-modal {
-        background: #121216;
+        background: linear-gradient(180deg, #10192c, #0b1221);
         border: 1px solid rgba(255, 255, 255, 0.08);
         color: #e1e1e6;
     }
@@ -382,7 +675,7 @@ const isAdminNavActive = (item) => {
     }
 
     .admin-menu-subtitle {
-        color: #8b8b9a;
+        color: #8da2d1;
         font-size: 0.82rem;
     }
 
@@ -394,7 +687,7 @@ const isAdminNavActive = (item) => {
         font-size: 0.7rem;
         letter-spacing: 0.12em;
         text-transform: uppercase;
-        color: rgba(255, 255, 255, 0.4);
+        color: rgba(163, 184, 230, 0.6);
         margin-bottom: 0.75rem;
         font-weight: 700;
     }
@@ -409,25 +702,26 @@ const isAdminNavActive = (item) => {
         display: flex;
         align-items: center;
         gap: 0.75rem;
+        justify-content: space-between;
         padding: 0.75rem 0.9rem;
         border-radius: 0.75rem;
         text-decoration: none;
         color: #d4d4dc;
-        background: rgba(255, 255, 255, 0.02);
+        background: rgba(255, 255, 255, 0.025);
         border: 1px solid rgba(255, 255, 255, 0.06);
         transition: all 0.2s ease;
     }
 
     .admin-menu-link:hover {
         color: #fff;
-        border-color: rgba(99, 102, 241, 0.35);
-        background: rgba(99, 102, 241, 0.08);
+        border-color: rgba(79, 124, 255, 0.35);
+        background: rgba(79, 124, 255, 0.1);
         transform: translateY(-1px);
     }
 
     .admin-menu-link.active {
-        border-color: rgba(99, 102, 241, 0.6);
-        background: rgba(99, 102, 241, 0.16);
+        border-color: rgba(79, 124, 255, 0.46);
+        background: rgba(79, 124, 255, 0.16);
         color: #fff;
     }
 
@@ -435,11 +729,11 @@ const isAdminNavActive = (item) => {
         width: 36px;
         height: 36px;
         border-radius: 10px;
-        background: rgba(99, 102, 241, 0.1);
+        background: rgba(79, 124, 255, 0.1);
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        color: #a5b4fc;
+        color: #b7c8ff;
         font-size: 1.05rem;
     }
 
@@ -450,7 +744,7 @@ const isAdminNavActive = (item) => {
 
     .admin-menu-desc {
         font-size: 0.75rem;
-        color: #8b8b9a;
+        color: #8ea3d0;
     }
 
     .admin-menu-footer {
@@ -466,7 +760,7 @@ const isAdminNavActive = (item) => {
         display: inline-flex;
         align-items: center;
         gap: 0.5rem;
-        color: #8b8b9a;
+        color: #8da2d1;
         text-decoration: none;
         padding: 0.4rem 0.75rem;
         border-radius: 999px;
@@ -475,7 +769,7 @@ const isAdminNavActive = (item) => {
 
     .admin-menu-support:hover {
         color: #fff;
-        border-color: rgba(99, 102, 241, 0.5);
+        border-color: rgba(79, 124, 255, 0.4);
     }
 
     .admin-nav-bar {
@@ -484,9 +778,9 @@ const isAdminNavActive = (item) => {
         left: 0;
         right: 0;
         z-index: 1040;
-        background: rgba(12, 12, 16, 0.92);
+        background: rgba(9, 16, 30, 0.92);
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        backdrop-filter: blur(10px);
+        backdrop-filter: blur(14px);
         padding: 0.6rem 1rem 0.5rem;
         box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
     }
@@ -502,7 +796,7 @@ const isAdminNavActive = (item) => {
     .admin-nav-bar-title {
         font-weight: 700;
         font-size: 0.95rem;
-        color: #e6e6ef;
+        color: #eef2ff;
         max-width: 40vw;
         white-space: nowrap;
         overflow: hidden;
@@ -528,7 +822,7 @@ const isAdminNavActive = (item) => {
         font-size: 0.65rem;
         text-transform: uppercase;
         letter-spacing: 0.12em;
-        color: rgba(255, 255, 255, 0.45);
+        color: rgba(170, 188, 227, 0.62);
         font-weight: 700;
     }
 
@@ -544,9 +838,9 @@ const isAdminNavActive = (item) => {
         gap: 0.4rem;
         padding: 0.35rem 0.7rem;
         border-radius: 999px;
-        color: #cbd5f5;
+        color: #d5dff8;
         text-decoration: none;
-        background: rgba(99, 102, 241, 0.12);
+        background: rgba(79, 124, 255, 0.1);
         border: 1px solid transparent;
         font-size: 0.78rem;
         white-space: nowrap;
@@ -555,14 +849,14 @@ const isAdminNavActive = (item) => {
 
     .admin-nav-link:hover {
         color: #fff;
-        border-color: rgba(99, 102, 241, 0.45);
-        background: rgba(99, 102, 241, 0.22);
+        border-color: rgba(79, 124, 255, 0.36);
+        background: rgba(79, 124, 255, 0.18);
     }
 
     .admin-nav-link.active {
         color: #fff;
-        background: rgba(99, 102, 241, 0.3);
-        border-color: rgba(99, 102, 241, 0.65);
+        background: rgba(79, 124, 255, 0.26);
+        border-color: rgba(79, 124, 255, 0.5);
     }
 
     @media (max-width: 768px) {

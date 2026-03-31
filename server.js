@@ -79,6 +79,7 @@ const { registerAdminCoreRoutes } = require('./routes/legacy/admin-core');
 const { registerAdminConnectorsOverviewRoutes } = require('./routes/legacy/admin-connectors-overview');
 const { createLegacyHelpers } = require('./core/helpers/legacy-helpers');
 const { registerWebSocketRuntime } = require('./core/websocket-runtime');
+const { getIncidentCenterRecords } = require('./core/incidents');
 const {
     SERVER_API_KEY_PERMISSION_CATALOG,
     normalizeServerApiKeyPermissions,
@@ -293,6 +294,61 @@ const {
     RESOURCE_ANOMALY_SAMPLE_TS,
     PLUGIN_CONFLICT_STATE
 } = legacyHelpers;
+
+app.use(async (req, res, next) => {
+    res.locals.adminSidebarBadges = {};
+    res.locals.serverSidebarBadges = {};
+
+    try {
+        const pathname = String(req.path || '');
+        const isAdminRequest = pathname === '/admin' || pathname.startsWith('/admin/');
+        if (isAdminRequest && req.session && req.session.user && req.session.user.isAdmin) {
+            const incidentRecords = await getIncidentCenterRecords(Settings);
+            const openIncidentCount = Array.isArray(incidentRecords)
+                ? incidentRecords.filter((entry) => String(entry && entry.status || 'open') !== 'resolved').length
+                : 0;
+            res.locals.adminSidebarBadges.incidents = {
+                label: String(openIncidentCount),
+                tone: openIncidentCount > 0 ? 'danger' : 'muted'
+            };
+        }
+
+        const serverMatch = pathname.match(/^\/server\/([^/]+)/);
+        if (serverMatch) {
+            const containerId = String(serverMatch[1] || '').trim();
+            if (containerId) {
+                const serverRow = await Server.findOne({
+                    where: { containerId },
+                    attributes: ['id']
+                });
+                if (serverRow) {
+                    const [backupCount, smartAlerts] = await Promise.all([
+                        ServerBackup.count({ where: { serverId: serverRow.id } }),
+                        legacyHelpers.getServerSmartAlertsConfig(serverRow.id)
+                    ]);
+
+                    const smartAlertEvents = smartAlerts && smartAlerts.events && typeof smartAlerts.events === 'object'
+                        ? Object.values(smartAlerts.events).filter(Boolean).length
+                        : 0;
+                    const smartAlertCount = smartAlerts && smartAlerts.enabled ? smartAlertEvents : 0;
+
+                    res.locals.serverSidebarBadges.backups = {
+                        label: String(backupCount),
+                        tone: backupCount > 0 ? 'success' : 'muted'
+                    };
+                    res.locals.serverSidebarBadges.smartalerts = {
+                        label: String(smartAlertCount),
+                        tone: smartAlertCount > 0 ? 'success' : 'muted'
+                    };
+                }
+            }
+        }
+    } catch (error) {
+        console.warn('Failed to build sidebar badges:', error.message || error);
+    }
+
+    return next();
+});
 
 const jobQueue = createJobQueue({
     Job,

@@ -1,19 +1,27 @@
 <%
+const serverSidebarRuntimeBadges = (typeof serverSidebarBadges !== 'undefined' && serverSidebarBadges) ? serverSidebarBadges : {};
+const buildServerBadge = (label, tone = 'info') => label ? { label, tone } : null;
+const serverStatusText = String(server && server.status || '').toLowerCase();
+const currentServerStatusBadge = serverStatusText === 'running'
+    ? buildServerBadge('On', 'success')
+    : (serverStatusText === 'installing' || serverStatusText === 'starting'
+        ? buildServerBadge('Wait', 'warning')
+        : buildServerBadge('Off', 'muted'));
 const coreItems = [
     { id: 'dashboard', label: 'Back to Dashboard', icon: 'bi-grid-1x2', link: `/` },
     { id: 'overview', label: 'Overview', icon: 'bi-speedometer2', link: `/server/${server.containerId}/overview` },
-    { id: 'console', label: 'Console', icon: 'bi-terminal', link: `/server/${server.containerId}`, turbo: false },
-    { id: 'files', label: 'File Manager', icon: 'bi-folder2-open', link: `/server/${server.containerId}/files`, turbo: false },
+    { id: 'console', label: 'Console', icon: 'bi-terminal', link: `/server/${server.containerId}`, turbo: false, badge: currentServerStatusBadge },
+    { id: 'files', label: 'File Manager', icon: 'bi-folder2-open', link: `/server/${server.containerId}/files`, turbo: false, badge: buildServerBadge('Hot', 'info') },
     { id: 'dbs', label: 'Databases', icon: 'bi-database', link: `/server/${server.containerId}/databases` },
     { id: 'users', label: 'Users', icon: 'bi-people', link: `/server/${server.containerId}/users` },
     { id: 'api', label: 'API Keys', icon: 'bi-key', link: `/server/${server.containerId}/api` },
-    { id: 'backups', label: 'Backups', icon: 'bi-archive', link: `/server/${server.containerId}/backups` }
+    { id: 'backups', label: 'Backups', icon: 'bi-archive', link: `/server/${server.containerId}/backups`, badge: serverSidebarRuntimeBadges.backups || buildServerBadge('Safe', 'success') }
 ];
 
 const automationItems = [
     { id: 'schedules', label: 'Schedules', icon: 'bi-calendar-event', link: `/server/${server.containerId}/schedules` },
-    { id: 'macros', label: 'Command Macros', icon: 'bi-lightning-charge', link: `/server/${server.containerId}/macros` },
-    { id: 'smartalerts', label: 'Smart Alerts', icon: 'bi-bell', link: `/server/${server.containerId}/smartalerts` }
+    { id: 'macros', label: 'Command Macros', icon: 'bi-lightning-charge', link: `/server/${server.containerId}/macros`, badge: buildServerBadge('Flow', 'violet') },
+    { id: 'smartalerts', label: 'Smart Alerts', icon: 'bi-bell', link: `/server/${server.containerId}/smartalerts`, badge: serverSidebarRuntimeBadges.smartalerts || buildServerBadge('Live', 'danger') }
 ];
 
 if (String(settings.featureScheduledScalingEnabled || 'false') === 'true') {
@@ -29,22 +37,22 @@ const networkItems = [
 ];
 
 const insightItems = [
-    { id: 'activity', label: 'Activity', icon: 'bi-activity', link: `/server/${server.containerId}/activity` },
+    { id: 'activity', label: 'Activity', icon: 'bi-activity', link: `/server/${server.containerId}/activity`, badge: buildServerBadge('Logs', 'muted') },
     { id: 'auditconsole', label: 'Audit Console', icon: 'bi-journal-text', link: `/server/${server.containerId}/audit-console` },
-    { id: 'timeline', label: 'Resource Timeline', icon: 'bi-graph-up-arrow', link: `/server/${server.containerId}/timeline` },
+    { id: 'timeline', label: 'Resource Timeline', icon: 'bi-graph-up-arrow', link: `/server/${server.containerId}/timeline`, badge: buildServerBadge('Live', 'success') },
     { id: 'performance', label: 'Performance', icon: 'bi-speedometer2', link: `/server/${server.containerId}/performance` },
     { id: 'debuglogs', label: 'Debug Logs', icon: 'bi-bug', link: `/server/${server.containerId}/debug-logs` }
 ];
 
 const minecraftItems = [
-    { id: 'mccenter', label: 'Minecraft Center', icon: 'bi-grid-1x2', link: `/server/${server.containerId}/minecraft-center` },
-    { id: 'mcinstaller', label: 'Version Installer', icon: 'bi-cloud-download', link: `/server/${server.containerId}/minecraft/installer` }
+    { id: 'mccenter', label: 'Minecraft Center', icon: 'bi-grid-1x2', link: `/server/${server.containerId}/minecraft-center`, badge: buildServerBadge('MC', 'warning') },
+    { id: 'mcinstaller', label: 'Version Installer', icon: 'bi-cloud-download', link: `/server/${server.containerId}/minecraft/installer`, badge: buildServerBadge('Setup', 'info') }
 ];
 
 const systemItems = [
     { id: 'startup', label: 'Startup', icon: 'bi-play-circle', link: `/server/${server.containerId}/startup` },
-    { id: 'ai', label: 'AI Controls', icon: 'bi-robot', link: `/server/${server.containerId}/ai-manage` },
-    { id: 'recovery', label: 'Recovery Assistant', icon: 'bi-life-preserver', link: `/server/${server.containerId}/recovery` }
+    { id: 'ai', label: 'AI Controls', icon: 'bi-robot', link: `/server/${server.containerId}/ai-manage`, badge: buildServerBadge('AI', 'violet') },
+    { id: 'recovery', label: 'Recovery Assistant', icon: 'bi-life-preserver', link: `/server/${server.containerId}/recovery`, badge: buildServerBadge('Fix', 'warning') }
 ];
 
 const navSections = [
@@ -55,11 +63,23 @@ const navSections = [
     { title: 'Minecraft', items: minecraftItems },
     { title: 'System', items: systemItems }
 ].filter((section) => Array.isArray(section.items) && section.items.length > 0);
+const serverNavBadgeForItem = (item) => {
+    if (active === item.id) return buildServerBadge('Open', 'info');
+    return item.badge || null;
+};
 %>
 
 <div class="server-sidebar-panel">
     <div class="server-sidebar-header">
-        <div class="server-sidebar-title">Server Menu</div>
+        <div class="server-sidebar-headline">
+            <div class="server-sidebar-brand-mark">
+                <img src="<%= settings.faviconUrl %>" alt="Brand" width="26" height="26">
+            </div>
+            <div class="server-sidebar-title-wrap">
+                <div class="server-sidebar-title">Server Menu</div>
+                <div class="server-sidebar-subtitle"><%= server.name %></div>
+            </div>
+        </div>
         <div class="nav-mode-switch server-nav-mode-switch">
             <button type="button" class="nav-mode-btn" data-server-nav-mode="modal">Popup</button>
             <button type="button" class="nav-mode-btn" data-server-nav-mode="sidebar">Sidebar</button>
@@ -74,17 +94,39 @@ const navSections = [
     <% } %>
     <% navSections.forEach((section) => { %>
         <div class="sidebar-section">
-            <div class="sidebar-section-title"><%= section.title %></div>
+            <div class="sidebar-section-head">
+                <div class="sidebar-section-title"><%= section.title %></div>
+                <span class="sidebar-section-count"><%= section.items.length %></span>
+            </div>
             <div class="sidebar-section-items">
                 <% section.items.forEach((item) => { %>
                     <a href="<%= item.link %>" class="sidebar-item <%= active === item.id ? 'active' : '' %>" <%= item.turbo === false ? 'data-turbo="false"' : '' %>>
-                        <i class="bi <%= item.icon %>"></i>
-                        <span><%= item.label %></span>
+                        <span class="sidebar-item-icon"><i class="bi <%= item.icon %>"></i></span>
+                        <span class="sidebar-item-copy">
+                            <span><%= item.label %></span>
+                            <small><%= item.id === 'dashboard' ? 'Return to main dashboard' : `Open ${item.label.toLowerCase()}` %></small>
+                        </span>
+                        <% const serverBadge = serverNavBadgeForItem(item); %>
+                        <% if (serverBadge) { %>
+                            <span class="server-item-badge server-item-badge-<%= serverBadge.tone || 'info' %>"><%= serverBadge.label %></span>
+                        <% } %>
+                        <i class="bi bi-chevron-right sidebar-item-chevron"></i>
                     </a>
                 <% }) %>
             </div>
         </div>
     <% }) %>
+    <div class="server-sidebar-footer">
+        <div class="server-sidebar-server-chip">
+            <div class="server-sidebar-server-chip-icon">
+                <i class="bi bi-hdd-stack"></i>
+            </div>
+            <div class="server-sidebar-server-chip-copy">
+                <strong><%= server.name %></strong>
+                <small><%= server.containerId %></small>
+            </div>
+        </div>
+    </div>
 </div>
 
 <button type="button" class="server-menu-toggle" data-bs-toggle="modal" data-bs-target="#serverNavModal" aria-label="Open server menu">
@@ -117,6 +159,10 @@ const navSections = [
                         <a href="<%= item.link %>" class="server-nav-link <%= active === item.id ? 'active' : '' %>" <%= item.turbo === false ? 'data-turbo="false"' : '' %>>
                             <i class="bi <%= item.icon %>"></i>
                             <span><%= item.label %></span>
+                            <% const serverNavbarBadge = serverNavBadgeForItem(item); %>
+                            <% if (serverNavbarBadge) { %>
+                                <span class="server-navbar-badge server-item-badge-<%= serverNavbarBadge.tone || 'info' %>"><%= serverNavbarBadge.label %></span>
+                            <% } %>
                         </a>
                     <% }) %>
                 </div>
@@ -150,6 +196,10 @@ const navSections = [
                                         <div class="server-menu-label"><%= item.label %></div>
                                         <div class="server-menu-desc">Go to <%= item.label.toLowerCase() %></div>
                                     </div>
+                                    <% const serverMenuBadge = serverNavBadgeForItem(item); %>
+                                    <% if (serverMenuBadge) { %>
+                                        <span class="server-menu-badge server-item-badge-<%= serverMenuBadge.tone || 'info' %>"><%= serverMenuBadge.label %></span>
+                                    <% } %>
                                 </a>
                             <% }) %>
                         </div>
@@ -228,7 +278,7 @@ const navSections = [
     }
 
     .server-sidebar-panel {
-        padding: 0.75rem 0.5rem 1.5rem;
+        padding: 0.75rem 0.55rem 1rem;
     }
 
     .server-policy-banner {
@@ -297,13 +347,59 @@ const navSections = [
         align-items: center;
         justify-content: space-between;
         gap: 0.75rem;
-        padding: 0.5rem 0.75rem 1rem;
+        padding: 0.55rem 0.75rem 0.85rem;
+    }
+
+    .server-sidebar-headline {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        min-width: 0;
+    }
+
+    .server-sidebar-brand-mark {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background:
+            radial-gradient(circle at 30% 25%, rgba(255,255,255,0.18), transparent 30%),
+            linear-gradient(180deg, rgba(59,130,246,0.24), rgba(59,130,246,0.08));
+        border: 1px solid rgba(255,255,255,0.08);
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+        overflow: hidden;
+        flex-shrink: 0;
+    }
+
+    .server-sidebar-brand-mark img {
+        width: 26px;
+        height: 26px;
+        object-fit: cover;
+        border-radius: 9px;
+    }
+
+    .server-sidebar-title-wrap {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
     }
 
     .server-sidebar-title {
         font-weight: 700;
         font-size: 0.95rem;
-        color: #e1e1e6;
+        color: #eef2ff;
+        line-height: 1.05;
+    }
+
+    .server-sidebar-subtitle {
+        color: rgba(255, 255, 255, 0.46);
+        font-size: 0.73rem;
+        margin-top: 0.18rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .nav-mode-switch {
@@ -338,7 +434,15 @@ const navSections = [
     }
 
     .sidebar-section {
-        margin-bottom: 1rem;
+        margin-bottom: 0.8rem;
+    }
+
+    .sidebar-section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin: 0.45rem 0.9rem 0.4rem;
     }
 
     .sidebar-section-title {
@@ -346,7 +450,22 @@ const navSections = [
         letter-spacing: 0.12em;
         text-transform: uppercase;
         color: rgba(255, 255, 255, 0.4);
-        margin: 0.5rem 0.9rem;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    .sidebar-section-count {
+        min-width: 22px;
+        height: 22px;
+        padding: 0 0.35rem;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(59, 130, 246, 0.12);
+        border: 1px solid rgba(59, 130, 246, 0.18);
+        color: #9ec5ff;
+        font-size: 0.68rem;
         font-weight: 700;
     }
 
@@ -358,25 +477,181 @@ const navSections = [
     }
 
     .sidebar-section-items .sidebar-item {
-        display: flex;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
         align-items: center;
-        gap: 0.6rem;
-        padding: 0.55rem 0.75rem;
-        border-radius: 0.65rem;
-        color: #cbd5f5;
+        gap: 0.72rem;
+        padding: 0.68rem 0.78rem;
+        min-height: 56px;
+        border-radius: 16px;
+        color: #d7e0f7;
         text-decoration: none;
+        border: 1px solid transparent;
         transition: all 0.2s ease;
     }
 
     .sidebar-section-items .sidebar-item:hover {
-        background: rgba(59, 130, 246, 0.12);
+        background: rgba(59, 130, 246, 0.08);
+        border-color: rgba(59, 130, 246, 0.16);
         color: #fff;
+        transform: translateX(1px);
     }
 
     .sidebar-section-items .sidebar-item.active {
-        background: rgba(59, 130, 246, 0.2);
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.22), rgba(59, 130, 246, 0.08));
         color: #fff;
-        box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.35);
+        box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.25);
+    }
+
+    .sidebar-item-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        color: #9cc4ff;
+        flex-shrink: 0;
+    }
+
+    .sidebar-item.active .sidebar-item-icon {
+        background: rgba(59, 130, 246, 0.16);
+        border-color: rgba(59, 130, 246, 0.18);
+        color: #fff;
+    }
+
+    .sidebar-item-copy {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.12rem;
+    }
+
+    .sidebar-item-copy > span {
+        line-height: 1.1;
+        font-weight: 700;
+    }
+
+    .sidebar-item-copy small {
+        color: rgba(255, 255, 255, 0.42);
+        font-size: 0.72rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .sidebar-item-chevron {
+        color: rgba(255, 255, 255, 0.26);
+        font-size: 0.82rem;
+    }
+
+    .server-item-badge,
+    .server-navbar-badge,
+    .server-menu-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 20px;
+        padding: 0 0.45rem;
+        border-radius: 999px;
+        border: 1px solid rgba(59, 130, 246, 0.24);
+        background: rgba(59, 130, 246, 0.14);
+        color: #bdd9ff;
+        font-size: 0.64rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        flex-shrink: 0;
+    }
+
+    .server-item-badge-info {
+        border-color: rgba(59, 130, 246, 0.24);
+        background: rgba(59, 130, 246, 0.14);
+        color: #bdd9ff;
+    }
+
+    .server-item-badge-success {
+        border-color: rgba(53, 211, 138, 0.26);
+        background: rgba(53, 211, 138, 0.14);
+        color: #bdf5d3;
+    }
+
+    .server-item-badge-warning {
+        border-color: rgba(255, 191, 77, 0.26);
+        background: rgba(255, 191, 77, 0.14);
+        color: #ffe2a6;
+    }
+
+    .server-item-badge-danger {
+        border-color: rgba(255, 114, 114, 0.26);
+        background: rgba(255, 114, 114, 0.14);
+        color: #ffc4c4;
+    }
+
+    .server-item-badge-violet {
+        border-color: rgba(144, 128, 255, 0.26);
+        background: rgba(144, 128, 255, 0.14);
+        color: #dad2ff;
+    }
+
+    .server-item-badge-muted {
+        border-color: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.06);
+        color: #d7def0;
+    }
+
+    .sidebar-item:hover .sidebar-item-chevron,
+    .sidebar-item.active .sidebar-item-chevron {
+        color: rgba(255,255,255,0.68);
+    }
+
+    .server-sidebar-footer {
+        padding: 0.2rem 0.75rem 0;
+    }
+
+    .server-sidebar-server-chip {
+        display: flex;
+        align-items: center;
+        gap: 0.72rem;
+        padding: 0.8rem 0.85rem;
+        border-radius: 18px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .server-sidebar-server-chip-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(59, 130, 246, 0.12);
+        border: 1px solid rgba(59, 130, 246, 0.14);
+        color: #a6ccff;
+    }
+
+    .server-sidebar-server-chip-copy {
+        min-width: 0;
+    }
+
+    .server-sidebar-server-chip-copy strong {
+        display: block;
+        font-size: 0.88rem;
+        color: #eef3ff;
+        line-height: 1.1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .server-sidebar-server-chip-copy small {
+        display: block;
+        margin-top: 0.14rem;
+        color: rgba(255,255,255,0.45);
+        font-size: 0.72rem;
     }
 
     .server-menu-toggle {
@@ -389,13 +664,13 @@ const navSections = [
         gap: 0.6rem;
         padding: 0.65rem 1rem;
         border-radius: 999px;
-        background: rgba(15, 15, 18, 0.92);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        color: #e1e1e6;
+        background: rgba(10, 16, 31, 0.94);
+        border: 1px solid rgba(89, 151, 255, 0.18);
+        color: #eef3ff;
         font-weight: 600;
         font-size: 0.9rem;
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
-        backdrop-filter: blur(10px);
+        backdrop-filter: blur(14px);
         animation: serverMenuPulse 5s ease-in-out infinite;
         transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
     }
@@ -417,7 +692,7 @@ const navSections = [
     }
 
     .server-menu-modal {
-        background: #121216;
+        background: linear-gradient(180deg, #10192c, #0b1221);
         border: 1px solid rgba(255, 255, 255, 0.08);
         color: #e1e1e6;
     }
@@ -428,7 +703,7 @@ const navSections = [
     }
 
     .server-menu-subtitle {
-        color: #8b8b9a;
+        color: #8ea3d0;
         font-size: 0.82rem;
     }
 
@@ -440,7 +715,7 @@ const navSections = [
         font-size: 0.7rem;
         letter-spacing: 0.12em;
         text-transform: uppercase;
-        color: rgba(255, 255, 255, 0.4);
+        color: rgba(163, 184, 230, 0.6);
         margin-bottom: 0.75rem;
         font-weight: 700;
     }
@@ -455,11 +730,12 @@ const navSections = [
         display: flex;
         align-items: center;
         gap: 0.75rem;
+        justify-content: space-between;
         padding: 0.75rem 0.9rem;
         border-radius: 0.75rem;
         text-decoration: none;
         color: #d4d4dc;
-        background: rgba(255, 255, 255, 0.02);
+        background: rgba(255, 255, 255, 0.025);
         border: 1px solid rgba(255, 255, 255, 0.06);
         transition: all 0.2s ease;
     }
@@ -467,7 +743,7 @@ const navSections = [
     .server-menu-link:hover {
         color: #fff;
         border-color: rgba(59, 130, 246, 0.35);
-        background: rgba(59, 130, 246, 0.08);
+        background: rgba(59, 130, 246, 0.1);
         transform: translateY(-1px);
     }
 
@@ -496,7 +772,7 @@ const navSections = [
 
     .server-menu-desc {
         font-size: 0.75rem;
-        color: #8b8b9a;
+        color: #8ea3d0;
     }
 
     .server-menu-footer {
@@ -511,7 +787,7 @@ const navSections = [
         display: inline-flex;
         align-items: center;
         gap: 0.5rem;
-        color: #8b8b9a;
+        color: #8ea3d0;
         text-decoration: none;
         padding: 0.4rem 0.75rem;
         border-radius: 999px;
@@ -529,9 +805,9 @@ const navSections = [
         left: 0;
         right: 0;
         z-index: 1040;
-        background: rgba(12, 12, 16, 0.92);
+        background: rgba(9, 16, 30, 0.92);
         border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        backdrop-filter: blur(10px);
+        backdrop-filter: blur(14px);
         padding: 0.6rem 1rem 0.5rem;
         box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
     }
@@ -547,7 +823,7 @@ const navSections = [
     .server-nav-bar-title {
         font-weight: 700;
         font-size: 0.95rem;
-        color: #e6e6ef;
+        color: #eef2ff;
         max-width: 40vw;
         white-space: nowrap;
         overflow: hidden;
@@ -573,7 +849,7 @@ const navSections = [
         font-size: 0.65rem;
         text-transform: uppercase;
         letter-spacing: 0.12em;
-        color: rgba(255, 255, 255, 0.45);
+        color: rgba(170, 188, 227, 0.62);
         font-weight: 700;
     }
 
@@ -589,9 +865,9 @@ const navSections = [
         gap: 0.4rem;
         padding: 0.35rem 0.7rem;
         border-radius: 999px;
-        color: #cbd5f5;
+        color: #d7e0f7;
         text-decoration: none;
-        background: rgba(59, 130, 246, 0.08);
+        background: rgba(59, 130, 246, 0.1);
         border: 1px solid transparent;
         font-size: 0.78rem;
         white-space: nowrap;
