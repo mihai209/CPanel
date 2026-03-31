@@ -1,6 +1,8 @@
 body {
     background:
+        linear-gradient(rgba(3, 8, 7, 0.78), rgba(7, 17, 14, 0.88)),
         radial-gradient(circle at 50% 0%, rgba(59, 255, 154, 0.1), transparent 32%),
+        url('/themes/hacker/hacker.png') center/cover no-repeat,
         linear-gradient(180deg, #030807 0%, #07110e 38%, #081511 100%) !important;
     background-attachment: scroll !important;
 }
