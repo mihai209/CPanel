@@ -49,7 +49,9 @@ WORK_DIR="$(mktemp -d)"
 ROOTFS_DIR="${WORK_DIR}/rootfs"
 
 cleanup() {
-    rm -rf "${WORK_DIR}"
+    if [[ -n "${WORK_DIR:-}" && -d "${WORK_DIR}" ]]; then
+        sudo rm -rf "${WORK_DIR}"
+    fi
 }
 trap cleanup EXIT
 
