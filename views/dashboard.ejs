@@ -737,6 +737,9 @@ const activeDashboardLayout = {
                         <div id="dashboardLayoutFeedback" class="small text-muted mt-3"></div>
                     </div>
                     <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-outline-warning btn-sm fw-semibold me-auto" id="dashboardLayoutResetBtn">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Default
+                        </button>
                         <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="modal">Close</button>
                         <button type="button" class="btn btn-primary btn-sm fw-semibold" id="dashboardLayoutSaveBtn">Save Layout</button>
                     </div>
@@ -1102,6 +1105,7 @@ const activeDashboardLayout = {
 
         const layoutModalEl = document.getElementById('dashboardLayoutModal');
         const layoutSaveBtn = document.getElementById('dashboardLayoutSaveBtn');
+        const layoutResetBtn = document.getElementById('dashboardLayoutResetBtn');
         const layoutFeedback = document.getElementById('dashboardLayoutFeedback');
         const layoutInputs = {
             metrics: document.getElementById('layoutMetrics'),
@@ -1109,6 +1113,13 @@ const activeDashboardLayout = {
             opsFeed: document.getElementById('layoutOpsFeed'),
             filters: document.getElementById('layoutFilters'),
             resourcePills: document.getElementById('layoutResourcePills')
+        };
+        const defaultLayout = {
+            metrics: true,
+            announcements: true,
+            opsFeed: true,
+            filters: true,
+            resourcePills: true
         };
 
         if (layoutModalEl && layoutSaveBtn && window.bootstrap) {
@@ -1122,26 +1133,40 @@ const activeDashboardLayout = {
                 else layoutFeedback.classList.add('text-muted');
             };
 
+            const getLayoutPayload = () => ({
+                metrics: Boolean(layoutInputs.metrics && layoutInputs.metrics.checked),
+                announcements: Boolean(layoutInputs.announcements && layoutInputs.announcements.checked),
+                opsFeed: Boolean(layoutInputs.opsFeed && layoutInputs.opsFeed.checked),
+                filters: Boolean(layoutInputs.filters && layoutInputs.filters.checked),
+                resourcePills: Boolean(layoutInputs.resourcePills && layoutInputs.resourcePills.checked)
+            });
+
+            const applyLayoutInputs = (payload) => {
+                Object.entries(layoutInputs).forEach(([key, input]) => {
+                    if (!input) return;
+                    input.checked = Boolean(payload && Object.prototype.hasOwnProperty.call(payload, key) ? payload[key] : defaultLayout[key]);
+                });
+            };
+
+            const saveLayoutPayload = async (payload) => {
+                const response = await fetch('/dashboard/layout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error((data && data.error) || 'Failed to save layout.');
+                }
+                return data;
+            };
+
             layoutSaveBtn.addEventListener('click', async () => {
                 layoutSaveBtn.disabled = true;
+                if (layoutResetBtn) layoutResetBtn.disabled = true;
                 setLayoutFeedback('Saving layout...', 'muted');
                 try {
-                    const payload = {
-                        metrics: Boolean(layoutInputs.metrics && layoutInputs.metrics.checked),
-                        announcements: Boolean(layoutInputs.announcements && layoutInputs.announcements.checked),
-                        opsFeed: Boolean(layoutInputs.opsFeed && layoutInputs.opsFeed.checked),
-                        filters: Boolean(layoutInputs.filters && layoutInputs.filters.checked),
-                        resourcePills: Boolean(layoutInputs.resourcePills && layoutInputs.resourcePills.checked)
-                    };
-                    const response = await fetch('/dashboard/layout', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    const data = await response.json();
-                    if (!response.ok || !data.success) {
-                        throw new Error((data && data.error) || 'Failed to save layout.');
-                    }
+                    await saveLayoutPayload(getLayoutPayload());
                     setLayoutFeedback('Layout saved. Refreshing...', 'success');
                     setTimeout(() => {
                         window.location.reload();
@@ -1150,8 +1175,30 @@ const activeDashboardLayout = {
                     setLayoutFeedback(error.message || 'Failed to save layout.', 'danger');
                 } finally {
                     layoutSaveBtn.disabled = false;
+                    if (layoutResetBtn) layoutResetBtn.disabled = false;
                 }
             });
+
+            if (layoutResetBtn) {
+                layoutResetBtn.addEventListener('click', async () => {
+                    layoutResetBtn.disabled = true;
+                    layoutSaveBtn.disabled = true;
+                    applyLayoutInputs(defaultLayout);
+                    setLayoutFeedback('Resetting layout to defaults...', 'muted');
+                    try {
+                        await saveLayoutPayload(defaultLayout);
+                        setLayoutFeedback('Default dashboard layout restored. Refreshing...', 'success');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 600);
+                    } catch (error) {
+                        setLayoutFeedback(error.message || 'Failed to reset layout.', 'danger');
+                    } finally {
+                        layoutResetBtn.disabled = false;
+                        layoutSaveBtn.disabled = false;
+                    }
+                });
+            }
         }
     })();
 </script>

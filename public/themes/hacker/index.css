@@ -1,0 +1,55 @@
+body {
+    background:
+        radial-gradient(circle at 50% 0%, rgba(59, 255, 154, 0.1), transparent 32%),
+        linear-gradient(180deg, #030807 0%, #07110e 38%, #081511 100%) !important;
+    background-attachment: scroll !important;
+}
+
+.card,
+.modal-content,
+.bg-dark,
+.details-panel,
+.stat-card,
+.terminal-container {
+    background: rgba(5, 14, 10, 0.92) !important;
+    border-color: rgba(59, 255, 154, 0.24) !important;
+}
+
+.navbar,
+.top-navbar,
+#sidebar,
+.sidebar,
+.terminal-header,
+header.top {
+    background: rgba(4, 12, 9, 0.97) !important;
+    border-color: rgba(59, 255, 154, 0.18) !important;
+}
+
+.form-control,
+.form-select,
+textarea {
+    background: rgba(3, 10, 7, 0.96) !important;
+    border-color: rgba(59, 255, 154, 0.3) !important;
+    color: #dfffee !important;
+}
+
+.btn-primary,
+.btn-success {
+    background: #3bff9a !important;
+    border-color: #3bff9a !important;
+    color: #02150b !important;
+}
+
+a,
+.text-primary,
+.link-primary,
+.nav-link.active,
+.sidebar-item.active {
+    color: #76ffb5 !important;
+}
+
+.terminal-output,
+pre,
+code {
+    color: #a7ffd1 !important;
+}
