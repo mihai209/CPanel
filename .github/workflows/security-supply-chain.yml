@@ -1,4 +1,4 @@
-name: Security - Axios Guard
+name: Security - Supply Chain Guard
 
 on:
   workflow_dispatch:
@@ -10,16 +10,18 @@ on:
       - 'package-lock.json'
       - 'pnpm-lock.yaml'
       - 'npm-shrinkwrap.json'
-      - 'scripts/security-check-axios.js'
-      - '.github/workflows/security-axios.yml'
+      - 'security/supply-chain-blocklist.json'
+      - 'scripts/security-check-supply-chain.js'
+      - '.github/workflows/security-supply-chain.yml'
   pull_request:
     paths:
       - 'package.json'
       - 'package-lock.json'
       - 'pnpm-lock.yaml'
       - 'npm-shrinkwrap.json'
-      - 'scripts/security-check-axios.js'
-      - '.github/workflows/security-axios.yml'
+      - 'security/supply-chain-blocklist.json'
+      - 'scripts/security-check-supply-chain.js'
+      - '.github/workflows/security-supply-chain.yml'
 
 jobs:
   guard:
@@ -33,5 +35,5 @@ jobs:
         with:
           node-version: 22
 
-      - name: Run axios security guard
-        run: node scripts/security-check-axios.js
+      - name: Run supply-chain security guard
+        run: node scripts/security-check-supply-chain.js

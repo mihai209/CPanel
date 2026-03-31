@@ -1,0 +1,29 @@
+{
+  "blockedPackages": [
+    {
+      "name": "axios",
+      "blockedVersions": ["1.14.1", "0.30.4"],
+      "reason": "Compromised npm releases with malicious postinstall payload."
+    },
+    {
+      "name": "plain-crypto-js",
+      "blockedVersions": ["*"],
+      "reason": "Malicious dependency observed in the axios compromise chain."
+    }
+  ],
+  "scanFiles": [
+    "package.json",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "npm-shrinkwrap.json"
+  ],
+  "skipDirectories": [
+    "node_modules",
+    ".git",
+    "storage",
+    "dist",
+    "build",
+    ".next",
+    "coverage"
+  ]
+}
