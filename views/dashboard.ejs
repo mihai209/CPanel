@@ -990,118 +990,118 @@ const activeDashboardLayout = {
         const customSaveButton = document.getElementById('dashboardCustomOrderSaveBtn');
         const customFeedback = document.getElementById('dashboardCustomOrderFeedback');
 
-        if (!customButton || !customModalElement || !customList || !customSaveButton || !window.bootstrap) return;
+        if (customButton && customModalElement && customList && customSaveButton && window.bootstrap) {
+            const customModal = bootstrap.Modal.getOrCreateInstance(customModalElement);
 
-        const customModal = bootstrap.Modal.getOrCreateInstance(customModalElement);
+            const setCustomFeedback = (message, variant = 'muted') => {
+                if (!customFeedback) return;
+                customFeedback.textContent = message || '';
+                customFeedback.classList.remove('text-muted', 'text-success', 'text-danger', 'text-warning');
+                if (variant === 'success') customFeedback.classList.add('text-success');
+                else if (variant === 'danger') customFeedback.classList.add('text-danger');
+                else if (variant === 'warning') customFeedback.classList.add('text-warning');
+                else customFeedback.classList.add('text-muted');
+            };
 
-        const setCustomFeedback = (message, variant = 'muted') => {
-            if (!customFeedback) return;
-            customFeedback.textContent = message || '';
-            customFeedback.classList.remove('text-muted', 'text-success', 'text-danger', 'text-warning');
-            if (variant === 'success') customFeedback.classList.add('text-success');
-            else if (variant === 'danger') customFeedback.classList.add('text-danger');
-            else if (variant === 'warning') customFeedback.classList.add('text-warning');
-            else customFeedback.classList.add('text-muted');
-        };
+            const buildCustomList = () => {
+                customList.innerHTML = '';
+                const orderedItems = sortByCustom(getServerItems(), savedCustomOrderIds);
+                orderedItems.forEach((item) => {
+                    const serverId = getServerId(item);
+                    const name = String(item.dataset.serverName || `Server #${serverId}`);
 
-        const buildCustomList = () => {
-            customList.innerHTML = '';
-            const orderedItems = sortByCustom(getServerItems(), savedCustomOrderIds);
-            orderedItems.forEach((item) => {
-                const serverId = getServerId(item);
-                const name = String(item.dataset.serverName || `Server #${serverId}`);
+                    const row = document.createElement('div');
+                    row.className = 'list-group-item dashboard-custom-order-item d-flex align-items-center justify-content-between gap-2';
+                    row.draggable = true;
+                    row.dataset.serverId = String(serverId);
 
-                const row = document.createElement('div');
-                row.className = 'list-group-item dashboard-custom-order-item d-flex align-items-center justify-content-between gap-2';
-                row.draggable = true;
-                row.dataset.serverId = String(serverId);
+                    const left = document.createElement('div');
+                    left.className = 'd-flex align-items-center gap-2';
 
-                const left = document.createElement('div');
-                left.className = 'd-flex align-items-center gap-2';
+                    const handle = document.createElement('i');
+                    handle.className = 'bi bi-grip-vertical dashboard-custom-order-handle';
+                    handle.setAttribute('aria-hidden', 'true');
+                    left.appendChild(handle);
 
-                const handle = document.createElement('i');
-                handle.className = 'bi bi-grip-vertical dashboard-custom-order-handle';
-                handle.setAttribute('aria-hidden', 'true');
-                left.appendChild(handle);
+                    const label = document.createElement('span');
+                    label.className = 'small';
+                    label.textContent = name;
+                    left.appendChild(label);
 
-                const label = document.createElement('span');
-                label.className = 'small';
-                label.textContent = name;
-                left.appendChild(label);
+                    row.appendChild(left);
+                    customList.appendChild(row);
+                });
+            };
 
-                row.appendChild(left);
-                customList.appendChild(row);
+            const getDragAfterElement = (container, clientY) => {
+                const draggableElements = Array.from(container.querySelectorAll('.dashboard-custom-order-item:not(.dragging)'));
+                let closest = { offset: Number.NEGATIVE_INFINITY, element: null };
+
+                draggableElements.forEach((child) => {
+                    const box = child.getBoundingClientRect();
+                    const offset = clientY - box.top - (box.height / 2);
+                    if (offset < 0 && offset > closest.offset) {
+                        closest = { offset, element: child };
+                    }
+                });
+
+                return closest.element;
+            };
+
+            customList.addEventListener('dragstart', (event) => {
+                const row = event.target && event.target.closest ? event.target.closest('.dashboard-custom-order-item') : null;
+                if (!row) return;
+                row.classList.add('dragging');
+                if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
             });
-        };
 
-        const getDragAfterElement = (container, clientY) => {
-            const draggableElements = Array.from(container.querySelectorAll('.dashboard-custom-order-item:not(.dragging)'));
-            let closest = { offset: Number.NEGATIVE_INFINITY, element: null };
+            customList.addEventListener('dragend', (event) => {
+                const row = event.target && event.target.closest ? event.target.closest('.dashboard-custom-order-item') : null;
+                if (!row) return;
+                row.classList.remove('dragging');
+            });
 
-            draggableElements.forEach((child) => {
-                const box = child.getBoundingClientRect();
-                const offset = clientY - box.top - (box.height / 2);
-                if (offset < 0 && offset > closest.offset) {
-                    closest = { offset, element: child };
+            customList.addEventListener('dragover', (event) => {
+                event.preventDefault();
+                const draggingRow = customList.querySelector('.dashboard-custom-order-item.dragging');
+                if (!draggingRow) return;
+                const nextRow = getDragAfterElement(customList, event.clientY);
+                if (!nextRow) customList.appendChild(draggingRow);
+                else customList.insertBefore(draggingRow, nextRow);
+            });
+
+            customButton.addEventListener('click', () => {
+                buildCustomList();
+                setCustomFeedback('Save and refresh the page to apply the new custom order.', 'muted');
+                customModal.show();
+            });
+
+            customSaveButton.addEventListener('click', async () => {
+                const orderedIds = normalizeServerIds(
+                    Array.from(customList.querySelectorAll('.dashboard-custom-order-item')).map((row) => row.dataset.serverId)
+                );
+                if (orderedIds.length === 0) {
+                    setCustomFeedback('No servers available for custom ordering.', 'warning');
+                    return;
+                }
+
+                customSaveButton.disabled = true;
+                try {
+                    const data = await persistServerOrder('custom', orderedIds);
+                    savedCustomOrderIds = normalizeServerIds(data.customIds || orderedIds);
+                    activeMode = 'custom';
+                    persistSortStateLocally(activeMode, savedCustomOrderIds);
+                    if (sortSelect) sortSelect.value = 'custom';
+                    applyModeToGrid('custom');
+                    setCustomFeedback('Custom order saved. Refresh page to apply it.', 'success');
+                    setSortFeedback('Custom order saved. Refresh page to apply it.', 'warning');
+                } catch (error) {
+                    setCustomFeedback(error.message || 'Failed to save custom order.', 'danger');
+                } finally {
+                    customSaveButton.disabled = false;
                 }
             });
-
-            return closest.element;
-        };
-
-        customList.addEventListener('dragstart', (event) => {
-            const row = event.target && event.target.closest ? event.target.closest('.dashboard-custom-order-item') : null;
-            if (!row) return;
-            row.classList.add('dragging');
-            if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
-        });
-
-        customList.addEventListener('dragend', (event) => {
-            const row = event.target && event.target.closest ? event.target.closest('.dashboard-custom-order-item') : null;
-            if (!row) return;
-            row.classList.remove('dragging');
-        });
-
-        customList.addEventListener('dragover', (event) => {
-            event.preventDefault();
-            const draggingRow = customList.querySelector('.dashboard-custom-order-item.dragging');
-            if (!draggingRow) return;
-            const nextRow = getDragAfterElement(customList, event.clientY);
-            if (!nextRow) customList.appendChild(draggingRow);
-            else customList.insertBefore(draggingRow, nextRow);
-        });
-
-        customButton.addEventListener('click', () => {
-            buildCustomList();
-            setCustomFeedback('Save and refresh the page to apply the new custom order.', 'muted');
-            customModal.show();
-        });
-
-        customSaveButton.addEventListener('click', async () => {
-            const orderedIds = normalizeServerIds(
-                Array.from(customList.querySelectorAll('.dashboard-custom-order-item')).map((row) => row.dataset.serverId)
-            );
-            if (orderedIds.length === 0) {
-                setCustomFeedback('No servers available for custom ordering.', 'warning');
-                return;
-            }
-
-            customSaveButton.disabled = true;
-            try {
-                const data = await persistServerOrder('custom', orderedIds);
-                savedCustomOrderIds = normalizeServerIds(data.customIds || orderedIds);
-                activeMode = 'custom';
-                persistSortStateLocally(activeMode, savedCustomOrderIds);
-                if (sortSelect) sortSelect.value = 'custom';
-                applyModeToGrid('custom');
-                setCustomFeedback('Custom order saved. Refresh page to apply it.', 'success');
-                setSortFeedback('Custom order saved. Refresh page to apply it.', 'warning');
-            } catch (error) {
-                setCustomFeedback(error.message || 'Failed to save custom order.', 'danger');
-            } finally {
-                customSaveButton.disabled = false;
-            }
-        });
+        }
 
         const layoutModalEl = document.getElementById('dashboardLayoutModal');
         const layoutSaveBtn = document.getElementById('dashboardLayoutSaveBtn');

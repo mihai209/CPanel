@@ -1,0 +1,155 @@
+body {
+    background:
+        linear-gradient(rgba(255, 244, 250, 0.72), rgba(236, 248, 255, 0.82)),
+        url('/themes/easter/easter.png') center/cover no-repeat !important;
+    background-attachment: scroll !important;
+    position: relative;
+}
+
+body::before,
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+
+body::before {
+    background:
+        radial-gradient(circle at 12% 18%, rgba(255, 158, 207, 0.24), transparent 18%),
+        radial-gradient(circle at 84% 20%, rgba(158, 231, 255, 0.22), transparent 18%),
+        radial-gradient(circle at 30% 78%, rgba(255, 226, 138, 0.22), transparent 16%),
+        radial-gradient(circle at 72% 82%, rgba(176, 255, 197, 0.18), transparent 14%);
+    animation: easterGlowFloat 12s ease-in-out infinite alternate;
+}
+
+body::after {
+    background-image:
+        radial-gradient(ellipse at center, rgba(255, 255, 255, 0.65) 0 18%, transparent 19%),
+        radial-gradient(ellipse at center, rgba(255, 158, 207, 0.82) 0 20%, transparent 21%),
+        radial-gradient(ellipse at center, rgba(158, 231, 255, 0.8) 0 20%, transparent 21%),
+        radial-gradient(ellipse at center, rgba(255, 226, 138, 0.82) 0 20%, transparent 21%);
+    background-size:
+        34px 46px,
+        42px 54px,
+        38px 50px,
+        40px 52px;
+    background-position:
+        8% 88%,
+        92% 86%,
+        18% 14%,
+        84% 18%;
+    background-repeat: no-repeat;
+    opacity: 0.82;
+    animation: easterEggDrift 9s ease-in-out infinite;
+}
+
+.card,
+.modal-content,
+.bg-dark,
+.details-panel,
+.stat-card,
+.terminal-container,
+.cpanel-footer-shell {
+    background: rgba(61, 43, 82, 0.82) !important;
+    border-color: rgba(255, 182, 211, 0.38) !important;
+    box-shadow: 0 18px 40px rgba(88, 63, 118, 0.16);
+}
+
+.navbar,
+.top-navbar,
+#sidebar,
+.sidebar,
+.terminal-header,
+header.top {
+    background: rgba(82, 56, 110, 0.9) !important;
+    border-color: rgba(158, 231, 255, 0.3) !important;
+}
+
+.form-control,
+.form-select,
+textarea {
+    background: rgba(255, 249, 253, 0.92) !important;
+    border-color: rgba(255, 182, 211, 0.42) !important;
+    color: #4b335e !important;
+}
+
+.form-control:focus,
+.form-select:focus,
+textarea:focus {
+    border-color: rgba(158, 231, 255, 0.76) !important;
+    box-shadow: 0 0 0 0.2rem rgba(158, 231, 255, 0.22) !important;
+}
+
+.btn-primary,
+.btn-success {
+    background: linear-gradient(135deg, #ff9ecf, #ffc6e0) !important;
+    border-color: #ff9ecf !important;
+    color: #4a2440 !important;
+}
+
+.btn-warning,
+.btn-outline-warning {
+    border-color: #ffe28a !important;
+    color: #ffe28a !important;
+}
+
+.btn-outline-info,
+.btn-info {
+    border-color: #9ee7ff !important;
+    color: #9ee7ff !important;
+}
+
+a,
+.text-primary,
+.link-primary,
+.nav-link.active,
+.sidebar-item.active {
+    color: #ffd6eb !important;
+}
+
+.badge.bg-primary,
+.badge.text-bg-primary {
+    background: #ff9ecf !important;
+    color: #4a2440 !important;
+}
+
+.badge.bg-success,
+.badge.text-bg-success {
+    background: #b0ffc5 !important;
+    color: #20412a !important;
+}
+
+.badge.bg-warning,
+.badge.text-bg-warning {
+    background: #ffe28a !important;
+    color: #5a4511 !important;
+}
+
+.terminal-output,
+pre,
+code {
+    color: #fff4fb !important;
+}
+
+@keyframes easterGlowFloat {
+    0% {
+        transform: translate3d(0, 0, 0) scale(1);
+        opacity: 0.88;
+    }
+    100% {
+        transform: translate3d(0, -10px, 0) scale(1.03);
+        opacity: 1;
+    }
+}
+
+@keyframes easterEggDrift {
+    0%,
+    100% {
+        transform: translate3d(0, 0, 0);
+    }
+    50% {
+        transform: translate3d(0, -6px, 0);
+    }
+}

@@ -39,6 +39,12 @@ const THEME_PREVIEWS = Object.freeze({
         background: 'linear-gradient(145deg, #13281d 0%, #355d2d 100%)',
         swatches: ['#82d957', '#ffd166', '#f8fff0']
     },
+    easter: {
+        eyebrow: 'Spring',
+        summary: 'Pastel panels, easter accents, and light seasonal motion.',
+        background: 'linear-gradient(145deg, #ffe6f4 0%, #dff6ff 52%, #fff7d9 100%)',
+        swatches: ['#ff9ecf', '#9ee7ff', '#ffe28a']
+    },
     'forest-night': {
         eyebrow: 'Moody',
         summary: 'Dense forest tones with subdued teal glow.',
@@ -159,6 +165,11 @@ const THEME_CATALOG = Object.freeze([
         id: 'default',
         label: 'Default',
         cssPath: '/themes/default/index.css'
+    },
+    {
+        id: 'easter',
+        label: 'Easter',
+        cssPath: '/themes/easter/index.css'
     },
     {
         id: 'hacker',
