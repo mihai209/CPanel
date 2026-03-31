@@ -143,17 +143,7 @@ function registerAccountRoutes({
 
             console.log(`[Account Debug] Rendering for user: ${userData.username} (ID: ${userData.id})`);
             console.log(
-                `[Account Debug] Linked Accounts summary: count=${
-                    normalizedLinkedAccounts.length
-                }, providers=${JSON.stringify(
-                    Array.from(
-                        new Set(
-                            normalizedLinkedAccounts
-                                .map((entry) => entry && entry.provider)
-                                .filter(Boolean)
-                        )
-                    )
-                )}`
+                `[Account Debug] Linked Accounts summary: count=${normalizedLinkedAccounts.length}`
             );
 
             const activeTheme = getUserThemeId(userData);
