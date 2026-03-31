@@ -138,6 +138,57 @@
         color: #ffffff;
     }
 
+    .copyright-info-modal .modal-dialog {
+        max-width: min(680px, calc(100vw - 2rem));
+        margin: 1rem auto;
+    }
+
+    .copyright-info-modal .modal-content {
+        border-radius: 26px;
+        overflow: hidden;
+        background:
+            radial-gradient(circle at top left, rgba(79, 124, 255, 0.12), transparent 34%),
+            linear-gradient(180deg, rgba(10, 18, 32, 0.98), rgba(7, 12, 24, 0.98)) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+        color: #ecf3ff;
+    }
+
+    .copyright-info-modal .modal-header,
+    .copyright-info-modal .modal-footer {
+        background: rgba(255, 255, 255, 0.02);
+        border-color: rgba(255, 255, 255, 0.08) !important;
+    }
+
+    .copyright-info-modal .modal-title {
+        font-size: 1rem;
+        letter-spacing: 0.01em;
+    }
+
+    .copyright-info-modal .modal-body {
+        padding: 1.25rem 1.35rem 1.1rem;
+    }
+
+    .copyright-info-modal .modal-body h6 {
+        font-size: 0.95rem;
+        letter-spacing: 0.01em;
+    }
+
+    .copyright-info-modal .modal-body p,
+    .copyright-info-modal .modal-body div {
+        line-height: 1.65;
+    }
+
+    .copyright-info-modal .modal-body .text-muted {
+        color: #aab8d8 !important;
+    }
+
+    .copyright-info-modal .btn-secondary {
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.12);
+    }
+
     @media (max-width: 900px) {
         .copyright-footer {
             grid-template-columns: 1fr;
@@ -258,7 +309,7 @@
 </script>
 
 <!-- Copyright Info Modal -->
-<div class="modal fade" id="copyrightInfoModal" tabindex="-1" aria-labelledby="copyrightInfoModalLabel"
+<div class="modal fade copyright-info-modal" id="copyrightInfoModal" tabindex="-1" aria-labelledby="copyrightInfoModalLabel"
     aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg text-start"
@@ -309,3 +360,19 @@
         </div>
     </div>
 </div>
+<script>
+    (() => {
+        const moveFooterModalToBody = () => {
+            const modal = document.getElementById('copyrightInfoModal');
+            if (!modal || modal.dataset.portalMounted === 'true') return;
+            document.body.appendChild(modal);
+            modal.dataset.portalMounted = 'true';
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', moveFooterModalToBody, { once: true });
+        } else {
+            moveFooterModalToBody();
+        }
+    })();
+</script>

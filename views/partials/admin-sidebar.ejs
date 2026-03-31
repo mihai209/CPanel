@@ -295,9 +295,39 @@ const isAdminNavActive = (item) => {
 </div>
 
 <style>
+    #adminSidebar {
+        height: 100vh;
+        max-height: 100vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(112, 146, 255, 0.28) transparent;
+    }
+
+    #adminSidebar::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    #adminSidebar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    #adminSidebar::-webkit-scrollbar-thumb {
+        background: rgba(112, 146, 255, 0.24);
+        border-radius: 999px;
+    }
+
+    #adminSidebar::-webkit-scrollbar-thumb:hover {
+        background: rgba(112, 146, 255, 0.38);
+    }
+
     :root[data-admin-nav="modal"] #adminSidebar.admin-sidebar-modal-host {
         width: 0 !important;
         min-width: 0 !important;
+        height: 0 !important;
+        max-height: 0 !important;
+        overflow: hidden !important;
         padding: 0 !important;
         border: 0 !important;
         background: transparent !important;
@@ -323,6 +353,9 @@ const isAdminNavActive = (item) => {
     :root[data-admin-nav="navbar"] #adminSidebar {
         width: 0 !important;
         min-width: 0 !important;
+        height: 0 !important;
+        max-height: 0 !important;
+        overflow: hidden !important;
         padding: 0 !important;
         border: 0 !important;
         background: transparent !important;
