@@ -15,10 +15,16 @@ jobs:
       matrix:
         include:
           - distro: ubuntu
+            release: "22.04"
+            arch: amd64
+          - distro: ubuntu
             release: "24.04"
             arch: amd64
           - distro: debian
             release: "12"
+            arch: amd64
+          - distro: debian
+            release: "13"
             arch: amd64
     permissions:
       contents: write
@@ -41,4 +47,3 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.release_tag }}
           files: dist/*.tar.xz
-

@@ -1,0 +1,48 @@
+name: VPS Image Smoke Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'images/misc/cpanel-vps-image/**'
+      - '.github/workflows/vps-image-smoke.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build runtime image
+        run: docker build -t cpanel-vps:smoke ./images/misc/cpanel-vps-image
+
+      - name: Prepare smoke rootfs archive
+        run: |
+          mkdir -p dist/rootfs
+          docker create --name cpanel-vps-rootfs-seed ubuntu:24.04 bash >/dev/null
+          docker export cpanel-vps-rootfs-seed | tar -C dist/rootfs -xf -
+          docker rm -f cpanel-vps-rootfs-seed >/dev/null
+          tar -C dist/rootfs -cJf dist/ubuntu-24.04-amd64.tar.xz .
+
+      - name: Validate proot filesystem
+        run: |
+          docker run --rm \
+            --entrypoint bash \
+            -e HOME=/home/container \
+            -e VPS_DISTRO=ubuntu \
+            -e VPS_RELEASE=24.04 \
+            -e ROOTFS_BASE_URL=file:///rootfs-tests \
+            -e ROOTFS_TAG= \
+            -v "${{ github.workspace }}/dist:/rootfs-tests:ro" \
+            cpanel-vps:smoke \
+            -lc '
+              /opt/cpanel-vps/scripts/install.sh
+              PROOT_BIN="$(command -v proot)"
+              test -x "${PROOT_BIN}"
+              "${PROOT_BIN}" --rootfs=/home/container/rootfs -0 -w /root -b /dev -b /sys -b /proc -b /tmp:/tmp -b /home/container:/home/container /bin/bash -lc "test -d /etc && test -d /bin && test -d /usr && ls /etc /bin /usr >/dev/null"
+            '

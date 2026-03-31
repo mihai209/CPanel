@@ -22,10 +22,12 @@ https://github.com/mihai209/cpanel-vps-rootfs/releases/download/latest/
 Expected filenames:
 
 ```text
+ubuntu-22.04-amd64.tar.xz
 ubuntu-24.04-amd64.tar.xz
 ubuntu-24.04-arm64.tar.xz
 debian-12-amd64.tar.xz
 debian-12-arm64.tar.xz
+debian-13-amd64.tar.xz
 ```
 
 ## Build locally
@@ -44,3 +46,17 @@ docker build -t ghcr.io/mihai209/cpanel-vps:rootfs panel/images/misc/cpanel-vps-
   - `VPS_RELEASE`
   - `ROOTFS_BASE_URL`
   - `ROOTFS_TAG`
+  - `ROOTFS_FALLBACK_TAG`
+- quick presets currently exposed in the egg UI:
+  - `Ubuntu 22.04`
+  - `Ubuntu 24.04`
+  - `Debian 12`
+  - `Debian 13`
+
+## Validation
+
+There is also a smoke-test workflow:
+
+- `.github/workflows/vps-image-smoke.yml`
+
+It builds the runtime image, prepares a temporary Ubuntu rootfs archive, and verifies that `proot` can enter a filesystem exposing `/etc`, `/bin`, and `/usr`.

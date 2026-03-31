@@ -22,6 +22,7 @@ VPS_DISTRO="${VPS_DISTRO:-ubuntu}"
 VPS_RELEASE="${VPS_RELEASE:-24.04}"
 ROOTFS_BASE_URL="${ROOTFS_BASE_URL:-https://github.com/mihai209/cpanel-vps-rootfs/releases/download}"
 ROOTFS_TAG="${ROOTFS_TAG:-latest}"
+ROOTFS_FALLBACK_TAG="${ROOTFS_FALLBACK_TAG:-latest}"
 ROOTFS_ARCH=""
 ROOTFS_DIR="${HOME}/rootfs"
 ROOTFS_ARCHIVE="${HOME}/rootfs.tar.xz"
@@ -60,8 +61,20 @@ vps_rootfs_filename() {
     printf '%s-%s-%s.tar.xz' "${VPS_DISTRO}" "${VPS_RELEASE}" "${ROOTFS_ARCH}"
 }
 
+vps_rootfs_url_for_tag() {
+    local tag="${1:-}"
+    local base="${ROOTFS_BASE_URL%/}"
+    local file
+    file="$(vps_rootfs_filename)"
+    if [[ -n "${tag}" ]]; then
+        printf '%s/%s/%s' "${base}" "${tag}" "${file}"
+    else
+        printf '%s/%s' "${base}" "${file}"
+    fi
+}
+
 vps_rootfs_url() {
-    printf '%s/%s/%s' "${ROOTFS_BASE_URL%/}" "${ROOTFS_TAG}" "$(vps_rootfs_filename)"
+    vps_rootfs_url_for_tag "${ROOTFS_TAG}"
 }
 
 vps_load_config() {

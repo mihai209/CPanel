@@ -39,12 +39,20 @@
             "field_type": "select",
             "options": [
                 {
+                    "label": "Ubuntu 22.04",
+                    "value": "ubuntu|22.04"
+                },
+                {
                     "label": "Ubuntu 24.04",
                     "value": "ubuntu|24.04"
                 },
                 {
                     "label": "Debian 12",
                     "value": "debian|12"
+                },
+                {
+                    "label": "Debian 13",
+                    "value": "debian|13"
                 }
             ]
         },
@@ -56,7 +64,17 @@
             "user_viewable": true,
             "user_editable": true,
             "rules": "required|string|max:16",
-            "field_type": "text"
+            "field_type": "select",
+            "options": [
+                {
+                    "label": "Ubuntu",
+                    "value": "ubuntu"
+                },
+                {
+                    "label": "Debian",
+                    "value": "debian"
+                }
+            ]
         },
         {
             "name": "VPS Release",
@@ -66,7 +84,25 @@
             "user_viewable": true,
             "user_editable": true,
             "rules": "required|string|max:16",
-            "field_type": "text"
+            "field_type": "select",
+            "options": [
+                {
+                    "label": "Ubuntu 22.04",
+                    "value": "22.04"
+                },
+                {
+                    "label": "Ubuntu 24.04",
+                    "value": "24.04"
+                },
+                {
+                    "label": "Debian 12",
+                    "value": "12"
+                },
+                {
+                    "label": "Debian 13",
+                    "value": "13"
+                }
+            ]
         },
         {
             "name": "VPS Hostname",
@@ -106,6 +142,16 @@
             "user_viewable": true,
             "user_editable": true,
             "rules": "required|string|max:64",
+            "field_type": "text"
+        },
+        {
+            "name": "Rootfs Fallback Tag",
+            "description": "Optional fallback release tag used if the primary tag does not contain the requested archive.",
+            "env_variable": "ROOTFS_FALLBACK_TAG",
+            "default_value": "latest",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|string|max:64",
             "field_type": "text"
         },
         {
