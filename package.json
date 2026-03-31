@@ -34,7 +34,7 @@
     "update-panel": "bash ./scripts/update-panel-safe.sh"
   },
   "dependencies": {
-    "axios": "^1.13.5",
+    "axios": "^1.14.0",
     "bcrypt": "^6.0.0",
     "blueimp-md5": "^2.19.0",
     "body-parser": "^2.2.2",
