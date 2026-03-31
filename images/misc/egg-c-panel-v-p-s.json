@@ -1,0 +1,53 @@
+{
+    "_comment": "Custom CPanel VPS egg using GHCR-hosted Debian/Ubuntu shell images.",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2026-03-31T22:00:00+03:00",
+    "name": "CPanel VPS",
+    "author": "mihai209@rocky.mihai209.cv",
+    "description": "A custom VPS-style egg for CPanel using GHCR-hosted Debian or Ubuntu runtime images. This avoids the LinuxContainers remote dependency and runs a direct shell inside the container.",
+    "features": null,
+    "docker_images": {
+        "GHCR Ubuntu 24.04": "ghcr.io/mihai209/cpanel-vps:ubuntu",
+        "GHCR Debian 12": "ghcr.io/mihai209/cpanel-vps:debian"
+    },
+    "file_denylist": [],
+    "startup": "./run.sh",
+    "config": {
+        "files": "{\r\n    \"vps.config\": {\r\n        \"parser\": \"properties\",\r\n        \"find\": {\r\n            \"internalip\": \"{{server.build.default.ip}}\",\r\n            \"port\": \"{{server.build.default.port}}\",\r\n            \"hostname\": \"{{server.build.env.VPS_HOSTNAME}}\",\r\n            \"timezone\": \"{{server.build.env.TIMEZONE}}\"\r\n        }\r\n    }\r\n}",
+        "startup": "{\r\n    \"done\": \"CPanel VPS Runtime\"\r\n}",
+        "logs": "{}",
+        "stop": "exit"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\r\ncd /mnt/server/\r\necho \"Using bundled CPanel VPS runtime image. No remote rootfs install step is required.\"\r\n",
+            "container": "ghcr.io/mihai209/cpanel-vps:ubuntu",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": [
+        {
+            "name": "VPS Hostname",
+            "description": "Prompt/display hostname inside the VPS shell.",
+            "env_variable": "VPS_HOSTNAME",
+            "default_value": "my-vps",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:32",
+            "field_type": "text"
+        },
+        {
+            "name": "Timezone",
+            "description": "Display timezone value stored in the VPS config.",
+            "env_variable": "TIMEZONE",
+            "default_value": "UTC",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:64",
+            "field_type": "text"
+        }
+    ]
+}
