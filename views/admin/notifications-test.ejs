@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= (settings.brandName || 'CPanel').toUpperCase() %> - Notifications Test Center</title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/mobile-layout.css">
+    <style>
+        .notify-card { background: #131a24; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 18px; }
+        .notify-pre { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; max-height: 260px; overflow: auto; background: #0b1120; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 14px; padding: 14px; color: #dbeafe; }
+        .notify-muted { color: #94a3b8; }
+        .notify-status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; border: 1px solid rgba(148, 163, 184, 0.18); }
+    </style>
+</head>
+<body>
+    <%- include('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3">
+                    <h4 class="mb-0 text-light fw-normal">Notifications Test Center</h4>
+                    <small class="text-muted">Preview templates, send manual probes, review delivery logs, and retry failed tests.</small>
+                </div>
+                <div class="breadcrumb-admin">
+                    <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span class="text-light">Notifications Test Center</span>
+                </div>
+            </div>
+
+            <div class="container-fluid py-4 px-lg-4">
+                <% if (success) { %>
+                    <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success"><%= success %></div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger"><%= error %></div>
+                <% } %>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-4">
+                        <div class="notify-card p-4 h-100">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h5 class="text-light mb-1">Discord test</h5>
+                                    <div class="notify-muted small">Uses the stored Extensions webhook config.</div>
+                                </div>
+                                <span class="notify-status-pill <%= notificationConfig.discordWebhook ? 'text-success border-success-subtle bg-success bg-opacity-10' : 'text-warning border-warning-subtle bg-warning bg-opacity-10' %>">
+                                    <%= notificationConfig.discordWebhook ? 'Configured' : 'Missing' %>
+                                </span>
+                            </div>
+                            <form method="POST" action="/admin/notifications-test/send">
+                                <input type="hidden" name="channel" value="discord">
+                                <div class="small notify-muted mb-3"><%= notificationConfig.discordWebhook ? maskNotificationTarget('discord', notificationConfig.discordWebhook) : 'No Discord webhook saved in Extensions.' %></div>
+                                <button type="submit" class="btn btn-primary btn-sm" <%= notificationConfig.discordWebhook ? '' : 'disabled' %>>Send Discord Test</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-4">
+                        <div class="notify-card p-4 h-100">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h5 class="text-light mb-1">Telegram test</h5>
+                                    <div class="notify-muted small">Uses the stored bot token and chat ID.</div>
+                                </div>
+                                <span class="notify-status-pill <%= (notificationConfig.telegramBotToken && notificationConfig.telegramChatId) ? 'text-success border-success-subtle bg-success bg-opacity-10' : 'text-warning border-warning-subtle bg-warning bg-opacity-10' %>">
+                                    <%= (notificationConfig.telegramBotToken && notificationConfig.telegramChatId) ? 'Configured' : 'Missing' %>
+                                </span>
+                            </div>
+                            <form method="POST" action="/admin/notifications-test/send">
+                                <input type="hidden" name="channel" value="telegram">
+                                <div class="small notify-muted mb-3"><%= notificationConfig.telegramChatId ? ('Chat ' + maskNotificationTarget('telegram', notificationConfig.telegramChatId)) : 'No Telegram config saved in Extensions.' %></div>
+                                <button type="submit" class="btn btn-primary btn-sm" <%= (notificationConfig.telegramBotToken && notificationConfig.telegramChatId) ? '' : 'disabled' %>>Send Telegram Test</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-4">
+                        <div class="notify-card p-4 h-100">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h5 class="text-light mb-1">Mail test</h5>
+                                    <div class="notify-muted small">Preview only until a real SMTP/mailer transport exists in the panel.</div>
+                                </div>
+                                <span class="notify-status-pill text-secondary border-secondary-subtle bg-secondary bg-opacity-10">Unsupported</span>
+                            </div>
+                            <form method="POST" action="/admin/notifications-test/send">
+                                <input type="hidden" name="channel" value="email">
+                                <button type="submit" class="btn btn-outline-light btn-sm">Create Email Preview Log</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-5">
+                        <div class="notify-card p-4 h-100">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h5 class="text-light mb-1">Generic webhook test</h5>
+                                    <div class="notify-muted small">Send a JSON payload to any HTTP/HTTPS endpoint without changing the saved Discord/Telegram module config.</div>
+                                </div>
+                                <span class="notify-status-pill text-info border-info-subtle bg-info bg-opacity-10">Manual URL</span>
+                            </div>
+                            <form method="POST" action="/admin/notifications-test/send" class="row g-3">
+                                <input type="hidden" name="channel" value="webhook">
+                                <div class="col-12">
+                                    <label class="form-label text-light small text-uppercase fw-semibold">Webhook URL</label>
+                                    <input type="url" name="webhookUrl" class="form-control" placeholder="https://example.com/hooks/test" required>
+                                </div>
+                                <div class="col-12">
+                                    <button type="submit" class="btn btn-primary btn-sm">Send Generic Webhook Test</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="col-lg-7">
+                        <div class="notify-card p-4 h-100">
+                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                <div>
+                                    <h5 class="text-light mb-1">Delivery logs</h5>
+                                    <div class="notify-muted small">Recent manual notification probes. Targets are masked in UI.</div>
+                                </div>
+                                <form method="POST" action="/admin/notifications-test/retry-last-failed">
+                                    <button type="submit" class="btn btn-outline-warning btn-sm" <%= lastFailedLog ? '' : 'disabled' %>>Retry Last Failed</button>
+                                </form>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-dark table-hover align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Channel</th>
+                                            <th>Status</th>
+                                            <th>Target</th>
+                                            <th>When</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% if (!deliveryLogs || deliveryLogs.length === 0) { %>
+                                            <tr><td colspan="5" class="text-center notify-muted py-4">No delivery logs yet.</td></tr>
+                                        <% } %>
+                                        <% (deliveryLogs || []).forEach((log) => { %>
+                                            <tr>
+                                                <td>
+                                                    <div class="text-light fw-semibold"><%= log.channel %></div>
+                                                    <div class="notify-muted small"><%= log.actor && log.actor.username ? ('@' + log.actor.username) : 'system' %></div>
+                                                </td>
+                                                <td>
+                                                    <span class="badge <%= log.status === 'sent' ? 'bg-success' : (log.status === 'unsupported' ? 'bg-secondary' : 'bg-danger') %>"><%= log.status %></span>
+                                                </td>
+                                                <td class="notify-muted small"><%= maskNotificationTarget(log.channel, log.target) %></td>
+                                                <td class="notify-muted small"><%= new Date(log.createdAt).toLocaleString() %></td>
+                                                <td class="text-end">
+                                                    <% if (log.status === 'failed') { %>
+                                                        <form method="POST" action="/admin/notifications-test/retry/<%= log.id %>" class="d-inline">
+                                                            <button type="submit" class="btn btn-outline-light btn-sm">Retry</button>
+                                                        </form>
+                                                    <% } %>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td colspan="5" class="pt-0 border-0">
+                                                    <details>
+                                                        <summary class="notify-muted small">Show preview / response</summary>
+                                                        <div class="row g-3 mt-1">
+                                                            <div class="col-md-6">
+                                                                <div class="notify-pre"><%= JSON.stringify(log.requestPayload || {}, null, 2) %></div>
+                                                            </div>
+                                                            <div class="col-md-6">
+                                                                <div class="notify-pre"><%= log.errorText || JSON.stringify(log.responsePayload || {}, null, 2) %></div>
+                                                            </div>
+                                                        </div>
+                                                    </details>
+                                                </td>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="notify-card p-4">
+                    <h5 class="text-light mb-3">Preview templates</h5>
+                    <div class="row g-4">
+                        <% ['discord', 'telegram', 'webhook', 'email'].forEach((channel) => { const preview = previews[channel]; %>
+                            <div class="col-lg-6">
+                                <div class="p-3 rounded-4 border border-secondary-subtle h-100">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div class="text-light fw-semibold text-capitalize"><%= channel %> preview</div>
+                                        <span class="notify-status-pill text-info border-info-subtle bg-info bg-opacity-10"><%= preview.stamp %></span>
+                                    </div>
+                                    <div class="notify-pre"><%= channel === 'webhook' ? JSON.stringify(preview.webhookPayload, null, 2) : (channel === 'email' ? (preview.emailSubject + '\n\n' + preview.emailBody) : (preview.title + '\n' + preview.description)) %></div>
+                                </div>
+                            </div>
+                        <% }) %>
+                    </div>
+                </div>
+            </div>
+
+            <%- include('../partials/footer') %>
+        </div>
+    </div>
+</body>
+</html>

@@ -4391,15 +4391,499 @@ function registerServerPagesRoutes(ctx) {
         const input = String(rawValue || '');
         if (!input) return [];
         const items = [];
-        const itemRegex = /id:\"([^\"]+)\"[^}]*?Count:(\d+)b/gi;
+        const itemRegex = /id:\"([^\"]+)\"[^}]*?(?:Slot:(-?\d+)b[^}]*?)?Count:(\d+)b/gi;
         let match;
         while ((match = itemRegex.exec(input))) {
             const id = normalizeMinecraftItemId(match[1]);
-            const count = Number.parseInt(match[2], 10);
+            const slot = Number.parseInt(match[2], 10);
+            const count = Number.parseInt(match[3], 10);
             if (!id) continue;
-            items.push({ id, count: Number.isFinite(count) ? count : 1 });
+            items.push({
+                id,
+                slot: Number.isFinite(slot) ? slot : null,
+                count: Number.isFinite(count) ? count : 1
+            });
         }
         return items;
+    }
+
+    function parseMinecraftNumericDataValue(rawValue) {
+        const match = String(rawValue || '').match(/-?\d+(?:\.\d+)?/);
+        if (!match) return null;
+        const parsed = Number.parseFloat(match[0]);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function parseMinecraftArrayDataValue(rawValue) {
+        const text = String(rawValue || '').trim();
+        if (!text.startsWith('[') || !text.endsWith(']')) return [];
+        return text
+            .slice(1, -1)
+            .split(',')
+            .map((entry) => Number.parseFloat(String(entry || '').trim().replace(/[dDfFbBsSlL]$/g, '')))
+            .filter((entry) => Number.isFinite(entry));
+    }
+
+    function parseMinecraftDimensionValue(rawValue) {
+        const text = String(rawValue || '').trim().replace(/^"+|"+$/g, '');
+        if (!text) return '';
+        const compact = text.includes(':') ? text.split(':').pop() : text;
+        return compact.replace(/_/g, ' ');
+    }
+
+    function humanizeMinecraftResourceId(rawId) {
+        const compact = String(rawId || '').trim();
+        if (!compact) return '';
+        const short = compact.includes(':') ? compact.split(':').pop() : compact;
+        return short
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+
+    function buildMinecraftTopStatEntries(section, limit = 8) {
+        if (!section || typeof section !== 'object') return [];
+        return Object.entries(section)
+            .map(([key, value]) => ({
+                key,
+                label: humanizeMinecraftResourceId(key),
+                count: Number.parseInt(value, 10) || 0
+            }))
+            .filter((entry) => entry.count > 0)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, Math.max(1, limit));
+    }
+
+    function buildMinecraftMovementSummary(customSection) {
+        const custom = customSection && typeof customSection === 'object' ? customSection : {};
+        const entries = [
+            ['Walk', 'minecraft:walk_one_cm'],
+            ['Sprint', 'minecraft:sprint_one_cm'],
+            ['Crouch', 'minecraft:crouch_one_cm'],
+            ['Swim', 'minecraft:swim_one_cm'],
+            ['Ride', 'minecraft:horse_one_cm'],
+            ['Fly', 'minecraft:fly_one_cm']
+        ];
+        return entries
+            .map(([label, key]) => ({
+                label,
+                count: Math.floor((Number.parseInt(custom[key], 10) || 0) / 100)
+            }))
+            .filter((entry) => entry.count > 0);
+    }
+
+    function buildMinecraftAdvancementsSummary(payload) {
+        if (!payload || typeof payload !== 'object') {
+            return { total: 0, completed: 0, entries: [] };
+        }
+        const entries = Object.entries(payload)
+            .filter(([key, value]) => key && value && typeof value === 'object')
+            .map(([key, value]) => ({
+                key,
+                label: humanizeMinecraftResourceId(key),
+                done: Boolean(value.done)
+            }));
+        return {
+            total: entries.length,
+            completed: entries.filter((entry) => entry.done).length,
+            entries: entries.slice(0, 80)
+        };
+    }
+
+    function buildMinecraftStatsSummary(payload) {
+        const statsRoot = payload && payload.stats && typeof payload.stats === 'object' ? payload.stats : (payload || {});
+        const custom = statsRoot['minecraft:custom'] && typeof statsRoot['minecraft:custom'] === 'object'
+            ? statsRoot['minecraft:custom']
+            : {};
+        return {
+            playtimeTicks: extractMinecraftPlaytimeTicks(payload),
+            playtimeLabel: formatMinecraftPlaytimeLabel(extractMinecraftPlaytimeTicks(payload)),
+            deaths: Number.parseInt(custom['minecraft:deaths'], 10) || 0,
+            jumps: Number.parseInt(custom['minecraft:jump'], 10) || 0,
+            movement: buildMinecraftMovementSummary(custom),
+            pickedUp: buildMinecraftTopStatEntries(statsRoot['minecraft:picked_up']),
+            used: buildMinecraftTopStatEntries(statsRoot['minecraft:used']),
+            mobsKilled: buildMinecraftTopStatEntries(statsRoot['minecraft:killed'])
+        };
+    }
+
+    function buildMinecraftCandidateUuids(username, onlineMode, usercacheUuid, offlineUuid, liveUuid = '') {
+        const candidates = [];
+        const push = (value) => {
+            const trimmed = String(value || '').trim();
+            if (!trimmed) return;
+            if (candidates.includes(trimmed)) return;
+            candidates.push(trimmed);
+        };
+        push(liveUuid);
+        push(usercacheUuid);
+        if (!onlineMode || !usercacheUuid) push(offlineUuid);
+        return candidates;
+    }
+
+    async function resolveMinecraftAdminRuntimeContext(server, connectorWs, settingsMap = {}) {
+        const bedrockMode = inferMinecraftBedrockMode(server);
+        const propertiesResult = await readConnectorFileContent(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.serverProperties, 8000);
+        const properties = parseMinecraftProperties(propertiesResult && propertiesResult.success ? propertiesResult.content : '');
+        const levelName = String(properties['level-name'] || 'world').trim() || 'world';
+        const onlineMode = normalizeMinecraftBooleanString(properties['online-mode'], 'true') === 'true';
+        const statusAddress = resolveMinecraftStatusAddress(server);
+        const statusPreview = bedrockMode
+            ? { ok: false, online: false, playersOnline: 0, playersMax: 0, playersList: [], motdClean: [], error: 'Bedrock mode' }
+            : await fetchMinecraftServerStatusPreview({
+                address: statusAddress,
+                bedrockMode: false,
+                settingsMap
+            });
+        const usercacheResult = await readConnectorFileContent(connectorWs, server.id, MINECRAFT_ADMIN_PATHS.usercache, 8000);
+        let usercacheEntries = [];
+        if (usercacheResult && usercacheResult.success && usercacheResult.content) {
+            try {
+                const parsed = JSON.parse(usercacheResult.content);
+                if (Array.isArray(parsed)) {
+                    usercacheEntries = parsed.map((entry) => ({
+                        uuid: String(entry && entry.uuid || '').trim(),
+                        name: String(entry && entry.name || '').trim()
+                    })).filter((entry) => entry.uuid || entry.name);
+                }
+            } catch { }
+        }
+        return {
+            bedrockMode,
+            properties,
+            levelName,
+            onlineMode,
+            statusAddress,
+            statusPreview,
+            usercacheEntries,
+            usercacheMap: buildMinecraftUserCacheMap(usercacheResult && usercacheResult.success ? usercacheResult.content : '')
+        };
+    }
+
+    async function readFirstMinecraftJsonPayload(connectorWs, serverId, candidatePaths = [], timeoutMs = 8000) {
+        for (const filePath of candidatePaths) {
+            if (!filePath) continue;
+            const result = await readConnectorFileContent(connectorWs, serverId, filePath, timeoutMs);
+            if (!result || !result.success || !result.content) continue;
+            try {
+                return {
+                    filePath,
+                    payload: JSON.parse(result.content)
+                };
+            } catch { }
+        }
+        return { filePath: '', payload: null };
+    }
+
+    async function readFirstMinecraftPlayerdata(connectorWs, serverId, candidatePaths = [], timeoutMs = 8000) {
+        for (const filePath of candidatePaths) {
+            if (!filePath) continue;
+            const result = await readConnectorFileContentBase64(connectorWs, serverId, filePath, timeoutMs);
+            if (!result || !result.success || !result.contentBase64) continue;
+            const parsed = await parseMinecraftPlayerNbt(result.contentBase64);
+            if (!parsed) continue;
+            return { filePath, payload: parsed };
+        }
+        return { filePath: '', payload: null };
+    }
+
+    async function buildMinecraftPlayerDirectoryPayload(server, connectorWs, settingsMap = {}, search = '') {
+        const runtime = await resolveMinecraftAdminRuntimeContext(server, connectorWs, settingsMap);
+        const searchTerm = String(search || '').trim().toLowerCase();
+        const [whitelistResult, opsResult, bannedPlayersResult, statsListing, playerdataListing, advancementsListing] = await Promise.all([
+            readConnectorFileContent(connectorWs, server.id, MINECRAFT_ADMIN_PATHS.whitelist, 8000),
+            readConnectorFileContent(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.ops, 8000),
+            readConnectorFileContent(connectorWs, server.id, MINECRAFT_ADMIN_PATHS.bannedPlayers, 8000),
+            runConnectorFileAction(connectorWs, {
+                type: 'list_files',
+                serverId: server.id,
+                directory: `/${runtime.levelName}/stats`
+            }, `/${runtime.levelName}/stats`, server.id, 12000),
+            runConnectorFileAction(connectorWs, {
+                type: 'list_files',
+                serverId: server.id,
+                directory: `/${runtime.levelName}/playerdata`
+            }, `/${runtime.levelName}/playerdata`, server.id, 12000),
+            runConnectorFileAction(connectorWs, {
+                type: 'list_files',
+                serverId: server.id,
+                directory: `/${runtime.levelName}/advancements`
+            }, `/${runtime.levelName}/advancements`, server.id, 12000)
+        ]);
+
+        const whitelistNames = new Set();
+        const opNames = new Set();
+        const bannedNames = new Set();
+
+        const safeParseArray = (content) => {
+            try {
+                const parsed = JSON.parse(content || '[]');
+                return Array.isArray(parsed) ? parsed : [];
+            } catch {
+                return [];
+            }
+        };
+
+        safeParseArray(whitelistResult && whitelistResult.success ? whitelistResult.content : '').forEach((entry) => {
+            const name = String(entry && entry.name || '').trim().toLowerCase();
+            if (name) whitelistNames.add(name);
+        });
+        safeParseArray(opsResult && opsResult.success ? opsResult.content : '').forEach((entry) => {
+            const name = String(entry && entry.name || '').trim().toLowerCase();
+            if (name) opNames.add(name);
+        });
+        safeParseArray(bannedPlayersResult && bannedPlayersResult.success ? bannedPlayersResult.content : '').forEach((entry) => {
+            const name = String(entry && entry.name || '').trim().toLowerCase();
+            if (name) bannedNames.add(name);
+        });
+
+        const onlineByName = new Map((runtime.statusPreview && Array.isArray(runtime.statusPreview.playersList) ? runtime.statusPreview.playersList : [])
+            .map((entry) => [String(entry.name || '').trim().toLowerCase(), entry]));
+
+        const players = new Map();
+        const registerPlayer = (nameRaw, patch = {}) => {
+            const name = String(nameRaw || '').trim();
+            const uuid = String(patch.uuid || '').trim();
+            const key = name ? name.toLowerCase() : (uuid ? normalizeMinecraftUuid(uuid) : '');
+            if (!key) return;
+            const current = players.get(key) || {
+                name,
+                uuid,
+                online: false,
+                whitelisted: false,
+                op: false,
+                banned: false,
+                hasStats: false,
+                hasPlayerdata: false,
+                hasAdvancements: false
+            };
+            const next = {
+                ...current,
+                ...patch,
+                name: name || current.name,
+                uuid: uuid || current.uuid
+            };
+            players.set(key, next);
+        };
+
+        runtime.usercacheEntries.forEach((entry) => {
+            registerPlayer(entry.name, { uuid: entry.uuid });
+        });
+
+        (runtime.statusPreview && Array.isArray(runtime.statusPreview.playersList) ? runtime.statusPreview.playersList : []).forEach((entry) => {
+            registerPlayer(entry.name, {
+                uuid: entry.uuid,
+                online: true
+            });
+        });
+
+        safeParseArray(whitelistResult && whitelistResult.success ? whitelistResult.content : '').forEach((entry) => {
+            registerPlayer(entry && entry.name, {
+                uuid: entry && entry.uuid,
+                whitelisted: true
+            });
+        });
+        safeParseArray(opsResult && opsResult.success ? opsResult.content : '').forEach((entry) => {
+            registerPlayer(entry && entry.name, {
+                uuid: entry && entry.uuid,
+                op: true
+            });
+        });
+        safeParseArray(bannedPlayersResult && bannedPlayersResult.success ? bannedPlayersResult.content : '').forEach((entry) => {
+            registerPlayer(entry && entry.name, {
+                uuid: entry && entry.uuid,
+                banned: true
+            });
+        });
+
+        const markUuidFiles = (listing, propName, extension) => {
+            const files = listing && listing.success && Array.isArray(listing.files) ? listing.files : [];
+            files.forEach((file) => {
+                if (!file || file.isDirectory) return;
+                const fileName = String(file.name || '').trim();
+                if (!fileName.toLowerCase().endsWith(extension)) return;
+                const uuidRaw = fileName.slice(0, -extension.length);
+                const resolvedName = runtime.usercacheMap.get(uuidRaw.toLowerCase()) || runtime.usercacheMap.get(normalizeMinecraftUuid(uuidRaw)) || '';
+                registerPlayer(resolvedName || uuidRaw, {
+                    uuid: uuidRaw,
+                    [propName]: true
+                });
+            });
+        };
+
+        markUuidFiles(statsListing, 'hasStats', '.json');
+        markUuidFiles(playerdataListing, 'hasPlayerdata', '.dat');
+        markUuidFiles(advancementsListing, 'hasAdvancements', '.json');
+
+        const rows = Array.from(players.values())
+            .map((entry) => {
+                const onlineMatch = onlineByName.get(String(entry.name || '').trim().toLowerCase());
+                const name = String(entry.name || '').trim();
+                const uuid = String(entry.uuid || (onlineMatch && onlineMatch.uuid) || '').trim();
+                return {
+                    ...entry,
+                    name: name || uuid || 'Unknown Player',
+                    uuid,
+                    online: Boolean(entry.online || onlineMatch),
+                    whitelisted: entry.whitelisted || whitelistNames.has(String(name).toLowerCase()),
+                    op: entry.op || opNames.has(String(name).toLowerCase()),
+                    banned: entry.banned || bannedNames.has(String(name).toLowerCase()),
+                    headUrl: buildMinecraftPlayerHeadUrl(name, uuid)
+                };
+            })
+            .filter((entry) => {
+                if (!searchTerm) return true;
+                return String(entry.name || '').toLowerCase().includes(searchTerm)
+                    || String(entry.uuid || '').toLowerCase().includes(searchTerm);
+            })
+            .sort((a, b) => {
+                if (a.online !== b.online) return a.online ? -1 : 1;
+                return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+            })
+            .slice(0, 500);
+
+        return {
+            levelName: runtime.levelName,
+            onlineCount: rows.filter((entry) => entry.online).length,
+            offlineCount: rows.filter((entry) => !entry.online).length,
+            players: rows,
+            generatedAt: new Date().toISOString()
+        };
+    }
+
+    async function buildMinecraftPlayerAdminPayload(server, connectorWs, username, settingsMap = {}, options = {}) {
+        const runtime = await resolveMinecraftAdminRuntimeContext(server, connectorWs, settingsMap);
+        const target = formatMinecraftCommandTarget(username);
+        const normalizedName = String(username || '').trim();
+        const explicitUuid = String(options && options.explicitUuid || '').trim();
+        const onlineEntry = (runtime.statusPreview && Array.isArray(runtime.statusPreview.playersList)
+            ? runtime.statusPreview.playersList.find((entry) => String(entry && entry.name || '').trim().toLowerCase() === normalizedName.toLowerCase())
+            : null) || null;
+        const usercacheUuid = resolvePlayerUuidFromUsercache(JSON.stringify(runtime.usercacheEntries || []), normalizedName);
+        const offlineUuid = computeOfflinePlayerUuid(normalizedName);
+        const candidateUuids = buildMinecraftCandidateUuids(normalizedName, runtime.onlineMode, usercacheUuid, offlineUuid, explicitUuid || (onlineEntry && onlineEntry.uuid));
+
+        const commands = [
+            { key: 'health', command: `data get entity ${target} Health` },
+            { key: 'food', command: `data get entity ${target} foodLevel` },
+            { key: 'xpLevel', command: `data get entity ${target} XpLevel` },
+            { key: 'location', command: `data get entity ${target} Pos` },
+            { key: 'rotation', command: `data get entity ${target} Rotation` },
+            { key: 'gamemode', command: `data get entity ${target} playerGameType` },
+            { key: 'dimension', command: `data get entity ${target} Dimension` },
+            { key: 'inventory', command: `data get entity ${target} Inventory` },
+            { key: 'enderChest', command: `data get entity ${target} EnderItems` }
+        ];
+
+        const liveData = {};
+        for (const entry of commands) {
+            const output = await captureMinecraftCommandOutput(server.id, connectorWs, entry.command, 2500);
+            const rawValue = output.success ? parseMinecraftDataGetOutput(output.output) : '';
+            liveData[entry.key] = rawValue;
+        }
+
+        const [statsResult, advancementsResult, playerdataResult, whitelistResult, opsResult, bannedPlayersResult] = await Promise.all([
+            readFirstMinecraftJsonPayload(connectorWs, server.id, candidateUuids.map((uuid) => `/${runtime.levelName}/stats/${uuid}.json`), 8000),
+            readFirstMinecraftJsonPayload(connectorWs, server.id, candidateUuids.map((uuid) => `/${runtime.levelName}/advancements/${uuid}.json`), 8000),
+            readFirstMinecraftPlayerdata(connectorWs, server.id, candidateUuids.map((uuid) => `/${runtime.levelName}/playerdata/${uuid}.dat`), 8000),
+            readConnectorFileContent(connectorWs, server.id, MINECRAFT_ADMIN_PATHS.whitelist, 8000),
+            readConnectorFileContent(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.ops, 8000),
+            readConnectorFileContent(connectorWs, server.id, MINECRAFT_ADMIN_PATHS.bannedPlayers, 8000)
+        ]);
+
+        const offlinePayload = playerdataResult && playerdataResult.payload ? playerdataResult.payload : null;
+        const offlineData = offlinePayload ? {
+            health: offlinePayload.Health ?? null,
+            food: offlinePayload.FoodLevel ?? offlinePayload.foodLevel ?? null,
+            gamemode: mapMinecraftGameType(offlinePayload.playerGameType) || offlinePayload.playerGameType || null,
+            pos: Array.isArray(offlinePayload.Pos) ? offlinePayload.Pos : null,
+            rotation: Array.isArray(offlinePayload.Rotation) ? offlinePayload.Rotation : null,
+            xpLevel: offlinePayload.XpLevel ?? offlinePayload.xpLevel ?? null,
+            dimension: parseMinecraftDimensionValue(offlinePayload.Dimension || '')
+        } : null;
+        const offlineItems = {
+            inventory: offlinePayload ? mapMinecraftNbtItemList(offlinePayload.Inventory) : [],
+            ender: offlinePayload ? mapMinecraftNbtItemList(offlinePayload.EnderItems) : []
+        };
+
+        const liveProfile = {
+            health: parseMinecraftNumericDataValue(liveData.health),
+            food: parseMinecraftNumericDataValue(liveData.food),
+            xpLevel: parseMinecraftNumericDataValue(liveData.xpLevel),
+            pos: parseMinecraftArrayDataValue(liveData.location),
+            rotation: parseMinecraftArrayDataValue(liveData.rotation),
+            gamemode: mapMinecraftGameType(liveData.gamemode) || '',
+            dimension: parseMinecraftDimensionValue(liveData.dimension)
+        };
+
+        const safeParseArray = (content) => {
+            try {
+                const parsed = JSON.parse(content || '[]');
+                return Array.isArray(parsed) ? parsed : [];
+            } catch {
+                return [];
+            }
+        };
+
+        const lowerName = normalizedName.toLowerCase();
+        const isWhitelisted = safeParseArray(whitelistResult && whitelistResult.success ? whitelistResult.content : '')
+            .some((entry) => String(entry && entry.name || '').trim().toLowerCase() === lowerName);
+        const isOp = safeParseArray(opsResult && opsResult.success ? opsResult.content : '')
+            .some((entry) => String(entry && entry.name || '').trim().toLowerCase() === lowerName);
+        const isBanned = safeParseArray(bannedPlayersResult && bannedPlayersResult.success ? bannedPlayersResult.content : '')
+            .some((entry) => String(entry && entry.name || '').trim().toLowerCase() === lowerName);
+
+        const statsPayload = statsResult && statsResult.payload ? statsResult.payload : null;
+        const advancementsPayload = advancementsResult && advancementsResult.payload ? advancementsResult.payload : null;
+        const statsSummary = buildMinecraftStatsSummary(statsPayload);
+        const advancementsSummary = buildMinecraftAdvancementsSummary(advancementsPayload);
+        const effectiveUuid = String((onlineEntry && onlineEntry.uuid) || usercacheUuid || (statsResult && statsResult.filePath ? statsResult.filePath.split('/').pop().replace(/\.json$/i, '') : '') || offlineUuid || '').trim();
+        const profile = {
+            name: normalizedName,
+            uuid: effectiveUuid,
+            offlineUuid,
+            headUrl: buildMinecraftPlayerHeadUrl(normalizedName, effectiveUuid),
+            online: Boolean(onlineEntry),
+            whitelisted: isWhitelisted,
+            op: isOp,
+            banned: isBanned,
+            bedrock: runtime.bedrockMode,
+            world: liveProfile.dimension || (offlineData && offlineData.dimension) || runtime.levelName,
+            health: liveProfile.health ?? (offlineData ? offlineData.health : null),
+            food: liveProfile.food ?? (offlineData ? offlineData.food : null),
+            xpLevel: liveProfile.xpLevel ?? (offlineData ? offlineData.xpLevel : null),
+            gamemode: liveProfile.gamemode || (offlineData && offlineData.gamemode) || '',
+            position: liveProfile.pos.length ? liveProfile.pos : ((offlineData && Array.isArray(offlineData.pos)) ? offlineData.pos : []),
+            rotation: liveProfile.rotation.length ? liveProfile.rotation : ((offlineData && Array.isArray(offlineData.rotation)) ? offlineData.rotation : []),
+            playtimeLabel: statsSummary.playtimeLabel,
+            deaths: statsSummary.deaths,
+            jumps: statsSummary.jumps,
+            statsFilePath: statsResult.filePath || '',
+            advancementsFilePath: advancementsResult.filePath || '',
+            playerdataFilePath: playerdataResult.filePath || ''
+        };
+
+        return {
+            profile,
+            runtime,
+            data: liveData,
+            offlineUuid,
+            offlineData,
+            items: {
+                inventory: parseMinecraftItemList(liveData.inventory),
+                ender: parseMinecraftItemList(liveData.enderChest)
+            },
+            offlineItems,
+            statsSummary,
+            advancementsSummary,
+            statsPayload,
+            advancementsPayload,
+            bedrock: runtime.bedrockMode,
+            generatedAt: new Date().toISOString(),
+            sources: {
+                inventory: parseMinecraftItemList(liveData.inventory).length ? 'online' : (offlineItems.inventory.length ? 'offline' : ''),
+                ender: parseMinecraftItemList(liveData.enderChest).length ? 'online' : (offlineItems.ender.length ? 'offline' : '')
+            }
+        };
     }
 
     const MINECRAFT_TEXTURE_CACHE = new Map(); // key -> { ts, buffer }
@@ -9968,6 +10452,13 @@ function registerServerPagesRoutes(ctx) {
                 return res.redirect(`/server/${server.containerId}/suspended`);
             }
 
+            const policyConfig = await getServerPolicyConfigSafe(server.id);
+            const filesWriteLocked = isServerEditLockedForAccess(policyConfig, access);
+            const uploadEnabledRaw = String((res.locals.settings && res.locals.settings.featureWebUploadEnabled) || 'true').trim().toLowerCase();
+            const webUploadEnabled = uploadEnabledRaw === 'true' || uploadEnabledRaw === '1' || uploadEnabledRaw === 'on' || uploadEnabledRaw === 'yes';
+            const uploadMaxMbRaw = Number.parseInt(String((res.locals.settings && res.locals.settings.featureWebUploadMaxMb) || '50').trim(), 10);
+            const webUploadMaxMb = Math.max(1, Math.min(2048, Number.isInteger(uploadMaxMbRaw) ? uploadMaxMbRaw : 50));
+
             const wsToken = jwt.sign({
                 serverId: server.id,
                 userId: req.session.user.id,
@@ -10006,6 +10497,12 @@ function registerServerPagesRoutes(ctx) {
                 wsToken,
                 commandMacros,
                 canUseMacros: hasServerPermission(access, 'server.macros'),
+                canUseConsoleFiles: hasServerPermission(access, 'server.files'),
+                canWriteConsoleFiles: hasServerPermission(access, 'server.files.write'),
+                webUploadEnabled,
+                webUploadMaxMb,
+                filesWriteLocked,
+                policyReadOnlyPatterns: policyConfig && policyConfig.readOnlyFiles ? policyConfig.readOnlyFiles.patterns || [] : [],
                 showMinecraftEulaModal: isServerLikelyMinecraft(server),
                 isMinecraftServer: isServerLikelyMinecraft(server),
                 minecraftStatusAddress: resolveMinecraftStatusAddress(server),
@@ -12637,6 +13134,26 @@ function registerServerPagesRoutes(ctx) {
         } catch (error) {
             console.error('Error queuing backup:', error);
             return res.redirect(`/server/${req.params.containerId}/backups?error=${encodeURIComponent('Failed to queue backup.')}`);
+        }
+    });
+
+    app.post('/server/:containerId/backups/history/clear', requireAuth, async (req, res) => {
+        try {
+            const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+            if (!server) return res.redirect('/server/notfound');
+            const access = await resolveServerAccess(server, req.session.user);
+            if (!hasServerPermission(access, 'server.backups.manage')) {
+                return res.redirect('/server/no-permissions');
+            }
+
+            await ServerBackup.destroy({
+                where: { serverId: server.id }
+            });
+
+            return res.redirect(`/server/${server.containerId}/backups?success=${encodeURIComponent('Backup history cleared. Google Drive files were not touched.')}`);
+        } catch (error) {
+            console.error('Error clearing backup history:', error);
+            return res.redirect(`/server/${req.params.containerId}/backups?error=${encodeURIComponent('Failed to clear backup history.')}`);
         }
     });
 
@@ -15885,7 +16402,22 @@ function registerServerPagesRoutes(ctx) {
                 user: req.session.user,
                 title: `Minecraft Admin ${server.name}`,
                 path: '/servers',
-                active: 'mccenter'
+                active: 'mccenter',
+                minecraftAdminPlayer: String(req.query.player || '').trim(),
+                minecraftAdminPermissions: {
+                    inspect: hasServerPermission(access, 'minecraft.inspect'),
+                    freeze: hasServerPermission(access, 'minecraft.freeze'),
+                    kick: hasServerPermission(access, 'minecraft.kick'),
+                    ban: hasServerPermission(access, 'minecraft.ban'),
+                    banlist: hasServerPermission(access, 'minecraft.banlist'),
+                    op: hasServerPermission(access, 'minecraft.op'),
+                    deop: hasServerPermission(access, 'minecraft.deop'),
+                    tempban: hasServerPermission(access, 'minecraft.tempban'),
+                    teleport: hasServerPermission(access, 'minecraft.teleport'),
+                    chat: hasServerPermission(access, 'minecraft.chat'),
+                    whitelist: hasServerPermission(access, 'minecraft.whitelist'),
+                    playerData: hasServerPermission(access, 'minecraft.inspect')
+                }
             });
         } catch (err) {
             console.error('Error loading Minecraft admin:', err);
@@ -19214,6 +19746,236 @@ function registerServerPagesRoutes(ctx) {
         }
     });
 
+    app.get('/server/:containerId/minecraft/admin/players', requireAuth, async (req, res) => {
+        try {
+            const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.inspect']);
+            if (!ctx) return;
+            const { server, connectorWs } = ctx;
+            const payload = await buildMinecraftPlayerDirectoryPayload(server, connectorWs, res.locals.settings || {}, req.query.search || '');
+            return res.json({ success: true, ...payload });
+        } catch (error) {
+            console.error('Error loading player directory:', error);
+            return res.status(500).json({ success: false, error: 'Failed to load player directory.' });
+        }
+    });
+
+    app.post('/server/:containerId/minecraft/admin/player-action', requireAuth, async (req, res) => {
+        try {
+            const action = String(req.body.action || '').trim().toLowerCase();
+            const actionCatalog = {
+                whitelist: { permission: 'minecraft.whitelist', command: 'whitelist add', requireReason: false },
+                dewhitelist: { permission: 'minecraft.whitelist', command: 'whitelist remove', requireReason: false },
+                op: { permission: 'minecraft.op', command: 'op', requireReason: false },
+                deop: { permission: 'minecraft.deop', command: 'deop', requireReason: false },
+                kick: { permission: 'minecraft.kick', command: 'kick', requireReason: true },
+                ban: { permission: 'minecraft.ban', command: 'ban', requireReason: true },
+                tempban: { permission: 'minecraft.tempban', command: 'tempban', requireReason: true, requireDuration: true },
+                unban: { permission: 'minecraft.banlist', command: 'pardon', requireReason: false }
+            };
+            const selected = Object.prototype.hasOwnProperty.call(actionCatalog, action) ? actionCatalog[action] : null;
+            if (!selected) {
+                return res.status(400).json({ success: false, error: 'Invalid action.' });
+            }
+            const ctx = await resolveMinecraftAdminApiContext(req, res, [selected.permission]);
+            if (!ctx) return;
+            const { server, connectorWs } = ctx;
+            const rawTarget = String(req.body.player || req.body.target || '').trim();
+            const target = normalizeMinecraftPlayerTarget(rawTarget);
+            if (!target) {
+                return res.status(400).json({ success: false, error: 'Invalid player name.' });
+            }
+            const reason = normalizeMinecraftCommandReason(req.body.reason, 120);
+            const duration = normalizeMinecraftDuration(req.body.duration || '');
+            let command = '';
+            if (action === 'unban') {
+                command = target.includes('.') ? `pardon-ip ${target}` : `pardon ${formatMinecraftCommandTarget(target)}`;
+            } else if (action === 'tempban') {
+                if (!duration) {
+                    return res.status(400).json({ success: false, error: 'Tempban duration is required.' });
+                }
+                command = `tempban ${formatMinecraftCommandTarget(target)} ${duration}${reason ? ` ${reason}` : ''}`;
+            } else if (action === 'kick' || action === 'ban') {
+                command = `${selected.command} ${formatMinecraftCommandTarget(target)}${reason ? ` ${reason}` : ''}`;
+            } else {
+                command = `${selected.command} ${formatMinecraftCommandTarget(target)}`;
+            }
+            const result = await dispatchMinecraftCommand(connectorWs, server.id, command);
+            if (!result.success) {
+                return res.status(500).json({ success: false, error: result.error || 'Failed to execute player action.' });
+            }
+            return res.json({
+                success: true,
+                action,
+                command,
+                requestId: result.requestId || null
+            });
+        } catch (error) {
+            console.error('Error executing minecraft player action:', error);
+            return res.status(500).json({ success: false, error: 'Failed to execute player action.' });
+        }
+    });
+
+    app.post('/server/:containerId/minecraft/admin/player-state', requireAuth, async (req, res) => {
+        try {
+            const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.inspect']);
+            if (!ctx) return;
+            const { server, connectorWs } = ctx;
+            const targetName = String(req.body.player || '').trim();
+            const target = formatMinecraftCommandTarget(targetName);
+            if (!target) {
+                return res.status(400).json({ success: false, error: 'Player is required.' });
+            }
+            const runtime = await resolveMinecraftAdminRuntimeContext(server, connectorWs, res.locals.settings || {});
+            const online = Array.isArray(runtime.statusPreview && runtime.statusPreview.playersList)
+                && runtime.statusPreview.playersList.some((entry) => String(entry && entry.name || '').trim().toLowerCase() === targetName.toLowerCase());
+            if (!online) {
+                return res.status(409).json({ success: false, error: 'Player must be online for live stat edits.' });
+            }
+
+            const field = String(req.body.field || '').trim().toLowerCase();
+            const valueRaw = req.body.value;
+            let command = '';
+            if (field === 'health') {
+                const value = Math.max(1, Math.min(40, Number.parseFloat(valueRaw)));
+                if (!Number.isFinite(value)) return res.status(400).json({ success: false, error: 'Invalid health value.' });
+                command = `data modify entity ${target} Health set value ${Number(value.toFixed(1))}f`;
+            } else if (field === 'food') {
+                const value = clampInteger(valueRaw, NaN, 0, 20);
+                if (!Number.isInteger(value)) return res.status(400).json({ success: false, error: 'Invalid hunger value.' });
+                command = `data modify entity ${target} foodLevel set value ${value}`;
+            } else if (field === 'xplevel') {
+                const value = clampInteger(valueRaw, NaN, 0, 10000);
+                if (!Number.isInteger(value)) return res.status(400).json({ success: false, error: 'Invalid XP level.' });
+                command = `xp set ${target} ${value} levels`;
+            } else if (field === 'gamemode') {
+                const mode = String(valueRaw || '').trim().toLowerCase();
+                if (!['survival', 'creative', 'adventure', 'spectator'].includes(mode)) {
+                    return res.status(400).json({ success: false, error: 'Invalid gamemode.' });
+                }
+                command = `gamemode ${mode} ${target}`;
+            } else {
+                return res.status(400).json({ success: false, error: 'Unsupported state field.' });
+            }
+
+            const result = await dispatchMinecraftCommand(connectorWs, server.id, command);
+            if (!result.success) {
+                return res.status(500).json({ success: false, error: result.error || 'Failed to update player state.' });
+            }
+            return res.json({ success: true, field, command, requestId: result.requestId || null });
+        } catch (error) {
+            console.error('Error updating minecraft player state:', error);
+            return res.status(500).json({ success: false, error: 'Failed to update player state.' });
+        }
+    });
+
+    app.post('/server/:containerId/minecraft/admin/inventory', requireAuth, async (req, res) => {
+        try {
+            const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.inspect']);
+            if (!ctx) return;
+            const { server, connectorWs } = ctx;
+            const targetName = String(req.body.player || '').trim();
+            const target = formatMinecraftCommandTarget(targetName);
+            if (!target) {
+                return res.status(400).json({ success: false, error: 'Player is required.' });
+            }
+            const runtime = await resolveMinecraftAdminRuntimeContext(server, connectorWs, res.locals.settings || {});
+            const online = Array.isArray(runtime.statusPreview && runtime.statusPreview.playersList)
+                && runtime.statusPreview.playersList.some((entry) => String(entry && entry.name || '').trim().toLowerCase() === targetName.toLowerCase());
+            if (!online) {
+                return res.status(409).json({ success: false, error: 'Inventory actions require the player to be online.' });
+            }
+            const action = String(req.body.action || '').trim().toLowerCase();
+            const itemId = sanitizeMinecraftItemId(req.body.itemId || '');
+            const count = clampInteger(req.body.count, 1, 1, 9999);
+            let command = '';
+
+            if (action === 'clear_inventory') {
+                command = `clear ${target}`;
+            } else if (action === 'clear_item') {
+                if (!itemId) {
+                    return res.status(400).json({ success: false, error: 'Item id is required.' });
+                }
+                command = `clear ${target} ${itemId} ${count}`;
+            } else if (action === 'clear_ender') {
+                command = `data modify entity ${target} EnderItems set value []`;
+            } else {
+                return res.status(400).json({ success: false, error: 'Invalid inventory action.' });
+            }
+
+            const result = await dispatchMinecraftCommand(connectorWs, server.id, command);
+            if (!result.success) {
+                return res.status(500).json({ success: false, error: result.error || 'Failed to execute inventory action.' });
+            }
+            return res.json({ success: true, action, command, requestId: result.requestId || null });
+        } catch (error) {
+            console.error('Error updating minecraft inventory:', error);
+            return res.status(500).json({ success: false, error: 'Failed to update inventory.' });
+        }
+    });
+
+    app.post('/server/:containerId/minecraft/admin/world-data', requireAuth, async (req, res) => {
+        try {
+            const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.inspect']);
+            if (!ctx) return;
+            const { server, connectorWs } = ctx;
+            const playerName = String(req.body.player || '').trim();
+            const explicitUuid = String(req.body.uuid || '').trim();
+            if (!playerName) {
+                return res.status(400).json({ success: false, error: 'Player is required.' });
+            }
+            const runtime = await resolveMinecraftAdminRuntimeContext(server, connectorWs, res.locals.settings || {});
+            const usercacheUuid = resolvePlayerUuidFromUsercache(JSON.stringify(runtime.usercacheEntries || []), playerName);
+            const offlineUuid = computeOfflinePlayerUuid(playerName);
+            const candidateUuids = buildMinecraftCandidateUuids(playerName, runtime.onlineMode, usercacheUuid, offlineUuid, explicitUuid);
+            const action = String(req.body.action || '').trim().toLowerCase();
+            let targetPath = '';
+            if (action === 'reset_stats') {
+                const fileResult = await readFirstMinecraftJsonPayload(
+                    connectorWs,
+                    server.id,
+                    candidateUuids.map((uuid) => `/${runtime.levelName}/stats/${uuid}.json`),
+                    6000
+                );
+                targetPath = fileResult.filePath || '';
+            } else if (action === 'reset_advancements') {
+                const fileResult = await readFirstMinecraftJsonPayload(
+                    connectorWs,
+                    server.id,
+                    candidateUuids.map((uuid) => `/${runtime.levelName}/advancements/${uuid}.json`),
+                    6000
+                );
+                targetPath = fileResult.filePath || '';
+            } else {
+                return res.status(400).json({ success: false, error: 'Invalid world-data action.' });
+            }
+
+            const pathInfo = parseServerAddonPath(targetPath);
+            if (!pathInfo) {
+                return res.json({ success: true, action, cleared: false, message: 'No stored file found for this player.' });
+            }
+
+            const result = await runConnectorFileAction(connectorWs, {
+                type: 'delete_files',
+                serverId: server.id,
+                directory: pathInfo.directory,
+                files: [pathInfo.fileName]
+            }, pathInfo.directory, server.id, 12000);
+
+            if (!result.success) {
+                return res.status(500).json({ success: false, error: result.error || 'Failed to clear player world data.' });
+            }
+            return res.json({
+                success: true,
+                action,
+                cleared: true,
+                path: targetPath
+            });
+        } catch (error) {
+            console.error('Error clearing minecraft player world data:', error);
+            return res.status(500).json({ success: false, error: 'Failed to clear player world data.' });
+        }
+    });
+
     app.get('/server/:containerId/minecraft/admin/inspect', requireAuth, async (req, res) => {
         try {
             const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.inspect']);
@@ -19222,6 +19984,7 @@ function registerServerPagesRoutes(ctx) {
             const target = formatMinecraftCommandTarget(req.query.player || '');
             if (!target) return res.status(400).json({ success: false, error: 'Player is required.' });
             const username = String(req.query.player || '').trim();
+            const explicitUuid = String(req.query.uuid || '').trim();
             const refresh = ['1', 'true', 'yes', 'on'].includes(String(req.query.refresh || '').trim().toLowerCase());
             const cacheKey = getMinecraftInspectCacheKey(server.id, username);
             if (!refresh) {
@@ -19231,80 +19994,7 @@ function registerServerPagesRoutes(ctx) {
                     return res.json({ success: true, cached: true, ...cached });
                 }
             }
-
-            const bedrockMode = inferMinecraftBedrockMode(server);
-            const propertiesResult = await readConnectorFileContent(connectorWs, server.id, MINECRAFT_CONFIG_PATHS.serverProperties, 8000);
-            const properties = parseMinecraftProperties(propertiesResult.success ? propertiesResult.content : '');
-            const levelName = String(properties['level-name'] || 'world').trim() || 'world';
-            const onlineMode = normalizeMinecraftBooleanString(properties['online-mode'], 'true') === 'true';
-
-            const commands = [
-                { key: 'health', command: `data get entity ${target} Health` },
-                { key: 'location', command: `data get entity ${target} Pos` },
-                { key: 'rotation', command: `data get entity ${target} Rotation` },
-                { key: 'gamemode', command: `data get entity ${target} playerGameType` },
-                { key: 'inventory', command: `data get entity ${target} Inventory` },
-                { key: 'enderChest', command: `data get entity ${target} EnderItems` }
-            ];
-
-            const data = {};
-            for (const entry of commands) {
-                const output = await captureMinecraftCommandOutput(server.id, connectorWs, entry.command, 2500);
-                const rawValue = output.success ? parseMinecraftDataGetOutput(output.output) : '';
-                data[entry.key] = rawValue;
-            }
-
-            if (data.gamemode) {
-                data.gamemode = mapMinecraftGameType(data.gamemode) || data.gamemode;
-            }
-
-            let offlineUuid = computeOfflinePlayerUuid(username);
-            let usercacheUuid = '';
-            try {
-                const usercacheResult = await readConnectorFileContent(connectorWs, server.id, MINECRAFT_ADMIN_PATHS.usercache, 8000);
-                if (usercacheResult.success && usercacheResult.content) {
-                    usercacheUuid = resolvePlayerUuidFromUsercache(usercacheResult.content, username);
-                }
-            } catch { }
-
-            let offlineData = null;
-            let offlineItems = { inventory: [], ender: [] };
-            if (!bedrockMode) {
-                const uuid = usercacheUuid || (!onlineMode ? offlineUuid : usercacheUuid || '');
-                if (uuid) {
-                    const playerdataPath = `/${levelName}/playerdata/${uuid}.dat`;
-                    const base64Result = await readConnectorFileContentBase64(connectorWs, server.id, playerdataPath, 8000);
-                    if (base64Result.success && base64Result.contentBase64) {
-                        const parsed = await parseMinecraftPlayerNbt(base64Result.contentBase64);
-                        if (parsed) {
-                            offlineData = {
-                                health: parsed.Health ?? null,
-                                food: parsed.FoodLevel ?? parsed.foodLevel ?? null,
-                                gamemode: mapMinecraftGameType(parsed.playerGameType) || parsed.playerGameType || null,
-                                pos: parsed.Pos || null,
-                                rotation: parsed.Rotation || null,
-                                xpLevel: parsed.XpLevel ?? parsed.xpLevel ?? null
-                            };
-                            offlineItems = {
-                                inventory: mapMinecraftNbtItemList(parsed.Inventory),
-                                ender: mapMinecraftNbtItemList(parsed.EnderItems)
-                            };
-                        }
-                    }
-                }
-            }
-
-            const payload = {
-                data,
-                offlineUuid,
-                offlineData,
-                items: {
-                    inventory: parseMinecraftItemList(data.inventory),
-                    ender: parseMinecraftItemList(data.enderChest)
-                },
-                offlineItems,
-                bedrock: bedrockMode
-            };
+            const payload = await buildMinecraftPlayerAdminPayload(server, connectorWs, username, res.locals.settings || {}, { refresh, explicitUuid });
             const redisClient = getRuntimeRedisClient();
             await setMinecraftInspectCache(redisClient, cacheKey, payload);
             return res.json({ success: true, cached: false, ...payload });

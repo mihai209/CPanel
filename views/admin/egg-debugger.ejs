@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= (settings.brandName || 'CPanel').toUpperCase() %> - Egg Debugger</title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/mobile-layout.css">
+    <style>
+        .debugger-card { background: #131a24; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 18px; }
+        .debugger-muted { color: #94a3b8; }
+        .debugger-kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+        .debugger-kv .tile { padding: 14px; border-radius: 14px; background: rgba(15, 23, 42, 0.72); border: 1px solid rgba(148, 163, 184, 0.12); }
+        .debugger-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; border: 1px solid rgba(148, 163, 184, 0.18); color: #cbd5e1; }
+        .debugger-pre { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; max-height: 340px; overflow: auto; background: #0b1120; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 14px; padding: 14px; color: #dbeafe; }
+        .debugger-table td, .debugger-table th { vertical-align: top; }
+        .debugger-target-list { display: grid; gap: 12px; }
+        .debugger-target { padding: 14px; border-radius: 14px; background: rgba(15, 23, 42, 0.72); border: 1px solid rgba(148, 163, 184, 0.12); }
+    </style>
+</head>
+<body>
+    <%- include('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3">
+                    <h4 class="mb-0 text-light fw-normal">Egg Debugger</h4>
+                    <small class="text-muted">Variable dependency graph, validation tester, and install/startup simulation for imported eggs.</small>
+                </div>
+                <div class="breadcrumb-admin">
+                    <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span class="text-light">Egg Debugger</span>
+                </div>
+            </div>
+
+            <div class="container-fluid py-4 px-lg-4">
+                <% if (success) { %>
+                    <div class="alert alert-success border-0 bg-success bg-opacity-10 text-success"><%= success %></div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger"><%= error %></div>
+                <% } %>
+
+                <div class="debugger-card p-4 mb-4">
+                    <form method="GET" action="/admin/egg-debugger" class="row g-3 align-items-end">
+                        <div class="col-lg-5">
+                            <label class="form-label text-light small text-uppercase fw-semibold">Select image</label>
+                            <select name="imageId" class="form-select" onchange="this.form.submit()">
+                                <% if (!images || images.length === 0) { %>
+                                    <option value="">No images available</option>
+                                <% } %>
+                                <% (images || []).forEach((image) => { %>
+                                    <option value="<%= image.id %>" <%= selectedImage && Number(selectedImage.id) === Number(image.id) ? 'selected' : '' %>><%= image.name %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-lg-7">
+                            <% if (selectedImage) { %>
+                                <div class="debugger-muted small"><%= selectedImage.description || 'No description.' %></div>
+                            <% } else { %>
+                                <div class="debugger-muted small">Choose an image to inspect its variables, startup placeholders, and install logic.</div>
+                            <% } %>
+                        </div>
+                    </form>
+                </div>
+
+                <% if (selectedImage && debuggerState) { %>
+                    <form method="GET" action="/admin/egg-debugger">
+                        <input type="hidden" name="imageId" value="<%= selectedImage.id %>">
+                        <input type="hidden" name="run" value="1">
+
+                        <div class="row g-4">
+                            <div class="col-12 col-xxl-8">
+                                <div class="debugger-card p-4 h-100">
+                                    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                                        <div>
+                                            <h5 class="text-light mb-1">Validation Tester</h5>
+                                            <div class="debugger-muted small">Run the same variable and startup validation logic the panel uses during deploy/redeploy.</div>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary btn-sm px-4">Run Validation</button>
+                                    </div>
+
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label text-light small">SERVER_MEMORY</label>
+                                            <input type="text" name="runtimeMemory" class="form-control" value="<%= debuggerState.runtimeValues.SERVER_MEMORY %>">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label text-light small">SERVER_IP</label>
+                                            <input type="text" name="runtimeIp" class="form-control" value="<%= debuggerState.runtimeValues.SERVER_IP %>">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label text-light small">SERVER_PORT</label>
+                                            <input type="text" name="runtimePort" class="form-control" value="<%= debuggerState.runtimeValues.SERVER_PORT %>">
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-3">
+                                        <% debuggerState.variableRows.forEach((row) => { %>
+                                            <div class="col-md-6">
+                                                <div class="tile p-3 h-100" style="background: rgba(15, 23, 42, 0.72); border: 1px solid rgba(148, 163, 184, 0.12); border-radius: 14px;">
+                                                    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                                        <div>
+                                                            <div class="text-light fw-semibold"><%= row.name %></div>
+                                                            <div class="debugger-muted small"><code><%= row.key %></code></div>
+                                                        </div>
+                                                        <span class="debugger-pill"><%= row.required ? 'Required' : 'Optional' %></span>
+                                                    </div>
+                                                    <input type="text" name="var_<%= row.key %>" class="form-control form-control-sm mb-2" value="<%= row.value %>">
+                                                    <div class="small debugger-muted mb-1"><%= row.description || 'No description.' %></div>
+                                                    <div class="small debugger-muted">Default: <code><%= row.defaultValue || '(empty)' %></code></div>
+                                                    <div class="small debugger-muted">Rules: <code><%= (row.rules && row.rules.length) ? row.rules.join(' | ') : 'none' %></code></div>
+                                                    <div class="small debugger-muted">Access: <%= row.viewable ? 'viewable' : 'hidden' %> / <%= row.editable ? 'editable' : 'locked' %></div>
+                                                    <% if (row.validationError) { %>
+                                                        <div class="small text-danger mt-2"><i class="bi bi-exclamation-triangle me-1"></i><%= row.validationError %></div>
+                                                    <% } %>
+                                                </div>
+                                            </div>
+                                        <% }) %>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-xxl-4">
+                                <div class="debugger-card p-4 h-100">
+                                    <h5 class="text-light mb-3">Required vs Optional</h5>
+                                    <div class="debugger-kv mb-4">
+                                        <div class="tile">
+                                            <div class="debugger-muted small text-uppercase">Required vars</div>
+                                            <div class="fs-3 text-light fw-semibold"><%= debuggerState.variableRows.filter((row) => row.required).length %></div>
+                                        </div>
+                                        <div class="tile">
+                                            <div class="debugger-muted small text-uppercase">Optional vars</div>
+                                            <div class="fs-3 text-light fw-semibold"><%= debuggerState.variableRows.filter((row) => !row.required).length %></div>
+                                        </div>
+                                    </div>
+
+                                    <h6 class="text-light">Validation result</h6>
+                                    <div class="alert <%= debuggerState.validationResult.ok ? 'alert-success' : 'alert-warning' %> border-0 bg-opacity-10">
+                                        <%= debuggerState.validationResult.message %>
+                                    </div>
+
+                                    <% if (debuggerState.unresolved && debuggerState.unresolved.length > 0) { %>
+                                        <h6 class="text-light mt-4">Unresolved references</h6>
+                                        <ul class="mb-0 small">
+                                            <% debuggerState.unresolved.forEach((entry) => { %>
+                                                <li><code><%= entry.key %></code> in <%= entry.target %></li>
+                                            <% }) %>
+                                        </ul>
+                                    <% } else { %>
+                                        <div class="small debugger-muted">No unresolved placeholders were detected in startup, stop, install, or config parser definitions.</div>
+                                    <% } %>
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-xxl-7">
+                                <div class="debugger-card p-4 h-100">
+                                    <h5 class="text-light mb-3">Dependency Graph</h5>
+                                    <div class="debugger-target-list">
+                                        <% debuggerState.graph.forEach((target) => { %>
+                                            <div class="debugger-target">
+                                                <div class="d-flex justify-content-between gap-3 mb-2">
+                                                    <div>
+                                                        <div class="text-light fw-semibold"><%= target.label %></div>
+                                                        <div class="debugger-muted small"><%= target.type %></div>
+                                                    </div>
+                                                    <span class="debugger-pill"><%= target.references.length %> refs</span>
+                                                </div>
+                                                <div class="small debugger-muted mb-2">
+                                                    <% if (target.references.length === 0) { %>
+                                                        No variable placeholders found here.
+                                                    <% } else { %>
+                                                        <% target.references.forEach((ref, index) => { %>
+                                                            <span class="badge <%= ref.exists ? 'bg-primary-subtle text-primary-emphasis' : 'bg-danger-subtle text-danger-emphasis' %> me-1 mb-1"><%= ref.key %></span>
+                                                        <% }) %>
+                                                    <% } %>
+                                                </div>
+                                                <div class="debugger-pre"><%= target.content %></div>
+                                            </div>
+                                        <% }) %>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-xxl-5">
+                                <div class="debugger-card p-4 h-100">
+                                    <h5 class="text-light mb-3">Install Script Simulator</h5>
+                                    <% if (debuggerState.installMeta) { %>
+                                        <div class="debugger-muted small mb-2">Container: <code><%= debuggerState.installMeta.container || 'not set' %></code></div>
+                                        <div class="debugger-muted small mb-3">Entrypoint: <code><%= debuggerState.installMeta.entrypoint && debuggerState.installMeta.entrypoint.length ? debuggerState.installMeta.entrypoint.join(' ') : 'default' %></code></div>
+                                    <% } else { %>
+                                        <div class="debugger-muted small mb-3">This image does not declare a separate install script payload.</div>
+                                    <% } %>
+
+                                    <div class="mb-3">
+                                        <div class="text-light small fw-semibold mb-2">Resolved startup</div>
+                                        <div class="debugger-pre"><%= debuggerState.validationResult.startup || 'Run validation to resolve startup.' %></div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <div class="text-light small fw-semibold mb-2">Resolved install script</div>
+                                        <div class="debugger-pre"><%= debuggerState.validationResult.installScript || 'Run validation to resolve install script.' %></div>
+                                    </div>
+
+                                    <div>
+                                        <div class="text-light small fw-semibold mb-2">Resolved environment</div>
+                                        <div class="debugger-pre"><%= JSON.stringify(debuggerState.validationResult.env || {}, null, 2) %></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                <% else { %>
+                    <div class="debugger-card p-5 text-center debugger-muted">No images available to inspect yet.</div>
+                <% } %>
+            </div>
+
+            <%- include('../partials/footer') %>
+        </div>
+    </div>
+</body>
+</html>

@@ -17,7 +17,7 @@ const adminNavSections = [
             { href: '/admin/settings', icon: 'bi-gear', label: 'Settings' },
             { href: '/admin/platform', icon: 'bi-command', label: 'Platform Ops' },
             { href: '/admin/incidents', icon: 'bi-exclamation-triangle', label: 'Incident Center', badge: adminSidebarRuntimeBadges.incidents || buildAdminBadge('Live', 'danger') },
-            { href: '/admin/logs', icon: 'bi-file-text', label: 'Logs' }
+            { href: '/admin/notifications-test', icon: 'bi-broadcast', label: 'Notifications Test', badge: buildAdminBadge('Test', 'warning') }
         ]
     },
     {
@@ -36,6 +36,7 @@ const adminNavSections = [
             { href: '/admin/connectors', icon: 'bi-diagram-3', label: 'Connectors', badge: buildAdminBadge('Ops', 'info') },
             { href: '/admin/allocations/drift', icon: 'bi-wrench-adjustable', label: 'Allocation Drift' },
             { href: '/admin/connect-info', icon: 'bi-activity', label: 'Connector(s) Health', badge: buildAdminBadge('Live', 'success') },
+            { href: '/admin/connector-lab', icon: 'bi-bezier2', label: 'Connector Lab', badge: buildAdminBadge('Lab', 'warning') },
             { href: '/admin/locations', icon: 'bi-geo-alt', label: 'Locations' },
             { href: '/admin/users', icon: 'bi-people', label: 'Users' },
             { href: '/admin/servers', icon: 'bi-hdd-stack', label: 'Servers' },
@@ -60,10 +61,10 @@ const adminNavSections = [
         title: 'Content',
         items: [
             { href: '/admin/images', icon: 'bi-grid-3x3-gap', label: 'Images' },
+            { href: '/admin/egg-debugger', icon: 'bi-diagram-2', label: 'Egg Debugger', badge: buildAdminBadge('Egg', 'violet') },
             { href: '/admin/packages', icon: 'bi-box', label: 'Packages' },
             { href: '/admin/migrations/pterodactyl', icon: 'bi-arrow-left-right', label: 'Migrations' },
             { href: '/admin/extensions', icon: 'bi-puzzle', label: 'Extensions' },
-            { href: '/admin/themes', icon: 'bi-palette', label: 'Themes', badge: buildAdminBadge('UI', 'violet') },
             { href: '/admin/lang', icon: 'bi-translate', label: 'Languages' }
         ]
     }

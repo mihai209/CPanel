@@ -127,6 +127,391 @@ const ensureLanguageDirectory = async () => {
     await nodeFsPromises.mkdir(LANG_DIRECTORY, { recursive: true });
 };
 
+const NOTIFICATION_WEBHOOKS_SETTING_KEY = 'extensionWebhooksConfig';
+const EGG_DEBUGGER_RUNTIME_DEFAULTS = {
+    SERVER_MEMORY: '1024',
+    SERVER_IP: '127.0.0.1',
+    SERVER_PORT: '25565'
+};
+
+const parseAdminJson = (raw, fallback) => {
+    if (raw === undefined || raw === null || raw === '') return fallback;
+    try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        return parsed === undefined || parsed === null ? fallback : parsed;
+    } catch {
+        return fallback;
+    }
+};
+
+const sanitizeAdminHttpUrl = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    try {
+        const parsed = new URL(raw);
+        const protocol = String(parsed.protocol || '').toLowerCase();
+        if (protocol !== 'http:' && protocol !== 'https:') return '';
+        return parsed.toString();
+    } catch {
+        return '';
+    }
+};
+
+const normalizeAdminNotificationConfig = (raw) => {
+    const parsed = parseAdminJson(raw, {});
+    return {
+        enabled: ['1', 'true', 'yes', 'on'].includes(String(parsed.enabled || '').trim().toLowerCase()),
+        discordWebhook: sanitizeAdminHttpUrl(parsed.discordWebhook),
+        telegramBotToken: String(parsed.telegramBotToken || '').trim(),
+        telegramChatId: String(parsed.telegramChatId || '').trim()
+    };
+};
+
+const getAdminNotificationConfig = async () => {
+    const row = await Settings.findByPk(NOTIFICATION_WEBHOOKS_SETTING_KEY);
+    return normalizeAdminNotificationConfig(row && row.value ? row.value : {});
+};
+
+const stringifyEggDebuggerValue = (value) => {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'string') return value;
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return String(value);
+    }
+};
+
+const extractEggPlaceholderKeys = (input) => {
+    const text = String(input || '');
+    const keys = new Set();
+    const single = /\{([A-Za-z0-9_]+)\}/g;
+    const dbl = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
+    let match = null;
+    while ((match = single.exec(text))) {
+        keys.add(String(match[1] || '').trim());
+    }
+    while ((match = dbl.exec(text))) {
+        keys.add(String(match[1] || '').trim());
+    }
+    return Array.from(keys).filter(Boolean);
+};
+
+const buildEggDebuggerTargets = (image) => {
+    const targets = [];
+    const startup = image && typeof image.startup === 'string' ? image.startup.trim() : '';
+    if (startup) {
+        targets.push({ id: 'startup', label: 'Startup command', type: 'startup', content: startup });
+    }
+
+    const stopCommand = image && image.eggConfig && typeof image.eggConfig.stop === 'string'
+        ? image.eggConfig.stop.trim()
+        : '';
+    if (stopCommand) {
+        targets.push({ id: 'stop', label: 'Stop command', type: 'command', content: stopCommand });
+    }
+
+    const installScript = image && image.installation && typeof image.installation.script === 'string'
+        ? image.installation.script.trim()
+        : (image && image.eggScripts && image.eggScripts.installation && typeof image.eggScripts.installation.script === 'string'
+            ? image.eggScripts.installation.script.trim()
+            : '');
+    if (installScript) {
+        targets.push({ id: 'install', label: 'Install script', type: 'install', content: installScript });
+    }
+
+    const configFiles = image && image.configFiles && typeof image.configFiles === 'object' && !Array.isArray(image.configFiles)
+        ? image.configFiles
+        : {};
+    Object.entries(configFiles).forEach(([fileName, definition]) => {
+        const replaceEntries = Array.isArray(definition && definition.replace) ? definition.replace : [];
+        replaceEntries.forEach((entry, index) => {
+            if (!entry || typeof entry !== 'object') return;
+            const replaceValue = stringifyEggDebuggerValue(entry.replace_with);
+            const ifValue = Object.prototype.hasOwnProperty.call(entry, 'if_value')
+                ? ` | if=${stringifyEggDebuggerValue(entry.if_value)}`
+                : '';
+            const line = `${String(entry.match || '')} => ${replaceValue}${ifValue}`;
+            targets.push({
+                id: `config:${fileName}:${index}`,
+                label: `Config parser: ${fileName}`,
+                type: 'config',
+                content: line
+            });
+        });
+    });
+
+    return targets;
+};
+
+const buildEggDebuggerState = (image, input = {}) => {
+    const variableDefinitions = typeof resolveImageVariableDefinitions === 'function'
+        ? resolveImageVariableDefinitions(image)
+        : [];
+    const definitionMap = new Map();
+    const variableFormValues = {};
+    const variableRows = [];
+
+    variableDefinitions.forEach((definition) => {
+        const key = String(definition && definition.env_variable || '').trim();
+        if (!key) return;
+        const defaultValue = definition.default_value === null || definition.default_value === undefined
+            ? ''
+            : String(definition.default_value);
+        const submitted = Object.prototype.hasOwnProperty.call(input, `var_${key}`)
+            ? input[`var_${key}`]
+            : defaultValue;
+        const value = submitted === null || submitted === undefined ? '' : String(submitted);
+        const rules = typeof parseRuleTokens === 'function'
+            ? parseRuleTokens(definition.rules || '')
+            : [];
+        const required = rules.includes('required') && !rules.includes('nullable');
+        let validationError = '';
+        try {
+            if (typeof validateEnvironmentValue === 'function') {
+                validateEnvironmentValue(key, value, definition.rules || '');
+            }
+        } catch (error) {
+            validationError = error.message || 'Validation failed.';
+        }
+        variableFormValues[key] = value;
+        definitionMap.set(key, definition);
+        variableRows.push({
+            key,
+            name: definition.name || key,
+            description: definition.description || '',
+            value,
+            defaultValue,
+            rules,
+            required,
+            editable: definition.user_editable == 1 || definition.user_editable === true,
+            viewable: definition.user_viewable == 1 || definition.user_viewable === true,
+            validationError
+        });
+    });
+
+    const targets = buildEggDebuggerTargets(image);
+    const graph = [];
+    const unresolved = [];
+    targets.forEach((target) => {
+        const keys = extractEggPlaceholderKeys(target.content);
+        if (keys.length === 0) {
+            graph.push(Object.assign({}, target, { references: [] }));
+            return;
+        }
+        const references = keys.map((key) => {
+            const internal = ['SERVER_MEMORY', 'SERVER_IP', 'SERVER_PORT'].includes(key);
+            const exists = definitionMap.has(key) || internal || key === 'STARTUP' || key === 'STARTUPSCRIPT';
+            if (!exists) unresolved.push({ key, target: target.label });
+            return {
+                key,
+                internal,
+                exists,
+                variable: definitionMap.get(key) || null
+            };
+        });
+        graph.push(Object.assign({}, target, { references }));
+    });
+
+    const runtimeValues = {
+        SERVER_MEMORY: String(input.runtimeMemory || EGG_DEBUGGER_RUNTIME_DEFAULTS.SERVER_MEMORY),
+        SERVER_IP: String(input.runtimeIp || EGG_DEBUGGER_RUNTIME_DEFAULTS.SERVER_IP),
+        SERVER_PORT: String(input.runtimePort || EGG_DEBUGGER_RUNTIME_DEFAULTS.SERVER_PORT)
+    };
+
+    let validationResult = {
+        ok: false,
+        message: 'Select an image and run validation.',
+        resolvedVariables: {},
+        env: {},
+        startup: '',
+        installScript: ''
+    };
+
+    if (image && String(input.run || '') === '1') {
+        try {
+            const built = typeof buildServerEnvironment === 'function'
+                ? buildServerEnvironment(image, variableFormValues, runtimeValues, { strictInvalidVariables: true })
+                : { resolvedVariables: variableFormValues, env: Object.assign({}, variableFormValues, runtimeValues) };
+            const startup = typeof buildStartupCommand === 'function'
+                ? buildStartupCommand(image.startup || '', built.env)
+                : String(image.startup || '');
+            const installTarget = targets.find((entry) => entry.id === 'install');
+            let installScriptPreview = '';
+            if (installTarget && installTarget.content) {
+                installScriptPreview = typeof buildStartupCommand === 'function'
+                    ? buildStartupCommand(installTarget.content, built.env)
+                    : installTarget.content;
+            }
+            validationResult = {
+                ok: true,
+                message: 'Validation passed. Environment and startup placeholders resolved cleanly.',
+                resolvedVariables: built.resolvedVariables || {},
+                env: built.env || {},
+                startup,
+                installScript: installScriptPreview
+            };
+        } catch (error) {
+            validationResult = {
+                ok: false,
+                message: error.message || 'Validation failed.',
+                resolvedVariables: {},
+                env: {},
+                startup: '',
+                installScript: ''
+            };
+        }
+    }
+
+    return {
+        variableRows,
+        variableFormValues,
+        graph,
+        unresolved,
+        runtimeValues,
+        validationResult,
+        configFiles: image && image.configFiles && typeof image.configFiles === 'object' && !Array.isArray(image.configFiles)
+            ? image.configFiles
+            : {},
+        installMeta: image && image.installation ? image.installation : null
+    };
+};
+
+const maskNotificationTarget = (channel, target) => {
+    const raw = String(target || '').trim();
+    if (!raw) return 'Not set';
+    if (channel === 'telegram') return raw.replace(/.(?=.{4})/g, '•');
+    try {
+        const parsed = new URL(raw);
+        const host = parsed.host || raw;
+        const pathname = String(parsed.pathname || '').split('/').filter(Boolean);
+        const tail = pathname.length > 0 ? pathname[pathname.length - 1].slice(-6) : '';
+        return `${parsed.protocol}//${host}/…${tail ? `/${tail}` : ''}`;
+    } catch {
+        return raw.length > 10 ? `${raw.slice(0, 3)}…${raw.slice(-4)}` : raw;
+    }
+};
+
+const buildNotificationPreview = (brandName, actorUsername, channel) => {
+    const stamp = new Date().toISOString();
+    const title = `[${brandName}] ${channel} test`;
+    const description = `Manual ${channel} test triggered by ${actorUsername} from Admin -> Notification Test Center at ${stamp}.`;
+    return {
+        title,
+        description,
+        stamp,
+        webhookPayload: {
+            event: 'manual_notification_test',
+            channel,
+            title,
+            description,
+            brand: brandName,
+            actor: actorUsername,
+            timestamp: stamp
+        },
+        emailSubject: title,
+        emailBody: `${description}\n\nThis preview is available, but email delivery is not configured in this panel build.`
+    };
+};
+
+const createNotificationLogEntry = async (payload) => {
+    if (!NotificationDeliveryLog) return null;
+    return NotificationDeliveryLog.create({
+        channel: String(payload.channel || '').trim() || 'unknown',
+        status: String(payload.status || 'failed').trim() || 'failed',
+        target: payload.target ? String(payload.target).trim().slice(0, 512) : null,
+        templateKey: payload.templateKey ? String(payload.templateKey).trim().slice(0, 64) : null,
+        eventKey: payload.eventKey ? String(payload.eventKey).trim().slice(0, 64) : null,
+        requestPayload: payload.requestPayload || null,
+        responsePayload: payload.responsePayload || null,
+        errorText: payload.errorText ? String(payload.errorText).slice(0, 5000) : null,
+        attemptedByUserId: payload.attemptedByUserId || null,
+        retriedFromId: payload.retriedFromId || null,
+        metadata: payload.metadata || null
+    });
+};
+
+const sendNotificationProbe = async ({ channel, target, brandName, actorUsername, telegramBotToken, telegramChatId }) => {
+    const preview = buildNotificationPreview(brandName, actorUsername, channel);
+    if (channel === 'email') {
+        throw new Error('Email delivery test is not available until a mail transport is configured in this panel build.');
+    }
+
+    if (channel === 'discord') {
+        const webhook = sanitizeAdminHttpUrl(target);
+        if (!webhook) throw new Error('Discord webhook URL is missing.');
+        await sendDiscordSmartAlert(webhook, preview.title, preview.description, '#3b82f6');
+        return { preview, target: webhook, responsePayload: { delivered: true } };
+    }
+
+    if (channel === 'telegram') {
+        const token = String(telegramBotToken || '').trim();
+        const chatId = String(telegramChatId || '').trim();
+        if (!token || !chatId) throw new Error('Telegram bot token and chat ID are required.');
+        await sendTelegramSmartAlert(token, chatId, `${preview.title}\n${preview.description}`);
+        return { preview, target: `telegram:${chatId}`, responsePayload: { delivered: true, chatId } };
+    }
+
+    if (channel === 'webhook') {
+        const webhook = sanitizeAdminHttpUrl(target);
+        if (!webhook) throw new Error('Webhook URL is missing.');
+        const response = await axios.post(webhook, preview.webhookPayload, {
+            timeout: 8000,
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': `${String(brandName || 'CPanel').replace(/\s+/g, '-')}/1.0 (+https://cpanel-rocky.netlify.app)`
+            },
+            validateStatus: () => true
+        });
+        if (response.status < 200 || response.status >= 300) {
+            throw new Error(`Webhook responded with HTTP ${response.status}.`);
+        }
+        return {
+            preview,
+            target: webhook,
+            responsePayload: {
+                status: response.status,
+                data: typeof response.data === 'string'
+                    ? response.data.slice(0, 1000)
+                    : response.data
+            }
+        };
+    }
+
+    throw new Error(`Unsupported notification channel "${channel}".`);
+};
+
+const buildConnectorLabChecks = (diagnostics) => {
+    const checks = diagnostics && diagnostics.checks && typeof diagnostics.checks === 'object'
+        ? diagnostics.checks
+        : {};
+    const define = (key, label, level = 'critical', description = '') => {
+        const raw = checks[key] && typeof checks[key] === 'object' ? checks[key] : null;
+        const ok = raw ? Boolean(raw.ok) : false;
+        return {
+            key,
+            label,
+            level,
+            description,
+            ok,
+            message: raw && raw.message ? String(raw.message) : (ok ? 'Ready' : 'No data or failed'),
+            metadata: raw && raw.metadata ? raw.metadata : null
+        };
+    };
+    return [
+        define('docker_access', 'Docker access', 'critical', 'Container start, stop, recreate, and image operations require this.'),
+        define('dns', 'DNS resolution', 'critical', 'Image pulls, remote downloads, and provider endpoints depend on DNS.'),
+        define('udp_bind', 'UDP bind', 'warning', 'Voice chat and UDP-only services need this to be healthy.'),
+        define('sftp_auth', 'SFTP auth path', 'warning', 'Subusers and owners need clean auth responses for file access.'),
+        define('websocket_payload_size', 'WebSocket payload headroom', 'critical', 'Large uploads and panel<->connector actions can fail if this is too low.'),
+        define('disk_perms', 'Disk permissions', 'critical', 'Install, edit, upload, extract, and backup operations need writable volume paths.'),
+        define('image_pull', 'Image pull support', 'critical', 'New installs and redeploys depend on image pull health.'),
+        define('archive_tools', 'Unzip / tar tools', 'warning', 'Imports, world operations, and archive handling require these tools.'),
+        define('java_runtime', 'Java runtime', 'warning', 'Minecraft and Java-based eggs benefit from runtime visibility.'),
+        define('node_runtime', 'Node runtime', 'warning', 'Node-based eggs and extensions benefit from runtime visibility.')
+    ];
+};
+
 const readLanguageCatalog = async () => {
     await ensureLanguageDirectory();
     const entries = await nodeFsPromises.readdir(LANG_DIRECTORY, { withFileTypes: true });
@@ -2051,6 +2436,338 @@ app.post('/admin/images/edit-json/:id', requireAuth, requireAdmin, async (req, r
     } catch (error) {
         console.error('Error updating image via JSON:', error);
         res.redirect(`/admin/images/edit-json/${req.params.id}?error=${encodeURIComponent(error.message || 'Failed to update image.')}`);
+    }
+});
+
+app.get('/admin/egg-debugger', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const images = await Image.findAll({
+            attributes: ['id', 'name', 'description', 'startup', 'eggConfig', 'eggScripts', 'eggVariables', 'installation', 'configFiles', 'environment', 'environmentMeta'],
+            order: [['name', 'ASC']]
+        });
+        const selectedImageId = Number.parseInt(req.query.imageId, 10);
+        const selectedImage = Number.isInteger(selectedImageId) && selectedImageId > 0
+            ? images.find((entry) => Number(entry.id) === selectedImageId) || null
+            : (images[0] || null);
+        const debuggerState = selectedImage ? buildEggDebuggerState(selectedImage, req.query || {}) : null;
+
+        res.render('admin/egg-debugger', {
+            user: req.session.user,
+            path: '/admin/egg-debugger',
+            title: 'Egg Debugger',
+            success: req.query.success || null,
+            error: req.query.error || null,
+            images,
+            selectedImage,
+            debuggerState
+        });
+    } catch (error) {
+        console.error('Error loading egg debugger:', error);
+        res.render('admin/egg-debugger', {
+            user: req.session.user,
+            path: '/admin/egg-debugger',
+            title: 'Egg Debugger',
+            success: null,
+            error: 'Failed to load egg debugger.',
+            images: [],
+            selectedImage: null,
+            debuggerState: null
+        });
+    }
+});
+
+app.get('/admin/notifications-test', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const notificationConfig = await getAdminNotificationConfig();
+        const recentLogs = NotificationDeliveryLog
+            ? await NotificationDeliveryLog.findAll({
+                order: [['createdAt', 'DESC']],
+                limit: 30,
+                include: [{ model: User, as: 'actor', attributes: ['id', 'username'] }]
+            })
+            : [];
+        const brandName = String(res.locals.settings.brandName || 'CPanel').trim() || 'CPanel';
+        const actorUsername = req.session && req.session.user ? req.session.user.username : 'admin';
+        const previews = {
+            discord: buildNotificationPreview(brandName, actorUsername, 'discord'),
+            telegram: buildNotificationPreview(brandName, actorUsername, 'telegram'),
+            webhook: buildNotificationPreview(brandName, actorUsername, 'webhook'),
+            email: buildNotificationPreview(brandName, actorUsername, 'email')
+        };
+        const lastFailedLog = recentLogs.find((entry) => String(entry.status || '') === 'failed') || null;
+
+        res.render('admin/notifications-test', {
+            user: req.session.user,
+            path: '/admin/notifications-test',
+            title: 'Notifications Test Center',
+            success: req.query.success || null,
+            error: req.query.error || null,
+            notificationConfig,
+            previews,
+            deliveryLogs: recentLogs,
+            lastFailedLog,
+            emailSupported: false,
+            maskNotificationTarget
+        });
+    } catch (error) {
+        console.error('Error loading notification test center:', error);
+        res.render('admin/notifications-test', {
+            user: req.session.user,
+            path: '/admin/notifications-test',
+            title: 'Notifications Test Center',
+            success: null,
+            error: 'Failed to load notification test center.',
+            notificationConfig: normalizeAdminNotificationConfig({}),
+            previews: {
+                discord: buildNotificationPreview('CPanel', 'admin', 'discord'),
+                telegram: buildNotificationPreview('CPanel', 'admin', 'telegram'),
+                webhook: buildNotificationPreview('CPanel', 'admin', 'webhook'),
+                email: buildNotificationPreview('CPanel', 'admin', 'email')
+            },
+            deliveryLogs: [],
+            lastFailedLog: null,
+            emailSupported: false,
+            maskNotificationTarget
+        });
+    }
+});
+
+app.post('/admin/notifications-test/send', requireAuth, requireAdmin, async (req, res) => {
+    const brandName = String(res.locals.settings.brandName || 'CPanel').trim() || 'CPanel';
+    const actorUsername = req.session && req.session.user ? req.session.user.username : 'admin';
+    const actorUserId = req.session && req.session.user ? req.session.user.id : null;
+    const channel = String(req.body.channel || '').trim().toLowerCase();
+
+    try {
+        const notificationConfig = await getAdminNotificationConfig();
+        let target = '';
+        let telegramBotToken = '';
+        let telegramChatId = '';
+
+        if (channel === 'discord') {
+            target = notificationConfig.discordWebhook;
+        } else if (channel === 'telegram') {
+            telegramBotToken = notificationConfig.telegramBotToken;
+            telegramChatId = notificationConfig.telegramChatId;
+        } else if (channel === 'webhook') {
+            target = sanitizeAdminHttpUrl(req.body.webhookUrl);
+            if (!target) {
+                throw new Error('Webhook URL must be valid HTTP/HTTPS.');
+            }
+        }
+
+        const result = await sendNotificationProbe({
+            channel,
+            target,
+            brandName,
+            actorUsername,
+            telegramBotToken,
+            telegramChatId
+        });
+
+        await createNotificationLogEntry({
+            channel,
+            status: 'sent',
+            target: result.target,
+            templateKey: 'manual_test',
+            eventKey: 'manual_notification_test',
+            requestPayload: {
+                preview: result.preview,
+                channel,
+                usesStoredConfig: channel === 'discord' || channel === 'telegram'
+            },
+            responsePayload: result.responsePayload,
+            attemptedByUserId: actorUserId,
+            metadata: {
+                source: channel === 'webhook' ? 'manual_url' : 'stored_extension_config'
+            }
+        });
+
+        return res.redirect('/admin/notifications-test?success=' + encodeURIComponent(`${channel} test sent successfully.`));
+    } catch (error) {
+        await createNotificationLogEntry({
+            channel: channel || 'unknown',
+            status: channel === 'email' ? 'unsupported' : 'failed',
+            target: channel === 'webhook' ? sanitizeAdminHttpUrl(req.body.webhookUrl) : null,
+            templateKey: 'manual_test',
+            eventKey: 'manual_notification_test',
+            requestPayload: {
+                channel,
+                webhookUrl: channel === 'webhook' ? sanitizeAdminHttpUrl(req.body.webhookUrl) : null
+            },
+            errorText: error.message || 'Notification test failed.',
+            attemptedByUserId: actorUserId,
+            metadata: {
+                source: channel === 'webhook' ? 'manual_url' : 'stored_extension_config'
+            }
+        });
+        return res.redirect('/admin/notifications-test?error=' + encodeURIComponent(error.message || 'Notification test failed.'));
+    }
+});
+
+app.post('/admin/notifications-test/retry/:id', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        if (!NotificationDeliveryLog) {
+            return res.redirect('/admin/notifications-test?error=' + encodeURIComponent('Notification delivery log model is not available.'));
+        }
+        const log = await NotificationDeliveryLog.findByPk(req.params.id);
+        if (!log) {
+            return res.redirect('/admin/notifications-test?error=' + encodeURIComponent('Notification log entry not found.'));
+        }
+
+        const brandName = String(res.locals.settings.brandName || 'CPanel').trim() || 'CPanel';
+        const actorUsername = req.session && req.session.user ? req.session.user.username : 'admin';
+        const actorUserId = req.session && req.session.user ? req.session.user.id : null;
+        const notificationConfig = await getAdminNotificationConfig();
+        let target = log.channel === 'webhook'
+            ? sanitizeAdminHttpUrl(log.target)
+            : (log.channel === 'discord' ? notificationConfig.discordWebhook : '');
+        let telegramBotToken = log.channel === 'telegram' ? notificationConfig.telegramBotToken : '';
+        let telegramChatId = log.channel === 'telegram' ? notificationConfig.telegramChatId : '';
+
+        const result = await sendNotificationProbe({
+            channel: log.channel,
+            target,
+            brandName,
+            actorUsername,
+            telegramBotToken,
+            telegramChatId
+        });
+
+        await createNotificationLogEntry({
+            channel: log.channel,
+            status: 'sent',
+            target: result.target,
+            templateKey: log.templateKey || 'manual_test',
+            eventKey: log.eventKey || 'manual_notification_test',
+            requestPayload: {
+                preview: result.preview,
+                channel: log.channel,
+                retried: true,
+                originalLogId: log.id
+            },
+            responsePayload: result.responsePayload,
+            attemptedByUserId: actorUserId,
+            retriedFromId: log.id,
+            metadata: Object.assign({}, log.metadata || {}, { retriedFromId: log.id })
+        });
+
+        return res.redirect('/admin/notifications-test?success=' + encodeURIComponent(`Retried ${log.channel} notification successfully.`));
+    } catch (error) {
+        return res.redirect('/admin/notifications-test?error=' + encodeURIComponent(error.message || 'Failed to retry notification.'));
+    }
+});
+
+app.post('/admin/notifications-test/retry-last-failed', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        if (!NotificationDeliveryLog) {
+            return res.redirect('/admin/notifications-test?error=' + encodeURIComponent('Notification delivery log model is not available.'));
+        }
+        const log = await NotificationDeliveryLog.findOne({
+            where: { status: 'failed' },
+            order: [['createdAt', 'DESC']]
+        });
+        if (!log) {
+            return res.redirect('/admin/notifications-test?error=' + encodeURIComponent('No failed notification delivery logs to retry.'));
+        }
+        const brandName = String(res.locals.settings.brandName || 'CPanel').trim() || 'CPanel';
+        const actorUsername = req.session && req.session.user ? req.session.user.username : 'admin';
+        const actorUserId = req.session && req.session.user ? req.session.user.id : null;
+        const notificationConfig = await getAdminNotificationConfig();
+        const target = log.channel === 'webhook'
+            ? sanitizeAdminHttpUrl(log.target)
+            : (log.channel === 'discord' ? notificationConfig.discordWebhook : '');
+        const telegramBotToken = log.channel === 'telegram' ? notificationConfig.telegramBotToken : '';
+        const telegramChatId = log.channel === 'telegram' ? notificationConfig.telegramChatId : '';
+        const result = await sendNotificationProbe({
+            channel: log.channel,
+            target,
+            brandName,
+            actorUsername,
+            telegramBotToken,
+            telegramChatId
+        });
+
+        await createNotificationLogEntry({
+            channel: log.channel,
+            status: 'sent',
+            target: result.target,
+            templateKey: log.templateKey || 'manual_test',
+            eventKey: log.eventKey || 'manual_notification_test',
+            requestPayload: {
+                preview: result.preview,
+                channel: log.channel,
+                retried: true,
+                originalLogId: log.id
+            },
+            responsePayload: result.responsePayload,
+            attemptedByUserId: actorUserId,
+            retriedFromId: log.id,
+            metadata: Object.assign({}, log.metadata || {}, { retriedFromId: log.id })
+        });
+
+        return res.redirect('/admin/notifications-test?success=' + encodeURIComponent(`Retried ${log.channel} notification successfully.`));
+    } catch (error) {
+        return res.redirect('/admin/notifications-test?error=' + encodeURIComponent(error.message || 'Failed to retry last failed notification.'));
+    }
+});
+
+app.get('/admin/connector-lab', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const connectors = await Connector.findAll({
+            include: [{ model: Location, as: 'location' }],
+            order: [['name', 'ASC']]
+        });
+        const connectorStatus = global.connectorStatus || {};
+        const selectedConnectorId = Number.parseInt(req.query.connectorId, 10);
+        const selectedConnector = Number.isInteger(selectedConnectorId) && selectedConnectorId > 0
+            ? connectors.find((entry) => Number(entry.id) === selectedConnectorId) || null
+            : (connectors[0] || null);
+        const selectedStatus = selectedConnector ? connectorStatus[selectedConnector.id] || null : null;
+        const selectedChecks = selectedStatus ? buildConnectorLabChecks(selectedStatus.diagnostics || null) : [];
+        const selectedServerCount = selectedConnector
+            ? await Server.count({
+                include: [{
+                    model: Allocation,
+                    as: 'allocation',
+                    where: { connectorId: selectedConnector.id }
+                }]
+            })
+            : 0;
+        const selectedAllocationCount = selectedConnector
+            ? await Allocation.count({ where: { connectorId: selectedConnector.id } })
+            : 0;
+
+        res.render('admin/connector-lab', {
+            user: req.session.user,
+            path: '/admin/connector-lab',
+            title: 'Connector Lab',
+            success: req.query.success || null,
+            error: req.query.error || null,
+            connectors,
+            connectorStatus,
+            selectedConnector,
+            selectedStatus,
+            selectedChecks,
+            selectedServerCount,
+            selectedAllocationCount
+        });
+    } catch (error) {
+        console.error('Error loading connector lab:', error);
+        res.render('admin/connector-lab', {
+            user: req.session.user,
+            path: '/admin/connector-lab',
+            title: 'Connector Lab',
+            success: null,
+            error: 'Failed to load connector lab.',
+            connectors: [],
+            connectorStatus: {},
+            selectedConnector: null,
+            selectedStatus: null,
+            selectedChecks: [],
+            selectedServerCount: 0,
+            selectedAllocationCount: 0
+        });
     }
 });
 

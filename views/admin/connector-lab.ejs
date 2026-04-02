@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= (settings.brandName || 'CPanel').toUpperCase() %> - Connector Lab</title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/mobile-layout.css">
+    <style>
+        .lab-card { background: #131a24; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 18px; }
+        .lab-muted { color: #94a3b8; }
+        .lab-check { padding: 14px; border-radius: 14px; border: 1px solid rgba(148, 163, 184, 0.12); background: rgba(15, 23, 42, 0.72); }
+        .lab-check-ok { border-color: rgba(16, 185, 129, 0.28); }
+        .lab-check-fail { border-color: rgba(239, 68, 68, 0.28); }
+        .lab-pre { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; max-height: 220px; overflow: auto; background: #0b1120; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 14px; padding: 14px; color: #dbeafe; }
+    </style>
+</head>
+<body>
+    <%- include('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3">
+                    <h4 class="mb-0 text-light fw-normal">Connector Preflight / Compatibility Lab</h4>
+                    <small class="text-muted">Read connector diagnostics as operational compatibility checks instead of raw heartbeat data.</small>
+                </div>
+                <div class="breadcrumb-admin">
+                    <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span class="text-light">Connector Lab</span>
+                </div>
+            </div>
+
+            <div class="container-fluid py-4 px-lg-4">
+                <% if (success) { %><div class="alert alert-success border-0 bg-success bg-opacity-10 text-success"><%= success %></div><% } %>
+                <% if (error) { %><div class="alert alert-danger border-0 bg-danger bg-opacity-10 text-danger"><%= error %></div><% } %>
+
+                <div class="row g-4">
+                    <div class="col-lg-4">
+                        <div class="lab-card p-4 h-100">
+                            <h5 class="text-light mb-3">Connectors</h5>
+                            <div class="list-group list-group-flush">
+                                <% if (!connectors || connectors.length === 0) { %>
+                                    <div class="lab-muted">No connectors registered yet.</div>
+                                <% } %>
+                                <% (connectors || []).forEach((connector) => { const statusData = connectorStatus && connectorStatus[connector.id] ? connectorStatus[connector.id] : null; %>
+                                    <a href="/admin/connector-lab?connectorId=<%= connector.id %>" class="list-group-item list-group-item-action bg-transparent text-light border-secondary-subtle <%= selectedConnector && Number(selectedConnector.id) === Number(connector.id) ? 'active' : '' %>">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <div class="fw-semibold"><%= connector.name %></div>
+                                                <div class="small lab-muted"><%= connector.location && connector.location.name ? connector.location.name : 'No location' %></div>
+                                            </div>
+                                            <span class="badge <%= statusData && String(statusData.status || '').toLowerCase() === 'online' ? 'bg-success' : 'bg-secondary' %>"><%= statusData && statusData.status ? statusData.status : 'offline' %></span>
+                                        </div>
+                                    </a>
+                                <% }) %>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-8">
+                        <div class="lab-card p-4 mb-4">
+                            <% if (selectedConnector) { %>
+                                <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                                    <div>
+                                        <h5 class="text-light mb-1"><%= selectedConnector.name %></h5>
+                                        <div class="lab-muted small"><%= selectedConnector.fqdn || selectedConnector.ip || 'No connector endpoint details saved.' %></div>
+                                    </div>
+                                    <span class="badge <%= selectedStatus && String(selectedStatus.status || '').toLowerCase() === 'online' ? 'bg-success' : 'bg-secondary' %> fs-6"><%= selectedStatus && selectedStatus.status ? selectedStatus.status : 'offline' %></span>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-4"><div class="lab-check"><div class="lab-muted small">Servers on connector</div><div class="fs-3 text-light fw-semibold"><%= selectedServerCount %></div></div></div>
+                                    <div class="col-md-4"><div class="lab-check"><div class="lab-muted small">Allocations on connector</div><div class="fs-3 text-light fw-semibold"><%= selectedAllocationCount %></div></div></div>
+                                    <div class="col-md-4"><div class="lab-check"><div class="lab-muted small">Last heartbeat</div><div class="text-light fw-semibold"><%= selectedStatus && selectedStatus.lastSeen ? new Date(selectedStatus.lastSeen).toLocaleString() : 'No heartbeat yet' %></div></div></div>
+                                </div>
+                            <% } else { %>
+                                <div class="lab-muted">Select a connector to inspect preflight and compatibility results.</div>
+                            <% } %>
+                        </div>
+
+                        <div class="lab-card p-4">
+                            <h5 class="text-light mb-3">Compatibility checks</h5>
+                            <div class="row g-3">
+                                <% if (!selectedChecks || selectedChecks.length === 0) { %>
+                                    <div class="col-12"><div class="lab-muted">No diagnostics received yet. Wait for a connector heartbeat.</div></div>
+                                <% } %>
+                                <% (selectedChecks || []).forEach((check) => { %>
+                                    <div class="col-md-6">
+                                        <div class="lab-check <%= check.ok ? 'lab-check-ok' : 'lab-check-fail' %> h-100">
+                                            <div class="d-flex justify-content-between gap-3 mb-2">
+                                                <div class="text-light fw-semibold"><%= check.label %></div>
+                                                <span class="badge <%= check.ok ? 'bg-success' : (check.level === 'critical' ? 'bg-danger' : 'bg-warning text-dark') %>"><%= check.ok ? 'ready' : check.level %></span>
+                                            </div>
+                                            <div class="lab-muted small mb-2"><%= check.description %></div>
+                                            <div class="text-light small"><%= check.message %></div>
+                                            <% if (check.metadata) { %>
+                                                <details class="mt-2">
+                                                    <summary class="lab-muted small">Show metadata</summary>
+                                                    <div class="lab-pre mt-2"><%= JSON.stringify(check.metadata, null, 2) %></div>
+                                                </details>
+                                            <% } %>
+                                        </div>
+                                    </div>
+                                <% }) %>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <%- include('../partials/footer') %>
+        </div>
+    </div>
+</body>
+</html>

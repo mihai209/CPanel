@@ -398,6 +398,29 @@ const SecurityEvent = sequelize.define('SecurityEvent', {
     ]
 });
 
+const NotificationDeliveryLog = sequelize.define('NotificationDeliveryLog', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    channel: { type: DataTypes.STRING(32), allowNull: false },
+    status: { type: DataTypes.STRING(16), allowNull: false, defaultValue: 'failed' },
+    target: { type: DataTypes.STRING(512), allowNull: true },
+    templateKey: { type: DataTypes.STRING(64), allowNull: true },
+    eventKey: { type: DataTypes.STRING(64), allowNull: true },
+    requestPayload: { type: DataTypes.JSON, allowNull: true },
+    responsePayload: { type: DataTypes.JSON, allowNull: true },
+    errorText: { type: DataTypes.TEXT, allowNull: true },
+    attemptedByUserId: { type: DataTypes.INTEGER, allowNull: true },
+    retriedFromId: { type: DataTypes.INTEGER, allowNull: true },
+    metadata: { type: DataTypes.JSON, allowNull: true }
+}, {
+    indexes: [
+        { fields: ['channel'] },
+        { fields: ['status'] },
+        { fields: ['attemptedByUserId'] },
+        { fields: ['retriedFromId'] },
+        { fields: ['createdAt'] }
+    ]
+});
+
 const ServerBackupPolicy = sequelize.define('ServerBackupPolicy', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     serverId: { type: DataTypes.INTEGER, allowNull: false, unique: true },
@@ -533,6 +556,18 @@ User.hasMany(SecurityEvent, {
 SecurityEvent.belongsTo(User, {
     foreignKey: 'userId',
     as: 'user',
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+});
+User.hasMany(NotificationDeliveryLog, {
+    foreignKey: 'attemptedByUserId',
+    as: 'notificationDeliveryLogs',
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+});
+NotificationDeliveryLog.belongsTo(User, {
+    foreignKey: 'attemptedByUserId',
+    as: 'actor',
     onDelete: 'SET NULL',
     onUpdate: 'CASCADE'
 });
@@ -711,6 +746,7 @@ module.exports = {
     Job,
     AuditLog,
     SecurityEvent,
+    NotificationDeliveryLog,
     ServerBackupPolicy,
     ServerBackup,
     Mount,

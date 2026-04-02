@@ -168,7 +168,16 @@
             </div>
 
             <div class="cardx p-3">
-                <h2 class="h6 mb-3">Backup History</h2>
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <h2 class="h6 mb-0">Backup History</h2>
+                    <% if (canManageBackupPolicy && history.length > 0) { %>
+                        <form method="POST" action="/server/<%= server.containerId %>/backups/history/clear" class="mb-0" onsubmit="return confirm('Clear backup history entries from panel database? This will not delete Google Drive backups.');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash3 me-1"></i>Clear Backup History
+                            </button>
+                        </form>
+                    <% } %>
+                </div>
                 <% if (!history.length) { %>
                     <div class="text-secondary">No backup entries yet.</div>
                 <% } else { %>

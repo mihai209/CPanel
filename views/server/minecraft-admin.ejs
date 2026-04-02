@@ -3,248 +3,1041 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minecraft Admin <%= server.name %> | <%= settings.brandName.toUpperCase() %></title>
+    <title>Player Control <%= server.name %> | <%= settings.brandName.toUpperCase() %></title>
     <%- include('../partials/favicon') %>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/css/mobile-layout.css">
     <style>
         :root {
-            --bg: #0f0f12;
-            --panel: #121216;
-            --border: #2d2d35;
-            --text: #e1e1e6;
-            --muted: #8b8b9a;
-            --accent: #3b82f6;
+            --pm-bg: #09111c;
+            --pm-surface: rgba(15, 24, 38, 0.94);
+            --pm-surface-2: rgba(27, 39, 58, 0.92);
+            --pm-border: rgba(123, 167, 255, 0.16);
+            --pm-text: #e6eefb;
+            --pm-muted: #8fa3c1;
+            --pm-accent: #4cd7b2;
+            --pm-accent-2: #5b8cff;
+            --pm-danger: #ff6868;
+            --pm-warning: #ffb347;
+            --pm-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
         }
-        body { background:var(--bg); color:var(--text); margin:0; font-family:Inter,system-ui,-apple-system,sans-serif; height:100vh; overflow:hidden; }
-        .wrapper{display:flex;height:100vh}
-        .sidebar{width:260px;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto}
-        .sidebar.collapsed{margin-left:-260px}
-        .content{flex:1;display:flex;flex-direction:column;min-width:0}
-        .top{background:var(--panel);border-bottom:1px solid var(--border);padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem}
-        .scroll{flex:1;overflow:auto;padding:1rem}
-        .cardx{background:var(--panel);border:1px solid var(--border);border-radius:.9rem}
-        .btn-icon{background:transparent;border:0;color:var(--muted);font-size:1.2rem}
-        .section-title{font-size:.9rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:600}
-        .muted{color:var(--muted)}
-        .table thead th{color:#aab0bf}
-        .pill{display:inline-flex;align-items:center;gap:.35rem;border-radius:999px;padding:.15rem .6rem;font-size:.75rem;border:1px solid rgba(255,255,255,0.12)}
-        .action-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem}
-        .input-dark{background:#0e0e14;border:1px solid var(--border);color:var(--text)}
-        .input-dark:focus{border-color:var(--accent);box-shadow:none;color:var(--text)}
-        .list-box{max-height:320px;overflow:auto}
-        .item-grid{display:grid;grid-template-columns:repeat(9,44px);gap:6px;align-content:start}
-        .item-slot{width:44px;height:44px;background:#15151c;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;position:relative;box-shadow:inset 0 0 12px rgba(0,0,0,0.35)}
-        .item-icon{width:32px;height:32px;image-rendering:pixelated}
-        .item-count{position:absolute;bottom:3px;right:4px;font-size:.65rem;background:rgba(0,0,0,.65);padding:0 4px;border-radius:6px}
-        .item-fallback{font-size:.55rem;color:var(--muted);text-align:center;line-height:1.1;padding:4px}
-        .item-empty{opacity:.35}
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--pm-text);
+            font-family: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(91, 140, 255, 0.24), transparent 32%),
+                radial-gradient(circle at bottom right, rgba(76, 215, 178, 0.16), transparent 28%),
+                linear-gradient(160deg, #08111b 0%, #0d1827 52%, #09111c 100%);
+            overflow: hidden;
+        }
+
+        .page-shell {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .server-sidebar-shell {
+            width: 288px;
+            flex: 0 0 288px;
+            overflow-y: auto;
+            border-right: 1px solid rgba(255,255,255,0.06);
+            background: rgba(4, 11, 20, 0.7);
+            backdrop-filter: blur(12px);
+        }
+
+        .page-main {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .page-header {
+            padding: 1.15rem 1.35rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            background: linear-gradient(180deg, rgba(8, 17, 29, 0.92), rgba(8, 17, 29, 0.68));
+            backdrop-filter: blur(12px);
+        }
+
+        .header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .header-title h1 {
+            margin: 0;
+            font-size: 1.55rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+        }
+
+        .header-title p {
+            margin: 0.35rem 0 0;
+            color: var(--pm-muted);
+        }
+
+        .live-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.45rem 0.8rem;
+            border-radius: 999px;
+            border: 1px solid rgba(76, 215, 178, 0.3);
+            background: rgba(18, 43, 43, 0.68);
+            color: #c9ffef;
+            font-size: 0.88rem;
+        }
+
+        .live-dot {
+            width: 0.55rem;
+            height: 0.55rem;
+            border-radius: 50%;
+            background: var(--pm-accent);
+            box-shadow: 0 0 0 0 rgba(76, 215, 178, 0.6);
+            animation: pulse-dot 1.6s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0% { box-shadow: 0 0 0 0 rgba(76, 215, 178, 0.55); }
+            70% { box-shadow: 0 0 0 10px rgba(76, 215, 178, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(76, 215, 178, 0); }
+        }
+
+        .page-body {
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+            padding: 1rem;
+        }
+
+        .control-layout {
+            display: grid;
+            grid-template-columns: 340px minmax(0, 1fr);
+            gap: 1rem;
+            height: 100%;
+        }
+
+        .panel-card {
+            border: 1px solid var(--pm-border);
+            border-radius: 1.1rem;
+            background: linear-gradient(180deg, rgba(17, 27, 42, 0.95), rgba(11, 19, 31, 0.95));
+            box-shadow: var(--pm-shadow);
+            overflow: hidden;
+        }
+
+        .panel-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.95rem 1.05rem;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .panel-card-title {
+            margin: 0;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .panel-card-subtitle {
+            margin: 0.22rem 0 0;
+            color: var(--pm-muted);
+            font-size: 0.83rem;
+        }
+
+        .player-directory {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .player-search-wrap {
+            padding: 0.9rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .input-dark,
+        .select-dark,
+        .textarea-dark {
+            background: rgba(8, 14, 24, 0.86);
+            border: 1px solid rgba(123, 167, 255, 0.14);
+            color: var(--pm-text);
+        }
+
+        .input-dark:focus,
+        .select-dark:focus,
+        .textarea-dark:focus {
+            background: rgba(8, 14, 24, 0.96);
+            color: var(--pm-text);
+            border-color: rgba(91, 140, 255, 0.5);
+            box-shadow: 0 0 0 0.18rem rgba(91, 140, 255, 0.15);
+        }
+
+        .input-dark::placeholder,
+        .textarea-dark::placeholder {
+            color: rgba(143, 163, 193, 0.75);
+        }
+
+        .player-list {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 0.65rem;
+        }
+
+        .player-row {
+            display: grid;
+            grid-template-columns: 50px minmax(0, 1fr) 38px;
+            gap: 0.8rem;
+            align-items: center;
+            width: 100%;
+            padding: 0.8rem;
+            margin-bottom: 0.7rem;
+            border-radius: 1rem;
+            border: 1px solid transparent;
+            background: rgba(255,255,255,0.03);
+            color: inherit;
+            text-align: left;
+            transition: transform .18s ease, border-color .18s ease, background .18s ease;
+        }
+
+        .player-row:hover,
+        .player-row.active {
+            transform: translateY(-1px);
+            border-color: rgba(91, 140, 255, 0.36);
+            background: rgba(25, 42, 67, 0.72);
+        }
+
+        .player-head {
+            width: 50px;
+            height: 50px;
+            border-radius: 0.8rem;
+            object-fit: cover;
+            image-rendering: pixelated;
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
+        }
+
+        .player-name {
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .player-meta {
+            color: var(--pm-muted);
+            font-size: 0.82rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .status-badge,
+        .flag-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            border-radius: 999px;
+            padding: 0.18rem 0.55rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .status-online { background: rgba(37, 211, 102, 0.16); color: #8ef0b1; border-color: rgba(37, 211, 102, 0.3); }
+        .status-offline { background: rgba(255, 104, 104, 0.12); color: #ffb1b1; border-color: rgba(255, 104, 104, 0.22); }
+        .flag-op { background: rgba(91, 140, 255, 0.14); color: #b9d0ff; }
+        .flag-ban { background: rgba(255, 88, 88, 0.14); color: #ffbcbc; }
+        .flag-white { background: rgba(76, 215, 178, 0.12); color: #bff7ea; }
+
+        .player-content {
+            min-height: 0;
+            overflow-y: auto;
+            padding-right: 0.2rem;
+        }
+
+        .content-stack {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .hero-card {
+            padding: 1.15rem;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 420px;
+            gap: 1rem;
+        }
+
+        .hero-main {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+        }
+
+        .hero-avatar {
+            width: 86px;
+            height: 86px;
+            border-radius: 1.1rem;
+            object-fit: cover;
+            image-rendering: pixelated;
+            background: rgba(255,255,255,0.05);
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
+        }
+
+        .hero-name {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin: 0;
+        }
+
+        .hero-uuid {
+            color: var(--pm-muted);
+            font-size: 0.85rem;
+            word-break: break-all;
+        }
+
+        .hero-flags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            margin-top: 0.6rem;
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.55rem;
+            margin-top: 0.9rem;
+        }
+
+        .action-btn {
+            border-radius: 0.9rem;
+            border: 1px solid rgba(255,255,255,0.08);
+            padding: 0.6rem 0.9rem;
+            font-weight: 600;
+            font-size: 0.88rem;
+            background: rgba(255,255,255,0.05);
+            color: var(--pm-text);
+        }
+
+        .action-btn:hover {
+            border-color: rgba(91, 140, 255, 0.35);
+            color: #fff;
+        }
+
+        .action-btn.danger {
+            background: rgba(255, 88, 88, 0.13);
+            border-color: rgba(255, 88, 88, 0.22);
+            color: #ffc2c2;
+        }
+
+        .action-btn.good {
+            background: rgba(76, 215, 178, 0.12);
+            border-color: rgba(76, 215, 178, 0.24);
+            color: #bff7ea;
+        }
+
+        .meters-grid {
+            display: grid;
+            gap: 0.8rem;
+        }
+
+        .meter-row {
+            display: grid;
+            grid-template-columns: 72px 44px minmax(0, 1fr) 44px;
+            align-items: center;
+            gap: 0.55rem;
+        }
+
+        .meter-label {
+            color: var(--pm-muted);
+            font-size: 0.83rem;
+        }
+
+        .meter-btn {
+            border-radius: 0.7rem;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            height: 38px;
+        }
+
+        .meter-visual {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.35rem;
+            min-width: 0;
+            padding: 0.5rem 0.65rem;
+            border-radius: 0.9rem;
+            background: rgba(255,255,255,0.04);
+        }
+
+        .meter-icons {
+            display: flex;
+            gap: 0.17rem;
+            flex-wrap: wrap;
+        }
+
+        .meter-icon {
+            font-size: 1rem;
+            opacity: 0.26;
+            color: #fff;
+        }
+
+        .meter-icon.filled-health { opacity: 1; color: #ff6161; }
+        .meter-icon.filled-food { opacity: 1; color: #ffb347; }
+
+        .xp-rail {
+            height: 10px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.09);
+            overflow: hidden;
+            flex: 1;
+        }
+
+        .xp-fill {
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #3cd782 0%, #5b8cff 100%);
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.8rem;
+        }
+
+        .summary-card,
+        .stats-card,
+        .world-card {
+            padding: 0.95rem 1rem;
+            border-radius: 1rem;
+            border: 1px solid rgba(255,255,255,0.06);
+            background: rgba(255,255,255,0.035);
+        }
+
+        .summary-card .label,
+        .stats-card .label,
+        .world-card .label {
+            color: var(--pm-muted);
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.35rem;
+        }
+
+        .summary-card .value,
+        .stats-card .value,
+        .world-card .value {
+            font-size: 1.12rem;
+            font-weight: 700;
+            line-height: 1.25;
+            word-break: break-word;
+        }
+
+        .inline-control-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.8rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.8rem;
+        }
+
+        .stats-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            display: grid;
+            gap: 0.48rem;
+            max-height: 210px;
+            overflow-y: auto;
+        }
+
+        .stats-entry {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            color: #d8e6ff;
+            font-size: 0.9rem;
+        }
+
+        .stats-entry small {
+            color: var(--pm-muted);
+        }
+
+        .inventory-card {
+            padding: 1rem;
+        }
+
+        .inventory-tabs {
+            display: flex;
+            gap: 0.6rem;
+            margin-bottom: 1rem;
+        }
+
+        .inventory-tab {
+            border: 0;
+            border-radius: 0.9rem;
+            padding: 0.65rem 0.9rem;
+            background: rgba(255,255,255,0.05);
+            color: var(--pm-muted);
+            font-weight: 600;
+        }
+
+        .inventory-tab.active {
+            background: rgba(76, 215, 178, 0.14);
+            color: #d6fff4;
+            box-shadow: inset 0 -2px 0 rgba(76, 215, 178, 0.8);
+        }
+
+        .inventory-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 330px;
+            gap: 1rem;
+        }
+
+        .item-grid {
+            display: grid;
+            grid-template-columns: repeat(9, minmax(0, 1fr));
+            gap: 0.55rem;
+        }
+
+        .item-slot {
+            position: relative;
+            aspect-ratio: 1 / 1;
+            border-radius: 0.95rem;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.04);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.45rem;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.18);
+            transition: transform .16s ease, border-color .16s ease, background .16s ease;
+        }
+
+        .item-slot:hover,
+        .item-slot.active {
+            transform: translateY(-1px);
+            border-color: rgba(91, 140, 255, 0.36);
+            background: rgba(38, 58, 90, 0.66);
+        }
+
+        .item-slot.empty {
+            opacity: 0.34;
+        }
+
+        .item-icon {
+            width: 34px;
+            height: 34px;
+            image-rendering: pixelated;
+        }
+
+        .item-name-fallback {
+            font-size: 0.58rem;
+            text-align: center;
+            color: var(--pm-muted);
+            line-height: 1.1;
+        }
+
+        .item-count {
+            position: absolute;
+            right: 0.32rem;
+            bottom: 0.26rem;
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 0.06rem 0.3rem;
+            border-radius: 999px;
+            background: rgba(0,0,0,0.58);
+        }
+
+        .slot-label {
+            position: absolute;
+            left: 0.32rem;
+            top: 0.26rem;
+            color: rgba(255,255,255,0.45);
+            font-size: 0.62rem;
+        }
+
+        .side-slot-stack {
+            display: grid;
+            gap: 0.7rem;
+        }
+
+        .equip-row {
+            display: grid;
+            grid-template-columns: 64px minmax(0, 1fr);
+            gap: 0.8rem;
+            padding: 0.75rem;
+            border-radius: 1rem;
+            border: 1px solid rgba(255,255,255,0.06);
+            background: rgba(255,255,255,0.04);
+            align-items: center;
+        }
+
+        .equip-meta h5 {
+            margin: 0;
+            font-size: 0.95rem;
+        }
+
+        .equip-meta p {
+            margin: 0.25rem 0 0;
+            color: var(--pm-muted);
+            font-size: 0.82rem;
+        }
+
+        .control-footer {
+            margin-top: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 0.8rem;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.55rem;
+            align-items: center;
+        }
+
+        .empty-state {
+            padding: 2rem 1.2rem;
+            color: var(--pm-muted);
+            text-align: center;
+        }
+
+        .message-bar {
+            display: none;
+            margin-bottom: 1rem;
+            padding: 0.85rem 1rem;
+            border-radius: 1rem;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.05);
+        }
+
+        .message-bar.show { display: block; }
+        .message-info { color: #c8d8f0; border-color: rgba(91, 140, 255, 0.18); background: rgba(91, 140, 255, 0.08); }
+        .message-success { color: #c9ffef; border-color: rgba(76, 215, 178, 0.24); background: rgba(76, 215, 178, 0.08); }
+        .message-error { color: #ffd0d0; border-color: rgba(255, 104, 104, 0.24); background: rgba(255, 104, 104, 0.08); }
+
+        .small-muted {
+            color: var(--pm-muted);
+            font-size: 0.84rem;
+        }
+
+        @media (max-width: 1450px) {
+            .hero-card { grid-template-columns: 1fr; }
+            .summary-grid,
+            .stats-grid,
+            .inline-control-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .inventory-layout { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 1100px) {
+            body { overflow: auto; }
+            .page-shell { display: block; }
+            .server-sidebar-shell { width: 100%; border-right: 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+            .page-main, .page-body, .player-content { overflow: visible; }
+            .control-layout { grid-template-columns: 1fr; height: auto; }
+            .summary-grid,
+            .stats-grid,
+            .inline-control-grid { grid-template-columns: 1fr; }
+            .hero-main { flex-direction: column; }
+            .meter-row { grid-template-columns: 1fr; }
+        }
     </style>
-    <link rel="stylesheet" href="/css/mobile-layout.css">
 </head>
 <body>
 <%- include('../partials/error-modal') %>
-<div class="wrapper">
-    <nav class="sidebar" id="sidebar"><div class="p-3"><%- include('../partials/server-sidebar', { server, active: 'mccenter' }) %></div></nav>
-    <main class="content">
-        <header class="top">
-            <button class="btn-icon" id="sidebarToggle"><i class="bi bi-list"></i></button>
-            <h1 class="h5 mb-0">Minecraft Admin / <span class="text-secondary"><%= server.name %></span></h1>
-        </header>
-        <section class="scroll">
-            <div class="cardx p-3 mb-3">
-                <div class="section-title">Admin & Control</div>
-                <div class="small muted">Inspector, moderation, whitelist, banlist, and chat controls.</div>
-                <div id="adminMessage" class="small mt-2"></div>
-            </div>
-
-            <div class="action-grid mb-4">
-                <div class="cardx p-3">
-                    <div class="fw-semibold mb-2">Player Inspector</div>
-                <div class="input-group mb-2">
-                    <input class="form-control input-dark" id="inspectPlayer" placeholder="Player name">
-                    <button class="btn btn-primary" id="inspectBtn">Inspect</button>
-                </div>
-                    <div class="small muted">Online players only. Offline UUID is shown for cracked servers.</div>
-                    <div class="small muted mt-1" id="inspectOfflineUuid"></div>
-                    <div class="row g-2 mt-2">
-                        <div class="col-12">
-                            <div class="small muted">Summary</div>
-                            <pre class="mt-1 small" id="inspectOutput" style="white-space:pre-wrap;max-height:160px;overflow:auto"></pre>
-                        </div>
-                        <div class="col-md-6">
-                    <div class="small muted">Inventory</div>
-                    <div class="small muted" id="inventorySource"></div>
-                    <div class="item-grid mt-2" id="inventoryGrid" data-slots="36"></div>
-                </div>
-                <div class="col-md-6">
-                    <div class="small muted">Ender Chest</div>
-                    <div class="small muted" id="enderSource"></div>
-                    <div class="item-grid mt-2" id="enderGrid" data-slots="27"></div>
-                </div>
-            </div>
+<div class="page-shell">
+    <aside class="server-sidebar-shell">
+        <div class="p-3">
+            <%- include('../partials/server-sidebar', { server, active: 'mccenter' }) %>
         </div>
-
-                <div class="cardx p-3">
-                    <div class="fw-semibold mb-2">Freeze / Unfreeze</div>
-                    <div class="input-group mb-2">
-                        <input class="form-control input-dark" id="freezePlayer" placeholder="Player name">
-                        <button class="btn btn-warning" id="freezeBtn">Freeze</button>
-                        <button class="btn btn-outline-light" id="unfreezeBtn">Unfreeze</button>
-                    </div>
-                    <div class="small muted">Applies slowness + jump fatigue effects.</div>
+    </aside>
+    <main class="page-main">
+        <section class="page-header">
+            <div class="header-row">
+                <div class="header-title">
+                    <h1>Player Control Surface</h1>
+                    <p>Live Minecraft player directory, profile controls, inventory view, and world-data maintenance for <strong><%= server.name %></strong>.</p>
                 </div>
-
-                <div class="cardx p-3">
-                    <div class="fw-semibold mb-2">Silent Teleport</div>
-                    <div class="input-group mb-2">
-                        <input class="form-control input-dark" id="tpPlayer" placeholder="Player">
-                        <input class="form-control input-dark" id="tpDestination" placeholder="Destination (player or coords)">
-                        <button class="btn btn-outline-info" id="tpBtn">Teleport</button>
-                    </div>
-                    <div class="small muted">Uses /tp silently.</div>
-                </div>
-
-                <div class="cardx p-3">
-                <div class="fw-semibold mb-2">Chat Controls</div>
-                    <div class="d-flex gap-2 flex-wrap mb-2">
-                        <button class="btn btn-outline-danger" id="muteChatBtn">Mute Chat</button>
-                        <button class="btn btn-outline-success" id="unmuteChatBtn">Unmute</button>
-                    </div>
-                    <div class="input-group">
-                        <input class="form-control input-dark" id="slowChatSeconds" type="number" min="1" max="60" placeholder="Slow seconds">
-                        <button class="btn btn-outline-warning" id="slowChatBtn">Slow Chat</button>
-                    </div>
-                    <div class="small muted mt-2">Requires a chat plugin with /mutechat, /unmutechat, /slowchat.</div>
-                    <div class="mt-3">
-                        <div class="small muted mb-1">Command settings</div>
-                        <div class="row g-2">
-                            <div class="col-md-4">
-                                <input class="form-control input-dark" id="chatMuteCmd" placeholder="mutechat">
-                            </div>
-                            <div class="col-md-4">
-                                <input class="form-control input-dark" id="chatUnmuteCmd" placeholder="unmutechat">
-                            </div>
-                            <div class="col-md-4">
-                                <input class="form-control input-dark" id="chatSlowCmd" placeholder="slowchat {seconds}">
-                            </div>
-                        </div>
-                        <button class="btn btn-outline-light btn-sm mt-2" id="saveChatConfig">Save Chat Commands</button>
-                    </div>
+                <div class="live-chip">
+                    <span class="live-dot"></span>
+                    <span id="lastRefreshText">Waiting for first sync...</span>
                 </div>
             </div>
-
-            <div class="row g-3">
-                <div class="col-lg-6">
-                    <div class="cardx p-3">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <div class="fw-semibold">Whitelist Manager</div>
-                            <button class="btn btn-sm btn-outline-info" id="refreshWhitelist">Refresh</button>
+        </section>
+        <section class="page-body">
+            <div id="messageBar" class="message-bar"></div>
+            <div class="control-layout">
+                <aside class="panel-card player-directory">
+                    <div class="panel-card-header">
+                        <div>
+                            <h2 class="panel-card-title mb-0">Player Directory</h2>
+                            <p class="panel-card-subtitle">Online first. Offline entries stay visible if they have cached server data.</p>
                         </div>
-                        <div class="input-group mb-2">
-                            <input class="form-control input-dark" id="whitelistPlayer" placeholder="Player name">
-                            <button class="btn btn-outline-success" id="whitelistAdd">Add</button>
-                            <button class="btn btn-outline-danger" id="whitelistRemove">Remove</button>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label small muted">Bulk import (one name per line)</label>
-                            <textarea class="form-control input-dark" id="whitelistBulk" rows="3" placeholder="player1\nplayer2"></textarea>
-                            <button class="btn btn-outline-light mt-2" id="whitelistImport">Import</button>
-                        </div>
-                        <div class="list-box">
-                            <table class="table table-dark table-striped table-sm align-middle mb-0">
-                                <thead><tr><th>Name</th><th>UUID</th><th></th></tr></thead>
-                                <tbody id="whitelistTable"></tbody>
-                            </table>
+                        <button class="btn btn-sm btn-outline-light" id="refreshDirectoryBtn">
+                            <i class="bi bi-arrow-repeat"></i>
+                        </button>
+                    </div>
+                    <div class="player-search-wrap">
+                        <input id="playerSearchInput" class="form-control input-dark" placeholder="Search player or UUID">
+                        <div class="d-flex justify-content-between align-items-center mt-2 small-muted">
+                            <span id="directoryCounts">0 online / 0 offline</span>
+                            <span id="directoryStatus">Idle</span>
                         </div>
                     </div>
-                </div>
+                    <div id="playerList" class="player-list"></div>
+                </aside>
 
-                <div class="col-lg-6">
-                    <div class="cardx p-3">
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <div class="fw-semibold">Banlist</div>
-                            <button class="btn btn-sm btn-outline-info" id="refreshBanlist">Refresh</button>
+                <section class="player-content">
+                    <div class="content-stack">
+                        <div class="panel-card hero-card">
+                            <div class="hero-main">
+                                <img id="heroAvatar" class="hero-avatar" src="https://mc-heads.net/avatar/Steve/64" alt="Player avatar">
+                                <div class="flex-grow-1 min-w-0">
+                                    <h2 id="heroName" class="hero-name">Select a player</h2>
+                                    <div id="heroUuid" class="hero-uuid">Choose a player from the directory to start inspecting live data.</div>
+                                    <div id="heroFlags" class="hero-flags"></div>
+                                    <div id="heroActions" class="hero-actions"></div>
+                                </div>
+                            </div>
+                            <div class="meters-grid">
+                                <div class="meter-row">
+                                    <div class="meter-label">Health</div>
+                                    <button class="meter-btn" data-adjust-field="health" data-adjust-delta="-1"><i class="bi bi-dash-lg"></i></button>
+                                    <div class="meter-visual">
+                                        <div id="healthIcons" class="meter-icons"></div>
+                                        <strong id="healthValue">-</strong>
+                                    </div>
+                                    <button class="meter-btn" data-adjust-field="health" data-adjust-delta="1"><i class="bi bi-plus-lg"></i></button>
+                                </div>
+                                <div class="meter-row">
+                                    <div class="meter-label">Food</div>
+                                    <button class="meter-btn" data-adjust-field="food" data-adjust-delta="-1"><i class="bi bi-dash-lg"></i></button>
+                                    <div class="meter-visual">
+                                        <div id="foodIcons" class="meter-icons"></div>
+                                        <strong id="foodValue">-</strong>
+                                    </div>
+                                    <button class="meter-btn" data-adjust-field="food" data-adjust-delta="1"><i class="bi bi-plus-lg"></i></button>
+                                </div>
+                                <div class="meter-row">
+                                    <div class="meter-label">XP Level</div>
+                                    <button class="meter-btn" data-adjust-field="xpLevel" data-adjust-delta="-1"><i class="bi bi-dash-lg"></i></button>
+                                    <div class="meter-visual">
+                                        <div class="xp-rail"><div id="xpFill" class="xp-fill" style="width:0%"></div></div>
+                                        <strong id="xpValue">-</strong>
+                                    </div>
+                                    <button class="meter-btn" data-adjust-field="xpLevel" data-adjust-delta="1"><i class="bi bi-plus-lg"></i></button>
+                                </div>
+                            </div>
                         </div>
-                        <div class="list-box">
-                            <table class="table table-dark table-striped table-sm align-middle mb-0">
-                                <thead><tr><th>Name</th><th>Reason</th><th>When</th><th></th></tr></thead>
-                                <tbody id="banlistTable"></tbody>
-                            </table>
+
+                        <div class="summary-grid">
+                            <div class="summary-card">
+                                <div class="label">Play Time</div>
+                                <div id="summaryPlaytime" class="value">-</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="label">World</div>
+                                <div id="summaryWorld" class="value">-</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="label">Position</div>
+                                <div id="summaryPosition" class="value">-</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="label">Deaths</div>
+                                <div id="summaryDeaths" class="value">-</div>
+                            </div>
+                        </div>
+
+                        <div class="panel-card p-3">
+                            <div class="panel-card-header px-0 pt-0">
+                                <div>
+                                    <h3 class="panel-card-title mb-0">Quick Controls</h3>
+                                    <p class="panel-card-subtitle">Teleport, gamemode changes, moderation, and status actions without leaving the page.</p>
+                                </div>
+                            </div>
+                            <div class="inline-control-grid">
+                                <div class="world-card">
+                                    <div class="label">Gamemode</div>
+                                    <select id="gamemodeSelect" class="form-select select-dark">
+                                        <option value="survival">Survival</option>
+                                        <option value="creative">Creative</option>
+                                        <option value="adventure">Adventure</option>
+                                        <option value="spectator">Spectator</option>
+                                    </select>
+                                    <button class="btn btn-primary w-100 mt-2" id="applyGamemodeBtn">Apply Gamemode</button>
+                                </div>
+                                <div class="world-card">
+                                    <div class="label">Teleport</div>
+                                    <input id="teleportTargetInput" class="form-control input-dark" placeholder="Player or x y z">
+                                    <button class="btn btn-outline-info w-100 mt-2" id="teleportBtn">Teleport Player</button>
+                                </div>
+                                <div class="world-card">
+                                    <div class="label">Moderation Context</div>
+                                    <input id="actionReasonInput" class="form-control input-dark mb-2" placeholder="Reason / note">
+                                    <div class="input-group">
+                                        <span class="input-group-text input-dark border-end-0">Tempban</span>
+                                        <input id="tempbanDurationInput" class="form-control input-dark border-start-0" placeholder="30m / 12h / 7d">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="stats-grid">
+                            <div class="stats-card">
+                                <div class="label">Items Picked Up</div>
+                                <ul id="pickedUpList" class="stats-list"></ul>
+                            </div>
+                            <div class="stats-card">
+                                <div class="label">Items Used</div>
+                                <ul id="usedList" class="stats-list"></ul>
+                            </div>
+                            <div class="stats-card">
+                                <div class="label">Mobs Killed</div>
+                                <ul id="mobsKilledList" class="stats-list"></ul>
+                            </div>
+                            <div class="stats-card">
+                                <div class="label">Blocks Travelled</div>
+                                <ul id="movementList" class="stats-list"></ul>
+                            </div>
+                        </div>
+
+                        <div class="panel-card inventory-card">
+                            <div class="panel-card-header px-0 pt-0">
+                                <div>
+                                    <h3 class="panel-card-title mb-0">Inventory & Equipment</h3>
+                                    <p class="panel-card-subtitle">Live inventory when the player is online, offline playerdata fallback when not.</p>
+                                </div>
+                            </div>
+
+                            <div class="inventory-tabs">
+                                <button class="inventory-tab active" data-inventory-tab="inventory">Inventory</button>
+                                <button class="inventory-tab" data-inventory-tab="ender">Ender Chest</button>
+                            </div>
+
+                            <div class="inventory-layout">
+                                <div>
+                                    <div id="inventoryMeta" class="small-muted mb-2"></div>
+                                    <div id="inventoryGrid" class="item-grid"></div>
+                                </div>
+                                <div class="side-slot-stack">
+                                    <div class="equip-row">
+                                        <div id="armorHelmetSlot" class="item-slot empty"></div>
+                                        <div class="equip-meta"><h5>Helmet</h5><p id="armorHelmetMeta">No item</p></div>
+                                    </div>
+                                    <div class="equip-row">
+                                        <div id="armorChestSlot" class="item-slot empty"></div>
+                                        <div class="equip-meta"><h5>Chestplate</h5><p id="armorChestMeta">No item</p></div>
+                                    </div>
+                                    <div class="equip-row">
+                                        <div id="armorLegsSlot" class="item-slot empty"></div>
+                                        <div class="equip-meta"><h5>Leggings</h5><p id="armorLegsMeta">No item</p></div>
+                                    </div>
+                                    <div class="equip-row">
+                                        <div id="armorBootsSlot" class="item-slot empty"></div>
+                                        <div class="equip-meta"><h5>Boots</h5><p id="armorBootsMeta">No item</p></div>
+                                    </div>
+                                    <div class="equip-row">
+                                        <div id="offhandSlot" class="item-slot empty"></div>
+                                        <div class="equip-meta"><h5>Offhand</h5><p id="offhandMeta">No item</p></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="control-footer">
+                                <div class="control-group">
+                                    <button class="action-btn danger" id="clearInventoryBtn">Clear Inventory</button>
+                                    <button class="action-btn" id="clearEnderBtn">Clear Ender Chest</button>
+                                </div>
+                                <div class="control-group">
+                                    <div id="selectedItemMeta" class="small-muted">Select an item slot to remove a specific stack.</div>
+                                    <button class="action-btn danger" id="deleteSelectedItemBtn" disabled>Delete Selected Item</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="panel-card p-3">
+                            <div class="panel-card-header px-0 pt-0">
+                                <div>
+                                    <h3 class="panel-card-title mb-0">World Data</h3>
+                                    <p class="panel-card-subtitle">Inspect advancement coverage and reset stored player stats or advancement state when needed.</p>
+                                </div>
+                            </div>
+                            <div class="summary-grid mb-3">
+                                <div class="world-card">
+                                    <div class="label">Stats File</div>
+                                    <div id="statsFilePath" class="value small-muted">-</div>
+                                </div>
+                                <div class="world-card">
+                                    <div class="label">Advancements</div>
+                                    <div id="advancementsSummary" class="value">-</div>
+                                </div>
+                                <div class="world-card">
+                                    <div class="label">Stored Playerdata</div>
+                                    <div id="playerdataFilePath" class="value small-muted">-</div>
+                                </div>
+                                <div class="world-card">
+                                    <div class="label">Identity Source</div>
+                                    <div id="identitySummary" class="value">-</div>
+                                </div>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                <button class="action-btn danger" id="resetStatsBtn">Reset Player Stats</button>
+                                <button class="action-btn danger" id="resetAdvancementsBtn">Reset Advancements</button>
+                            </div>
+                            <div class="stats-card">
+                                <div class="label">Advancement Snapshot</div>
+                                <ul id="advancementsList" class="stats-list"></ul>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </section>
             </div>
         </section>
     </main>
 </div>
+
 <script>
-    const serverId = "<%= server.containerId %>";
-    const setMessage = (msg, type = 'info') => {
-        const el = document.getElementById('adminMessage');
-        if (!el) return;
-        el.textContent = msg || '';
-        el.className = `small mt-2 text-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'muted'}`;
+    const serverId = <%- JSON.stringify(server.containerId) %>;
+    const permissions = <%- JSON.stringify(minecraftAdminPermissions || {}) %>;
+    const defaultPlayer = <%- JSON.stringify(minecraftAdminPlayer || '') %>;
+    const textureBase = `/server/${serverId}/minecraft/admin/item-texture?item=`;
+    const state = {
+        players: [],
+        selectedPlayer: defaultPlayer || '',
+        selectedPlayerUuid: '',
+        selectedData: null,
+        selectedInventoryTab: 'inventory',
+        selectedItem: null,
+        listTimer: null,
+        inspectTimer: null,
+        listRequestId: 0,
+        inspectRequestId: 0
     };
 
-    const apiFetch = async (url, opts) => {
-        const res = await fetch(url, opts);
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || data.success === false) {
+    const elements = {
+        messageBar: document.getElementById('messageBar'),
+        playerList: document.getElementById('playerList'),
+        playerSearchInput: document.getElementById('playerSearchInput'),
+        directoryCounts: document.getElementById('directoryCounts'),
+        directoryStatus: document.getElementById('directoryStatus'),
+        lastRefreshText: document.getElementById('lastRefreshText'),
+        heroAvatar: document.getElementById('heroAvatar'),
+        heroName: document.getElementById('heroName'),
+        heroUuid: document.getElementById('heroUuid'),
+        heroFlags: document.getElementById('heroFlags'),
+        heroActions: document.getElementById('heroActions'),
+        healthIcons: document.getElementById('healthIcons'),
+        foodIcons: document.getElementById('foodIcons'),
+        healthValue: document.getElementById('healthValue'),
+        foodValue: document.getElementById('foodValue'),
+        xpValue: document.getElementById('xpValue'),
+        xpFill: document.getElementById('xpFill'),
+        summaryPlaytime: document.getElementById('summaryPlaytime'),
+        summaryWorld: document.getElementById('summaryWorld'),
+        summaryPosition: document.getElementById('summaryPosition'),
+        summaryDeaths: document.getElementById('summaryDeaths'),
+        gamemodeSelect: document.getElementById('gamemodeSelect'),
+        applyGamemodeBtn: document.getElementById('applyGamemodeBtn'),
+        teleportTargetInput: document.getElementById('teleportTargetInput'),
+        teleportBtn: document.getElementById('teleportBtn'),
+        actionReasonInput: document.getElementById('actionReasonInput'),
+        tempbanDurationInput: document.getElementById('tempbanDurationInput'),
+        pickedUpList: document.getElementById('pickedUpList'),
+        usedList: document.getElementById('usedList'),
+        mobsKilledList: document.getElementById('mobsKilledList'),
+        movementList: document.getElementById('movementList'),
+        inventoryMeta: document.getElementById('inventoryMeta'),
+        inventoryGrid: document.getElementById('inventoryGrid'),
+        selectedItemMeta: document.getElementById('selectedItemMeta'),
+        deleteSelectedItemBtn: document.getElementById('deleteSelectedItemBtn'),
+        statsFilePath: document.getElementById('statsFilePath'),
+        advancementsSummary: document.getElementById('advancementsSummary'),
+        playerdataFilePath: document.getElementById('playerdataFilePath'),
+        identitySummary: document.getElementById('identitySummary'),
+        advancementsList: document.getElementById('advancementsList')
+    };
+
+    const apiFetch = async (url, opts = {}) => {
+        const response = await fetch(url, opts);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.success === false) {
             throw new Error(data.error || 'Request failed');
         }
         return data;
     };
 
-    const loadWhitelist = async () => {
-        const data = await apiFetch(`/server/${serverId}/minecraft/admin/whitelist`);
-        const tbody = document.getElementById('whitelistTable');
-        tbody.innerHTML = '';
-        (data.entries || []).forEach((entry) => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${entry.name || '-'}</td><td class="small text-muted">${entry.uuid || ''}</td><td><button class="btn btn-sm btn-outline-danger" data-remove="${entry.name || ''}">Remove</button></td>`;
-            tbody.appendChild(tr);
-        });
-        tbody.querySelectorAll('[data-remove]').forEach((btn) => {
-            btn.addEventListener('click', async () => {
-                const name = btn.getAttribute('data-remove');
-                if (!name) return;
-                await apiFetch(`/server/${serverId}/minecraft/admin/whitelist/remove`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player: name }) });
-                setMessage(`Removed ${name} from whitelist.`, 'success');
-                loadWhitelist();
-            });
-        });
+    const escapeHtml = (value) => String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
+    const setMessage = (message, type = 'info') => {
+        if (!elements.messageBar) return;
+        if (!message) {
+            elements.messageBar.className = 'message-bar';
+            elements.messageBar.textContent = '';
+            return;
+        }
+        elements.messageBar.className = `message-bar show message-${type}`;
+        elements.messageBar.textContent = message;
     };
 
-    const loadBanlist = async () => {
-        const data = await apiFetch(`/server/${serverId}/minecraft/admin/banlist`);
-        const tbody = document.getElementById('banlistTable');
-        tbody.innerHTML = '';
-        (data.players || []).forEach((entry) => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${entry.name || entry.uuid || '-'}</td><td class="small text-muted">${entry.reason || ''}</td><td class="small text-muted">${entry.created || ''}</td><td><button class="btn btn-sm btn-outline-warning" data-unban="${entry.name || entry.uuid || ''}">Unban</button></td>`;
-            tbody.appendChild(tr);
-        });
-        tbody.querySelectorAll('[data-unban]').forEach((btn) => {
-            btn.addEventListener('click', async () => {
-                const name = btn.getAttribute('data-unban');
-                if (!name) return;
-                await apiFetch(`/server/${serverId}/minecraft/admin/unban`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target: name }) });
-                setMessage(`Unbanned ${name}.`, 'success');
-                loadBanlist();
-            });
-        });
+    const setLastRefresh = (isoValue) => {
+        const date = isoValue ? new Date(isoValue) : new Date();
+        elements.lastRefreshText.textContent = `Last refresh ${date.toLocaleTimeString()}`;
     };
 
-    const modTextureBase = `/server/${serverId}/minecraft/admin/item-texture?item=`;
-    const resolveItemTextureUrls = (rawId) => {
+    const renderMetricIcons = (container, total, filled, className, icon) => {
+        if (!container) return;
+        container.innerHTML = '';
+        for (let index = 0; index < total; index += 1) {
+            const span = document.createElement('span');
+            span.className = `meter-icon ${index < filled ? className : ''}`;
+            span.innerHTML = icon;
+            container.appendChild(span);
+        }
+    };
+
+    const formatArray = (values, precision = 1) => {
+        if (!Array.isArray(values) || values.length === 0) return '-';
+        return values.map((value) => Number(value).toFixed(precision)).join(', ');
+    };
+
+    const getItemTextureUrls = (rawId) => {
         const id = String(rawId || '').trim();
         if (!id) return { itemUrl: '', blockUrl: '' };
-        const [ns, name] = id.includes(':') ? id.split(':') : ['minecraft', id];
-        if (ns !== 'minecraft') {
-            return { itemUrl: `${modTextureBase}${encodeURIComponent(id)}`, blockUrl: '' };
+        const [namespace, name] = id.includes(':') ? id.split(':') : ['minecraft', id];
+        if (namespace !== 'minecraft') {
+            return {
+                itemUrl: `${textureBase}${encodeURIComponent(id)}`,
+                blockUrl: ''
+            };
         }
-        const clean = name.replace(/^minecraft:/, '').replace(/[\s]/g, '_');
+        const clean = name.replace(/^minecraft:/, '').replace(/\s+/g, '_');
         const base = 'https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@1.16.5/assets/minecraft/textures';
         return {
             itemUrl: `${base}/item/${encodeURIComponent(clean)}.png`,
@@ -252,186 +1045,548 @@
         };
     };
 
-    const renderItemGrid = (items, containerId) => {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-        container.innerHTML = '';
-        const slots = Number.parseInt(container.dataset.slots || '0', 10);
-        const gridSize = Number.isFinite(slots) && slots > 0 ? slots : (items || []).length;
-        const arranged = new Array(gridSize).fill(null);
+    const createSlotInner = (slotElement, item, slotLabel = '') => {
+        slotElement.className = `item-slot${item ? '' : ' empty'}`;
+        slotElement.innerHTML = '';
+        if (slotLabel) {
+            const label = document.createElement('div');
+            label.className = 'slot-label';
+            label.textContent = slotLabel;
+            slotElement.appendChild(label);
+        }
+        if (!item) return;
+        const rawId = String(item.id || '');
+        const urls = getItemTextureUrls(rawId);
+        const img = document.createElement('img');
+        img.className = 'item-icon';
+        img.alt = rawId;
+        img.src = urls.itemUrl;
+        img.onerror = () => {
+            if (img.dataset.stage !== 'block' && urls.blockUrl) {
+                img.dataset.stage = 'block';
+                img.src = urls.blockUrl;
+                return;
+            }
+            img.remove();
+            const fallback = document.createElement('div');
+            fallback.className = 'item-name-fallback';
+            fallback.textContent = rawId.split(':').pop() || rawId;
+            slotElement.appendChild(fallback);
+        };
+        slotElement.appendChild(img);
+        if ((Number(item.count) || 0) > 1) {
+            const count = document.createElement('div');
+            count.className = 'item-count';
+            count.textContent = String(item.count);
+            slotElement.appendChild(count);
+        }
+    };
+
+    const buildInventoryViews = (items) => {
+        const source = Array.isArray(items) ? items : [];
+        const bySlot = new Map();
         const loose = [];
-        (items || []).forEach((item) => {
-            if (Number.isFinite(item.slot) && item.slot >= 0 && item.slot < gridSize) {
-                arranged[item.slot] = item;
+        source.forEach((item) => {
+            if (Number.isFinite(item.slot)) {
+                bySlot.set(Number(item.slot), item);
             } else {
                 loose.push(item);
             }
         });
-        loose.forEach((item) => {
-            const idx = arranged.findIndex((entry) => entry === null);
-            if (idx >= 0) arranged[idx] = item;
+
+        const takeLoose = () => loose.length ? loose.shift() : null;
+        const inventorySlots = [];
+        for (let slot = 9; slot <= 35; slot += 1) inventorySlots.push(bySlot.get(slot) || takeLoose());
+        for (let slot = 0; slot <= 8; slot += 1) inventorySlots.push(bySlot.get(slot) || takeLoose());
+
+        const armor = {
+            helmet: bySlot.get(103) || bySlot.get(39) || null,
+            chest: bySlot.get(102) || bySlot.get(38) || null,
+            legs: bySlot.get(101) || bySlot.get(37) || null,
+            boots: bySlot.get(100) || bySlot.get(36) || null,
+            offhand: bySlot.get(-106) || bySlot.get(40) || bySlot.get(150) || null
+        };
+
+        return { inventorySlots, armor };
+    };
+
+    const renderPlayerList = () => {
+        const list = Array.isArray(state.players) ? state.players : [];
+        if (!list.length) {
+            elements.playerList.innerHTML = '<div class="empty-state">No players matched the current search. Offline players appear once the server has cached stats, playerdata, whitelist, ops, or ban records.</div>';
+            return;
+        }
+
+        elements.playerList.innerHTML = list.map((player) => `
+            <button class="player-row ${state.selectedPlayer === player.name ? 'active' : ''}" type="button" data-player-row="${escapeHtml(player.name)}" data-player-uuid="${escapeHtml(player.uuid || '')}">
+                <img class="player-head" src="${escapeHtml(player.headUrl)}" alt="${escapeHtml(player.name)}">
+                <div class="min-w-0">
+                    <div class="player-name">${escapeHtml(player.name)}</div>
+                    <div class="player-meta">${escapeHtml(player.uuid || 'No UUID cached yet')}</div>
+                    <div class="d-flex flex-wrap gap-1 mt-2">
+                        <span class="status-badge ${player.online ? 'status-online' : 'status-offline'}">${player.online ? 'Online' : 'Offline'}</span>
+                        ${player.op ? '<span class="flag-badge flag-op">OP</span>' : ''}
+                        ${player.whitelisted ? '<span class="flag-badge flag-white">Whitelist</span>' : ''}
+                        ${player.banned ? '<span class="flag-badge flag-ban">Banned</span>' : ''}
+                    </div>
+                </div>
+                <i class="bi bi-box-arrow-up-right text-secondary"></i>
+            </button>
+        `).join('');
+
+        elements.playerList.querySelectorAll('[data-player-row]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const player = button.getAttribute('data-player-row');
+                const uuid = button.getAttribute('data-player-uuid') || '';
+                if (!player) return;
+                selectPlayer(player, uuid, true);
+            });
         });
-        arranged.forEach((item, idx) => {
-            const slot = document.createElement('div');
-            slot.className = `item-slot${item ? '' : ' item-empty'}`;
-            slot.title = item ? `${item.id || 'unknown'}${item.count ? ` x${item.count}` : ''}` : `Empty slot ${idx + 1}`;
-            if (!item) {
-                container.appendChild(slot);
+    };
+
+    const renderActionButtons = (profile) => {
+        const can = permissions || {};
+        const buttons = [];
+        if (can.whitelist) {
+            buttons.push(`<button class="action-btn ${profile.whitelisted ? '' : 'good'}" data-player-action="${profile.whitelisted ? 'dewhitelist' : 'whitelist'}">${profile.whitelisted ? 'Dewhitelist' : 'Whitelist'}</button>`);
+        }
+        if (can.op || can.deop) {
+            if (profile.op && can.deop) buttons.push('<button class="action-btn" data-player-action="deop">DeOP</button>');
+            if (!profile.op && can.op) buttons.push('<button class="action-btn good" data-player-action="op">OP</button>');
+        }
+        if (can.kick) buttons.push('<button class="action-btn" data-player-action="kick">Kick</button>');
+        if (can.ban && !profile.banned) buttons.push('<button class="action-btn danger" data-player-action="ban">Ban</button>');
+        if (can.banlist && profile.banned) buttons.push('<button class="action-btn good" data-player-action="unban">Unban</button>');
+        if (can.tempban) buttons.push('<button class="action-btn danger" data-player-action="tempban">Tempban</button>');
+        if (can.freeze) {
+            buttons.push('<button class="action-btn" data-freeze-action="freeze">Freeze</button>');
+            buttons.push('<button class="action-btn" data-freeze-action="unfreeze">Unfreeze</button>');
+        }
+        elements.heroActions.innerHTML = buttons.join('');
+
+        elements.heroActions.querySelectorAll('[data-player-action]').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const action = button.getAttribute('data-player-action');
+                if (!action) return;
+                await runPlayerAction(action);
+            });
+        });
+
+        elements.heroActions.querySelectorAll('[data-freeze-action]').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const action = button.getAttribute('data-freeze-action');
+                if (!action) return;
+                await runFreezeAction(action);
+            });
+        });
+    };
+
+    const renderStatsList = (target, entries, fallbackLabel) => {
+        const safeEntries = Array.isArray(entries) ? entries : [];
+        if (!target) return;
+        if (!safeEntries.length) {
+            target.innerHTML = `<li class="stats-entry"><span class="small-muted">${escapeHtml(fallbackLabel)}</span><strong>0</strong></li>`;
+            return;
+        }
+        target.innerHTML = safeEntries.map((entry) => `
+            <li class="stats-entry">
+                <span>${escapeHtml(entry.label || entry.key || '-')}</span>
+                <strong>${escapeHtml(entry.count)}</strong>
+            </li>
+        `).join('');
+    };
+
+    const renderEquipSlot = (elementId, metaId, item, emptyLabel) => {
+        const slot = document.getElementById(elementId);
+        const meta = document.getElementById(metaId);
+        if (!slot || !meta) return;
+        createSlotInner(slot, item);
+        meta.textContent = item ? `${String(item.id || '').split(':').pop()}${item.count ? ` ×${item.count}` : ''}` : emptyLabel;
+    };
+
+    const renderInventoryGrid = (payload) => {
+        const items = state.selectedInventoryTab === 'inventory'
+            ? ((payload.sources && payload.sources.inventory === 'online') ? payload.items.inventory : payload.offlineItems.inventory)
+            : ((payload.sources && payload.sources.ender === 'online') ? payload.items.ender : payload.offlineItems.ender);
+        const sourceLabel = state.selectedInventoryTab === 'inventory'
+            ? (payload.sources && payload.sources.inventory ? payload.sources.inventory : 'none')
+            : (payload.sources && payload.sources.ender ? payload.sources.ender : 'none');
+        elements.inventoryMeta.textContent = `Source: ${sourceLabel}. Click any populated slot to remove that stack type.`;
+        elements.inventoryGrid.innerHTML = '';
+        state.selectedItem = null;
+        elements.selectedItemMeta.textContent = 'Select an item slot to remove a specific stack.';
+        elements.deleteSelectedItemBtn.disabled = true;
+
+        if (state.selectedInventoryTab === 'ender') {
+            const rows = new Array(27).fill(null);
+            const loose = [];
+            (Array.isArray(items) ? items : []).forEach((item) => {
+                if (Number.isFinite(item.slot) && item.slot >= 0 && item.slot < rows.length) {
+                    rows[item.slot] = item;
+                } else {
+                    loose.push(item);
+                }
+            });
+            let looseIndex = 0;
+            rows.forEach((entry, index) => {
+                const item = entry || loose[looseIndex++] || null;
+                const slot = document.createElement('button');
+                slot.type = 'button';
+                slot.className = `item-slot${item ? '' : ' empty'}`;
+                createSlotInner(slot, item, String(index + 1));
+                if (item) {
+                    slot.addEventListener('click', () => selectInventoryItem(item, 'ender'));
+                }
+                elements.inventoryGrid.appendChild(slot);
+            });
+            renderEquipSlot('armorHelmetSlot', 'armorHelmetMeta', null, 'Not visible in ender chest mode');
+            renderEquipSlot('armorChestSlot', 'armorChestMeta', null, 'Not visible in ender chest mode');
+            renderEquipSlot('armorLegsSlot', 'armorLegsMeta', null, 'Not visible in ender chest mode');
+            renderEquipSlot('armorBootsSlot', 'armorBootsMeta', null, 'Not visible in ender chest mode');
+            renderEquipSlot('offhandSlot', 'offhandMeta', null, 'Not visible in ender chest mode');
+            return;
+        }
+
+        const view = buildInventoryViews(items);
+        view.inventorySlots.forEach((item, index) => {
+            const slot = document.createElement('button');
+            slot.type = 'button';
+            slot.className = `item-slot${item ? '' : ' empty'}`;
+            createSlotInner(slot, item, String(index + 1));
+            if (item) {
+                slot.addEventListener('click', () => selectInventoryItem(item, 'inventory'));
+            }
+            elements.inventoryGrid.appendChild(slot);
+        });
+        renderEquipSlot('armorHelmetSlot', 'armorHelmetMeta', view.armor.helmet, 'No helmet equipped');
+        renderEquipSlot('armorChestSlot', 'armorChestMeta', view.armor.chest, 'No chestplate equipped');
+        renderEquipSlot('armorLegsSlot', 'armorLegsMeta', view.armor.legs, 'No leggings equipped');
+        renderEquipSlot('armorBootsSlot', 'armorBootsMeta', view.armor.boots, 'No boots equipped');
+        renderEquipSlot('offhandSlot', 'offhandMeta', view.armor.offhand, 'No offhand item');
+    };
+
+    const selectInventoryItem = (item, scope) => {
+        state.selectedItem = { ...item, scope };
+        elements.selectedItemMeta.textContent = `${String(item.id || '').split(':').pop()} ×${item.count || 1} selected. Delete will remove that item type from the player.`;
+        const profile = state.selectedData && state.selectedData.profile ? state.selectedData.profile : null;
+        elements.deleteSelectedItemBtn.disabled = !(profile && profile.online);
+    };
+
+    const renderPlayerDetails = (payload) => {
+        state.selectedData = payload;
+        const profile = payload.profile || {};
+        state.selectedPlayerUuid = profile.uuid || state.selectedPlayerUuid || '';
+        elements.heroAvatar.src = profile.headUrl || 'https://mc-heads.net/avatar/Steve/64';
+        elements.heroName.textContent = profile.name || 'Unknown Player';
+        elements.heroUuid.textContent = profile.uuid ? `${profile.uuid}${payload.offlineUuid && payload.offlineUuid !== profile.uuid ? ` | offline UUID ${payload.offlineUuid}` : ''}` : (payload.offlineUuid || 'UUID unavailable');
+        elements.heroFlags.innerHTML = `
+            <span class="status-badge ${profile.online ? 'status-online' : 'status-offline'}">${profile.online ? 'Online' : 'Offline'}</span>
+            ${profile.whitelisted ? '<span class="flag-badge flag-white">Whitelisted</span>' : ''}
+            ${profile.op ? '<span class="flag-badge flag-op">OP</span>' : ''}
+            ${profile.banned ? '<span class="flag-badge flag-ban">Banned</span>' : ''}
+            ${profile.bedrock ? '<span class="flag-badge">Bedrock</span>' : '<span class="flag-badge">Java</span>'}
+        `;
+        renderActionButtons(profile);
+
+        const health = Math.max(0, Math.min(20, Math.round(Number(profile.health || 0) / 2)));
+        const food = Math.max(0, Math.min(10, Math.round(Number(profile.food || 0) / 2)));
+        const xpLevel = Math.max(0, Number(profile.xpLevel || 0));
+        renderMetricIcons(elements.healthIcons, 10, health, 'filled-health', '<i class="bi bi-heart-fill"></i>');
+        renderMetricIcons(elements.foodIcons, 10, food, 'filled-food', '<i class="bi bi-egg-fried"></i>');
+        elements.healthValue.textContent = Number.isFinite(Number(profile.health)) ? Number(profile.health).toFixed(1) : '-';
+        elements.foodValue.textContent = Number.isFinite(Number(profile.food)) ? String(profile.food) : '-';
+        elements.xpValue.textContent = Number.isFinite(xpLevel) ? `Lv ${xpLevel}` : '-';
+        elements.xpFill.style.width = `${Math.min(100, Math.max(0, xpLevel % 100))}%`;
+
+        elements.summaryPlaytime.textContent = profile.playtimeLabel || '-';
+        elements.summaryWorld.textContent = profile.world || '-';
+        elements.summaryPosition.textContent = formatArray(profile.position, 1);
+        elements.summaryDeaths.textContent = Number.isFinite(Number(profile.deaths)) ? String(profile.deaths) : '-';
+        elements.gamemodeSelect.value = ['survival', 'creative', 'adventure', 'spectator'].includes(String(profile.gamemode || '').toLowerCase())
+            ? String(profile.gamemode || '').toLowerCase()
+            : 'survival';
+        elements.gamemodeSelect.disabled = !profile.online;
+        if (elements.applyGamemodeBtn) elements.applyGamemodeBtn.disabled = !profile.online;
+        if (elements.teleportTargetInput) elements.teleportTargetInput.disabled = !profile.online;
+        if (elements.teleportBtn) elements.teleportBtn.disabled = !profile.online;
+
+        renderStatsList(elements.pickedUpList, payload.statsSummary && payload.statsSummary.pickedUp, 'No pickup stats yet');
+        renderStatsList(elements.usedList, payload.statsSummary && payload.statsSummary.used, 'No usage stats yet');
+        renderStatsList(elements.mobsKilledList, payload.statsSummary && payload.statsSummary.mobsKilled, 'No mob kills yet');
+        renderStatsList(elements.movementList, payload.statsSummary && payload.statsSummary.movement, 'No movement stats yet');
+
+        elements.statsFilePath.textContent = profile.statsFilePath || 'No stored stats file';
+        elements.playerdataFilePath.textContent = profile.playerdataFilePath || 'No stored playerdata file';
+        elements.identitySummary.textContent = profile.uuid
+            ? `${profile.online ? 'Live + stored profile' : 'Stored profile only'}`
+            : 'Unresolved identity';
+        const advancementCompleted = payload.advancementsSummary ? Number(payload.advancementsSummary.completed || 0) : 0;
+        const advancementTotal = payload.advancementsSummary ? Number(payload.advancementsSummary.total || 0) : 0;
+        elements.advancementsSummary.textContent = advancementTotal ? `${advancementCompleted}/${advancementTotal} completed` : 'No stored advancements';
+        const advancementEntries = payload.advancementsSummary && Array.isArray(payload.advancementsSummary.entries)
+            ? payload.advancementsSummary.entries
+            : [];
+        elements.advancementsList.innerHTML = advancementEntries.length
+            ? advancementEntries.map((entry) => `
+                <li class="stats-entry">
+                    <span>${escapeHtml(entry.label || entry.key || '-')}</span>
+                    <strong>${entry.done ? 'Done' : 'Pending'}</strong>
+                </li>
+            `).join('')
+            : '<li class="stats-entry"><span class="small-muted">No stored advancement file available.</span><strong>-</strong></li>';
+
+        renderInventoryGrid(payload);
+        document.querySelectorAll('[data-adjust-field]').forEach((button) => {
+            button.disabled = !profile.online;
+        });
+        document.getElementById('clearInventoryBtn').disabled = !profile.online;
+        document.getElementById('clearEnderBtn').disabled = !profile.online;
+        if (!profile.online) {
+            elements.deleteSelectedItemBtn.disabled = true;
+        }
+        setLastRefresh(payload.generatedAt);
+    };
+
+    const loadPlayerList = async (preserveSelection = true) => {
+        const requestId = Date.now();
+        state.listRequestId = requestId;
+        elements.directoryStatus.textContent = 'Refreshing...';
+        const search = elements.playerSearchInput.value.trim();
+        try {
+            const payload = await apiFetch(`/server/${serverId}/minecraft/admin/players?search=${encodeURIComponent(search)}`);
+            if (state.listRequestId !== requestId) return;
+            state.players = Array.isArray(payload.players) ? payload.players : [];
+            elements.directoryCounts.textContent = `${payload.onlineCount || 0} online / ${payload.offlineCount || 0} offline`;
+            elements.directoryStatus.textContent = 'Synced';
+            const selectedEntry = state.players.find((player) => player.name === state.selectedPlayer);
+            if (selectedEntry) {
+                state.selectedPlayerUuid = selectedEntry.uuid || state.selectedPlayerUuid || '';
+            }
+            renderPlayerList();
+
+            if (!state.players.length) {
+                clearInspectLoop();
+                state.selectedPlayer = '';
+                state.selectedPlayerUuid = '';
                 return;
             }
-            const rawId = String(item.id || '');
-            const { itemUrl, blockUrl } = resolveItemTextureUrls(rawId);
-            if (itemUrl) {
-                const icon = document.createElement('img');
-                icon.className = 'item-icon';
-                icon.alt = rawId;
-                icon.dataset.stage = 'item';
-                icon.src = itemUrl;
-                icon.onerror = () => {
-                    if (icon.dataset.stage === 'item' && blockUrl) {
-                        icon.dataset.stage = 'block';
-                        icon.src = blockUrl;
-                        return;
-                    }
-                    icon.remove();
-                    const fallback = document.createElement('div');
-                    fallback.className = 'item-fallback';
-                    fallback.textContent = rawId.split(':').slice(-1)[0] || rawId;
-                    slot.appendChild(fallback);
-                };
-                slot.appendChild(icon);
-            } else {
-                const fallback = document.createElement('div');
-                fallback.className = 'item-fallback';
-                fallback.textContent = rawId.split(':').slice(-1)[0] || rawId;
-                slot.appendChild(fallback);
+            if (!preserveSelection || !state.selectedPlayer || !state.players.some((player) => player.name === state.selectedPlayer)) {
+                const preferred = defaultPlayer && state.players.find((player) => player.name === defaultPlayer);
+                const firstOnline = state.players.find((player) => player.online);
+                const target = preferred || firstOnline || state.players[0];
+                state.selectedPlayer = target.name;
+                state.selectedPlayerUuid = target.uuid || '';
             }
-            if (item.count && item.count > 1) {
-                const count = document.createElement('div');
-                count.className = 'item-count';
-                count.textContent = String(item.count);
-                slot.appendChild(count);
+            renderPlayerList();
+            if (state.selectedPlayer && (!state.selectedData || state.selectedData.profile.name !== state.selectedPlayer)) {
+                await loadPlayerDetails(false);
             }
-            container.appendChild(slot);
-        });
-    };
-
-    document.getElementById('inspectBtn')?.addEventListener('click', async () => {
-        const player = document.getElementById('inspectPlayer').value.trim();
-        if (!player) return;
-        setMessage('Inspecting player...');
-        try {
-            const data = await apiFetch(`/server/${serverId}/minecraft/admin/inspect?player=${encodeURIComponent(player)}`);
-            const output = document.getElementById('inspectOutput');
-            output.textContent = JSON.stringify(data.data || {}, null, 2);
-            const offline = document.getElementById('inspectOfflineUuid');
-            if (offline) {
-                offline.textContent = data.offlineUuid ? `Offline UUID: ${data.offlineUuid}` : '';
-            }
-            const onlineInventory = (data.items && data.items.inventory) || [];
-            const onlineEnder = (data.items && data.items.ender) || [];
-            const offlineInventory = (data.offlineItems && data.offlineItems.inventory) || [];
-            const offlineEnder = (data.offlineItems && data.offlineItems.ender) || [];
-            const inventoryItems = onlineInventory.length ? onlineInventory : offlineInventory;
-            const enderItems = onlineEnder.length ? onlineEnder : offlineEnder;
-            renderItemGrid(inventoryItems, 'inventoryGrid');
-            renderItemGrid(enderItems, 'enderGrid');
-            const invSource = document.getElementById('inventorySource');
-            const enderSource = document.getElementById('enderSource');
-            if (invSource) invSource.textContent = onlineInventory.length ? 'Source: online' : (offlineInventory.length ? 'Source: offline' : '');
-            if (enderSource) enderSource.textContent = onlineEnder.length ? 'Source: online' : (offlineEnder.length ? 'Source: offline' : '');
-            setMessage('Inspector data loaded.', 'success');
-        } catch (err) {
-            setMessage(err.message, 'error');
+        } catch (error) {
+            elements.directoryStatus.textContent = 'Failed';
+            setMessage(error.message || 'Failed to refresh player directory.', 'error');
         }
-    });
-
-    document.getElementById('freezeBtn')?.addEventListener('click', async () => {
-        const player = document.getElementById('freezePlayer').value.trim();
-        if (!player) return;
-        await apiFetch(`/server/${serverId}/minecraft/admin/freeze`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player, action: 'freeze' }) });
-        setMessage(`Froze ${player}.`, 'success');
-    });
-
-    document.getElementById('unfreezeBtn')?.addEventListener('click', async () => {
-        const player = document.getElementById('freezePlayer').value.trim();
-        if (!player) return;
-        await apiFetch(`/server/${serverId}/minecraft/admin/freeze`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player, action: 'unfreeze' }) });
-        setMessage(`Unfroze ${player}.`, 'success');
-    });
-
-    document.getElementById('tpBtn')?.addEventListener('click', async () => {
-        const player = document.getElementById('tpPlayer').value.trim();
-        const destination = document.getElementById('tpDestination').value.trim();
-        if (!player || !destination) return;
-        await apiFetch(`/server/${serverId}/minecraft/admin/teleport`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player, destination }) });
-        setMessage(`Teleported ${player}.`, 'success');
-    });
-
-    document.getElementById('muteChatBtn')?.addEventListener('click', async () => {
-        await apiFetch(`/server/${serverId}/minecraft/admin/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'mute' }) });
-        setMessage('Mute chat command sent.', 'success');
-    });
-
-    document.getElementById('unmuteChatBtn')?.addEventListener('click', async () => {
-        await apiFetch(`/server/${serverId}/minecraft/admin/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'unmute' }) });
-        setMessage('Unmute chat command sent.', 'success');
-    });
-
-    document.getElementById('slowChatBtn')?.addEventListener('click', async () => {
-        const seconds = Number.parseInt(document.getElementById('slowChatSeconds').value, 10);
-        if (!Number.isFinite(seconds) || seconds < 1) return;
-        await apiFetch(`/server/${serverId}/minecraft/admin/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'slow', seconds }) });
-        setMessage('Slow chat command sent.', 'success');
-    });
-
-    const loadChatConfig = async () => {
-        const data = await apiFetch(`/server/${serverId}/minecraft/admin/chat-config`);
-        const cfg = data.config || {};
-        document.getElementById('chatMuteCmd').value = cfg.muteCommand || '';
-        document.getElementById('chatUnmuteCmd').value = cfg.unmuteCommand || '';
-        document.getElementById('chatSlowCmd').value = cfg.slowCommand || '';
     };
 
-    document.getElementById('saveChatConfig')?.addEventListener('click', async () => {
-        const muteCommand = document.getElementById('chatMuteCmd').value.trim();
-        const unmuteCommand = document.getElementById('chatUnmuteCmd').value.trim();
-        const slowCommand = document.getElementById('chatSlowCmd').value.trim();
-        await apiFetch(`/server/${serverId}/minecraft/admin/chat-config`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ muteCommand, unmuteCommand, slowCommand }) });
-        setMessage('Chat command config saved.', 'success');
+    const loadPlayerDetails = async (forceRefresh = true) => {
+        if (!state.selectedPlayer) return;
+        const requestId = Date.now();
+        state.inspectRequestId = requestId;
+        try {
+            const payload = await apiFetch(`/server/${serverId}/minecraft/admin/inspect?player=${encodeURIComponent(state.selectedPlayer)}${state.selectedPlayerUuid ? `&uuid=${encodeURIComponent(state.selectedPlayerUuid)}` : ''}${forceRefresh ? '&refresh=1' : ''}`);
+            if (state.inspectRequestId !== requestId) return;
+            renderPlayerDetails(payload);
+        } catch (error) {
+            setMessage(error.message || 'Failed to inspect player.', 'error');
+        }
+    };
+
+    const clearInspectLoop = () => {
+        if (state.inspectTimer) {
+            clearInterval(state.inspectTimer);
+            state.inspectTimer = null;
+        }
+    };
+
+    const startInspectLoop = () => {
+        clearInspectLoop();
+        if (!state.selectedPlayer) return;
+        state.inspectTimer = setInterval(() => {
+            loadPlayerDetails(true).catch(() => {});
+        }, 1000);
+    };
+
+    const selectPlayer = async (playerName, playerUuid = '', forceRefresh = false) => {
+        state.selectedPlayer = playerName;
+        state.selectedPlayerUuid = playerUuid || '';
+        state.selectedItem = null;
+        renderPlayerList();
+        history.replaceState({}, '', `/server/${serverId}/minecraft/admin?player=${encodeURIComponent(playerName)}${playerUuid ? `&uuid=${encodeURIComponent(playerUuid)}` : ''}`);
+        await loadPlayerDetails(forceRefresh);
+        startInspectLoop();
+    };
+
+    const runPlayerAction = async (action) => {
+        if (!state.selectedPlayer) return;
+        const body = { action, player: state.selectedPlayer };
+        if (action === 'kick' || action === 'ban') {
+            body.reason = elements.actionReasonInput.value.trim();
+        }
+        if (action === 'tempban') {
+            body.reason = elements.actionReasonInput.value.trim();
+            body.duration = elements.tempbanDurationInput.value.trim();
+        }
+        const payload = await apiFetch(`/server/${serverId}/minecraft/admin/player-action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        setMessage(`${action} sent for ${state.selectedPlayer}.`, 'success');
+        await loadPlayerList(true);
+        await loadPlayerDetails(true);
+        return payload;
+    };
+
+    const runFreezeAction = async (action) => {
+        if (!state.selectedPlayer) return;
+        await apiFetch(`/server/${serverId}/minecraft/admin/freeze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ player: state.selectedPlayer, action })
+        });
+        setMessage(`${action === 'freeze' ? 'Freeze' : 'Unfreeze'} applied for ${state.selectedPlayer}.`, 'success');
+    };
+
+    const applyStateDelta = async (field, delta) => {
+        if (!state.selectedData || !state.selectedData.profile) return;
+        const profile = state.selectedData.profile;
+        let nextValue;
+        if (field === 'health') nextValue = Math.max(1, Math.min(40, Number(profile.health || 20) + delta));
+        if (field === 'food') nextValue = Math.max(0, Math.min(20, Number(profile.food || 20) + delta));
+        if (field === 'xpLevel') nextValue = Math.max(0, Math.min(10000, Number(profile.xpLevel || 0) + delta));
+        if (!Number.isFinite(nextValue)) return;
+        await apiFetch(`/server/${serverId}/minecraft/admin/player-state`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ player: profile.name, field, value: nextValue })
+        });
+        setMessage(`${field} updated for ${profile.name}.`, 'success');
+        await loadPlayerDetails(true);
+    };
+
+    const applyGamemode = async () => {
+        if (!state.selectedPlayer) return;
+        await apiFetch(`/server/${serverId}/minecraft/admin/player-state`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                player: state.selectedPlayer,
+                field: 'gamemode',
+                value: elements.gamemodeSelect.value
+            })
+        });
+        setMessage(`Gamemode updated for ${state.selectedPlayer}.`, 'success');
+        await loadPlayerDetails(true);
+    };
+
+    const teleportSelectedPlayer = async () => {
+        if (!state.selectedPlayer) return;
+        const destination = elements.teleportTargetInput.value.trim();
+        if (!destination) {
+            setMessage('Teleport destination is required.', 'error');
+            return;
+        }
+        await apiFetch(`/server/${serverId}/minecraft/admin/teleport`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ player: state.selectedPlayer, destination })
+        });
+        setMessage(`Teleport queued for ${state.selectedPlayer}.`, 'success');
+    };
+
+    const runInventoryAction = async (action, itemId = '', count = 1) => {
+        if (!state.selectedPlayer) return;
+        await apiFetch(`/server/${serverId}/minecraft/admin/inventory`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                player: state.selectedPlayer,
+                action,
+                itemId,
+                count
+            })
+        });
+        setMessage(`Inventory action "${action}" sent for ${state.selectedPlayer}.`, 'success');
+        await loadPlayerDetails(true);
+    };
+
+    const runWorldDataAction = async (action) => {
+        if (!state.selectedPlayer) return;
+        await apiFetch(`/server/${serverId}/minecraft/admin/world-data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                player: state.selectedPlayer,
+                uuid: state.selectedPlayerUuid || '',
+                action
+            })
+        });
+        setMessage(`${action === 'reset_stats' ? 'Stats' : 'Advancements'} reset for ${state.selectedPlayer}.`, 'success');
+        await loadPlayerDetails(true);
+    };
+
+    document.getElementById('refreshDirectoryBtn')?.addEventListener('click', () => loadPlayerList(true));
+    document.getElementById('applyGamemodeBtn')?.addEventListener('click', () => applyGamemode().catch((error) => setMessage(error.message, 'error')));
+    document.getElementById('teleportBtn')?.addEventListener('click', () => teleportSelectedPlayer().catch((error) => setMessage(error.message, 'error')));
+    document.getElementById('clearInventoryBtn')?.addEventListener('click', () => runInventoryAction('clear_inventory').catch((error) => setMessage(error.message, 'error')));
+    document.getElementById('clearEnderBtn')?.addEventListener('click', () => runInventoryAction('clear_ender').catch((error) => setMessage(error.message, 'error')));
+    document.getElementById('deleteSelectedItemBtn')?.addEventListener('click', () => {
+        if (!state.selectedItem) return;
+        runInventoryAction('clear_item', state.selectedItem.id, state.selectedItem.count || 1).catch((error) => setMessage(error.message, 'error'));
+    });
+    document.getElementById('resetStatsBtn')?.addEventListener('click', () => runWorldDataAction('reset_stats').catch((error) => setMessage(error.message, 'error')));
+    document.getElementById('resetAdvancementsBtn')?.addEventListener('click', () => runWorldDataAction('reset_advancements').catch((error) => setMessage(error.message, 'error')));
+
+    document.querySelectorAll('[data-adjust-field]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const field = button.getAttribute('data-adjust-field');
+            const delta = Number(button.getAttribute('data-adjust-delta') || '0');
+            if (!field || !delta) return;
+            applyStateDelta(field, delta).catch((error) => setMessage(error.message, 'error'));
+        });
     });
 
-    document.getElementById('whitelistAdd')?.addEventListener('click', async () => {
-        const player = document.getElementById('whitelistPlayer').value.trim();
-        if (!player) return;
-        await apiFetch(`/server/${serverId}/minecraft/admin/whitelist/add`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player }) });
-        setMessage(`Whitelisted ${player}.`, 'success');
-        loadWhitelist();
+    document.querySelectorAll('[data-inventory-tab]').forEach((button) => {
+        button.addEventListener('click', () => {
+            state.selectedInventoryTab = button.getAttribute('data-inventory-tab') || 'inventory';
+            document.querySelectorAll('[data-inventory-tab]').forEach((entry) => entry.classList.toggle('active', entry === button));
+            if (state.selectedData) renderInventoryGrid(state.selectedData);
+        });
     });
 
-    document.getElementById('whitelistRemove')?.addEventListener('click', async () => {
-        const player = document.getElementById('whitelistPlayer').value.trim();
-        if (!player) return;
-        await apiFetch(`/server/${serverId}/minecraft/admin/whitelist/remove`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ player }) });
-        setMessage(`Removed ${player} from whitelist.`, 'success');
-        loadWhitelist();
+    let searchTimer = null;
+    elements.playerSearchInput?.addEventListener('input', () => {
+        if (searchTimer) clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            loadPlayerList(false).catch(() => {});
+        }, 220);
     });
 
-    document.getElementById('whitelistImport')?.addEventListener('click', async () => {
-        const raw = document.getElementById('whitelistBulk').value || '';
-        await apiFetch(`/server/${serverId}/minecraft/admin/whitelist/import`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ players: raw }) });
-        setMessage('Whitelist import dispatched.', 'success');
-        loadWhitelist();
-    });
+    window.addEventListener('beforeunload', clearInspectLoop);
 
-    document.getElementById('refreshWhitelist')?.addEventListener('click', () => loadWhitelist());
-    document.getElementById('refreshBanlist')?.addEventListener('click', () => loadBanlist());
-
-    document.getElementById('sidebarToggle')?.addEventListener('click', () => document.getElementById('sidebar')?.classList.toggle('collapsed'));
-
-    loadWhitelist().catch(() => {});
-    loadBanlist().catch(() => {});
-    loadChatConfig().catch(() => {});
+    (async () => {
+        try {
+            await loadPlayerList(false);
+            if (state.selectedPlayer) {
+                await loadPlayerDetails(false);
+                startInspectLoop();
+            }
+            state.listTimer = setInterval(() => {
+                loadPlayerList(true).catch(() => {});
+            }, 5000);
+        } catch (error) {
+            setMessage(error.message || 'Failed to initialize Player Control Surface.', 'error');
+        }
+    })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
 </body>
