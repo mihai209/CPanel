@@ -1,22 +1,12 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { Link } from 'react-router-dom';
+import { ReactRoutes } from './ReactRoutes.js';
+import ReactAppShell from './components/ReactAppShell.jsx';
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
-const root = createRoot(document.getElementById('reactRoot'));
-
-function resolveBrandImage() {
-    return data.faviconUrl || '/assets/rocky.png';
-}
-
-function resolveUserAvatar(user) {
-    if (user && user.avatarProvider === 'url' && user.avatarUrl) {
-        return user.avatarUrl;
-    }
-    if (user && user.gravatarHash) {
-        return `https://www.gravatar.com/avatar/${user.gravatarHash}?d=retro&s=80`;
-    }
-    return resolveBrandImage();
-}
+const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'dashboard';
+const root = standaloneEntry ? createRoot(document.getElementById('reactRoot')) : null;
 
 function formatStatus(status) {
     const value = String(status || 'unknown').toLowerCase();
@@ -29,14 +19,6 @@ function metricTone(status) {
     if (['installing', 'reinstalling', 'starting'].includes(value)) return 'warning';
     if (['stopped', 'offline', 'error'].includes(value)) return 'danger';
     return 'muted';
-}
-
-function TopAction({ href, icon, active = false, title }) {
-    return (
-        <a className={`react-top-action${active ? ' is-active' : ''}`} href={href} title={title}>
-            <i className={`bi ${icon}`}></i>
-        </a>
-    );
 }
 
 function ResourcePill({ icon, value, label, tone = '' }) {
@@ -99,13 +81,11 @@ function SideItem({ title, value, note, tone = '' }) {
     );
 }
 
-function DashboardApp() {
-    const servers = Array.isArray(data.servers) ? data.servers : [];
-    const incidents = Array.isArray(data.openIncidents) ? data.openIncidents : [];
-    const maintenance = Array.isArray(data.pendingMaintenance) ? data.pendingMaintenance : [];
-    const security = Array.isArray(data.openSecurityAlerts) ? data.openSecurityAlerts : [];
-    const brandImage = resolveBrandImage();
-    const userAvatar = resolveUserAvatar(data.user || {});
+export function DashboardPage({ pageData = data }) {
+    const servers = Array.isArray(pageData.servers) ? pageData.servers : [];
+    const incidents = Array.isArray(pageData.openIncidents) ? pageData.openIncidents : [];
+    const maintenance = Array.isArray(pageData.pendingMaintenance) ? pageData.pendingMaintenance : [];
+    const security = Array.isArray(pageData.openSecurityAlerts) ? pageData.openSecurityAlerts : [];
 
     const runningCount = servers.filter((server) => String(server.status || '').toLowerCase() === 'running').length;
     const provisioningCount = servers.filter((server) => ['installing', 'reinstalling', 'starting'].includes(String(server.status || '').toLowerCase())).length;
@@ -113,40 +93,17 @@ function DashboardApp() {
     const signalCount = incidents.length + maintenance.length + security.length;
 
     return (
-        <div className="react-basic-page">
-            <div className="react-basic-shell">
-                <header className="react-basic-topbar">
-                    <div className="react-basic-brand">
-                        <div className="react-basic-brand-mark">
-                            <img src={brandImage} alt={data.brandName || 'CPanel'} className="react-brand-image" />
-                        </div>
-                        <div>
-                            <div className="react-basic-brand-title">{data.brandName || 'CPanel'}</div>
-                            <div className="react-basic-brand-subtitle">React view beta</div>
-                        </div>
-                    </div>
-
-                    <div className="react-basic-actions">
-                        <TopAction href="/experimental-features" icon="bi-sliders" title="Experimental Features" />
-                        <TopAction href="/account" icon="bi-person" title="Account" />
-                        <TopAction href="/themes" icon="bi-palette2" title="Themes" />
-                        <div className="react-basic-user">
-                            <img src={userAvatar} alt={data.user && data.user.username ? data.user.username : 'User'} className="react-basic-user-avatar" />
-                            <span>{data.user && data.user.username ? `@${data.user.username}` : 'Unknown'}</span>
-                        </div>
-                    </div>
-                </header>
-
-                <main className="react-basic-grid">
+        <ReactAppShell pageData={pageData} subtitle="React view beta">
+            <main className="react-basic-grid">
                     <section className="react-basic-main">
                         <div className="react-basic-heading">
                             <div>
                                 <h1>Servers</h1>
                                 <p>Simple fleet view for the React renderer. Clean, fast, and focused on runtime state.</p>
                             </div>
-                            <a href="/experimental/change-view" className="react-basic-link">
-                                Change View
-                            </a>
+                        <Link to={ReactRoutes.changeView} className="react-basic-link">
+                            Change View
+                        </Link>
                         </div>
 
                         <div className="react-server-list-scroll">
@@ -156,7 +113,7 @@ function DashboardApp() {
                                         <ServerRow
                                             key={server.id || server.containerId}
                                             server={server}
-                                            isAdminDashboard={Boolean(data.isAdminDashboard)}
+                                            isAdminDashboard={Boolean(pageData.isAdminDashboard)}
                                         />
                                     ))
                                 ) : (
@@ -196,13 +153,16 @@ function DashboardApp() {
                             </div>
                         </div>
                     </aside>
-                </main>
-            </div>
-        </div>
+            </main>
+        </ReactAppShell>
     );
 }
 
-root.render(<DashboardApp />);
-if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
-    window.__CPANEL_REACT_BOOTED__();
+export default DashboardPage;
+
+if (root) {
+    root.render(<DashboardPage pageData={data} />);
+    if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
+        window.__CPANEL_REACT_BOOTED__();
+    }
 }

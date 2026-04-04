@@ -1,30 +1,12 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { Link } from 'react-router-dom';
+import { ReactRoutes, resolveBrandImage, resolveUserAvatar } from './ReactRoutes.js';
+import ReactAppShell from './components/ReactAppShell.jsx';
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
-const root = createRoot(document.getElementById('reactRoot'));
-
-function resolveBrandImage() {
-    return data.faviconUrl || '/assets/rocky.png';
-}
-
-function resolveUserAvatar(user) {
-    if (user && user.avatarProvider === 'url' && user.avatarUrl) {
-        return user.avatarUrl;
-    }
-    if (user && user.gravatarHash) {
-        return `https://www.gravatar.com/avatar/${user.gravatarHash}?d=retro&s=120`;
-    }
-    return resolveBrandImage();
-}
-
-function TopAction({ href, icon, title }) {
-    return (
-        <a className="react-top-action" href={href} title={title}>
-            <i className={`bi ${icon}`}></i>
-        </a>
-    );
-}
+const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'account';
+const root = standaloneEntry ? createRoot(document.getElementById('reactRoot')) : null;
 
 function LinkedProviderCard({ provider }) {
     return (
@@ -47,11 +29,10 @@ function LinkedProviderCard({ provider }) {
     );
 }
 
-function AccountApp() {
-    const user = data.user || {};
-    const linkedProviders = Array.isArray(data.linkedProviders) ? data.linkedProviders : [];
-    const avatar = resolveUserAvatar(user);
-    const brandImage = resolveBrandImage();
+export function AccountPage({ pageData = data }) {
+    const user = pageData.user || {};
+    const linkedProviders = Array.isArray(pageData.linkedProviders) ? pageData.linkedProviders : [];
+    const avatar = resolveUserAvatar(user, resolveBrandImage(pageData));
     const [setupState, setSetupState] = React.useState({ loading: false, qrCodeUrl: '', secret: '', code: '', error: '' });
     const [disableState, setDisableState] = React.useState({ password: '', loading: false, error: '' });
 
@@ -132,38 +113,15 @@ function AccountApp() {
     };
 
     return (
-        <div className="react-basic-page react-account-page">
-            <div className="react-basic-shell react-account-shell">
-                <header className="react-basic-topbar">
-                    <div className="react-basic-brand">
-                        <div className="react-basic-brand-mark">
-                            <img src={brandImage} alt={data.brandName || 'CPanel'} className="react-brand-image" />
-                        </div>
-                        <div>
-                            <div className="react-basic-brand-title">{data.brandName || 'CPanel'}</div>
-                            <div className="react-basic-brand-subtitle">Account surface</div>
-                        </div>
-                    </div>
-
-                    <div className="react-basic-actions">
-                        <TopAction href="/" icon="bi-grid-1x2" title="Dashboard" />
-                        <TopAction href="/experimental-features" icon="bi-sliders" title="Experimental Features" />
-                        <TopAction href="/themes" icon="bi-palette2" title="Themes" />
-                        <div className="react-basic-user">
-                            <img src={avatar} alt={user.username || 'User'} className="react-basic-user-avatar" />
-                            <span>{user.username ? `@${user.username}` : 'Unknown'}</span>
-                        </div>
-                    </div>
-                </header>
-
-                <main className="react-account-layout">
+        <ReactAppShell pageData={pageData} subtitle="Account surface" pageClassName="react-account-page" shellClassName="react-account-shell">
+            <main className="react-account-layout">
                     <section className="react-account-main">
                         <div className="react-account-scroll">
-                            {data.success ? (
-                                <div className="react-account-flash is-success">{data.success}</div>
+                            {pageData.success ? (
+                                <div className="react-account-flash is-success">{pageData.success}</div>
                             ) : null}
-                            {data.error ? (
-                                <div className="react-account-flash is-danger">{data.error}</div>
+                            {pageData.error ? (
+                                <div className="react-account-flash is-danger">{pageData.error}</div>
                             ) : null}
 
                             <div className="react-account-grid">
@@ -180,12 +138,12 @@ function AccountApp() {
                                         <span className={`react-account-badge ${user.twoFactorEnabled ? 'is-success' : 'is-muted'}`}>
                                             {user.twoFactorEnabled ? '2FA Active' : '2FA Inactive'}
                                         </span>
-                                        <span className="react-account-badge is-info">Theme: {data.activeTheme || 'default'}</span>
+                                        <span className="react-account-badge is-info">Theme: {pageData.activeTheme || 'default'}</span>
                                     </div>
                                     <div className="react-account-inline-actions">
-                                        <a href="/account/device-login" className="react-account-button is-ghost">Device History</a>
-                                        <a href="/themes" className="react-account-button is-ghost">Themes</a>
-                                        <a href="/experimental-features" className="react-account-button is-ghost">Experimental</a>
+                                        <Link to={ReactRoutes.deviceLogin} className="react-account-button is-ghost">Device History</Link>
+                                        <a href={ReactRoutes.themes} className="react-account-button is-ghost">Themes</a>
+                                        <Link to={ReactRoutes.experimentalFeatures} className="react-account-button is-ghost">Experimental</Link>
                                     </div>
                                 </div>
 
@@ -318,12 +276,15 @@ function AccountApp() {
                         </div>
                     </section>
                 </main>
-            </div>
-        </div>
+        </ReactAppShell>
     );
 }
 
-root.render(<AccountApp />);
-if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
-    window.__CPANEL_REACT_BOOTED__();
+export default AccountPage;
+
+if (root) {
+    root.render(<AccountPage pageData={data} />);
+    if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
+        window.__CPANEL_REACT_BOOTED__();
+    }
 }

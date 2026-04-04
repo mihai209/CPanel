@@ -456,9 +456,14 @@ body.react-view-body {
 
 .react-account-shell {
     height: calc(100vh - 56px);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
 }
 
 .react-account-layout {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
+    height: 100%;
     min-height: 0;
     overflow: hidden;
 }
@@ -470,6 +475,7 @@ body.react-view-body {
 
 .react-account-scroll {
     height: 100%;
+    min-height: 0;
     overflow-y: auto;
     padding: 22px;
     scrollbar-width: thin;
@@ -739,8 +745,21 @@ body.react-view-body {
     overflow: hidden;
 }
 
+.react-experimental-shell {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+}
+
+.react-experimental-layout {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
+}
+
 .react-experimental-scroll {
     height: 100%;
+    min-height: 0;
     overflow-y: auto;
     padding: 22px;
 }
@@ -796,8 +815,33 @@ body.react-view-body {
     font-size: 0.86rem;
 }
 
+.react-device-event {
+    align-items: flex-start;
+}
+
+.react-device-event-meta {
+    text-align: right;
+}
+
+.react-device-event-meta strong,
+.react-device-event-meta span {
+    display: block;
+}
+
+.react-device-event-meta span {
+    margin-top: 4px;
+    color: var(--react-muted);
+    font-size: 0.84rem;
+}
+
 @media (max-width: 1080px) {
     .react-experimental-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 760px) {
+    .react-device-event-meta {
+        text-align: left;
     }
 }

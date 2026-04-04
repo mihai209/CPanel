@@ -39,6 +39,10 @@ function registerAccountRoutes({
         return String(value || '').trim().toLowerCase() === 'react' ? 'react' : 'ejs';
     };
 
+    const wantsReactPageData = (req) => {
+        return String(req && req.query ? req.query.__reactData || '' : '').trim() === '1';
+    };
+
     const updateSessionThemeState = (req, themeId, customTheme) => {
         if (!req || !req.session || !req.session.user) return;
         if (themeId) req.session.user.uiTheme = normalizeThemeId(themeId);
@@ -219,30 +223,37 @@ function registerAccountRoutes({
                 req.session.user.uiCustomTheme = activeCustomTheme;
             }
 
+            const reactPageData = {
+                routePath: '/account',
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                appUrl: APP_URL,
+                success: req.query.success || null,
+                error: req.query.error || null,
+                activeTheme,
+                user: {
+                    id: userData.id,
+                    username: userData.username,
+                    firstName: userData.firstName || '',
+                    lastName: userData.lastName || '',
+                    email: userData.email || '',
+                    avatarUrl: userData.avatarUrl || '',
+                    avatarProvider: userData.avatarProvider || 'gravatar',
+                    gravatarHash: userData.gravatarHash || md5(String(userData.email || '').trim().toLowerCase()),
+                    twoFactorEnabled: Boolean(userData.twoFactorEnabled)
+                },
+                linkedProviders
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
             if (normalizeExperimentalViewMode(user.experimentalViewMode) === 'react') {
                 return res.render('react/loader', {
                     title: 'Account Settings',
-                    reactEntry: 'account',
-                    reactPageData: {
-                        brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
-                        faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
-                        appUrl: APP_URL,
-                        success: req.query.success || null,
-                        error: req.query.error || null,
-                        activeTheme,
-                        user: {
-                            id: userData.id,
-                            username: userData.username,
-                            firstName: userData.firstName || '',
-                            lastName: userData.lastName || '',
-                            email: userData.email || '',
-                            avatarUrl: userData.avatarUrl || '',
-                            avatarProvider: userData.avatarProvider || 'gravatar',
-                            gravatarHash: userData.gravatarHash || md5(String(userData.email || '').trim().toLowerCase()),
-                            twoFactorEnabled: Boolean(userData.twoFactorEnabled)
-                        },
-                        linkedProviders
-                    }
+                    reactEntry: 'app',
+                    reactPageData
                 });
             }
 
@@ -288,26 +299,33 @@ function registerAccountRoutes({
             if (!user) return res.redirect('/login');
             updateSessionExperimentalState(req, user);
             const featureModel = await buildExperimentalFeaturesViewModel(user);
+            const reactPageData = {
+                routePath: '/experimental-features',
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                user: {
+                    username: user.username,
+                    email: user.email || '',
+                    avatarUrl: user.avatarUrl || '',
+                    avatarProvider: user.avatarProvider || 'gravatar',
+                    gravatarHash: md5(String(user.email || '').trim().toLowerCase()),
+                    experimentalAiEnabled: Boolean(user.experimentalAiEnabled)
+                },
+                currentViewMode: normalizeExperimentalViewMode(user.experimentalViewMode),
+                success: req.query.success || null,
+                error: req.query.error || null,
+                ...featureModel
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
             if (normalizeExperimentalViewMode(user.experimentalViewMode) === 'react') {
                 return res.render('react/loader', {
                     title: 'Experimental Features',
-                    reactEntry: 'experimental-features',
-                    reactPageData: {
-                        brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
-                        faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
-                        user: {
-                            username: user.username,
-                            email: user.email || '',
-                            avatarUrl: user.avatarUrl || '',
-                            avatarProvider: user.avatarProvider || 'gravatar',
-                            gravatarHash: md5(String(user.email || '').trim().toLowerCase()),
-                            experimentalAiEnabled: Boolean(user.experimentalAiEnabled)
-                        },
-                        currentViewMode: normalizeExperimentalViewMode(user.experimentalViewMode),
-                        success: req.query.success || null,
-                        error: req.query.error || null,
-                        ...featureModel
-                    }
+                    reactEntry: 'app',
+                    reactPageData
                 });
             }
             return res.render('experimental/features', {
@@ -359,21 +377,28 @@ function registerAccountRoutes({
             const user = await User.findByPk(req.session.user.id, { attributes: ['id', 'username', 'experimentalViewMode'] });
             if (!user) return res.redirect('/login');
             updateSessionExperimentalState(req, user);
+            const reactPageData = {
+                routePath: '/experimental/change-view',
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                user: {
+                    username: user.username
+                },
+                currentViewMode: normalizeExperimentalViewMode(user.experimentalViewMode),
+                success: req.query.success || null,
+                error: req.query.error || null,
+                applied: String(req.query.applied || '') === '1'
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
             if (normalizeExperimentalViewMode(user.experimentalViewMode) === 'react') {
                 return res.render('react/loader', {
                     title: 'Change View',
-                    reactEntry: 'change-view',
-                    reactPageData: {
-                        brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
-                        faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
-                        user: {
-                            username: user.username
-                        },
-                        currentViewMode: normalizeExperimentalViewMode(user.experimentalViewMode),
-                        success: req.query.success || null,
-                        error: req.query.error || null,
-                        applied: String(req.query.applied || '') === '1'
-                    }
+                    reactEntry: 'app',
+                    reactPageData
                 });
             }
             return res.render('experimental/change-view', {
@@ -729,6 +754,32 @@ function registerAccountRoutes({
                     createdAt: data.createdAt
                 };
             });
+
+            const reactPageData = {
+                routePath: '/account/device-login',
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                user: {
+                    username: user.username,
+                    email: user.email || '',
+                    avatarUrl: user.avatarUrl || '',
+                    avatarProvider: user.avatarProvider || 'gravatar',
+                    gravatarHash: md5(String(user.email || '').trim().toLowerCase())
+                },
+                events
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
+            if (normalizeExperimentalViewMode(user.experimentalViewMode) === 'react') {
+                return res.render('react/loader', {
+                    title: 'Device Login History',
+                    reactEntry: 'app',
+                    reactPageData
+                });
+            }
 
             return res.render('account-device-login', {
                 title: 'Device Login History',

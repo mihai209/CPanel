@@ -1,60 +1,37 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { ReactRoutes } from './ReactRoutes.js';
+import ReactAppShell from './components/ReactAppShell.jsx';
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
-const root = createRoot(document.getElementById('reactRoot'));
+const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'change-view';
+const root = standaloneEntry ? createRoot(document.getElementById('reactRoot')) : null;
 
-function resolveBrandImage() {
-    return data.faviconUrl || '/assets/rocky.png';
-}
-
-function ChangeViewApp() {
+export function ChangeViewPage({ pageData = data }) {
     React.useEffect(() => {
-        if (!data.applied) return;
+        if (!pageData.applied) return;
         try {
             window.localStorage.clear();
         } catch (_) {}
         const timer = window.setTimeout(() => {
-            window.location.replace('/');
+            window.location.replace(ReactRoutes.dashboard);
         }, 150);
         return () => window.clearTimeout(timer);
     }, []);
 
     return (
-        <div className="react-basic-page react-experimental-page">
-            <div className="react-basic-shell react-experimental-shell">
-                <header className="react-basic-topbar">
-                    <div className="react-basic-brand">
-                        <div className="react-basic-brand-mark">
-                            <img src={resolveBrandImage()} alt={data.brandName || 'CPanel'} className="react-brand-image" />
-                        </div>
-                        <div>
-                            <div className="react-basic-brand-title">{data.brandName || 'CPanel'}</div>
-                            <div className="react-basic-brand-subtitle">Change renderer</div>
-                        </div>
-                    </div>
-
-                    <div className="react-basic-actions">
-                        <a className="react-top-action" href="/experimental-features" title="Experimental Features">
-                            <i className="bi bi-sliders"></i>
-                        </a>
-                        <a className="react-top-action" href="/" title="Dashboard">
-                            <i className="bi bi-grid-1x2"></i>
-                        </a>
-                    </div>
-                </header>
-
-                <main className="react-experimental-layout">
+        <ReactAppShell pageData={pageData} subtitle="Change renderer" pageClassName="react-experimental-page" shellClassName="react-experimental-shell">
+            <main className="react-experimental-layout">
                     <div className="react-experimental-scroll">
-                        {data.success ? <div className="react-account-flash is-success">{data.success}</div> : null}
-                        {data.error ? <div className="react-account-flash is-danger">{data.error}</div> : null}
+                        {pageData.success ? <div className="react-account-flash is-success">{pageData.success}</div> : null}
+                        {pageData.error ? <div className="react-account-flash is-danger">{pageData.error}</div> : null}
 
                         <div className="react-experimental-grid react-change-view-grid">
                             <section className="react-account-card">
                                 <div className="react-account-section-title">Legacy EJS View</div>
                                 <div className="react-account-muted">Stable production renderer. Full theme support and complete route coverage.</div>
                                 <div className="react-experimental-stat-row">
-                                    {data.currentViewMode === 'ejs' ? (
+                                    {pageData.currentViewMode === 'ejs' ? (
                                         <span className="react-account-badge is-success">Active</span>
                                     ) : (
                                         <span className="react-account-badge is-muted">Available</span>
@@ -72,7 +49,7 @@ function ChangeViewApp() {
                                 <div className="react-account-section-title">React Beta View</div>
                                 <div className="react-account-muted">Dark fixed renderer for migrated pages. Faster iteration, partial route coverage, no custom themes.</div>
                                 <div className="react-experimental-stat-row">
-                                    {data.currentViewMode === 'react' ? (
+                                    {pageData.currentViewMode === 'react' ? (
                                         <span className="react-account-badge is-info">Active</span>
                                     ) : (
                                         <span className="react-account-badge is-muted">Available</span>
@@ -94,13 +71,16 @@ function ChangeViewApp() {
                             </section>
                         </div>
                     </div>
-                </main>
-            </div>
-        </div>
+            </main>
+        </ReactAppShell>
     );
 }
 
-root.render(<ChangeViewApp />);
-if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
-    window.__CPANEL_REACT_BOOTED__();
+export default ChangeViewPage;
+
+if (root) {
+    root.render(<ChangeViewPage pageData={data} />);
+    if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
+        window.__CPANEL_REACT_BOOTED__();
+    }
 }

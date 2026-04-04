@@ -101,6 +101,10 @@ function registerServerPagesRoutes(ctx) {
         return entries.filter((entry) => !isProtectedServerRuntimePath(entry && entry.name ? entry.name : ''));
     }
 
+    function wantsReactPageData(req) {
+        return String(req && req.query ? req.query.__reactData || '' : '').trim() === '1';
+    }
+
     function buildServerPolicyTargetPath(directory, name = '') {
         const dirRaw = String(directory || '/').trim().replace(/\\/g, '/');
         const cleanDir = nodePath.posix.normalize(dirRaw.startsWith('/') ? dirRaw : `/${dirRaw}`);
@@ -932,34 +936,41 @@ function registerServerPagesRoutes(ctx) {
                 dashboardNowMs: Date.now()
             };
 
+            const reactPageData = {
+                routePath: '/',
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                user: req.session.user,
+                servers: orderedServers.map((server) => ({
+                    id: server.id,
+                    containerId: server.containerId,
+                    name: server.name,
+                    description: server.description || '',
+                    status: server.status || 'unknown',
+                    ownerUsername: server.owner && server.owner.username ? server.owner.username : '',
+                    memory: Number(server.memory || 0),
+                    disk: Number(server.disk || 0),
+                    cpu: Number(server.cpu || 0),
+                    databaseLimit: Number(server.databaseLimit || 0),
+                    tags: Array.isArray(server.tags) ? server.tags : []
+                })),
+                isAdminDashboard,
+                openIncidents,
+                pendingMaintenance,
+                openSecurityAlerts,
+                dashboardFolders,
+                dashboardTags
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
             if (String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
                 return res.render('react/loader', {
                     title: 'React Dashboard',
-                    reactEntry: 'dashboard',
-                    reactPageData: {
-                        brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
-                        faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
-                        user: req.session.user,
-                        servers: orderedServers.map((server) => ({
-                            id: server.id,
-                            containerId: server.containerId,
-                            name: server.name,
-                            description: server.description || '',
-                            status: server.status || 'unknown',
-                            ownerUsername: server.owner && server.owner.username ? server.owner.username : '',
-                            memory: Number(server.memory || 0),
-                            disk: Number(server.disk || 0),
-                            cpu: Number(server.cpu || 0),
-                            databaseLimit: Number(server.databaseLimit || 0),
-                            tags: Array.isArray(server.tags) ? server.tags : []
-                        })),
-                        isAdminDashboard,
-                        openIncidents,
-                        pendingMaintenance,
-                        openSecurityAlerts,
-                        dashboardFolders,
-                        dashboardTags
-                    }
+                    reactEntry: 'app',
+                    reactPageData
                 });
             }
 
