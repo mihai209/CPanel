@@ -1,20 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# =========================================================
-
-# SAFE AUTO-UPDATER (auto-healing, no data loss)
-# number 2 
-
-# =========================================================
-
-# --- Detect real git repo root (robust) ---
-
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 
 if [ -z "$repo_root" ]; then
-echo "Error: Not inside a git repository."
-exit 1
+  echo "Error: Not inside a git repository."
+  exit 1
 fi
 
 cd "$repo_root"
@@ -47,132 +38,109 @@ restore_updater_managed_files() {
     || git checkout HEAD -- "${existing[@]}"
 }
 
-echo "===> Using repo: $repo_root"
-
-# ---------------------------------------------------------
-
-# 1. Stabilize repository (CRITICAL)
-
-# ---------------------------------------------------------
-
-echo "===> Stabilizing repository state..."
-
-# Abort any broken operations
-
-git merge --abort 2>/dev/null || true
-git rebase --abort 2>/dev/null || true
-
-# Clean index but KEEP working tree
-
-git reset
-
-# Force resolve if index still corrupted
-
-if [ -n "$(git ls-files -u)" ]; then
-echo "Unresolved conflicts detected. Auto-resolving (keeping local versions)..."
-git checkout --ours .
-git add -A
-fi
-
-# ---------------------------------------------------------
-
-# 2. Fetch latest
-
-# ---------------------------------------------------------
-
-echo "===> Fetching latest main..."
-git fetch origin main
-
-# ---------------------------------------------------------
-
-# 3. Stash local changes
-
-# ---------------------------------------------------------
-
-echo "===> Stashing local changes (tracked + untracked)..."
-
-if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-git stash push -u -m "auto-update-$(date +%s)" || true
-STASHED=1
-else
-STASHED=0
-fi
-
-# ---------------------------------------------------------
-
-# 4. Update code
-
-# ---------------------------------------------------------
-
-echo "===> Updating to origin/main..."
-
-if ! git merge --ff-only origin/main; then
-  echo "Fast-forward not possible; performing merge..."
-
-  if ! git merge --no-edit origin/main; then
-    echo "Merge conflicts detected. Auto-resolving (keeping local versions)..."
-
-    git checkout --ours .
-    git add -A
-
-    git commit -m "auto-merge: keep local changes"
+install_dependencies() {
+  echo "===> Installing dependencies..."
+  if command -v pnpm >/dev/null 2>&1; then
+    pnpm install
+    return 0
   fi
-fi
 
-# ---------------------------------------------------------
-
-# 5. Reapply local changes
-
-# ---------------------------------------------------------
-
-if [ "$STASHED" -eq 1 ]; then
-echo "===> Re-applying local changes..."
-
-if ! git stash pop; then
-echo "Conflicts detected. Keeping local versions..."
-
-git checkout --ours .
-git add -A
-
-# finalize to avoid broken repo state
-git commit -m "auto-resolve: keep local changes" || true
-
-fi
-fi
-
-# ---------------------------------------------------------
-
-# 5.5. Keep updater files on latest repo version
-
-# ---------------------------------------------------------
-
-restore_updater_managed_files
-
-# ---------------------------------------------------------
-
-# 6. Install deps
-
-# ---------------------------------------------------------
-
-echo "===> Installing dependencies..."
-if command -v pnpm >/dev/null 2>&1; then
-  pnpm install
-else
   if grep -Rqs "\"link:\"\\|link:" "$repo_root/package.json"; then
     echo "Error: package.json contains link: dependencies. Install pnpm (recommended) and retry."
     echo "Tip: corepack enable && corepack prepare pnpm@latest --activate"
     exit 1
   fi
+
   npm install
+}
+
+run_migrations_only() {
+  echo "===> Running DB upgrade..."
+  npm run upgrade-db
+  echo "===> Migration completed successfully!"
+}
+
+run_full_update() {
+  echo "===> Using repo: $repo_root"
+  echo "===> Stabilizing repository state..."
+
+  git merge --abort 2>/dev/null || true
+  git rebase --abort 2>/dev/null || true
+  git reset
+
+  if [ -n "$(git ls-files -u)" ]; then
+    echo "Unresolved conflicts detected. Auto-resolving (keeping local versions)..."
+    git checkout --ours .
+    git add -A
+  fi
+
+  echo "===> Fetching latest main..."
+  git fetch origin main
+
+  echo "===> Stashing local changes (tracked + untracked)..."
+  local stashed=0
+  if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+    git stash push -u -m "auto-update-$(date +%s)" || true
+    stashed=1
+  fi
+
+  echo "===> Updating to origin/main..."
+  if ! git merge --ff-only origin/main; then
+    echo "Fast-forward not possible; performing merge..."
+
+    if ! git merge --no-edit origin/main; then
+      echo "Merge conflicts detected. Auto-resolving (keeping local versions)..."
+      git checkout --ours .
+      git add -A
+      git commit -m "auto-merge: keep local changes"
+    fi
+  fi
+
+  if [ "$stashed" -eq 1 ]; then
+    echo "===> Re-applying local changes..."
+    if ! git stash pop; then
+      echo "Conflicts detected. Keeping local versions..."
+      git checkout --ours .
+      git add -A
+      git commit -m "auto-resolve: keep local changes" || true
+    fi
+  fi
+
+  restore_updater_managed_files
+  install_dependencies
+  run_migrations_only
+  echo "===> Panel updated successfully!"
+}
+
+show_menu() {
+  echo
+  echo "CPanel Updater"
+  echo "1) Update panel"
+  echo "2) Run migration"
+  echo "3) Exit"
+  echo
+  read -r -p "Select an option [1-3]: " choice
+
+  case "${choice:-1}" in
+    1)
+      run_full_update
+      ;;
+    2)
+      run_migrations_only
+      ;;
+    3)
+      echo "===> Exit."
+      exit 0
+      ;;
+    *)
+      echo "Invalid option."
+      exit 1
+      ;;
+  esac
+}
+
+if [ -t 0 ]; then
+  show_menu
+else
+  run_full_update
 fi
-
-# ---------------------------------------------------------
-
-# 7. Run DB migrations
-
-# ---------------------------------------------------------
-
-echo "===> Running DB upgrade..."
-npm run upgrade-db
-
-echo "===> Panel updated successfully!"
