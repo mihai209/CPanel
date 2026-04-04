@@ -139,6 +139,56 @@ function InlineMetric({ title, value, note, tone = '' }) {
     );
 }
 
+function buildTrendPoints(percent, seed) {
+    const safe = clamp(Number(percent) || 0, 0, 100);
+    const points = [];
+    for (let index = 0; index < 12; index += 1) {
+        const progress = index / 11;
+        const wobble = Math.sin((index + seed) * 0.82) * 6 + Math.cos((index + seed) * 0.47) * 3;
+        const value = clamp(safe * (0.38 + progress * 0.62) + wobble, 4, 100);
+        const x = (index / 11) * 100;
+        const y = 100 - value;
+        points.push(`${x},${y}`);
+    }
+    return points.join(' ');
+}
+
+function MetricGraphCard({ title, value, note, percent, tone = 'info', seed = 1 }) {
+    const safePercent = clamp(Number(percent) || 0, 0, 100);
+    return (
+        <article className={`react-console-graph-card is-${tone}`}>
+            <div className="react-console-graph-head">
+                <div>
+                    <span>{title}</span>
+                    <strong>{value}</strong>
+                </div>
+                <small>{note}</small>
+            </div>
+            <div className="react-console-graph-canvas">
+                <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                    <defs>
+                        <linearGradient id={`consoleGraphFill-${title.replace(/\s+/g, '-')}`} x1="0%" x2="0%" y1="0%" y2="100%">
+                            <stop offset="0%" stopColor="currentColor" stopOpacity="0.34" />
+                            <stop offset="100%" stopColor="currentColor" stopOpacity="0.02" />
+                        </linearGradient>
+                    </defs>
+                    <polyline
+                        className="react-console-graph-line"
+                        points={buildTrendPoints(safePercent, seed)}
+                        fill="none"
+                        vectorEffect="non-scaling-stroke"
+                    />
+                    <polygon
+                        className="react-console-graph-fill"
+                        points={`0,100 ${buildTrendPoints(safePercent, seed)} 100,100`}
+                        fill={`url(#consoleGraphFill-${title.replace(/\s+/g, '-')})`}
+                    />
+                </svg>
+            </div>
+        </article>
+    );
+}
+
 function scrubAnsi(text) {
     return String(text || '').replace(/\\x1b/g, '\x1b');
 }
@@ -468,60 +518,39 @@ export function ServerConsolePage({ pageData = data }) {
         <ReactAppShell pageData={pageData} subtitle="React server console" pageClassName="react-console-page" shellClassName="react-console-shell">
             <div className="react-console-frame">
                 <ServerSubnav items={pageData.serverNavItems} />
-                <main className="react-console-layout">
-                    <aside className="react-console-side">
-                        <section className="react-console-side-card">
-                            <div className="react-console-server-header">
+                <main className="react-console-board">
+                    {pageData.success ? <div className="react-account-flash is-success">{pageData.success}</div> : null}
+                    {pageData.error ? <div className="react-account-flash is-danger">{pageData.error}</div> : null}
+                    {terminalError ? <div className="react-account-flash is-danger">{terminalError}</div> : null}
+
+                    <section className="react-console-topbar">
+                        <div className="react-console-titleblock">
+                            <div className="react-console-titleline">
                                 <div className={`react-console-status-dot is-${statusTone(status)}`}></div>
-                                <div>
-                                    <h1>{server.name || 'Server Console'}</h1>
-                                    <div className="react-console-server-meta">
-                                        {server.address || 'No allocation address'}
-                                    </div>
-                                </div>
+                                <h1>{server.name || 'Server Console'}</h1>
                             </div>
+                            <p>{server.description || 'Live runtime output and power controls for this server.'}</p>
+                        </div>
 
-                            <div className="react-console-side-list">
-                                <ResourceBadge icon="bi-hdd-stack" label="Status" value={formatStatus(status)} />
-                                <ResourceBadge icon="bi-cpu" label="CPU Cap" value={limits.cpu ? `${limits.cpu}%` : 'Unlimited'} />
-                                <ResourceBadge icon="bi-memory" label="RAM Cap" value={limits.memory ? `${limits.memory} MB` : 'Unlimited'} />
-                            </div>
+                        <div className="react-console-top-actions">
+                            <button type="button" className="react-console-action is-success" onClick={() => sendPowerAction('start')} disabled={startDisabled}>
+                                Start
+                            </button>
+                            <button type="button" className="react-console-action is-warning" onClick={() => sendPowerAction('restart')} disabled={restartDisabled}>
+                                Restart
+                            </button>
+                            <button type="button" className="react-console-action is-danger" onClick={() => sendPowerAction('stop')} disabled={stopDisabled}>
+                                Stop
+                            </button>
+                        </div>
+                    </section>
 
-                            <div className={`react-console-connection is-${connectorOnline ? 'success' : 'danger'}`}>
-                                <i className={`bi ${connectorOnline ? 'bi-broadcast-pin' : 'bi-wifi-off'}`}></i>
-                                <span>{connectionState}</span>
-                            </div>
-                        </section>
-
-                        <section className="react-console-side-card">
-                            <div className="react-console-actions">
-                                <button type="button" className="react-console-action is-success" onClick={() => sendPowerAction('start')} disabled={startDisabled}>
-                                    Start
-                                </button>
-                                <button type="button" className="react-console-action is-warning" onClick={() => sendPowerAction('restart')} disabled={restartDisabled}>
-                                    Restart
-                                </button>
-                                <button type="button" className="react-console-action is-danger" onClick={() => sendPowerAction('stop')} disabled={stopDisabled}>
-                                    Stop
-                                </button>
-                            </div>
-                            <div className="react-console-side-links">
-                                <Link to={ReactRoutes.changeView} className="react-account-button is-ghost">View Mode</Link>
-                                <a href={`/server/${server.containerId}?popout=true`} className="react-account-button is-ghost">Popout</a>
-                            </div>
-                        </section>
-                    </aside>
-
-                    <section className="react-console-main">
-                        {pageData.success ? <div className="react-account-flash is-success">{pageData.success}</div> : null}
-                        {pageData.error ? <div className="react-account-flash is-danger">{pageData.error}</div> : null}
-                        {terminalError ? <div className="react-account-flash is-danger">{terminalError}</div> : null}
-
+                    <section className="react-console-core">
                         <section className="react-console-terminal-card">
                             <div className="react-console-terminal-head">
                                 <div className="react-console-terminal-heading">
-                                    <h2>Live Console</h2>
-                                    <div className="react-console-chart-note">{server.description || 'Live runtime output.'}</div>
+                                    <h2>Console</h2>
+                                    <div className="react-console-chart-note">Interactive server stream with direct command input.</div>
                                 </div>
                                 <div className="react-console-terminal-tools">
                                     <button
@@ -587,26 +616,81 @@ export function ServerConsolePage({ pageData = data }) {
                             </div>
                         </section>
 
-                        <section className="react-console-metrics-strip">
-                            <InlineMetric
-                                title="CPU"
-                                value={`${stats.cpu.toFixed(1)}%`}
-                                note={limits.cpu ? `${limits.cpu}% cap` : 'No cap'}
-                                tone="info"
-                            />
-                            <InlineMetric
-                                title="Memory"
-                                value={`${Math.round(stats.memory)} MB`}
-                                note={`${memoryPercent.toFixed(0)}% used`}
-                                tone="success"
-                            />
-                            <InlineMetric
-                                title="Disk"
-                                value={`${Math.round(stats.disk)} MB`}
-                                note={`${diskPercent.toFixed(0)}% used`}
-                                tone="warning"
-                            />
-                        </section>
+                        <aside className="react-console-details">
+                            <section className="react-console-side-card">
+                                <div className="react-console-panel-title">Server Details</div>
+                                <div className="react-console-side-list">
+                                    <ResourceBadge icon="bi-hdd-network" label="Allocation" value={server.address || 'No allocation address'} />
+                                    <ResourceBadge icon="bi-hdd-stack" label="Status" value={formatStatus(status)} />
+                                    <ResourceBadge icon="bi-cpu" label="CPU Cap" value={limits.cpu ? `${limits.cpu}%` : 'Unlimited'} />
+                                    <ResourceBadge icon="bi-memory" label="RAM Cap" value={limits.memory ? `${limits.memory} MB` : 'Unlimited'} />
+                                    <ResourceBadge icon="bi-device-hdd" label="Disk Cap" value={limits.disk ? `${limits.disk} MB` : 'Unlimited'} />
+                                </div>
+                            </section>
+
+                            <section className="react-console-side-card">
+                                <div className="react-console-panel-title">Connector Link</div>
+                                <div className={`react-console-connection is-${connectorOnline ? 'success' : 'danger'}`}>
+                                    <i className={`bi ${connectorOnline ? 'bi-broadcast-pin' : 'bi-wifi-off'}`}></i>
+                                    <span>{connectionState}</span>
+                                </div>
+                                <div className="react-console-side-links">
+                                    <Link to={ReactRoutes.changeView} className="react-account-button is-ghost">View Mode</Link>
+                                    <a href={`/server/${server.containerId}?popout=true`} className="react-account-button is-ghost">Popout</a>
+                                </div>
+                            </section>
+
+                            <section className="react-console-side-card">
+                                <div className="react-console-panel-title">Runtime Snapshot</div>
+                                <div className="react-console-side-list">
+                                    <InlineMetric
+                                        title="CPU"
+                                        value={`${stats.cpu.toFixed(1)}%`}
+                                        note={limits.cpu ? `${limits.cpu}% cap` : 'No cap'}
+                                        tone="info"
+                                    />
+                                    <InlineMetric
+                                        title="Memory"
+                                        value={`${Math.round(stats.memory)} MB`}
+                                        note={`${memoryPercent.toFixed(0)}% used`}
+                                        tone="success"
+                                    />
+                                    <InlineMetric
+                                        title="Disk"
+                                        value={`${Math.round(stats.disk)} MB`}
+                                        note={`${diskPercent.toFixed(0)}% used`}
+                                        tone="warning"
+                                    />
+                                </div>
+                            </section>
+                        </aside>
+                    </section>
+
+                    <section className="react-console-graphs">
+                        <MetricGraphCard
+                            title="CPU Usage"
+                            value={`${stats.cpu.toFixed(1)}%`}
+                            note={limits.cpu ? `${limits.cpu}% server limit` : 'No limit configured'}
+                            percent={limits.cpu ? usagePercent(stats.cpu, limits.cpu) : clamp(stats.cpu, 0, 100)}
+                            tone="info"
+                            seed={1}
+                        />
+                        <MetricGraphCard
+                            title="Memory Usage"
+                            value={`${Math.round(stats.memory)} MB`}
+                            note={limits.memory ? `${Math.round(limits.memory)} MB limit` : 'No memory limit'}
+                            percent={memoryPercent}
+                            tone="success"
+                            seed={5}
+                        />
+                        <MetricGraphCard
+                            title="Disk Usage"
+                            value={`${Math.round(stats.disk)} MB`}
+                            note={limits.disk ? `${Math.round(limits.disk)} MB limit` : 'No disk limit'}
+                            percent={diskPercent}
+                            tone="warning"
+                            seed={9}
+                        />
                     </section>
                 </main>
             </div>

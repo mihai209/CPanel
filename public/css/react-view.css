@@ -858,6 +858,15 @@ body.react-view-body {
     min-height: 0;
 }
 
+.react-console-board {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    gap: 16px;
+    padding: 18px 22px 22px;
+    overflow: hidden;
+}
+
 .react-console-subnav {
     display: flex;
     align-items: center;
@@ -889,29 +898,61 @@ body.react-view-body {
     background: rgba(41, 197, 206, 0.12);
 }
 
-.react-console-layout {
+.react-console-topbar {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.react-console-titleblock {
+    min-width: 0;
+}
+
+.react-console-titleline {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.react-console-titleline h1 {
+    margin: 0;
+    font-size: 1.6rem;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+.react-console-titleblock p {
+    margin: 10px 0 0;
+    color: var(--react-muted);
+    max-width: 64ch;
+}
+
+.react-console-top-actions {
+    display: inline-flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.react-console-core {
     min-height: 0;
     display: grid;
-    grid-template-columns: 248px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 300px;
     gap: 16px;
-    padding: 18px 22px 22px;
     overflow: hidden;
 }
 
-.react-console-side,
-.react-console-main {
+.react-console-details {
     min-height: 0;
     display: grid;
     gap: 14px;
-}
-
-.react-console-side {
     align-content: start;
 }
 
 .react-console-side-card,
 .react-console-terminal-card,
-.react-console-metrics-strip {
+.react-console-graph-card {
     border-radius: 20px;
     border: 1px solid var(--react-border);
     background: rgba(255, 255, 255, 0.04);
@@ -968,6 +1009,15 @@ body.react-view-body {
 .react-console-status-dot.is-muted {
     background: rgba(255, 255, 255, 0.28);
     box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.06);
+}
+
+.react-console-panel-title {
+    margin-bottom: 12px;
+    color: var(--react-text);
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .react-console-side-list,
@@ -1057,11 +1107,6 @@ body.react-view-body {
     color: var(--react-muted);
     font-size: 0.88rem;
     line-height: 1.5;
-}
-
-.react-console-main {
-    grid-template-rows: auto minmax(0, 1fr) auto;
-    overflow: hidden;
 }
 
 .react-console-terminal-card {
@@ -1195,11 +1240,10 @@ body.react-view-body {
     cursor: not-allowed;
 }
 
-.react-console-metrics-strip {
+.react-console-graphs {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-    padding: 10px;
+    gap: 12px;
 }
 
 .react-console-inline-metric {
@@ -1240,28 +1284,98 @@ body.react-view-body {
     color: #ffd08a;
 }
 
-@media (max-width: 1180px) {
-    .react-console-layout {
-        grid-template-columns: 1fr;
-    }
+.react-console-graph-card {
+    display: grid;
+    gap: 14px;
+    padding: 16px;
+    overflow: hidden;
+}
 
-    .react-console-side {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+.react-console-graph-head {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.react-console-graph-head span {
+    display: block;
+    color: var(--react-muted);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.react-console-graph-head strong {
+    display: block;
+    margin-top: 8px;
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.react-console-graph-head small {
+    color: var(--react-muted);
+    font-size: 0.82rem;
+    text-align: right;
+    max-width: 18ch;
+}
+
+.react-console-graph-canvas {
+    height: 150px;
+    border-radius: 16px;
+    overflow: hidden;
+    background:
+        linear-gradient(to top, rgba(255, 255, 255, 0.04) 1px, transparent 1px) 0 0 / 100% 25%,
+        rgba(11, 18, 26, 0.2);
+    padding: 10px;
+}
+
+.react-console-graph-canvas svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.react-console-graph-card .react-console-graph-line {
+    stroke: currentColor;
+    stroke-width: 2.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.react-console-graph-card.is-info {
+    color: #63baff;
+}
+
+.react-console-graph-card.is-success {
+    color: #52d49f;
+}
+
+.react-console-graph-card.is-warning {
+    color: #ffbd61;
+}
+
+@media (max-width: 1180px) {
+    .react-console-core {
+        grid-template-columns: 1fr;
     }
 }
 
 @media (max-width: 820px) {
     .react-console-subnav,
-    .react-console-layout {
+    .react-console-board {
         padding-left: 16px;
         padding-right: 16px;
     }
 
-    .react-console-side {
-        grid-template-columns: 1fr;
+    .react-console-topbar,
+    .react-console-graph-head,
+    .react-console-terminal-head {
+        flex-direction: column;
+        align-items: flex-start;
     }
 
-    .react-console-metrics-strip {
+    .react-console-graphs {
         grid-template-columns: 1fr;
     }
 
@@ -1271,10 +1385,5 @@ body.react-view-body {
 
     .react-console-command-prefix {
         display: none;
-    }
-
-    .react-console-terminal-head {
-        flex-direction: column;
-        align-items: flex-start;
     }
 }
