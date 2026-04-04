@@ -128,7 +128,7 @@
             "name": "Rootfs Base URL",
             "description": "Base URL that serves your Debian/Ubuntu rootfs archives.",
             "env_variable": "ROOTFS_BASE_URL",
-            "default_value": "https://github.com/mihai209/cpanel-vps-rootfs/releases/download",
+            "default_value": "https://github.com/mihai209/CPanel/releases/download",
             "user_viewable": true,
             "user_editable": true,
             "rules": "required|string|max:191",
