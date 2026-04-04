@@ -4,55 +4,122 @@ import { createRoot } from 'react-dom/client';
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const root = createRoot(document.getElementById('reactRoot'));
 
-function MetricCard({ label, value, subtitle, icon }) {
+const STATUS_ORDER = ['running', 'starting', 'installing', 'reinstalling', 'stopped', 'offline', 'error'];
+
+function formatStatus(status) {
+    return String(status || 'unknown').replace(/_/g, ' ');
+}
+
+function statusClass(status) {
+    return `react-fleet-status react-fleet-status-${String(status || 'unknown').toLowerCase()}`;
+}
+
+function FleetMetric({ icon, label, value, subvalue, tone = '' }) {
     return (
-        <div className="react-card">
-            <div className="react-pill mb-2">
+        <div className={`react-inline-metric ${tone ? `is-${tone}` : ''}`}>
+            <div className="react-inline-metric-icon">
                 <i className={`bi ${icon}`}></i>
-                {label}
             </div>
-            <div className="react-metric-value">{String(value)}</div>
-            <div className="react-card-subtle mt-2">{subtitle}</div>
+            <div>
+                <div className="react-inline-metric-value">{value}</div>
+                <div className="react-inline-metric-label">
+                    {label}
+                    {subvalue ? <span>{subvalue}</span> : null}
+                </div>
+            </div>
         </div>
     );
 }
 
-function statusClass(status) {
-    return `react-status react-status-${String(status || 'unknown').toLowerCase()}`;
+function UsageBar({ label, value, total, tone = 'blue' }) {
+    const used = Number(value || 0);
+    const cap = Number(total || 0);
+    const width = cap > 0 ? Math.max(0, Math.min(100, (used / cap) * 100)) : 0;
+
+    return (
+        <div className="react-usage-block">
+            <div className="react-usage-head">
+                <span>{label}</span>
+                <span>{used}{cap > 0 ? ` / ${cap}` : ''}</span>
+            </div>
+            <div className="react-usage-track">
+                <div className={`react-usage-fill is-${tone}`} style={{ width: `${width}%` }}></div>
+            </div>
+        </div>
+    );
 }
 
-function ServerCard({ server, showOwner }) {
+function FleetRow({ server, showOwner }) {
+    const status = String(server.status || 'unknown').toLowerCase();
+    const accent = status === 'running' ? 'success' : (['installing', 'reinstalling', 'starting'].includes(status) ? 'warning' : 'muted');
+    const tags = Array.isArray(server.tags) ? server.tags.filter(Boolean) : [];
+
     return (
-        <a className="react-server-card" href={`/server/${server.containerId}`}>
-            <div>
-                <div className="react-server-name">{server.name || 'Unnamed Server'}</div>
-                <div className="react-server-meta">
-                    {server.description || `CPU ${server.cpu}% · RAM ${server.memory} MB · Disk ${server.disk} MB`}
-                </div>
-                {Array.isArray(server.tags) && server.tags.length > 0 ? (
-                    <div className="d-flex flex-wrap gap-2 mt-3">
-                        {server.tags.slice(0, 4).map((tag) => (
-                            <span key={tag} className="react-pill">{tag}</span>
-                        ))}
-                    </div>
-                ) : null}
+        <a className="react-fleet-row" href={`/server/${server.containerId}`}>
+            <div className={`react-fleet-avatar is-${accent}`}>
+                <i className="bi bi-hdd-stack"></i>
             </div>
-            <div className="text-end">
-                <div className={statusClass(server.status)}>
-                    <span className="react-status-dot"></span>
-                    <span>{String(server.status || 'unknown')}</span>
+
+            <div className="react-fleet-main">
+                <div className="react-fleet-title-row">
+                    <div>
+                        <div className="react-fleet-title">{server.name || 'Unnamed Server'}</div>
+                        <div className="react-fleet-subtitle">
+                            {server.description || 'No description provided yet.'}
+                        </div>
+                    </div>
+                    <div className={statusClass(status)}>
+                        <span className="react-fleet-status-dot"></span>
+                        <span>{formatStatus(status)}</span>
+                    </div>
                 </div>
-                {showOwner && server.ownerUsername ? (
-                    <div className="react-server-meta mt-2">Owner: @{server.ownerUsername}</div>
-                ) : null}
+
+                <div className="react-fleet-meta-row">
+                    <FleetMetric icon="bi bi-cpu" label="CPU" value={`${server.cpu || 0}%`} />
+                    <FleetMetric icon="bi bi-memory" label="RAM" value={`${server.memory || 0} MB`} />
+                    <FleetMetric icon="bi bi-device-hdd" label="Disk" value={`${server.disk || 0} MB`} />
+                    <FleetMetric icon="bi bi-database" label="DB Limit" value={String(server.databaseLimit || 0)} />
+                    {showOwner && server.ownerUsername ? (
+                        <FleetMetric icon="bi bi-person" label="Owner" value={`@${server.ownerUsername}`} />
+                    ) : null}
+                </div>
+
+                <div className="react-fleet-bottom-row">
+                    <div className="react-fleet-usage-grid">
+                        <UsageBar label="CPU Profile" value={server.cpu || 0} total={100} tone="blue" />
+                        <UsageBar label="Memory Slice" value={server.memory || 0} total={Math.max(server.memory || 0, 2048)} tone="green" />
+                        <UsageBar label="Disk Slice" value={server.disk || 0} total={Math.max(server.disk || 0, 20480)} tone="amber" />
+                    </div>
+                    <div className="react-fleet-tags">
+                        {tags.length > 0 ? tags.slice(0, 4).map((tag) => (
+                            <span key={tag} className="react-fleet-tag">{tag}</span>
+                        )) : <span className="react-fleet-tag is-muted">No tags</span>}
+                    </div>
+                </div>
             </div>
         </a>
     );
 }
 
-function FeedItem({ title, detail }) {
+function SignalCard({ title, eyebrow, count, note, icon, tone = '' }) {
     return (
-        <div className="react-feed-item">
+        <div className={`react-signal-card ${tone ? `is-${tone}` : ''}`}>
+            <div className="react-signal-icon">
+                <i className={`bi ${icon}`}></i>
+            </div>
+            <div>
+                <div className="react-signal-eyebrow">{eyebrow}</div>
+                <div className="react-signal-title">{title}</div>
+                <div className="react-signal-note">{note}</div>
+            </div>
+            <div className="react-signal-count">{count}</div>
+        </div>
+    );
+}
+
+function FeedItem({ title, detail, tone = '' }) {
+    return (
+        <div className={`react-feed-item ${tone ? `is-${tone}` : ''}`}>
             <strong>{title}</strong>
             {detail ? <div className="react-card-subtle">{detail}</div> : null}
         </div>
@@ -60,153 +127,146 @@ function FeedItem({ title, detail }) {
 }
 
 function DashboardApp() {
-    const servers = Array.isArray(data.servers) ? data.servers : [];
+    const servers = Array.isArray(data.servers) ? [...data.servers] : [];
     const incidents = Array.isArray(data.openIncidents) ? data.openIncidents : [];
     const maintenance = Array.isArray(data.pendingMaintenance) ? data.pendingMaintenance : [];
     const security = Array.isArray(data.openSecurityAlerts) ? data.openSecurityAlerts : [];
+
+    servers.sort((a, b) => {
+        const left = STATUS_ORDER.indexOf(String(a.status || '').toLowerCase());
+        const right = STATUS_ORDER.indexOf(String(b.status || '').toLowerCase());
+        return (left === -1 ? 999 : left) - (right === -1 ? 999 : right);
+    });
+
     const serverCount = servers.length;
     const runningCount = servers.filter((server) => String(server.status || '').toLowerCase() === 'running').length;
-    const installCount = servers.filter((server) => ['installing', 'reinstalling', 'starting'].includes(String(server.status || '').toLowerCase())).length;
+    const provisioningCount = servers.filter((server) => ['installing', 'reinstalling', 'starting'].includes(String(server.status || '').toLowerCase())).length;
+    const idleCount = servers.filter((server) => ['stopped', 'offline'].includes(String(server.status || '').toLowerCase())).length;
     const feedEntries = [
         ...incidents.slice(0, 2).map((entry, index) => ({
             key: `incident-${index}`,
             title: entry && (entry.title || entry.name || `Incident ${index + 1}`),
-            detail: entry && (entry.description || entry.status || '')
+            detail: entry && (entry.description || entry.status || ''),
+            tone: 'danger'
         })),
         ...maintenance.slice(0, 2).map((entry, index) => ({
             key: `maintenance-${index}`,
             title: entry && (entry.title || entry.name || `Maintenance ${index + 1}`),
-            detail: entry && (entry.description || entry.status || '')
+            detail: entry && (entry.description || entry.status || ''),
+            tone: 'warning'
         })),
         ...security.slice(0, 2).map((entry, index) => ({
             key: `security-${index}`,
             title: entry && (entry.title || entry.name || `Security ${index + 1}`),
-            detail: entry && (entry.description || entry.status || '')
+            detail: entry && (entry.description || entry.status || ''),
+            tone: 'info'
         }))
     ];
 
     return (
-        <div className="react-shell">
-            <aside className="react-sidebar">
-                <div className="react-brand">
-                    <div className="react-brand-mark">
-                        <i className="bi bi-grid-1x2-fill"></i>
+        <div className="react-dashboard-page">
+            <div className="react-dashboard-shell">
+                <header className="react-dashboard-topbar">
+                    <div className="react-dashboard-brand">
+                        <div className="react-dashboard-brand-mark">
+                            <i className="bi bi-grid-3x3-gap-fill"></i>
+                        </div>
+                        <div>
+                            <div className="react-dashboard-brand-title">{data.brandName || 'CPanel'}</div>
+                            <div className="react-dashboard-brand-subtitle">React fleet board</div>
+                        </div>
                     </div>
-                    <div>
-                        <div className="react-brand-title">{(data.brandName || 'CPanel') + ' React'}</div>
-                        <div className="react-brand-subtitle">Experimental renderer</div>
-                    </div>
-                </div>
 
-                <div className="react-nav">
-                    <a className="react-nav-link is-active" href="/dashboard">
-                        <div className="react-nav-link-label">
+                    <nav className="react-dashboard-actions">
+                        <a className="react-top-action is-active" href="/dashboard" title="Dashboard">
                             <i className="bi bi-house-door"></i>
-                            <div>
-                                <div>Dashboard</div>
-                                <small>React beta</small>
-                            </div>
-                        </div>
-                        <i className="bi bi-arrow-up-right"></i>
-                    </a>
-                    <a className="react-nav-link" href="/experimental-features">
-                        <div className="react-nav-link-label">
+                        </a>
+                        <a className="react-top-action" href="/experimental-features" title="Experimental Features">
                             <i className="bi bi-beaker"></i>
-                            <div>
-                                <div>Experimental</div>
-                                <small>Flags and betas</small>
-                            </div>
-                        </div>
-                        <i className="bi bi-arrow-up-right"></i>
-                    </a>
-                    <a className="react-nav-link" href="/account">
-                        <div className="react-nav-link-label">
+                        </a>
+                        <a className="react-top-action" href="/account" title="Account">
                             <i className="bi bi-person"></i>
-                            <div>
-                                <div>Account</div>
-                                <small>Session and profile</small>
-                            </div>
-                        </div>
-                        <i className="bi bi-arrow-up-right"></i>
-                    </a>
-                    <a className="react-nav-link" href="/themes">
-                        <div className="react-nav-link-label">
+                        </a>
+                        <a className="react-top-action" href="/themes" title="Themes">
                             <i className="bi bi-palette2"></i>
-                            <div>
-                                <div>Themes</div>
-                                <small>Legacy theme manager</small>
-                            </div>
+                        </a>
+                        <div className="react-user-chip">
+                            <i className="bi bi-person-circle"></i>
+                            <span>{data.user && data.user.username ? `@${data.user.username}` : 'Unknown'}</span>
                         </div>
-                        <i className="bi bi-arrow-up-right"></i>
-                    </a>
-                </div>
+                    </nav>
+                </header>
 
-                <div className="react-sidebar-meta mt-4">
-                    <div className="react-pill">{serverCount} servers tracked</div>
-                    <div className="react-pill">{(data.dashboardFolders || []).length} folders</div>
-                    <div className="react-pill">{(data.dashboardTags || []).length} tags</div>
-                </div>
-            </aside>
-
-            <main className="react-main">
-                <div className="react-topbar">
+                <section className="react-hero-strip">
                     <div>
-                        <h1>Dashboard</h1>
-                        <p>React beta shell for migrated surfaces. Non-migrated pages continue using the legacy renderer.</p>
+                        <div className="react-hero-label">Fleet summary</div>
+                        <h1>Keep the whole panel in one glance.</h1>
+                        <p>
+                            Fast status scan for runtime state, inventory pressure, and the signals that actually need attention.
+                        </p>
                     </div>
-                    <div className="react-user-chip">
-                        <i className="bi bi-person-circle"></i>
-                        <span>{data.user && data.user.username ? `@${data.user.username}` : 'Unknown'}</span>
+                    <div className="react-hero-badges">
+                        <span className="react-hero-badge">React beta</span>
+                        <span className="react-hero-badge is-soft">No custom themes</span>
                     </div>
-                </div>
+                </section>
 
-                <div className="react-banner">
-                    <div className="fw-semibold mb-1">React beta is enabled</div>
-                    <div className="react-card-subtle">
-                        This renderer uses a fixed dark palette and ignores custom themes. Use Experimental Features to switch back whenever you want the stable EJS layout.
-                    </div>
-                </div>
+                <section className="react-scoreboard">
+                    <SignalCard title="Servers in fleet" eyebrow="Inventory" count={serverCount} note={`${runningCount} active, ${idleCount} idle`} icon="bi-hdd-stack" />
+                    <SignalCard title="Provisioning queue" eyebrow="Runtime" count={provisioningCount} note="Install, reinstall, and first-start operations" icon="bi-arrow-repeat" tone="warning" />
+                    <SignalCard title="Operational signals" eyebrow="Ops" count={incidents.length + maintenance.length + security.length} note="Incidents, maintenance, and security alerts" icon="bi-broadcast-pin" tone="info" />
+                </section>
 
-                <div className="react-grid metrics">
-                    <MetricCard label="Servers" value={serverCount} subtitle={`${runningCount} running right now`} icon="bi-hdd-stack" />
-                    <MetricCard label="Provisioning" value={installCount} subtitle="Install, reinstall, and startup transitions" icon="bi-arrow-repeat" />
-                    <MetricCard label="Incidents" value={incidents.length} subtitle="Open incident records" icon="bi-exclamation-diamond" />
-                    <MetricCard label="Maintenance" value={maintenance.length} subtitle="Planned maintenance windows" icon="bi-tools" />
-                </div>
-
-                <div className="react-grid content mt-4">
-                    <section className="react-card">
-                        <div className="d-flex justify-content-between align-items-start gap-3">
+                <div className="react-board-grid">
+                    <section className="react-board-panel">
+                        <div className="react-panel-head">
                             <div>
-                                <h2>Server Fleet</h2>
-                                <div className="react-card-subtle">
-                                    Current server inventory with live status snapshots from the existing panel data.
-                                </div>
+                                <div className="react-panel-eyebrow">Your servers</div>
+                                <h2>Fleet Board</h2>
                             </div>
-                            <a href="/dashboard" className="react-pill text-decoration-none">
-                                <i className="bi bi-layout-text-window-reverse"></i>
-                                Legacy dashboard
-                            </a>
+                            <div className="react-panel-head-right">
+                                <span className="react-panel-toggle">
+                                    <span className="react-toggle-dot"></span>
+                                    Showing your servers
+                                </span>
+                                <a href="/experimental/change-view" className="react-link-chip">
+                                    Switch view
+                                </a>
+                            </div>
                         </div>
-                        <div className="react-server-list">
+
+                        <div className="react-fleet-list">
                             {servers.length > 0 ? (
                                 servers.map((server) => (
-                                    <ServerCard key={server.id || server.containerId} server={server} showOwner={Boolean(data.isAdminDashboard)} />
+                                    <FleetRow
+                                        key={server.id || server.containerId}
+                                        server={server}
+                                        showOwner={Boolean(data.isAdminDashboard)}
+                                    />
                                 ))
                             ) : (
-                                <FeedItem title="No servers found" detail="Create a server or switch back to the legacy renderer if you expected content here." />
+                                <FeedItem title="No servers found" detail="Create a server first or switch back to the legacy renderer if this looks wrong." />
                             )}
                         </div>
                     </section>
 
-                    <aside className="d-grid gap-4">
-                        <section className="react-card">
-                            <h3>Operations Feed</h3>
-                            <div className="react-card-subtle">Highest-priority incident, maintenance, and security signals.</div>
+                    <aside className="react-board-rail">
+                        <section className="react-board-panel is-compact">
+                            <div className="react-panel-eyebrow">Now visible</div>
+                            <h3>Board Notes</h3>
+                            <div className="react-feed-list">
+                                <FeedItem title="React renderer is live" detail="This dashboard runs from views/react/dashboard.jsx and is bundled separately." tone="info" />
+                                <FeedItem title="Legacy pages still exist" detail="Non-migrated routes continue to render through EJS until each page is ported." />
+                            </div>
+                        </section>
+
+                        <section className="react-board-panel is-compact">
+                            <div className="react-panel-eyebrow">Operational feed</div>
+                            <h3>Priority Signals</h3>
                             <div className="react-feed-list">
                                 {feedEntries.length > 0 ? (
                                     feedEntries.map((entry) => (
-                                        <FeedItem key={entry.key} title={entry.title} detail={entry.detail} />
+                                        <FeedItem key={entry.key} title={entry.title} detail={entry.detail} tone={entry.tone} />
                                     ))
                                 ) : (
                                     <FeedItem title="No active feed items" detail="Nothing urgent is currently queued in the dashboard feed." />
@@ -214,16 +274,31 @@ function DashboardApp() {
                             </div>
                         </section>
 
-                        <section className="react-card">
-                            <h3>Current Coverage</h3>
-                            <div className="react-feed-list">
-                                <FeedItem title="React pages installed" detail="Dashboard is rendered from views/react/dashboard.jsx in this build." />
-                                <FeedItem title="Legacy fallback remains active" detail="Server pages and the rest of the panel stay on EJS until their React pages are added." />
+                        <section className="react-board-panel is-compact">
+                            <div className="react-panel-eyebrow">Coverage</div>
+                            <h3>Renderer Limits</h3>
+                            <div className="react-mini-stats">
+                                <div className="react-mini-stat">
+                                    <span>Current React page</span>
+                                    <strong>Dashboard</strong>
+                                </div>
+                                <div className="react-mini-stat">
+                                    <span>Theme mode</span>
+                                    <strong>Dark only</strong>
+                                </div>
+                                <div className="react-mini-stat">
+                                    <span>Folder groups</span>
+                                    <strong>{(data.dashboardFolders || []).length}</strong>
+                                </div>
+                                <div className="react-mini-stat">
+                                    <span>Tag groups</span>
+                                    <strong>{(data.dashboardTags || []).length}</strong>
+                                </div>
                             </div>
                         </section>
                     </aside>
                 </div>
-            </main>
+            </div>
         </div>
     );
 }
