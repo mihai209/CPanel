@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { Link } from 'react-router-dom';
-import { ReactRoutes } from './ReactRoutes.js';
+import { ReactRoutes, buildServerConsoleRoute } from './ReactRoutes.js';
 import ReactAppShell from './components/ReactAppShell.jsx';
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
@@ -38,7 +38,7 @@ function ServerRow({ server, isAdminDashboard }) {
     const description = server.description || 'No description provided yet.';
 
     return (
-        <a className="react-server-row" href={`/server/${server.containerId}`}>
+        <Link className="react-server-row" to={buildServerConsoleRoute(server.containerId)}>
             <div className={`react-server-icon is-${metricTone(status)}`}>
                 <i className="bi bi-hdd-stack"></i>
             </div>
@@ -65,7 +65,7 @@ function ServerRow({ server, isAdminDashboard }) {
                     ) : null}
                 </div>
             </div>
-        </a>
+        </Link>
     );
 }
 

@@ -10537,6 +10537,72 @@ function registerServerPagesRoutes(ctx) {
             else if (!aiPolicy.enabled) aiDisabledReason = 'AI disabled for this server';
             else if (!aiUsePermission) aiDisabledReason = 'No permission';
 
+            const userSession = req.session && req.session.user ? req.session.user : {};
+            const userEmail = String(userSession.email || '').trim().toLowerCase();
+            const gravatarHash = userSession.gravatarHash || (userEmail ? nodeCrypto.createHash('md5').update(userEmail).digest('hex') : '');
+            const allocationAddress = server.allocation
+                ? `${server.allocation.alias || server.allocation.ip || 'unassigned'}:${server.allocation.port || 0}`
+                : 'No allocation';
+            const serverNavItems = [
+                { key: 'console', label: 'Console', href: `/server/${server.containerId}`, active: true },
+                hasServerPermission(access, 'server.files') ? { key: 'files', label: 'Files', href: `/server/${server.containerId}/files`, active: false } : null,
+                hasServerPermission(access, 'server.backups') ? { key: 'backups', label: 'Backups', href: `/server/${server.containerId}/backups`, active: false } : null,
+                hasServerPermission(access, 'server.startup') ? { key: 'startup', label: 'Startup', href: `/server/${server.containerId}/startup`, active: false } : null,
+                hasServerPermission(access, 'server.activity.view') ? { key: 'activity', label: 'Activity', href: `/server/${server.containerId}/activity`, active: false } : null,
+                isServerLikelyMinecraft(server) && hasServerPermission(access, 'server.minecraft')
+                    ? { key: 'players', label: 'Players', href: `/server/${server.containerId}/minecraft/admin`, active: false }
+                    : null
+            ].filter(Boolean);
+
+            const reactPageData = {
+                routePath: `/server/${server.containerId}`,
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                success: req.query.success || null,
+                error: req.query.error || null,
+                wsToken,
+                connectorOnline: Boolean(server.allocation && server.allocation.connectorId && connectorConnections.has(server.allocation.connectorId)),
+                initialConsoleBuffer: getServerConsoleBuffer(server.id) || '',
+                initialStats: {
+                    cpu: '0',
+                    memory: '0',
+                    disk: '0'
+                },
+                user: {
+                    id: userSession.id,
+                    username: userSession.username || '',
+                    avatarUrl: userSession.avatarUrl || '',
+                    avatarProvider: userSession.avatarProvider || 'gravatar',
+                    gravatarHash
+                },
+                server: {
+                    id: server.id,
+                    containerId: server.containerId,
+                    name: server.name,
+                    description: server.description || '',
+                    status: server.status || 'stopped',
+                    address: allocationAddress,
+                    limits: {
+                        cpu: Number.parseInt(server.cpu, 10) || 0,
+                        memory: Number.parseInt(server.memory, 10) || 0,
+                        disk: Number.parseInt(server.disk, 10) || 0
+                    }
+                },
+                serverNavItems
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
+            if (String(userSession.experimentalViewMode || 'ejs').trim().toLowerCase() === 'react') {
+                return res.render('react/loader', {
+                    title: `Console · ${server.name}`,
+                    reactEntry: 'app',
+                    reactPageData
+                });
+            }
+
             res.render('server/console', {
                 server,
                 user: req.session.user,

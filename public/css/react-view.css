@@ -845,3 +845,410 @@ body.react-view-body {
         text-align: left;
     }
 }
+
+.react-console-page,
+.react-console-shell,
+.react-console-frame {
+    overflow: hidden;
+}
+
+.react-console-frame {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+}
+
+.react-console-subnav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--react-border);
+    background: rgba(18, 26, 36, 0.34);
+    overflow-x: auto;
+}
+
+.react-console-subnav-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    color: var(--react-muted);
+    text-decoration: none;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.react-console-subnav-link.is-active,
+.react-console-subnav-link:hover {
+    color: var(--react-text);
+    border-color: rgba(41, 197, 206, 0.28);
+    background: rgba(41, 197, 206, 0.12);
+}
+
+.react-console-layout {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: 18px;
+    padding: 18px 22px 22px;
+    overflow: hidden;
+}
+
+.react-console-side,
+.react-console-main {
+    min-height: 0;
+    display: grid;
+    gap: 16px;
+}
+
+.react-console-side {
+    align-content: start;
+}
+
+.react-console-side-card,
+.react-console-terminal-card,
+.react-console-chart-card {
+    border-radius: 20px;
+    border: 1px solid var(--react-border);
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.react-console-side-card {
+    padding: 18px;
+}
+
+.react-console-server-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.react-console-server-header h1 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 800;
+}
+
+.react-console-server-meta {
+    margin-top: 6px;
+    color: var(--react-muted);
+    font-size: 0.86rem;
+    word-break: break-word;
+}
+
+.react-console-status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-top: 6px;
+    flex: 0 0 auto;
+}
+
+.react-console-status-dot.is-success {
+    background: var(--react-good);
+    box-shadow: 0 0 0 6px rgba(41, 199, 128, 0.12);
+}
+
+.react-console-status-dot.is-warning {
+    background: var(--react-warn);
+    box-shadow: 0 0 0 6px rgba(246, 165, 69, 0.12);
+}
+
+.react-console-status-dot.is-danger {
+    background: var(--react-danger);
+    box-shadow: 0 0 0 6px rgba(255, 108, 108, 0.12);
+}
+
+.react-console-status-dot.is-muted {
+    background: rgba(255, 255, 255, 0.28);
+    box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.06);
+}
+
+.react-console-side-list,
+.react-console-side-links,
+.react-console-actions {
+    display: grid;
+    gap: 12px;
+}
+
+.react-console-resource {
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: rgba(11, 18, 26, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.react-console-resource i {
+    color: var(--react-accent);
+}
+
+.react-console-resource strong,
+.react-console-resource span {
+    display: block;
+}
+
+.react-console-resource span {
+    margin-top: 4px;
+    color: var(--react-muted);
+    font-size: 0.82rem;
+}
+
+.react-console-connection {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    font-weight: 700;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.react-console-connection.is-success {
+    color: #bff8dd;
+    background: rgba(41, 199, 128, 0.1);
+}
+
+.react-console-connection.is-danger {
+    color: #ffbcbc;
+    background: rgba(255, 108, 108, 0.1);
+}
+
+.react-console-action {
+    min-height: 46px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--react-text);
+    font-weight: 800;
+}
+
+.react-console-action:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.react-console-action.is-success {
+    background: rgba(41, 199, 128, 0.16);
+    border-color: rgba(41, 199, 128, 0.22);
+}
+
+.react-console-action.is-warning {
+    background: rgba(246, 165, 69, 0.16);
+    border-color: rgba(246, 165, 69, 0.22);
+}
+
+.react-console-action.is-danger {
+    background: rgba(255, 108, 108, 0.16);
+    border-color: rgba(255, 108, 108, 0.22);
+}
+
+.react-console-side-note {
+    color: var(--react-muted);
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.react-console-main {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    overflow: hidden;
+}
+
+.react-console-terminal-card {
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    overflow: hidden;
+}
+
+.react-console-terminal-head,
+.react-console-chart-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 18px 18px 14px;
+}
+
+.react-console-terminal-head h2,
+.react-console-chart-head h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+.react-console-chart-note {
+    margin-top: 6px;
+    color: var(--react-muted);
+    font-size: 0.84rem;
+}
+
+.react-console-terminal-tools {
+    display: inline-flex;
+    gap: 10px;
+}
+
+.react-console-mini-toggle {
+    min-height: 38px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--react-text);
+    font-weight: 700;
+}
+
+.react-console-mini-toggle.is-active {
+    border-color: rgba(41, 197, 206, 0.28);
+    background: rgba(41, 197, 206, 0.14);
+}
+
+.react-console-terminal-body {
+    min-height: 0;
+    padding: 0 18px 18px;
+    position: relative;
+    overflow: hidden;
+}
+
+.react-console-terminal-body .xterm {
+    height: 100%;
+}
+
+.react-console-terminal-body .xterm-viewport {
+    border-radius: 18px;
+}
+
+.react-console-terminal-placeholder {
+    height: 100%;
+    min-height: 320px;
+    display: grid;
+    place-items: center;
+    border-radius: 18px;
+    background: rgba(11, 18, 26, 0.4);
+    color: var(--react-muted);
+}
+
+.react-console-terminal-body.is-loading {
+    min-height: 320px;
+}
+
+.react-console-command-row {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 88px;
+    gap: 12px;
+    align-items: center;
+    padding: 14px 18px 18px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.react-console-command-prefix {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    border-radius: 14px;
+    background: rgba(11, 18, 26, 0.4);
+    color: var(--react-muted);
+    font-weight: 800;
+}
+
+.react-console-command-input {
+    width: 100%;
+    min-height: 44px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(11, 18, 26, 0.4);
+    color: var(--react-text);
+    padding: 0 14px;
+    outline: none;
+}
+
+.react-console-send {
+    min-height: 44px;
+    border-radius: 14px;
+    border: 1px solid rgba(41, 197, 206, 0.24);
+    background: rgba(41, 197, 206, 0.14);
+    color: var(--react-text);
+    font-weight: 800;
+}
+
+.react-console-send:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.react-console-chart-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.react-console-chart-card {
+    padding-bottom: 12px;
+    overflow: hidden;
+}
+
+.react-console-chart-value {
+    font-size: 1.15rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.react-console-sparkline {
+    width: calc(100% - 24px);
+    height: 132px;
+    margin: 0 12px 12px;
+    display: block;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.01) 100%);
+}
+
+@media (max-width: 1180px) {
+    .react-console-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .react-console-side {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .react-console-chart-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 820px) {
+    .react-console-subnav,
+    .react-console-layout {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .react-console-side {
+        grid-template-columns: 1fr;
+    }
+
+    .react-console-command-row {
+        grid-template-columns: 1fr;
+    }
+
+    .react-console-command-prefix {
+        display: none;
+    }
+
+    .react-console-terminal-head,
+    .react-console-chart-head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

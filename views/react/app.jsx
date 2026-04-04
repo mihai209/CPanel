@@ -1,8 +1,9 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { ReactRoutes } from './ReactRoutes.js';
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { ReactRoutes, isServerConsolePath } from './ReactRoutes.js';
 import { DashboardPage } from './dashboard.jsx';
+import { ServerConsolePage } from './server-console.jsx';
 import { AccountPage } from './account.jsx';
 import { DeviceLoginPage } from './device-login.jsx';
 import { ExperimentalFeaturesPage } from './experimental-features.jsx';
@@ -21,6 +22,7 @@ function normalizePathname(pathname) {
 function resolveComponentForPath(pathname) {
     const current = normalizePathname(pathname);
     if (current === ReactRoutes.dashboard) return DashboardPage;
+    if (isServerConsolePath(current)) return ServerConsolePage;
     if (current === ReactRoutes.account) return AccountPage;
     if (current === ReactRoutes.deviceLogin) return DeviceLoginPage;
     if (current === ReactRoutes.experimentalFeatures) return ExperimentalFeaturesPage;
@@ -107,7 +109,7 @@ function RoutedPage() {
 
     const CurrentComponent = resolveComponentForPath(pathname);
     if (!CurrentComponent) {
-        return null;
+        return <FullReloadFallback />;
     }
     if (loading && normalizePathname(pageData.routePath || '/') !== pathname) {
         return <LoadingRoute pageData={pageData} pathname={pathname} />;
@@ -120,6 +122,7 @@ function AppRouter() {
         <BrowserRouter>
             <Routes>
                 <Route path={ReactRoutes.dashboard} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverConsolePattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.account} element={<RoutedPage />} />
                 <Route path={ReactRoutes.deviceLogin} element={<RoutedPage />} />
                 <Route path={ReactRoutes.experimentalFeatures} element={<RoutedPage />} />
