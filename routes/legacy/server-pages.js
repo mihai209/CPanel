@@ -938,7 +938,7 @@ function registerServerPagesRoutes(ctx) {
                     reactEntry: 'dashboard',
                     reactPageData: {
                         brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
-                        faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/favicon.ico',
+                        faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
                         user: req.session.user,
                         servers: orderedServers.map((server) => ({
                             id: server.id,

@@ -5,7 +5,7 @@ const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const root = createRoot(document.getElementById('reactRoot'));
 
 function resolveBrandImage() {
-    return data.faviconUrl || '/favicon.ico';
+    return data.faviconUrl || '/assets/rocky.png';
 }
 
 function resolveUserAvatar(user) {
