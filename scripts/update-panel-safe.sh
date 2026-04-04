@@ -21,6 +21,32 @@ cd "$repo_root"
 
 git config advice.addIgnoredFile false >/dev/null 2>&1 || true
 
+UPDATER_MANAGED_FILES=(
+  "package.json"
+  "package-lock.json"
+  "pnpm-lock.yaml"
+  ".npmrc"
+  "scripts/update-panel-safe.sh"
+)
+
+restore_updater_managed_files() {
+  local existing=()
+  local path
+  for path in "${UPDATER_MANAGED_FILES[@]}"; do
+    if git cat-file -e "HEAD:$path" >/dev/null 2>&1; then
+      existing+=("$path")
+    fi
+  done
+
+  if [ "${#existing[@]}" -eq 0 ]; then
+    return 0
+  fi
+
+  echo "===> Refreshing updater-managed files from latest HEAD..."
+  git restore --source=HEAD --staged --worktree -- "${existing[@]}" 2>/dev/null \
+    || git checkout HEAD -- "${existing[@]}"
+}
+
 echo "===> Using repo: $repo_root"
 
 # ---------------------------------------------------------
@@ -95,7 +121,7 @@ fi
 
 # ---------------------------------------------------------
 
-# 5. Reapply local changes (user wins)
+# 5. Reapply local changes
 
 # ---------------------------------------------------------
 
@@ -113,6 +139,14 @@ git commit -m "auto-resolve: keep local changes" || true
 
 fi
 fi
+
+# ---------------------------------------------------------
+
+# 5.5. Keep updater files on latest repo version
+
+# ---------------------------------------------------------
+
+restore_updater_managed_files
 
 # ---------------------------------------------------------
 
