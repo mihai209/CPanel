@@ -276,6 +276,17 @@
                 border-color: rgba(59, 130, 246, 0.3);
             }
 
+            .status-reinstalling .status-dot {
+                background: #f59e0b;
+                animation: pulse 2s infinite;
+            }
+
+            .status-reinstalling {
+                background: rgba(245, 158, 11, 0.15);
+                color: #f59e0b;
+                border-color: rgba(245, 158, 11, 0.3);
+            }
+
             @keyframes pulse {
 
                 0%,
@@ -1276,7 +1287,8 @@ const consoleShortcuts = [
     { action: 'Restart server', keys: 'Ctrl + Shift + R' },
     { action: 'Start/Stop server', keys: 'Ctrl + Shift + S' }
 ];
-const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing', 'starting'].includes(String(server.status || '').toLowerCase());
+const initialProvisioningStatus = String(server.status || '').toLowerCase();
+const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing', 'reinstalling', 'starting'].includes(initialProvisioningStatus);
 %>
         <div class="wrapper">
             <!-- Sidebar -->
@@ -1330,11 +1342,13 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                     <div id="provisioningScreen" class="provisioning-screen <%= isRestrictedProvisioningViewer ? '' : 'd-none' %>">
                         <div class="provisioning-screen-card">
                             <img src="/assets/welcoming-rocky.png" alt="Provisioning" class="provisioning-screen-image">
-                            <h2 class="provisioning-screen-title" id="provisioningScreenTitle"><%= String(server.status || '').toLowerCase() === 'starting' ? 'Starting Server' : 'Running Installer' %></h2>
+                            <h2 class="provisioning-screen-title" id="provisioningScreenTitle"><%= initialProvisioningStatus === 'starting' ? 'Starting Server' : (initialProvisioningStatus === 'reinstalling' ? 'Reinstalling Server' : 'Running Installer') %></h2>
                             <p class="provisioning-screen-message" id="provisioningScreenMessage">
-                                <%= String(server.status || '').toLowerCase() === 'starting'
+                                <%= initialProvisioningStatus === 'starting'
                                     ? 'Your server is starting for the first time. Most actions stay locked until the runtime container is ready.'
-                                    : 'Your server is being created and configured. This usually finishes in under a minute.' %>
+                                    : (initialProvisioningStatus === 'reinstalling'
+                                        ? 'Your server is being reinstalled. Existing runtime content is being refreshed before the console becomes available again.'
+                                        : 'Your server is being created and configured. This usually finishes in under a minute.') %>
                             </p>
                             <div class="provisioning-screen-status">
                                 <i class="bi bi-hourglass-split"></i>
@@ -1344,10 +1358,10 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                         </div>
                     </div>
 
-                    <div id="adminInstallScreen" class="admin-install-screen <%= user && user.isAdmin && ['installing', 'starting'].includes(String(server.status || '').toLowerCase()) ? '' : 'd-none' %>">
+                    <div id="adminInstallScreen" class="admin-install-screen <%= user && user.isAdmin && ['installing', 'reinstalling', 'starting'].includes(initialProvisioningStatus) ? '' : 'd-none' %>">
                         <div class="admin-install-header">
                             <div>
-                                <h2 class="admin-install-title" id="adminInstallTitle"><%= String(server.status || '').toLowerCase() === 'starting' ? 'Starting Runtime Container' : 'Running Installer' %></h2>
+                                <h2 class="admin-install-title" id="adminInstallTitle"><%= initialProvisioningStatus === 'starting' ? 'Starting Runtime Container' : (initialProvisioningStatus === 'reinstalling' ? 'Reinstalling Server Runtime' : 'Running Installer') %></h2>
                                 <p class="admin-install-message" id="adminInstallMessage">Complete install output from the runtime builder is shown below.</p>
                             </div>
                             <div class="admin-install-badge">
@@ -1374,7 +1388,7 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                         <div class="alert alert-danger py-2 mb-3"><%= error %></div>
                     <% } %>
 
-                    <div id="consoleGrid" class="console-grid <%= (isRestrictedProvisioningViewer || (user && user.isAdmin && ['installing', 'starting'].includes(String(server.status || '').toLowerCase()))) ? 'd-none' : '' %>">
+                    <div id="consoleGrid" class="console-grid <%= (isRestrictedProvisioningViewer || (user && user.isAdmin && ['installing', 'reinstalling', 'starting'].includes(initialProvisioningStatus))) ? 'd-none' : '' %>">
                         <!-- Terminal Container -->
                         <div class="terminal-container">
                         <div class="terminal-header">
@@ -2357,7 +2371,7 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                 { key: 'start', label: 'Start Server' }
             ];
             const provisioningState = {
-                active: ['installing', 'starting'].includes(currentServerStatus),
+                active: ['installing', 'reinstalling', 'starting'].includes(currentServerStatus),
                 stages: Object.fromEntries(provisioningStageDefs.map((entry) => [entry.key, { status: 'pending', note: '' }])),
                 adminLines: [],
                 lastSummary: ''
@@ -2365,7 +2379,8 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
             const adminInstallLogLines = [];
 
             const stripAnsiSequences = (value) => String(value || '').replace(/\x1B\[[0-9;]*[A-Za-z]/g, '');
-            const isProvisioningStatus = (status) => ['installing', 'starting'].includes(String(status || '').toLowerCase());
+            const isProvisioningStatus = (status) => ['installing', 'reinstalling', 'starting'].includes(String(status || '').toLowerCase());
+            const isReinstallingStatus = (status) => String(status || '').toLowerCase() === 'reinstalling';
 
             function renderProvisioningPanel() {
                 if (!provisioningPanel || !provisioningStagesEl) return;
@@ -2374,10 +2389,12 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                 provisioningPanel.classList.toggle('d-none', !shouldShow);
                 if (!shouldShow) return;
 
-                provisioningTitle.textContent = isAdminConsoleViewer ? 'Server Provisioning' : 'Creating server';
+                provisioningTitle.textContent = isAdminConsoleViewer
+                    ? (isReinstallingStatus(currentServerStatus) ? 'Server Reinstall' : 'Server Provisioning')
+                    : (isReinstallingStatus(currentServerStatus) ? 'Reinstalling server' : 'Creating server');
                 provisioningSummary.textContent = provisioningState.lastSummary || (isAdminConsoleViewer
-                    ? 'Waiting for connector install activity.'
-                    : 'The server is being prepared. This can take a minute.');
+                    ? (isReinstallingStatus(currentServerStatus) ? 'Waiting for connector reinstall activity.' : 'Waiting for connector install activity.')
+                    : (isReinstallingStatus(currentServerStatus) ? 'The server runtime is being refreshed. This can take a minute.' : 'The server is being prepared. This can take a minute.'));
 
                 const failed = provisioningStageDefs.some((entry) => provisioningState.stages[entry.key].status === 'fail');
                 const done = provisioningStageDefs.every((entry) => {
@@ -2480,7 +2497,7 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
 
             function renderProvisioningAccessState(status) {
                 const lowerStatus = String(status || '').toLowerCase();
-                const blocked = ['installing', 'starting'].includes(lowerStatus);
+                const blocked = ['installing', 'reinstalling', 'starting'].includes(lowerStatus);
                 const adminBlocked = isAdminConsoleViewer && blocked;
                 const userBlocked = restrictedProvisioningViewer && blocked;
                 if (terminalWrapper) {
@@ -2504,23 +2521,31 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                     provisioningScreenStatus.textContent = lowerStatus.toUpperCase();
                 }
                 if (provisioningScreenTitle && userBlocked) {
-                    provisioningScreenTitle.textContent = lowerStatus === 'starting' ? 'Starting Server' : 'Running Installer';
+                    provisioningScreenTitle.textContent = lowerStatus === 'starting'
+                        ? 'Starting Server'
+                        : (lowerStatus === 'reinstalling' ? 'Reinstalling Server' : 'Running Installer');
                 }
                 if (provisioningScreenMessage && userBlocked) {
                     provisioningScreenMessage.textContent = lowerStatus === 'starting'
                         ? 'Your server is starting for the first time. Most actions stay locked until the runtime container is ready.'
-                        : 'Your server is being created and configured. This usually finishes in under a minute.';
+                        : (lowerStatus === 'reinstalling'
+                            ? 'Your server is being reinstalled. Existing runtime content is being refreshed before the console becomes available again.'
+                            : 'Your server is being created and configured. This usually finishes in under a minute.');
                 }
                 if (adminInstallStatus && adminBlocked) {
                     adminInstallStatus.textContent = lowerStatus.toUpperCase();
                 }
                 if (adminInstallTitle && adminBlocked) {
-                    adminInstallTitle.textContent = lowerStatus === 'starting' ? 'Starting Runtime Container' : 'Running Installer';
+                    adminInstallTitle.textContent = lowerStatus === 'starting'
+                        ? 'Starting Runtime Container'
+                        : (lowerStatus === 'reinstalling' ? 'Reinstalling Server Runtime' : 'Running Installer');
                 }
                 if (adminInstallMessage && adminBlocked) {
                     adminInstallMessage.textContent = lowerStatus === 'starting'
                         ? 'The runtime container is starting. Full connector and installer output is streamed below.'
-                        : 'Complete install output from the runtime builder is shown below.';
+                        : (lowerStatus === 'reinstalling'
+                            ? 'Complete reinstall output from the runtime builder is shown below.'
+                            : 'Complete install output from the runtime builder is shown below.');
                 }
             }
 
@@ -2580,8 +2605,12 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
 
             if (isProvisioningStatus(currentServerStatus)) {
                 activateProvisioning(isAdminConsoleViewer
-                    ? 'Waiting for connector install activity.'
-                    : 'Your server is being created. You can keep this page open while it finishes.');
+                    ? (isReinstallingStatus(currentServerStatus)
+                        ? 'Waiting for connector reinstall activity.'
+                        : 'Waiting for connector install activity.')
+                    : (isReinstallingStatus(currentServerStatus)
+                        ? 'Your server is being reinstalled. You can keep this page open while the runtime is refreshed.'
+                        : 'Your server is being created. You can keep this page open while it finishes.'));
             }
             renderProvisioningPanel();
             renderProvisioningAccessState(currentServerStatus);
@@ -3679,6 +3708,13 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                         btnStop.classList.add('d-none');
                         btnKill.disabled = false;
                         btnKill.classList.remove('d-none');
+                    } else if (isProvisioningStatus(nextStatus) || nextStatus === 'error') {
+                        btnStart.disabled = true;
+                        btnRestart.disabled = true;
+                        btnStop.disabled = true;
+                        btnStop.classList.remove('d-none');
+                        btnKill.disabled = true;
+                        btnKill.classList.add('d-none');
                     } else {
                         btnStart.disabled = false;
                         btnRestart.disabled = true;
@@ -3698,8 +3734,12 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
                 if (provisioningContext) {
                     if (isProvisioningStatus(nextStatus)) {
                         activateProvisioning(isAdminConsoleViewer
-                            ? 'Connector is provisioning the runtime container.'
-                            : 'Your server is being created. This usually takes less than a minute.');
+                            ? (isReinstallingStatus(nextStatus)
+                                ? 'Connector is reinstalling the runtime container and refreshing server files.'
+                                : 'Connector is provisioning the runtime container.')
+                            : (isReinstallingStatus(nextStatus)
+                                ? 'Your server is being reinstalled. Existing runtime content is being refreshed now.'
+                                : 'Your server is being created. This usually takes less than a minute.'));
                     } else if (nextStatus === 'running') {
                         completeProvisioningStage('prepare', 'Ready');
                         completeProvisioningStage('install', 'Ready');

@@ -293,6 +293,8 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, Settings, md5
                 avatarUrl: user.avatarUrl,
                 avatarProvider: user.avatarProvider,
                 uiTheme: getUserThemeId(user.toJSON ? user.toJSON() : user),
+                experimentalAiEnabled: Boolean(user.experimentalAiEnabled),
+                experimentalViewMode: String(user.experimentalViewMode || 'ejs').trim().toLowerCase() === 'react' ? 'react' : 'ejs',
                 loginMethod: normalizedLoginType
             };
 
@@ -318,7 +320,9 @@ function registerOAuthRoutes({ app, passport, User, LinkedAccount, Settings, md5
                 avatarUrl: user.avatarUrl,
                 avatarProvider: user.avatarProvider,
                 gravatarHash: md5(user.email.trim().toLowerCase()),
-                uiTheme: getUserThemeId(user.toJSON ? user.toJSON() : user)
+                uiTheme: getUserThemeId(user.toJSON ? user.toJSON() : user),
+                experimentalAiEnabled: Boolean(user.experimentalAiEnabled),
+                experimentalViewMode: String(user.experimentalViewMode || 'ejs').trim().toLowerCase() === 'react' ? 'react' : 'ejs'
             };
             req.session.save(() => {
                 Promise.resolve(

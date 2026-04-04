@@ -42,20 +42,24 @@ function registerLocalsMiddleware(app, Settings, User, settingsCache = null) {
 
         let activeThemeId = DEFAULT_THEME_ID;
         let activeUserCustomTheme = getUserCustomTheme(null);
+        let experimentalViewMode = 'ejs';
         try {
             if (req.session && req.session.user) {
                 const sessionMissingTheme = !req.session.user.uiTheme;
                 const sessionMissingCustomTheme = !req.session.user.uiCustomTheme;
-                if ((sessionMissingTheme || sessionMissingCustomTheme) && User && req.session.user.id) {
-                    const account = await User.findByPk(req.session.user.id, { attributes: ['id', 'permissions'] });
+                const sessionMissingViewMode = !req.session.user.experimentalViewMode;
+                if ((sessionMissingTheme || sessionMissingCustomTheme || sessionMissingViewMode) && User && req.session.user.id) {
+                    const account = await User.findByPk(req.session.user.id, { attributes: ['id', 'permissions', 'experimentalViewMode'] });
                     if (account) {
                         const accountData = account.toJSON();
                         req.session.user.uiTheme = getUserThemeId(accountData);
                         req.session.user.uiCustomTheme = getUserCustomTheme(accountData);
+                        req.session.user.experimentalViewMode = String(accountData.experimentalViewMode || 'ejs').trim().toLowerCase() === 'react' ? 'react' : 'ejs';
                     }
                 }
                 activeThemeId = normalizeThemeId(req.session.user.uiTheme);
                 activeUserCustomTheme = getUserCustomTheme(req.session.user);
+                experimentalViewMode = String(req.session.user.experimentalViewMode || 'ejs').trim().toLowerCase() === 'react' ? 'react' : 'ejs';
             }
         } catch (error) {
             console.warn('Failed to resolve user theme from session/db:', error.message || error);
@@ -65,6 +69,7 @@ function registerLocalsMiddleware(app, Settings, User, settingsCache = null) {
         res.locals.activeThemeCssPath = getThemeCssPath(activeThemeId);
         res.locals.activeUserCustomTheme = activeUserCustomTheme;
         res.locals.activeUserCustomThemeEnabled = Boolean(activeUserCustomTheme && activeUserCustomTheme.enabled);
+        res.locals.experimentalViewMode = experimentalViewMode;
         next();
     });
 }

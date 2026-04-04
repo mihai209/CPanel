@@ -1,0 +1,88 @@
+<%- include('../partials/header') %>
+<%- include('../partials/navbar') %>
+<%- include('../partials/error-modal') %>
+
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-12 d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+                <h2 class="text-light mb-1">Experimental Features</h2>
+                <div class="text-muted">Early-access features. Expect incomplete coverage and occasional breakage.</div>
+            </div>
+            <a href="/experimental/change-view" class="btn btn-outline-info">
+                <i class="bi bi-window-sidebar me-1"></i>Change View
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12 col-xl-7">
+            <div class="card border-0 shadow-sm h-100"
+                style="background-color: #141419; border: 1px solid rgba(255,255,255,0.05) !important; border-radius: 15px;">
+                <div class="card-body p-4">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                        <div>
+                            <h5 class="mb-1 text-light"><i class="bi bi-robot me-2 text-primary"></i>Rocky AI Agent</h5>
+                            <div class="text-muted small">Console assistant. Experimental and not guaranteed to be correct.</div>
+                            <div class="text-muted small mt-2">
+                                Daily quota: <span class="text-info"><%= quotaUsed %></span> / <span class="text-info"><%= quotaLimit %></span>
+                            </div>
+                            <% if (!aiAdminEnabled) { %>
+                                <div class="text-warning small mt-2">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>Admin has not enabled AI agents yet.
+                                </div>
+                            <% } %>
+                            <% if (aiAdminEnabled && !aiProviderReady) { %>
+                                <div class="text-warning small mt-2">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>No AI provider configured by admin.
+                                </div>
+                            <% } %>
+                        </div>
+                        <form action="/experimental-features/ai" method="POST" class="d-flex align-items-center gap-3">
+                            <div class="form-check form-switch text-light">
+                                <input class="form-check-input" type="checkbox" id="aiExperimentalToggle" name="enabled"
+                                    value="true" <%= user.experimentalAiEnabled ? 'checked' : '' %> <%= (!aiAdminEnabled || !aiProviderReady) ? 'disabled' : '' %>>
+                                <label class="form-check-label" for="aiExperimentalToggle">Enable</label>
+                            </div>
+                            <button type="submit" class="btn btn-outline-info btn-sm" <%= (!aiAdminEnabled || !aiProviderReady) ? 'disabled' : '' %>>
+                                Save
+                            </button>
+                        </form>
+                    </div>
+                    <div class="alert alert-warning mt-4 mb-0">
+                        <strong>Warning:</strong> Experimental features may be unstable and can change without notice.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-5">
+            <div class="card border-0 shadow-sm h-100"
+                style="background-color: #141419; border: 1px solid rgba(255,255,255,0.05) !important; border-radius: 15px;">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+                        <div>
+                            <h5 class="mb-1 text-light"><i class="bi bi-window me-2 text-info"></i>Interface Renderer</h5>
+                            <div class="text-muted small">Switch between the legacy EJS interface and the React beta shell.</div>
+                        </div>
+                        <span class="badge bg-dark border border-secondary-subtle text-light text-uppercase"><%= String(currentViewMode || 'ejs').toUpperCase() %></span>
+                    </div>
+                    <div class="small text-muted mb-3">
+                        React coverage in this build starts with the dashboard and falls back to legacy pages until each screen is ported.
+                    </div>
+                    <ul class="small text-muted ps-3 mb-4">
+                        <li>Default renderer: EJS</li>
+                        <li>React beta ignores custom themes and uses a fixed dark palette</li>
+                        <li>Switching view clears <code>localStorage</code> but keeps your active session</li>
+                    </ul>
+                    <a href="/experimental/change-view" class="btn btn-primary">
+                        <i class="bi bi-arrow-repeat me-1"></i>Open Change View
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

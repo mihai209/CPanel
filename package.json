@@ -19,10 +19,11 @@
     "buy-me-a-coffee": "https://www.buymeacoffee.com/mihai14launcher",
     "github": "https://github.com/sponsors/mihai209"
   },
-    "scripts": {
+  "scripts": {
     "create-user": "node scripts/create-user.js",
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "build:react": "node scripts/build-react.mjs",
     "fix-schema": "node scripts/fix-schema.js",
     "init:packages": "node scripts/init-packages.js",
     "upgrade-db": "node scripts/upgrade-db.js",
@@ -66,6 +67,8 @@
     "pg-hstore": "^2.3.4",
     "qrcode": "^1.5.4",
     "prismarine-nbt": "^2.7.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "adm-zip": "^0.5.12",
     "redis": "^5.8.2",
     "sequelize": "^6.37.7",
@@ -77,6 +80,7 @@
     "lusca": "^1.7.0"
   },
   "devDependencies": {
+    "esbuild": "^0.25.3",
     "nodemon": "^3.1.11"
   },
   "overrides": {

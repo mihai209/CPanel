@@ -356,6 +356,8 @@ function registerServerPagesRoutes(ctx) {
                         avatarUrl: user.avatarUrl,
                         avatarProvider: user.avatarProvider,
                         uiTheme: getUserThemeId(user.toJSON ? user.toJSON() : user),
+                        experimentalAiEnabled: Boolean(user.experimentalAiEnabled),
+                        experimentalViewMode: String(user.experimentalViewMode || 'ejs').trim().toLowerCase() === 'react' ? 'react' : 'ejs',
                         loginMethod: 'email'
                     };
 
@@ -380,7 +382,9 @@ function registerServerPagesRoutes(ctx) {
                     avatarUrl: user.avatarUrl,
                     avatarProvider: user.avatarProvider,
                     twoFactorEnabled: user.twoFactorEnabled,
-                    uiTheme: getUserThemeId(user.toJSON ? user.toJSON() : user)
+                    uiTheme: getUserThemeId(user.toJSON ? user.toJSON() : user),
+                    experimentalAiEnabled: Boolean(user.experimentalAiEnabled),
+                    experimentalViewMode: String(user.experimentalViewMode || 'ejs').trim().toLowerCase() === 'react' ? 'react' : 'ejs'
                 };
 
                 await new Promise((resolve, reject) => {
@@ -911,7 +915,7 @@ function registerServerPagesRoutes(ctx) {
             const pendingMaintenance = maintenanceEnabled ? maintenanceRaw.filter((entry) => !entry.completed).slice(0, 8) : [];
             const openSecurityAlerts = securityEnabled ? securityRaw.filter((entry) => entry.status !== 'resolved').slice(0, 8) : [];
 
-            res.render('dashboard', {
+            const dashboardViewData = {
                 user: req.session.user,
                 servers: orderedServers,
                 isAdminDashboard,
@@ -926,7 +930,39 @@ function registerServerPagesRoutes(ctx) {
                 dashboardTags,
                 dashboardLayout,
                 dashboardNowMs: Date.now()
-            });
+            };
+
+            if (String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
+                return res.render('react/loader', {
+                    title: 'React Dashboard',
+                    reactEntry: 'dashboard',
+                    reactPageData: {
+                        brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                        user: req.session.user,
+                        servers: orderedServers.map((server) => ({
+                            id: server.id,
+                            containerId: server.containerId,
+                            name: server.name,
+                            description: server.description || '',
+                            status: server.status || 'unknown',
+                            ownerUsername: server.owner && server.owner.username ? server.owner.username : '',
+                            memory: Number(server.memory || 0),
+                            disk: Number(server.disk || 0),
+                            cpu: Number(server.cpu || 0),
+                            databaseLimit: Number(server.databaseLimit || 0),
+                            tags: Array.isArray(server.tags) ? server.tags : []
+                        })),
+                        isAdminDashboard,
+                        openIncidents,
+                        pendingMaintenance,
+                        openSecurityAlerts,
+                        dashboardFolders,
+                        dashboardTags
+                    }
+                });
+            }
+
+            res.render('dashboard', dashboardViewData);
         } catch (err) {
             console.error("Dashboard Error:", err);
             res.status(500).send('Error loading dashboard: ' + err.message);
@@ -2468,7 +2504,7 @@ function registerServerPagesRoutes(ctx) {
         } else if (status === 'offline' || status === 'stopped') {
             score -= 15;
             factors.push('Server is not running');
-        } else if (status === 'installing' || status === 'starting') {
+        } else if (status === 'installing' || status === 'reinstalling' || status === 'starting') {
             score -= 10;
             factors.push('Server is in transition state');
         }
@@ -6846,7 +6882,7 @@ function registerServerPagesRoutes(ctx) {
 
     function isServerProvisioningRestrictedStatus(status) {
         const normalized = String(status || '').trim().toLowerCase();
-        return normalized === 'installing' || normalized === 'starting';
+        return normalized === 'installing' || normalized === 'reinstalling' || normalized === 'starting';
     }
 
     function isAllowedProvisioningRoutePath(routePath) {
@@ -20255,6 +20291,9 @@ function registerServerPagesRoutes(ctx) {
             const action = String(req.body.action || 'save').toLowerCase();
             const shouldRestart = action === 'apply';
             const shouldReinstall = action === 'reinstall';
+            if (shouldReinstall && isServerProvisioningRestrictedStatus(server.status)) {
+                return res.redirect(`/server/${server.containerId}/startup?error=${encodeURIComponent('Server is already provisioning. Wait for the current install/reinstall to finish.')}`);
+            }
 
             const updatePayload = {
                 variables: resolvedVariables,
@@ -20424,7 +20463,7 @@ function registerServerPagesRoutes(ctx) {
 
             await server.update({
                 ...updatePayload,
-                status: 'installing',
+                status: 'reinstalling',
                 isSuspended: false
             });
             await setServerStartupPresetSelection(server.id, selectedPresetId);

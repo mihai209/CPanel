@@ -2530,6 +2530,9 @@ app.post('/admin/servers/reinstall/:containerId', requireAuth, requireAdmin, asy
         });
         if (!server) return res.redirect('/admin/servers?error=Server not found.');
         if (!server.image) return res.redirect(`/admin/servers/${server.containerId}/manage?error=Server is missing image configuration.`);
+        if (['installing', 'reinstalling', 'starting'].includes(String(server.status || '').trim().toLowerCase())) {
+            return res.redirect(`/admin/servers/${server.containerId}/manage?error=Server is already provisioning. Wait for the current install/reinstall to finish.`);
+        }
 
         const primaryAllocation = await resolvePrimaryAllocationForServer(server, { includeConnector: true });
         if (!primaryAllocation) return res.redirect(`/admin/servers/${server.containerId}/manage?error=Server primary allocation is missing.`);
@@ -2597,7 +2600,7 @@ app.post('/admin/servers/reinstall/:containerId', requireAuth, requireAdmin, asy
             createdByUserId: req.session.user.id
         });
 
-        await server.update({ variables: resolvedVariables, status: 'installing', isSuspended: false });
+        await server.update({ variables: resolvedVariables, status: 'reinstalling', isSuspended: false });
         res.redirect(`/admin/servers/${server.containerId}/manage?success=${encodeURIComponent(`Reinstall queued as job #${installJob.id}.`)}`);
     } catch (err) {
         console.error('Error reinstalling server:', err);

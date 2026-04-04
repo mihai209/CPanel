@@ -285,7 +285,7 @@ function registerDefaultJobHandlers(jobQueue, deps) {
             pendingMigrationFileImports.set(serverId, payload.pendingFileImport);
         }
 
-        const updatePayload = { status: 'installing' };
+        const updatePayload = { status: payload.reinstall ? 'reinstalling' : 'installing' };
         if (payload.resolvedVariables && typeof payload.resolvedVariables === 'object') {
             updatePayload.variables = payload.resolvedVariables;
         }

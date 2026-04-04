@@ -1,0 +1,98 @@
+<%- include('../partials/header') %>
+<%- include('../partials/navbar') %>
+<%- include('../partials/error-modal') %>
+
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-12 d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div>
+                <h2 class="text-light mb-1">Change View</h2>
+                <div class="text-muted">Select the renderer used for migrated user-facing pages.</div>
+            </div>
+            <a href="/experimental-features" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Back to Experimental Features
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm h-100"
+                style="background-color: #141419; border: 1px solid rgba(255,255,255,0.05) !important; border-radius: 15px;">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                        <div>
+                            <div class="text-uppercase text-info small fw-semibold">Stable</div>
+                            <h5 class="mb-1 text-light">Legacy EJS View</h5>
+                            <div class="text-muted small">Current production renderer. Full feature coverage, custom themes, and all existing layouts.</div>
+                        </div>
+                        <% if (currentViewMode === 'ejs') { %>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
+                        <% } %>
+                    </div>
+                    <ul class="small text-muted ps-3 mb-4">
+                        <li>Full current panel coverage</li>
+                        <li>Supports custom themes and user custom theme builder</li>
+                        <li>Recommended if you need maximum compatibility</li>
+                    </ul>
+                    <form method="POST" action="/experimental/change-view">
+                        <input type="hidden" name="viewMode" value="ejs">
+                        <button type="submit" class="btn <%= currentViewMode === 'ejs' ? 'btn-outline-success' : 'btn-success' %>">
+                            <i class="bi bi-filetype-ejs me-1"></i>Use EJS View
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm h-100"
+                style="background-color: #101318; border: 1px solid rgba(59,130,246,0.18) !important; border-radius: 15px;">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                        <div>
+                            <div class="text-uppercase text-warning small fw-semibold">Experimental</div>
+                            <h5 class="mb-1 text-light">React Beta View</h5>
+                            <div class="text-muted small">New renderer under <code>views/react/*.jsx</code>. Fixed dark palette, no custom themes, and partial route coverage while screens are migrated.</div>
+                        </div>
+                        <% if (currentViewMode === 'react') { %>
+                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Active</span>
+                        <% } %>
+                    </div>
+                    <ul class="small text-muted ps-3 mb-4">
+                        <li>Uses a dedicated React shell and fixed dark look</li>
+                        <li>Clears <code>localStorage</code> after switching so old client state does not leak across renderers</li>
+                        <li>Current migrated screen in this build: dashboard</li>
+                    </ul>
+                    <form method="POST" action="/experimental/change-view">
+                        <input type="hidden" name="viewMode" value="react">
+                        <button type="submit" class="btn <%= currentViewMode === 'react' ? 'btn-outline-warning' : 'btn-warning' %> text-dark">
+                            <i class="bi bi-badge-ad me-1"></i>Use React Beta
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="alert alert-dark border border-secondary-subtle mt-4">
+        <div class="fw-semibold text-light mb-1">Apply behavior</div>
+        <div class="small text-muted mb-0">The saved preference is used on the next full page load. This page clears <code>localStorage</code> after a successful switch and then redirects you back into the panel.</div>
+    </div>
+</div>
+
+<% if (applied) { %>
+<script>
+(() => {
+    try {
+        window.localStorage.clear();
+    } catch (_) {}
+    window.setTimeout(() => {
+        window.location.replace('/dashboard');
+    }, 120);
+})();
+</script>
+<% } %>
+
+</body>
+</html>

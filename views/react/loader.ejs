@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<%= typeof csrfToken !== 'undefined' && csrfToken ? csrfToken : '' %>">
+    <title><%= ((typeof settings !== 'undefined' && settings && settings.brandName) ? settings.brandName : 'CPanel') %> - <%= title || 'React View' %></title>
+    <link rel="icon" type="image/png" href="<%= settings.faviconUrl %>">
+    <link rel="icon" type="image/x-icon" href="<%= settings.faviconUrl %>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/css/react-view.css">
+</head>
+<body class="react-view-body">
+    <div id="reactRoot"></div>
+    <div id="reactLoaderFallback" class="container py-5 d-none">
+        <div class="alert alert-dark border border-secondary-subtle">
+            <h4 class="mb-2">React bundle is not built yet</h4>
+            <div class="text-muted small mb-2">This view mode expects compiled files under <code>public/react-build/</code>.</div>
+            <div class="small text-muted mb-0">Run <code>npm install</code> and then <code>npm run build:react</code> inside <code>panel/</code>.</div>
+        </div>
+    </div>
+    <script>
+        window.__CPANEL_REACT_PAGE_DATA__ = <%- JSON.stringify(typeof reactPageData !== 'undefined' ? reactPageData : {}) %>;
+        window.__CPANEL_REACT_PAGE_META__ = <%- JSON.stringify({
+            entry: reactEntry || '',
+            title: title || 'React View'
+        }) %>;
+    </script>
+    <script>
+    (() => {
+        let booted = false;
+        window.__CPANEL_REACT_BOOTED__ = () => {
+            booted = true;
+        };
+        window.setTimeout(() => {
+            if (booted) return;
+            const fallback = document.getElementById('reactLoaderFallback');
+            if (fallback) fallback.classList.remove('d-none');
+        }, 1600);
+        window.__CPANEL_REACT_BUNDLE_ERROR__ = () => {
+            const fallback = document.getElementById('reactLoaderFallback');
+            if (fallback) fallback.classList.remove('d-none');
+        };
+    })();
+    </script>
+    <script src="/react-build/<%= reactEntry %>.js" onerror="window.__CPANEL_REACT_BUNDLE_ERROR__ && window.__CPANEL_REACT_BUNDLE_ERROR__()"></script>
+</body>
+</html>

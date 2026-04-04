@@ -35,10 +35,25 @@ function registerAccountRoutes({
         return false;
     };
 
+    const normalizeExperimentalViewMode = (value) => {
+        return String(value || '').trim().toLowerCase() === 'react' ? 'react' : 'ejs';
+    };
+
     const updateSessionThemeState = (req, themeId, customTheme) => {
         if (!req || !req.session || !req.session.user) return;
         if (themeId) req.session.user.uiTheme = normalizeThemeId(themeId);
         if (customTheme) req.session.user.uiCustomTheme = normalizeUserCustomThemeConfig(customTheme);
+    };
+
+    const updateSessionExperimentalState = (req, userLike = null) => {
+        if (!req || !req.session || !req.session.user) return;
+        const source = userLike && typeof userLike.toJSON === 'function' ? userLike.toJSON() : userLike;
+        if (source && Object.prototype.hasOwnProperty.call(source, 'experimentalAiEnabled')) {
+            req.session.user.experimentalAiEnabled = Boolean(source.experimentalAiEnabled);
+        }
+        if (source && Object.prototype.hasOwnProperty.call(source, 'experimentalViewMode')) {
+            req.session.user.experimentalViewMode = normalizeExperimentalViewMode(source.experimentalViewMode);
+        }
     };
 
     const getAiAdminConfig = async () => {
@@ -69,6 +84,32 @@ function registerAccountRoutes({
             if (Number.isInteger(parsed) && parsed > 0 && parsed < 10000) return parsed;
         } catch {}
         return 100;
+    };
+
+    const buildExperimentalFeaturesViewModel = async (user) => {
+        const aiAdminConfig = await getAiAdminConfig();
+        const providerReady = Array.isArray(aiAdminConfig.providers)
+            ? aiAdminConfig.providers.some((p) => p && p.enabled && p.apiKey)
+            : false;
+        const limit = await resolveAiDailyQuotaLimit(user);
+        const today = new Date().toISOString().slice(0, 10);
+        let used = 0;
+        try {
+            if (typeof getRedisClient === 'function') {
+                const redisClient = getRedisClient();
+                if (redisClient && redisClient.isReady) {
+                    const raw = await redisClient.get(`ai:quota:${user.id}:${today}`);
+                    const parsed = Number.parseInt(raw, 10);
+                    if (Number.isInteger(parsed)) used = parsed;
+                }
+            }
+        } catch {}
+        return {
+            aiAdminEnabled: Boolean(aiAdminConfig.enabled),
+            aiProviderReady: providerReady,
+            quotaUsed: used,
+            quotaLimit: limit
+        };
     };
 
     const applyPresetThemeForUser = async (user, rawTheme) => {
@@ -189,45 +230,32 @@ function registerAccountRoutes({
         }
     });
 
-    app.get('/experimental/ai', requireAuth, async (req, res) => {
+    app.get('/experimental-features', requireAuth, async (req, res) => {
         try {
             const user = await User.findByPk(req.session.user.id);
             if (!user) return res.redirect('/login');
-            const aiAdminConfig = await getAiAdminConfig();
-            const providerReady = Array.isArray(aiAdminConfig.providers)
-                ? aiAdminConfig.providers.some((p) => p && p.enabled && p.apiKey)
-                : false;
-            const limit = await resolveAiDailyQuotaLimit(user);
-            const today = new Date().toISOString().slice(0, 10);
-            let used = 0;
-            try {
-                if (typeof getRedisClient === 'function') {
-                    const redisClient = getRedisClient();
-                    if (redisClient && redisClient.isReady) {
-                        const raw = await redisClient.get(`ai:quota:${user.id}:${today}`);
-                        const parsed = Number.parseInt(raw, 10);
-                        if (Number.isInteger(parsed)) used = parsed;
-                    }
-                }
-            } catch {}
-            return res.render('experimental/ai', {
+            updateSessionExperimentalState(req, user);
+            const featureModel = await buildExperimentalFeaturesViewModel(user);
+            return res.render('experimental/features', {
                 user: user.toJSON(),
                 title: 'Experimental Features',
-                path: '/experimental/ai',
-                aiAdminEnabled: Boolean(aiAdminConfig.enabled),
-                aiProviderReady: providerReady,
-                quotaUsed: used,
-                quotaLimit: limit,
+                path: '/experimental-features',
+                currentViewMode: normalizeExperimentalViewMode(user.experimentalViewMode),
+                ...featureModel,
                 success: req.query.success || null,
                 error: req.query.error || null
             });
         } catch (err) {
-            console.error('Failed to load experimental AI page:', err);
+            console.error('Failed to load experimental features page:', err);
             return res.redirect('/account?error=' + encodeURIComponent('Failed to load experimental features.'));
         }
     });
 
-    app.post('/experimental/ai', requireAuth, async (req, res) => {
+    app.get('/experimental/ai', requireAuth, async (req, res) => {
+        return res.redirect('/experimental-features');
+    });
+
+    app.post('/experimental-features/ai', requireAuth, async (req, res) => {
         try {
             const user = await User.findByPk(req.session.user.id);
             if (!user) return res.redirect('/login');
@@ -236,17 +264,53 @@ function registerAccountRoutes({
                 ? aiAdminConfig.providers.some((p) => p && p.enabled && p.apiKey)
                 : false;
             if (!aiAdminConfig.enabled || !providerReady) {
-                return res.redirect('/experimental/ai?error=' + encodeURIComponent('AI agents are not enabled by admin.'));
+                return res.redirect('/experimental-features?error=' + encodeURIComponent('AI agents are not enabled by admin.'));
             }
             const enabled = parseToggle(req.body && req.body.enabled);
             await user.update({ experimentalAiEnabled: enabled });
-            if (req.session && req.session.user) {
-                req.session.user.experimentalAiEnabled = enabled;
-            }
-            return res.redirect('/experimental/ai?success=' + encodeURIComponent('Experimental AI setting updated.'));
+            updateSessionExperimentalState(req, { experimentalAiEnabled: enabled });
+            return res.redirect('/experimental-features?success=' + encodeURIComponent('Experimental AI setting updated.'));
         } catch (err) {
             console.error('Failed to update experimental AI setting:', err);
-            return res.redirect('/experimental/ai?error=' + encodeURIComponent('Failed to update setting.'));
+            return res.redirect('/experimental-features?error=' + encodeURIComponent('Failed to update setting.'));
+        }
+    });
+
+    app.post('/experimental/ai', requireAuth, async (req, res) => {
+        return res.redirect(307, '/experimental-features/ai');
+    });
+
+    app.get('/experimental/change-view', requireAuth, async (req, res) => {
+        try {
+            const user = await User.findByPk(req.session.user.id, { attributes: ['id', 'username', 'experimentalViewMode'] });
+            if (!user) return res.redirect('/login');
+            updateSessionExperimentalState(req, user);
+            return res.render('experimental/change-view', {
+                user: user.toJSON(),
+                title: 'Change View',
+                path: '/experimental/change-view',
+                currentViewMode: normalizeExperimentalViewMode(user.experimentalViewMode),
+                success: req.query.success || null,
+                error: req.query.error || null,
+                applied: String(req.query.applied || '') === '1'
+            });
+        } catch (err) {
+            console.error('Failed to load change-view page:', err);
+            return res.redirect('/experimental-features?error=' + encodeURIComponent('Failed to load change view settings.'));
+        }
+    });
+
+    app.post('/experimental/change-view', requireAuth, async (req, res) => {
+        try {
+            const user = await User.findByPk(req.session.user.id, { attributes: ['id', 'experimentalViewMode'] });
+            if (!user) return res.redirect('/login');
+            const nextMode = normalizeExperimentalViewMode(req.body && req.body.viewMode);
+            await user.update({ experimentalViewMode: nextMode });
+            updateSessionExperimentalState(req, { experimentalViewMode: nextMode });
+            return res.redirect(`/experimental/change-view?applied=1&success=${encodeURIComponent(`View preference saved. ${nextMode === 'react' ? 'React beta view is now enabled for migrated pages.' : 'Legacy EJS view is active again.'}`)}`);
+        } catch (err) {
+            console.error('Failed to update experimental view mode:', err);
+            return res.redirect('/experimental/change-view?error=' + encodeURIComponent('Failed to update view mode.'));
         }
     });
 

@@ -11,6 +11,8 @@ function createSessionAuthGuards({ User }) {
             }
             if (user) {
                 req.session.user.coins = Number.isFinite(Number(user.coins)) ? Number(user.coins) : 0;
+                req.session.user.experimentalAiEnabled = Boolean(user.experimentalAiEnabled);
+                req.session.user.experimentalViewMode = String(user.experimentalViewMode || 'ejs').trim().toLowerCase() === 'react' ? 'react' : 'ejs';
             }
             next();
         }).catch((error) => {
