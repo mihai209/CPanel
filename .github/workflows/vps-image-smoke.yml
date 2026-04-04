@@ -23,11 +23,11 @@ jobs:
 
       - name: Prepare smoke rootfs archive
         run: |
-          mkdir -p dist/rootfs
+          mkdir -p dist/rootfs dist/latest
           docker create --name cpanel-vps-rootfs-seed ubuntu:24.04 bash >/dev/null
           docker export cpanel-vps-rootfs-seed | tar -C dist/rootfs -xf -
           docker rm -f cpanel-vps-rootfs-seed >/dev/null
-          tar -C dist/rootfs -cJf dist/ubuntu-24.04-amd64.tar.xz .
+          tar -C dist/rootfs -cJf dist/latest/ubuntu-24.04-amd64.tar.xz .
 
       - name: Validate proot filesystem
         run: |
@@ -37,11 +37,13 @@ jobs:
             -e VPS_DISTRO=ubuntu \
             -e VPS_RELEASE=24.04 \
             -e ROOTFS_BASE_URL=file:///rootfs-tests \
-            -e ROOTFS_TAG= \
+            -e ROOTFS_TAG=latest \
             -v "${{ github.workspace }}/dist:/rootfs-tests:ro" \
             cpanel-vps:smoke \
             -lc '
               /opt/cpanel-vps/scripts/install.sh
+              test -d /home/container/rootfs/etc
+              test -x /usr/bin/proot || test -x /bin/proot
               PROOT_BIN="$(command -v proot)"
               test -x "${PROOT_BIN}"
               "${PROOT_BIN}" --rootfs=/home/container/rootfs -0 -w /root -b /dev -b /sys -b /proc -b /tmp:/tmp -b /home/container:/home/container /bin/bash -lc "test -d /etc && test -d /bin && test -d /usr && ls /etc /bin /usr >/dev/null"
