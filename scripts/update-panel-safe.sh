@@ -108,8 +108,7 @@ run_full_update() {
 
   restore_updater_managed_files
   install_dependencies
-  run_migrations_only
-  echo "===> Panel updated successfully!"
+  echo "===> Panel updated successfully! Run option 2 if you also need database migrations."
 }
 
 show_menu() {
