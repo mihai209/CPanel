@@ -4,6 +4,20 @@ import { createRoot } from 'react-dom/client';
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const root = createRoot(document.getElementById('reactRoot'));
 
+function resolveBrandImage() {
+    return data.faviconUrl || '/favicon.ico';
+}
+
+function resolveUserAvatar(user) {
+    if (user && user.avatarProvider === 'url' && user.avatarUrl) {
+        return user.avatarUrl;
+    }
+    if (user && user.gravatarHash) {
+        return `https://www.gravatar.com/avatar/${user.gravatarHash}?d=retro&s=80`;
+    }
+    return resolveBrandImage();
+}
+
 function formatStatus(status) {
     const value = String(status || 'unknown').toLowerCase();
     return value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ');
@@ -90,6 +104,8 @@ function DashboardApp() {
     const incidents = Array.isArray(data.openIncidents) ? data.openIncidents : [];
     const maintenance = Array.isArray(data.pendingMaintenance) ? data.pendingMaintenance : [];
     const security = Array.isArray(data.openSecurityAlerts) ? data.openSecurityAlerts : [];
+    const brandImage = resolveBrandImage();
+    const userAvatar = resolveUserAvatar(data.user || {});
 
     const runningCount = servers.filter((server) => String(server.status || '').toLowerCase() === 'running').length;
     const provisioningCount = servers.filter((server) => ['installing', 'reinstalling', 'starting'].includes(String(server.status || '').toLowerCase())).length;
@@ -102,7 +118,7 @@ function DashboardApp() {
                 <header className="react-basic-topbar">
                     <div className="react-basic-brand">
                         <div className="react-basic-brand-mark">
-                            <i className="bi bi-grid-3x3-gap-fill"></i>
+                            <img src={brandImage} alt={data.brandName || 'CPanel'} className="react-brand-image" />
                         </div>
                         <div>
                             <div className="react-basic-brand-title">{data.brandName || 'CPanel'}</div>
@@ -111,12 +127,11 @@ function DashboardApp() {
                     </div>
 
                     <div className="react-basic-actions">
-                        <TopAction href="https://github.com/mihai209/CPanel" icon="bi-house-door" active title="Github" />
-                        <TopAction href="/experimental-features" icon="bi-warning-fill" title="Experimental Features" />
+                        <TopAction href="/experimental-features" icon="bi-sliders" title="Experimental Features" />
                         <TopAction href="/account" icon="bi-person" title="Account" />
                         <TopAction href="/themes" icon="bi-palette2" title="Themes" />
                         <div className="react-basic-user">
-                            <i className="bi bi-person-circle"></i>
+                            <img src={userAvatar} alt={data.user && data.user.username ? data.user.username : 'User'} className="react-basic-user-avatar" />
                             <span>{data.user && data.user.username ? `@${data.user.username}` : 'Unknown'}</span>
                         </div>
                     </div>
@@ -134,21 +149,23 @@ function DashboardApp() {
                             </a>
                         </div>
 
-                        <div className="react-server-list">
-                            {servers.length > 0 ? (
-                                servers.map((server) => (
-                                    <ServerRow
-                                        key={server.id || server.containerId}
-                                        server={server}
-                                        isAdminDashboard={Boolean(data.isAdminDashboard)}
-                                    />
-                                ))
-                            ) : (
-                                <div className="react-empty-state">
-                                    <strong>No servers found</strong>
-                                    <span>Create a server or switch back to the legacy view if this looks wrong.</span>
-                                </div>
-                            )}
+                        <div className="react-server-list-scroll">
+                            <div className="react-server-list">
+                                {servers.length > 0 ? (
+                                    servers.map((server) => (
+                                        <ServerRow
+                                            key={server.id || server.containerId}
+                                            server={server}
+                                            isAdminDashboard={Boolean(data.isAdminDashboard)}
+                                        />
+                                    ))
+                                ) : (
+                                    <div className="react-empty-state">
+                                        <strong>No servers found</strong>
+                                        <span>Create a server or switch back to the legacy view if this looks wrong.</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </section>
 
