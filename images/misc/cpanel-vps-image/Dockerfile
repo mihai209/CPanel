@@ -1,3 +1,11 @@
+FROM --platform=$BUILDPLATFORM golang:1.24 AS ssh-builder
+
+WORKDIR /src/ssh
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+COPY ssh /src/ssh
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/cpanel-vps-ssh ./cmd/cpanel-vps-ssh
+
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -34,15 +42,17 @@ RUN apt-get update \
         zip \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /home/container /opt/cpanel-vps/scripts
+RUN mkdir -p /home/container /opt/cpanel-vps/scripts /opt/cpanel-vps/bin
 
+COPY --from=ssh-builder /out/cpanel-vps-ssh /opt/cpanel-vps/bin/cpanel-vps-ssh
 COPY scripts/common.sh /opt/cpanel-vps/scripts/common.sh
 COPY scripts/entrypoint.sh /opt/cpanel-vps/scripts/entrypoint.sh
 COPY scripts/helper.sh /opt/cpanel-vps/scripts/helper.sh
 COPY scripts/install.sh /opt/cpanel-vps/scripts/install.sh
 COPY scripts/run.sh /opt/cpanel-vps/scripts/run.sh
+COPY scripts/start-ssh.sh /opt/cpanel-vps/scripts/start-ssh.sh
 
-RUN chmod +x /opt/cpanel-vps/scripts/*.sh
+RUN chmod +x /opt/cpanel-vps/scripts/*.sh /opt/cpanel-vps/bin/cpanel-vps-ssh
 
 WORKDIR /home/container
 ENTRYPOINT ["/opt/cpanel-vps/scripts/entrypoint.sh"]

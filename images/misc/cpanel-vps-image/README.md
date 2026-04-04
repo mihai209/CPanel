@@ -39,8 +39,9 @@ docker build -t ghcr.io/mihai209/cpanel-vps:rootfs panel/images/misc/cpanel-vps-
 ## Runtime model
 
 - `entrypoint.sh` prepares `/home/container`
-- `install.sh` downloads and extracts the requested rootfs
+- `install.sh` downloads and extracts the requested rootfs directly from `ROOTFS_BASE_URL`
 - `run.sh` launches an interactive `proot` shell inside that rootfs
+- `get-ssh` starts the bundled Go SSH server from inside the VPS shell
 - distro selection happens through egg variables:
   - `VPS_DISTRO`
   - `VPS_RELEASE`
@@ -52,6 +53,29 @@ docker build -t ghcr.io/mihai209/cpanel-vps:rootfs panel/images/misc/cpanel-vps-
   - `Ubuntu 24.04`
   - `Debian 12`
   - `Debian 13`
+
+## SSH runtime
+
+The runtime creates `/home/container/ssh-conf.yml` automatically on first boot:
+
+```yaml
+SSH_PORT: 2222
+SSH_USERNAME: root
+SSH_PASSWORD: generated-on-first-boot
+TIMEOUT: 5m
+SSH_LOG: /logs/latest.txt
+```
+
+Notes:
+
+- `PORT2` is the recommended external allocation for `SSH_PORT`.
+- If `TIMEOUT` is `0`, sessions never auto-close.
+- `/logs/latest.txt` is backed by `/home/container/logs/latest.txt`.
+- Start the listener from the VPS shell with:
+
+```bash
+get-ssh
+```
 
 ## Validation
 

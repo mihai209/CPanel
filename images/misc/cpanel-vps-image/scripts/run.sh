@@ -36,6 +36,7 @@ exec "${PROOT_BIN}" \
     -b /sys \
     -b /proc \
     -b /tmp:/tmp \
+    -b "${HOME}/logs:/logs" \
     -b "${HOME}:/home/container" \
-    -b /opt/cpanel-vps/scripts:/opt/cpanel-vps/scripts \
+    -b /opt/cpanel-vps:/opt/cpanel-vps \
     /bin/bash --rcfile /root/.cpanel_vps_rc -i
