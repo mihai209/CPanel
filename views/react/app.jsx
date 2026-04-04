@@ -12,6 +12,7 @@ import ReactAppShell from './components/ReactAppShell.jsx';
 
 const initialPageData = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const root = createRoot(document.getElementById('reactRoot'));
+const HARD_FALLBACK_GUARD_KEY = 'cpanel.react.hard-fallback';
 
 function normalizePathname(pathname) {
     const value = String(pathname || '/').trim();
@@ -50,6 +51,46 @@ async function fetchReactPageData(pathname, search = '') {
     return payload;
 }
 
+function readHardFallbackGuard() {
+    try {
+        const raw = sessionStorage.getItem(HARD_FALLBACK_GUARD_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+}
+
+function clearHardFallbackGuard(pathname = '') {
+    try {
+        const current = readHardFallbackGuard();
+        const normalized = `${pathname || ''}`;
+        if (!current || !normalized || current.path === normalized) {
+            sessionStorage.removeItem(HARD_FALLBACK_GUARD_KEY);
+        }
+    } catch {
+        // Ignore session storage failures.
+    }
+}
+
+function performSafeHardFallback(pathname, search = '') {
+    const target = `${pathname || '/'}${search || ''}`;
+    const now = Date.now();
+    const current = readHardFallbackGuard();
+    if (current && current.path === target && now - Number(current.at || 0) < 8000) {
+        return false;
+    }
+    try {
+        sessionStorage.setItem(HARD_FALLBACK_GUARD_KEY, JSON.stringify({
+            path: target,
+            at: now
+        }));
+    } catch {
+        // Ignore session storage failures.
+    }
+    window.location.replace(target);
+    return true;
+}
+
 function LoadingRoute({ pageData, pathname }) {
     return (
         <ReactAppShell pageData={pageData} subtitle="Loading React route">
@@ -67,10 +108,31 @@ function LoadingRoute({ pageData, pathname }) {
 
 function FullReloadFallback() {
     const location = useLocation();
+    const [blocked, setBlocked] = React.useState(false);
     React.useEffect(() => {
-        window.location.assign(`${location.pathname}${location.search || ''}`);
+        const didFallback = performSafeHardFallback(location.pathname, location.search || '');
+        if (!didFallback) {
+            setBlocked(true);
+        }
     }, [location.pathname, location.search]);
-    return null;
+    if (!blocked) return null;
+    return (
+        <ReactAppShell pageData={initialPageData} subtitle="React fallback blocked">
+            <main className="react-experimental-layout">
+                <div className="react-experimental-scroll">
+                    <div className="react-account-card">
+                        <div className="react-account-section-title">React route fallback was blocked</div>
+                        <div className="react-account-muted">
+                            The same route tried to hard-reload repeatedly. The auto-reload was stopped to avoid an infinite loop.
+                        </div>
+                        <div className="react-account-inline-actions" style={{ marginTop: '14px' }}>
+                            <a href="/experimental/change-view" className="react-account-button is-primary">Open Change View</a>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </ReactAppShell>
+    );
 }
 
 function RoutedPage() {
@@ -78,15 +140,21 @@ function RoutedPage() {
     const pathname = normalizePathname(location.pathname);
     const [pageData, setPageData] = React.useState(initialPageData);
     const [loading, setLoading] = React.useState(false);
+    const [fallbackBlocked, setFallbackBlocked] = React.useState(false);
 
     React.useEffect(() => {
         const targetPath = normalizePathname(location.pathname);
         const currentPath = normalizePathname(pageData.routePath || initialPageData.routePath || '/');
         const PageComponent = resolveComponentForPath(targetPath);
         if (!PageComponent) {
-            window.location.assign(`${location.pathname}${location.search || ''}`);
+            const didFallback = performSafeHardFallback(location.pathname, location.search || '');
+            if (!didFallback) {
+                setFallbackBlocked(true);
+            }
             return;
         }
+        clearHardFallbackGuard(`${location.pathname}${location.search || ''}`);
+        setFallbackBlocked(false);
         if (targetPath === currentPath) return;
 
         let cancelled = false;
@@ -96,10 +164,16 @@ function RoutedPage() {
                 if (cancelled) return;
                 setPageData(nextPageData);
                 setLoading(false);
+                clearHardFallbackGuard(`${location.pathname}${location.search || ''}`);
+                setFallbackBlocked(false);
             })
             .catch(() => {
                 if (cancelled) return;
-                window.location.assign(`${location.pathname}${location.search || ''}`);
+                const didFallback = performSafeHardFallback(location.pathname, location.search || '');
+                if (!didFallback) {
+                    setLoading(false);
+                    setFallbackBlocked(true);
+                }
             });
 
         return () => {
@@ -110,6 +184,25 @@ function RoutedPage() {
     const CurrentComponent = resolveComponentForPath(pathname);
     if (!CurrentComponent) {
         return <FullReloadFallback />;
+    }
+    if (fallbackBlocked) {
+        return (
+            <ReactAppShell pageData={pageData} subtitle="React route fallback blocked">
+                <main className="react-experimental-layout">
+                    <div className="react-experimental-scroll">
+                        <div className="react-account-card">
+                            <div className="react-account-section-title">React route fallback was blocked</div>
+                            <div className="react-account-muted">
+                                This route kept trying to reload itself. Auto-reload was stopped so you can switch back to EJS or report the route.
+                            </div>
+                            <div className="react-account-inline-actions" style={{ marginTop: '14px' }}>
+                                <a href="/experimental/change-view" className="react-account-button is-primary">Open Change View</a>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </ReactAppShell>
+        );
     }
     if (loading && normalizePathname(pageData.routePath || '/') !== pathname) {
         return <LoadingRoute pageData={pageData} pathname={pathname} />;
