@@ -449,3 +449,355 @@ body.react-view-body {
         grid-template-columns: 1fr;
     }
 }
+
+.react-account-page {
+    overflow: hidden;
+}
+
+.react-account-shell {
+    height: calc(100vh - 56px);
+}
+
+.react-account-layout {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.react-account-main {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.react-account-scroll {
+    height: 100%;
+    overflow-y: auto;
+    padding: 22px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+.react-account-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.react-account-card {
+    border-radius: 20px;
+    border: 1px solid var(--react-border);
+    background: rgba(255, 255, 255, 0.04);
+    padding: 18px;
+}
+
+.react-account-profile-card {
+    grid-column: 1 / -1;
+}
+
+.react-account-profile {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.react-account-avatar {
+    width: 88px;
+    height: 88px;
+    border-radius: 24px;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.react-account-profile h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 800;
+}
+
+.react-account-username,
+.react-account-email,
+.react-account-muted {
+    margin-top: 4px;
+    color: var(--react-muted);
+}
+
+.react-account-badges,
+.react-account-inline-actions,
+.react-account-form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.react-account-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.react-account-badge.is-success {
+    color: var(--react-good);
+}
+
+.react-account-badge.is-info {
+    color: var(--react-accent);
+}
+
+.react-account-badge.is-muted {
+    color: var(--react-muted);
+}
+
+.react-account-section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 14px;
+}
+
+.react-account-form,
+.react-account-twofa-block {
+    display: grid;
+    gap: 14px;
+}
+
+.react-account-form label,
+.react-account-twofa-block label {
+    display: grid;
+    gap: 7px;
+}
+
+.react-account-form span,
+.react-account-twofa-block span {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--react-muted);
+}
+
+.react-account-form input,
+.react-account-form select,
+.react-account-twofa-block input {
+    width: 100%;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(16, 25, 35, 0.34);
+    color: var(--react-text);
+    padding: 12px 13px;
+    outline: none;
+}
+
+.react-account-form input[readonly] {
+    color: var(--react-muted);
+}
+
+.react-account-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.react-account-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 42px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--react-text);
+    text-decoration: none;
+    font-weight: 700;
+}
+
+.react-account-button.is-primary {
+    background: rgba(41, 197, 206, 0.16);
+    border-color: rgba(41, 197, 206, 0.22);
+}
+
+.react-account-button.is-danger {
+    background: rgba(255, 108, 108, 0.12);
+    border-color: rgba(255, 108, 108, 0.22);
+}
+
+.react-account-button.is-ghost {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.react-account-provider-list {
+    display: grid;
+    gap: 12px;
+}
+
+.react-account-provider {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px;
+    border-radius: 16px;
+    background: rgba(16, 25, 35, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.react-account-provider-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.react-account-provider-main i {
+    font-size: 1.35rem;
+}
+
+.react-account-provider-main strong,
+.react-account-provider-main span {
+    display: block;
+}
+
+.react-account-provider-main span {
+    font-size: 0.84rem;
+    color: var(--react-muted);
+}
+
+.react-account-inline-error {
+    color: #ff9b9b;
+    font-size: 0.88rem;
+}
+
+.react-account-twofa-setup {
+    display: grid;
+    gap: 14px;
+}
+
+.react-account-twofa-qr-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    border-radius: 18px;
+    background: #fff;
+    width: fit-content;
+}
+
+.react-account-twofa-qr {
+    width: 190px;
+    height: 190px;
+    object-fit: contain;
+}
+
+.react-account-flash {
+    margin-bottom: 16px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.react-account-flash.is-success {
+    color: #aaf3cc;
+    border-color: rgba(41, 199, 128, 0.2);
+}
+
+.react-account-flash.is-danger {
+    color: #ffb6b6;
+    border-color: rgba(255, 108, 108, 0.2);
+}
+
+@media (max-width: 1080px) {
+    .react-account-scroll {
+        overflow: visible;
+        height: auto;
+    }
+
+    .react-account-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 760px) {
+    .react-account-form-grid,
+    .react-account-provider,
+    .react-account-profile {
+        grid-template-columns: 1fr;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+.react-experimental-page,
+.react-experimental-shell,
+.react-experimental-layout {
+    overflow: hidden;
+}
+
+.react-experimental-scroll {
+    height: 100%;
+    overflow-y: auto;
+    padding: 22px;
+}
+
+.react-experimental-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.react-experimental-wide {
+    grid-column: 1 / -1;
+}
+
+.react-experimental-stat-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+    margin-bottom: 10px;
+}
+
+.react-experimental-stat-list,
+.react-experimental-note-grid {
+    display: grid;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.react-experimental-toggle {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+    padding: 14px;
+    border-radius: 16px;
+    background: rgba(16, 25, 35, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.react-experimental-toggle input {
+    margin-top: 4px;
+}
+
+.react-experimental-toggle strong,
+.react-experimental-toggle span {
+    display: block;
+}
+
+.react-experimental-toggle span {
+    margin-top: 4px;
+    color: var(--react-muted);
+    font-size: 0.86rem;
+}
+
+@media (max-width: 1080px) {
+    .react-experimental-grid {
+        grid-template-columns: 1fr;
+    }
+}

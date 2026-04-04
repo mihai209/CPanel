@@ -187,11 +187,63 @@ function registerAccountRoutes({
                 `[Account Debug] Linked Accounts summary: count=${normalizedLinkedAccounts.length}`
             );
 
+            const providerDefinitions = [
+                { id: 'discord', name: 'Discord', icon: 'bi-discord', color: '#5865F2' },
+                { id: 'google', name: 'Google', icon: 'bi-google', color: '#DB4437' },
+                { id: 'reddit', name: 'Reddit', icon: 'bi-reddit', color: '#FF4500' },
+                { id: 'github', name: 'GitHub', icon: 'bi-github', color: '#d0d8e5' }
+            ];
+            const settingsMap = (res.locals && res.locals.settings && typeof res.locals.settings === 'object')
+                ? res.locals.settings
+                : {};
+            const linkedProviders = providerDefinitions
+                .map((provider) => {
+                    const link = normalizedLinkedAccounts.find((entry) => entry.provider === provider.id) || null;
+                    const configKey = `auth${provider.id.charAt(0).toUpperCase() + provider.id.slice(1)}Enabled`;
+                    const isConfigured = String(settingsMap[configKey] || '').toLowerCase() === 'true';
+                    if (!isConfigured && !link) return null;
+                    return {
+                        ...provider,
+                        isConfigured,
+                        isLinked: Boolean(link),
+                        linkAction: `/auth/${provider.id}`,
+                        unlinkAction: `/account/unlink/${provider.id}`
+                    };
+                })
+                .filter(Boolean);
+
             const activeTheme = getUserThemeId(userData);
             const activeCustomTheme = getUserCustomTheme(userData);
             if (req.session && req.session.user) {
                 req.session.user.uiTheme = activeTheme;
                 req.session.user.uiCustomTheme = activeCustomTheme;
+            }
+
+            if (normalizeExperimentalViewMode(user.experimentalViewMode) === 'react') {
+                return res.render('react/loader', {
+                    title: 'Account Settings',
+                    reactEntry: 'account',
+                    reactPageData: {
+                        brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                        faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                        appUrl: APP_URL,
+                        success: req.query.success || null,
+                        error: req.query.error || null,
+                        activeTheme,
+                        user: {
+                            id: userData.id,
+                            username: userData.username,
+                            firstName: userData.firstName || '',
+                            lastName: userData.lastName || '',
+                            email: userData.email || '',
+                            avatarUrl: userData.avatarUrl || '',
+                            avatarProvider: userData.avatarProvider || 'gravatar',
+                            gravatarHash: userData.gravatarHash || md5(String(userData.email || '').trim().toLowerCase()),
+                            twoFactorEnabled: Boolean(userData.twoFactorEnabled)
+                        },
+                        linkedProviders
+                    }
+                });
             }
 
             res.render('account', {
@@ -236,6 +288,28 @@ function registerAccountRoutes({
             if (!user) return res.redirect('/login');
             updateSessionExperimentalState(req, user);
             const featureModel = await buildExperimentalFeaturesViewModel(user);
+            if (normalizeExperimentalViewMode(user.experimentalViewMode) === 'react') {
+                return res.render('react/loader', {
+                    title: 'Experimental Features',
+                    reactEntry: 'experimental-features',
+                    reactPageData: {
+                        brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                        faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                        user: {
+                            username: user.username,
+                            email: user.email || '',
+                            avatarUrl: user.avatarUrl || '',
+                            avatarProvider: user.avatarProvider || 'gravatar',
+                            gravatarHash: md5(String(user.email || '').trim().toLowerCase()),
+                            experimentalAiEnabled: Boolean(user.experimentalAiEnabled)
+                        },
+                        currentViewMode: normalizeExperimentalViewMode(user.experimentalViewMode),
+                        success: req.query.success || null,
+                        error: req.query.error || null,
+                        ...featureModel
+                    }
+                });
+            }
             return res.render('experimental/features', {
                 user: user.toJSON(),
                 title: 'Experimental Features',
@@ -285,6 +359,23 @@ function registerAccountRoutes({
             const user = await User.findByPk(req.session.user.id, { attributes: ['id', 'username', 'experimentalViewMode'] });
             if (!user) return res.redirect('/login');
             updateSessionExperimentalState(req, user);
+            if (normalizeExperimentalViewMode(user.experimentalViewMode) === 'react') {
+                return res.render('react/loader', {
+                    title: 'Change View',
+                    reactEntry: 'change-view',
+                    reactPageData: {
+                        brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                        faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                        user: {
+                            username: user.username
+                        },
+                        currentViewMode: normalizeExperimentalViewMode(user.experimentalViewMode),
+                        success: req.query.success || null,
+                        error: req.query.error || null,
+                        applied: String(req.query.applied || '') === '1'
+                    }
+                });
+            }
             return res.render('experimental/change-view', {
                 user: user.toJSON(),
                 title: 'Change View',
