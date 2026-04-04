@@ -106,6 +106,23 @@ function findSignature(samples, signatures) {
     return '';
 }
 
+function buildRequestScanPayload(req) {
+    const path = String(req.originalUrl || req.url || '');
+    const query = req.query || {};
+    const body = req.body && typeof req.body === 'object' ? { ...req.body } : (req.body || {});
+
+    const isAdminImageJsonRoute = req.path === '/admin/images/import'
+        || String(req.path || '').startsWith('/admin/images/edit-json/');
+    if (isAdminImageJsonRoute && body && typeof body === 'object') {
+        // Image/egg import JSON legitimately contains path fragments such as ../.
+        // Keep scanning the route/query and other body fields, but do not treat the raw
+        // imported JSON blob as a traversal attack by itself.
+        delete body.jsonPayload;
+    }
+
+    return { path, query, body };
+}
+
 function registerSecurityMiddleware(app, options = {}) {
     const SecurityEvent = options.SecurityEvent || null;
     const allowedOrigins = parseAllowedOrigins();
@@ -285,11 +302,7 @@ function registerSecurityMiddleware(app, options = {}) {
             return res.status(400).send('Bad Request');
         }
 
-        const scanSamples = flattenValues({
-            path: String(req.originalUrl || req.url || ''),
-            query: req.query || {},
-            body: req.body || {}
-        });
+        const scanSamples = flattenValues(buildRequestScanPayload(req));
         const blockSignature = findSignature(scanSamples, BLOCK_SIGNATURES);
         if (blockSignature) {
             logSecurityEvent(req, {
