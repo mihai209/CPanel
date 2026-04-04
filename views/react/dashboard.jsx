@@ -4,300 +4,182 @@ import { createRoot } from 'react-dom/client';
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const root = createRoot(document.getElementById('reactRoot'));
 
-const STATUS_ORDER = ['running', 'starting', 'installing', 'reinstalling', 'stopped', 'offline', 'error'];
-
 function formatStatus(status) {
-    return String(status || 'unknown').replace(/_/g, ' ');
+    const value = String(status || 'unknown').toLowerCase();
+    return value.charAt(0).toUpperCase() + value.slice(1).replace(/_/g, ' ');
 }
 
-function statusClass(status) {
-    return `react-fleet-status react-fleet-status-${String(status || 'unknown').toLowerCase()}`;
+function metricTone(status) {
+    const value = String(status || 'unknown').toLowerCase();
+    if (value === 'running') return 'success';
+    if (['installing', 'reinstalling', 'starting'].includes(value)) return 'warning';
+    if (['stopped', 'offline', 'error'].includes(value)) return 'danger';
+    return 'muted';
 }
 
-function FleetMetric({ icon, label, value, subvalue, tone = '' }) {
+function TopAction({ href, icon, active = false, title }) {
     return (
-        <div className={`react-inline-metric ${tone ? `is-${tone}` : ''}`}>
-            <div className="react-inline-metric-icon">
-                <i className={`bi ${icon}`}></i>
-            </div>
+        <a className={`react-top-action${active ? ' is-active' : ''}`} href={href} title={title}>
+            <i className={`bi ${icon}`}></i>
+        </a>
+    );
+}
+
+function ResourcePill({ icon, value, label, tone = '' }) {
+    return (
+        <div className={`react-resource-pill${tone ? ` is-${tone}` : ''}`}>
+            <i className={`bi ${icon}`}></i>
             <div>
-                <div className="react-inline-metric-value">{value}</div>
-                <div className="react-inline-metric-label">
-                    {label}
-                    {subvalue ? <span>{subvalue}</span> : null}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function UsageBar({ label, value, total, tone = 'blue' }) {
-    const used = Number(value || 0);
-    const cap = Number(total || 0);
-    const width = cap > 0 ? Math.max(0, Math.min(100, (used / cap) * 100)) : 0;
-
-    return (
-        <div className="react-usage-block">
-            <div className="react-usage-head">
+                <strong>{value}</strong>
                 <span>{label}</span>
-                <span>{used}{cap > 0 ? ` / ${cap}` : ''}</span>
-            </div>
-            <div className="react-usage-track">
-                <div className={`react-usage-fill is-${tone}`} style={{ width: `${width}%` }}></div>
             </div>
         </div>
     );
 }
 
-function FleetRow({ server, showOwner }) {
+function ServerRow({ server, isAdminDashboard }) {
     const status = String(server.status || 'unknown').toLowerCase();
-    const accent = status === 'running' ? 'success' : (['installing', 'reinstalling', 'starting'].includes(status) ? 'warning' : 'muted');
-    const tags = Array.isArray(server.tags) ? server.tags.filter(Boolean) : [];
+    const description = server.description || 'No description provided yet.';
 
     return (
-        <a className="react-fleet-row" href={`/server/${server.containerId}`}>
-            <div className={`react-fleet-avatar is-${accent}`}>
+        <a className="react-server-row" href={`/server/${server.containerId}`}>
+            <div className={`react-server-icon is-${metricTone(status)}`}>
                 <i className="bi bi-hdd-stack"></i>
             </div>
 
-            <div className="react-fleet-main">
-                <div className="react-fleet-title-row">
+            <div className="react-server-main">
+                <div className="react-server-head">
                     <div>
-                        <div className="react-fleet-title">{server.name || 'Unnamed Server'}</div>
-                        <div className="react-fleet-subtitle">
-                            {server.description || 'No description provided yet.'}
-                        </div>
+                        <div className="react-server-name">{server.name || 'Unnamed Server'}</div>
+                        <div className="react-server-description">{description}</div>
                     </div>
-                    <div className={statusClass(status)}>
-                        <span className="react-fleet-status-dot"></span>
+                    <div className={`react-status-badge is-${metricTone(status)}`}>
+                        <span className="react-status-dot"></span>
                         <span>{formatStatus(status)}</span>
                     </div>
                 </div>
 
-                <div className="react-fleet-meta-row">
-                    <FleetMetric icon="bi bi-cpu" label="CPU" value={`${server.cpu || 0}%`} />
-                    <FleetMetric icon="bi bi-memory" label="RAM" value={`${server.memory || 0} MB`} />
-                    <FleetMetric icon="bi bi-device-hdd" label="Disk" value={`${server.disk || 0} MB`} />
-                    <FleetMetric icon="bi bi-database" label="DB Limit" value={String(server.databaseLimit || 0)} />
-                    {showOwner && server.ownerUsername ? (
-                        <FleetMetric icon="bi bi-person" label="Owner" value={`@${server.ownerUsername}`} />
+                <div className="react-server-resources">
+                    <ResourcePill icon="bi-cpu" value={`${server.cpu || 0}%`} label="CPU" />
+                    <ResourcePill icon="bi-memory" value={`${server.memory || 0} MB`} label="Memory" />
+                    <ResourcePill icon="bi-device-hdd" value={`${server.disk || 0} MB`} label="Disk" />
+                    <ResourcePill icon="bi-database" value={String(server.databaseLimit || 0)} label="Databases" />
+                    {isAdminDashboard && server.ownerUsername ? (
+                        <ResourcePill icon="bi-person" value={`@${server.ownerUsername}`} label="Owner" tone="info" />
                     ) : null}
-                </div>
-
-                <div className="react-fleet-bottom-row">
-                    <div className="react-fleet-usage-grid">
-                        <UsageBar label="CPU Profile" value={server.cpu || 0} total={100} tone="blue" />
-                        <UsageBar label="Memory Slice" value={server.memory || 0} total={Math.max(server.memory || 0, 2048)} tone="green" />
-                        <UsageBar label="Disk Slice" value={server.disk || 0} total={Math.max(server.disk || 0, 20480)} tone="amber" />
-                    </div>
-                    <div className="react-fleet-tags">
-                        {tags.length > 0 ? tags.slice(0, 4).map((tag) => (
-                            <span key={tag} className="react-fleet-tag">{tag}</span>
-                        )) : <span className="react-fleet-tag is-muted">No tags</span>}
-                    </div>
                 </div>
             </div>
         </a>
     );
 }
 
-function SignalCard({ title, eyebrow, count, note, icon, tone = '' }) {
+function SideItem({ title, value, note, tone = '' }) {
     return (
-        <div className={`react-signal-card ${tone ? `is-${tone}` : ''}`}>
-            <div className="react-signal-icon">
-                <i className={`bi ${icon}`}></i>
+        <div className={`react-side-item${tone ? ` is-${tone}` : ''}`}>
+            <div className="react-side-item-head">
+                <strong>{title}</strong>
+                <span>{value}</span>
             </div>
-            <div>
-                <div className="react-signal-eyebrow">{eyebrow}</div>
-                <div className="react-signal-title">{title}</div>
-                <div className="react-signal-note">{note}</div>
-            </div>
-            <div className="react-signal-count">{count}</div>
-        </div>
-    );
-}
-
-function FeedItem({ title, detail, tone = '' }) {
-    return (
-        <div className={`react-feed-item ${tone ? `is-${tone}` : ''}`}>
-            <strong>{title}</strong>
-            {detail ? <div className="react-card-subtle">{detail}</div> : null}
+            <div className="react-side-item-note">{note}</div>
         </div>
     );
 }
 
 function DashboardApp() {
-    const servers = Array.isArray(data.servers) ? [...data.servers] : [];
+    const servers = Array.isArray(data.servers) ? data.servers : [];
     const incidents = Array.isArray(data.openIncidents) ? data.openIncidents : [];
     const maintenance = Array.isArray(data.pendingMaintenance) ? data.pendingMaintenance : [];
     const security = Array.isArray(data.openSecurityAlerts) ? data.openSecurityAlerts : [];
 
-    servers.sort((a, b) => {
-        const left = STATUS_ORDER.indexOf(String(a.status || '').toLowerCase());
-        const right = STATUS_ORDER.indexOf(String(b.status || '').toLowerCase());
-        return (left === -1 ? 999 : left) - (right === -1 ? 999 : right);
-    });
-
-    const serverCount = servers.length;
     const runningCount = servers.filter((server) => String(server.status || '').toLowerCase() === 'running').length;
     const provisioningCount = servers.filter((server) => ['installing', 'reinstalling', 'starting'].includes(String(server.status || '').toLowerCase())).length;
-    const idleCount = servers.filter((server) => ['stopped', 'offline'].includes(String(server.status || '').toLowerCase())).length;
-    const feedEntries = [
-        ...incidents.slice(0, 2).map((entry, index) => ({
-            key: `incident-${index}`,
-            title: entry && (entry.title || entry.name || `Incident ${index + 1}`),
-            detail: entry && (entry.description || entry.status || ''),
-            tone: 'danger'
-        })),
-        ...maintenance.slice(0, 2).map((entry, index) => ({
-            key: `maintenance-${index}`,
-            title: entry && (entry.title || entry.name || `Maintenance ${index + 1}`),
-            detail: entry && (entry.description || entry.status || ''),
-            tone: 'warning'
-        })),
-        ...security.slice(0, 2).map((entry, index) => ({
-            key: `security-${index}`,
-            title: entry && (entry.title || entry.name || `Security ${index + 1}`),
-            detail: entry && (entry.description || entry.status || ''),
-            tone: 'info'
-        }))
-    ];
+    const offlineCount = servers.filter((server) => ['stopped', 'offline', 'error'].includes(String(server.status || '').toLowerCase())).length;
+    const signalCount = incidents.length + maintenance.length + security.length;
 
     return (
-        <div className="react-dashboard-page">
-            <div className="react-dashboard-shell">
-                <header className="react-dashboard-topbar">
-                    <div className="react-dashboard-brand">
-                        <div className="react-dashboard-brand-mark">
+        <div className="react-basic-page">
+            <div className="react-basic-shell">
+                <header className="react-basic-topbar">
+                    <div className="react-basic-brand">
+                        <div className="react-basic-brand-mark">
                             <i className="bi bi-grid-3x3-gap-fill"></i>
                         </div>
                         <div>
-                            <div className="react-dashboard-brand-title">{data.brandName || 'CPanel'}</div>
-                            <div className="react-dashboard-brand-subtitle">React fleet board</div>
+                            <div className="react-basic-brand-title">{data.brandName || 'CPanel'}</div>
+                            <div className="react-basic-brand-subtitle">React view beta</div>
                         </div>
                     </div>
 
-                    <nav className="react-dashboard-actions">
-                        <a className="react-top-action is-active" href="/dashboard" title="Dashboard">
-                            <i className="bi bi-house-door"></i>
-                        </a>
-                        <a className="react-top-action" href="/experimental-features" title="Experimental Features">
-                            <i className="bi bi-beaker"></i>
-                        </a>
-                        <a className="react-top-action" href="/account" title="Account">
-                            <i className="bi bi-person"></i>
-                        </a>
-                        <a className="react-top-action" href="/themes" title="Themes">
-                            <i className="bi bi-palette2"></i>
-                        </a>
-                        <div className="react-user-chip">
+                    <div className="react-basic-actions">
+                        <TopAction href="https://github.com/mihai209/CPanel" icon="bi-house-door" active title="Github" />
+                        <TopAction href="/experimental-features" icon="bi-warning-fill" title="Experimental Features" />
+                        <TopAction href="/account" icon="bi-person" title="Account" />
+                        <TopAction href="/themes" icon="bi-palette2" title="Themes" />
+                        <div className="react-basic-user">
                             <i className="bi bi-person-circle"></i>
                             <span>{data.user && data.user.username ? `@${data.user.username}` : 'Unknown'}</span>
                         </div>
-                    </nav>
+                    </div>
                 </header>
 
-                <section className="react-hero-strip">
-                    <div>
-                        <div className="react-hero-label">Fleet summary</div>
-                        <h1>Keep the whole panel in one glance.</h1>
-                        <p>
-                            Fast status scan for runtime state, inventory pressure, and the signals that actually need attention.
-                        </p>
-                    </div>
-                    <div className="react-hero-badges">
-                        <span className="react-hero-badge">React beta</span>
-                        <span className="react-hero-badge is-soft">No custom themes</span>
-                    </div>
-                </section>
-
-                <section className="react-scoreboard">
-                    <SignalCard title="Servers in fleet" eyebrow="Inventory" count={serverCount} note={`${runningCount} active, ${idleCount} idle`} icon="bi-hdd-stack" />
-                    <SignalCard title="Provisioning queue" eyebrow="Runtime" count={provisioningCount} note="Install, reinstall, and first-start operations" icon="bi-arrow-repeat" tone="warning" />
-                    <SignalCard title="Operational signals" eyebrow="Ops" count={incidents.length + maintenance.length + security.length} note="Incidents, maintenance, and security alerts" icon="bi-broadcast-pin" tone="info" />
-                </section>
-
-                <div className="react-board-grid">
-                    <section className="react-board-panel">
-                        <div className="react-panel-head">
+                <main className="react-basic-grid">
+                    <section className="react-basic-main">
+                        <div className="react-basic-heading">
                             <div>
-                                <div className="react-panel-eyebrow">Your servers</div>
-                                <h2>Fleet Board</h2>
+                                <h1>Servers</h1>
+                                <p>Simple fleet view for the React renderer. Clean, fast, and focused on runtime state.</p>
                             </div>
-                            <div className="react-panel-head-right">
-                                <span className="react-panel-toggle">
-                                    <span className="react-toggle-dot"></span>
-                                    Showing your servers
-                                </span>
-                                <a href="/experimental/change-view" className="react-link-chip">
-                                    Switch view
-                                </a>
-                            </div>
+                            <a href="/experimental/change-view" className="react-basic-link">
+                                Change View
+                            </a>
                         </div>
 
-                        <div className="react-fleet-list">
+                        <div className="react-server-list">
                             {servers.length > 0 ? (
                                 servers.map((server) => (
-                                    <FleetRow
+                                    <ServerRow
                                         key={server.id || server.containerId}
                                         server={server}
-                                        showOwner={Boolean(data.isAdminDashboard)}
+                                        isAdminDashboard={Boolean(data.isAdminDashboard)}
                                     />
                                 ))
                             ) : (
-                                <FeedItem title="No servers found" detail="Create a server first or switch back to the legacy renderer if this looks wrong." />
+                                <div className="react-empty-state">
+                                    <strong>No servers found</strong>
+                                    <span>Create a server or switch back to the legacy view if this looks wrong.</span>
+                                </div>
                             )}
                         </div>
                     </section>
 
-                    <aside className="react-board-rail">
-                        <section className="react-board-panel is-compact">
-                            <div className="react-panel-eyebrow">Now visible</div>
-                            <h3>Board Notes</h3>
-                            <div className="react-feed-list">
-                                <FeedItem title="React renderer is live" detail="This dashboard runs from views/react/dashboard.jsx and is bundled separately." tone="info" />
-                                <FeedItem title="Legacy pages still exist" detail="Non-migrated routes continue to render through EJS until each page is ported." />
+                    <aside className="react-basic-side">
+                        <div className="react-side-card">
+                            <div className="react-side-title">Overview</div>
+                            <div className="react-side-list">
+                                <SideItem title="Servers" value={String(servers.length)} note={`${runningCount} running now`} />
+                                <SideItem title="Provisioning" value={String(provisioningCount)} note="Installing, reinstalling, or starting" tone="warning" />
+                                <SideItem title="Offline" value={String(offlineCount)} note="Stopped, offline, or error state" tone="danger" />
                             </div>
-                        </section>
+                        </div>
 
-                        <section className="react-board-panel is-compact">
-                            <div className="react-panel-eyebrow">Operational feed</div>
-                            <h3>Priority Signals</h3>
-                            <div className="react-feed-list">
-                                {feedEntries.length > 0 ? (
-                                    feedEntries.map((entry) => (
-                                        <FeedItem key={entry.key} title={entry.title} detail={entry.detail} tone={entry.tone} />
-                                    ))
-                                ) : (
-                                    <FeedItem title="No active feed items" detail="Nothing urgent is currently queued in the dashboard feed." />
-                                )}
+                        <div className="react-side-card">
+                            <div className="react-side-title">Signals</div>
+                            <div className="react-side-list">
+                                <SideItem title="Incidents" value={String(incidents.length)} note="Open incident records" tone="danger" />
+                                <SideItem title="Maintenance" value={String(maintenance.length)} note="Planned maintenance windows" tone="warning" />
+                                <SideItem title="Security" value={String(security.length)} note="Open security alerts" tone="info" />
+                                <SideItem title="Total" value={String(signalCount)} note="Combined platform signals" />
                             </div>
-                        </section>
+                        </div>
 
-                        <section className="react-board-panel is-compact">
-                            <div className="react-panel-eyebrow">Coverage</div>
-                            <h3>Renderer Limits</h3>
-                            <div className="react-mini-stats">
-                                <div className="react-mini-stat">
-                                    <span>Current React page</span>
-                                    <strong>Dashboard</strong>
-                                </div>
-                                <div className="react-mini-stat">
-                                    <span>Theme mode</span>
-                                    <strong>Dark only</strong>
-                                </div>
-                                <div className="react-mini-stat">
-                                    <span>Folder groups</span>
-                                    <strong>{(data.dashboardFolders || []).length}</strong>
-                                </div>
-                                <div className="react-mini-stat">
-                                    <span>Tag groups</span>
-                                    <strong>{(data.dashboardTags || []).length}</strong>
-                                </div>
+                        <div className="react-side-card">
+                            <div className="react-side-title">Renderer</div>
+                            <div className="react-renderer-note">
+                                React uses a fixed dark theme here. Non-migrated pages still fall back to EJS.
                             </div>
-                        </section>
+                        </div>
                     </aside>
-                </div>
+                </main>
             </div>
         </div>
     );
