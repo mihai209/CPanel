@@ -1,6 +1,6 @@
 {
   "name": "panel",
-  "version": "1.8.0",
+  "version": "1.8.5",
   "public":"true",
   "main": "server.js",
   "keywords": ["game panel", "minecraft", "server management", "web panel", "docker", "cloud hosting"],
