@@ -1120,22 +1120,31 @@ body.react-view-body {
     overflow: hidden;
 }
 
-.react-console-terminal-body .xterm {
+.react-console-terminal-host {
+    height: 100%;
+    min-height: 320px;
+    border-radius: 18px;
+    overflow: hidden;
+    background: #10161d;
+}
+
+.react-console-terminal-host .xterm {
     height: 100%;
 }
 
-.react-console-terminal-body .xterm-viewport {
+.react-console-terminal-host .xterm-viewport {
     border-radius: 18px;
 }
 
 .react-console-terminal-placeholder {
-    height: 100%;
-    min-height: 320px;
+    position: absolute;
+    inset: 0 18px 18px;
     display: grid;
     place-items: center;
     border-radius: 18px;
-    background: rgba(11, 18, 26, 0.4);
+    background: rgba(11, 18, 26, 0.72);
     color: var(--react-muted);
+    pointer-events: none;
 }
 
 .react-console-terminal-body.is-loading {

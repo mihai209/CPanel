@@ -606,7 +606,8 @@ export function ServerConsolePage({ pageData = data }) {
                                     </button>
                                 </div>
                             </div>
-                            <div className={`react-console-terminal-body${terminalBooted ? '' : ' is-loading'}`} ref={terminalHostRef}>
+                            <div className={`react-console-terminal-body${terminalBooted ? '' : ' is-loading'}`}>
+                                <div className="react-console-terminal-host" ref={terminalHostRef}></div>
                                 {!terminalBooted && !terminalError ? (
                                     <div className="react-console-terminal-placeholder">Booting xterm runtime…</div>
                                 ) : null}
