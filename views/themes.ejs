@@ -236,13 +236,34 @@
     const initialCustomState = root.getAttribute('data-user-custom-theme') === 'on';
     let previewing = false;
 
+    const sanitizeThemeCssPath = (rawPath) => {
+        if (!rawPath || typeof rawPath !== 'string') return null;
+        const value = rawPath.trim();
+        if (!value) return null;
+        const lower = value.toLowerCase();
+        // Disallow dangerous schemes or protocol-like patterns
+        if (lower.startsWith('javascript:') || lower.startsWith('data:') || lower.includes('://')) {
+            return null;
+        }
+        // Only allow paths under /themes/ and basic safe characters
+        if (!lower.startsWith('/themes/')) {
+            return null;
+        }
+        if (!/^[\w\-./]+\.css$/i.test(value)) {
+            return null;
+        }
+        return value;
+    };
+
     const applyTheme = (themeId, cssPath) => {
         if (window.CPanelThemeLoader && typeof window.CPanelThemeLoader.applyTheme === 'function') {
             window.CPanelThemeLoader.applyTheme(themeId, cssPath);
             return;
         }
         themeLink.dataset.theme = String(themeId || 'default').trim().toLowerCase() || 'default';
-        themeLink.setAttribute('href', cssPath || themeLink.getAttribute('href'));
+        if (cssPath) {
+            themeLink.setAttribute('href', cssPath);
+        }
         document.dispatchEvent(new Event('turbo:load'));
     };
 
@@ -266,7 +287,8 @@
         button.addEventListener('click', () => {
             const themeId = String(button.getAttribute('data-theme-id') || '').trim().toLowerCase();
             const themeLabel = String(button.getAttribute('data-theme-label') || themeId || 'theme').trim();
-            const themeCss = String(button.getAttribute('data-theme-css') || '').trim();
+            const rawThemeCss = String(button.getAttribute('data-theme-css') || '').trim();
+            const themeCss = sanitizeThemeCssPath(rawThemeCss);
             if (!themeId || !themeCss) return;
             previewing = true;
             applyTheme(themeId, themeCss);
