@@ -24,7 +24,12 @@ rm -f "${ROOTFS_ARCHIVE}"
 downloaded_url=""
 for candidate_url in "${ROOTFS_URLS[@]}"; do
     vps_log "INFO" "Trying rootfs source ${candidate_url}" "$CYAN"
-    if curl -fL --retry 3 --connect-timeout 15 "${candidate_url}" -o "${ROOTFS_ARCHIVE}"; then
+    if command -v wget >/dev/null 2>&1; then
+        if wget --tries=3 --timeout=15 --show-progress --progress=bar:force:noscroll -O "${ROOTFS_ARCHIVE}" "${candidate_url}"; then
+            downloaded_url="${candidate_url}"
+            break
+        fi
+    elif curl -fL --retry 3 --connect-timeout 15 --progress-bar "${candidate_url}" -o "${ROOTFS_ARCHIVE}"; then
         downloaded_url="${candidate_url}"
         break
     fi
