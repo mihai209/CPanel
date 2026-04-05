@@ -20,7 +20,7 @@ VPS_INTERNAL_IP=""
 VPS_EXTRA_PORTS=()
 VPS_DISTRO="${VPS_DISTRO:-ubuntu}"
 VPS_RELEASE="${VPS_RELEASE:-24.04}"
-ROOTFS_BASE_URL="${ROOTFS_BASE_URL:-https://github.com/mihai209/cpanel-vps-rootfs/releases/download}"
+ROOTFS_BASE_URL="${ROOTFS_BASE_URL:-https://github.com/mihai209/CPanel/releases/download}"
 ROOTFS_TAG="${ROOTFS_TAG:-latest}"
 ROOTFS_FALLBACK_TAG="${ROOTFS_FALLBACK_TAG:-latest}"
 ROOTFS_ARCH=""
@@ -115,6 +115,13 @@ vps_load_config() {
     if [[ -z "$VPS_INTERNAL_IP" ]]; then
         VPS_INTERNAL_IP="$(ip route get 1.1.1.1 2>/dev/null | awk '/src/ {for (i=1; i<=NF; i++) if ($i == "src") { print $(i+1); exit }}')"
     fi
+
+    case "${ROOTFS_BASE_URL}" in
+        https://github.com/mihai209/cpanel-vps-rootfs/releases/download|https://github.com/mihai209/cpanel-vps-rootfs/releases/download/*)
+            ROOTFS_BASE_URL="https://github.com/mihai209/CPanel/releases/download"
+            vps_log "WARN" "Migrated legacy rootfs URL to https://github.com/mihai209/CPanel/releases/download" "$YELLOW"
+            ;;
+    esac
 }
 
 vps_print_banner() {

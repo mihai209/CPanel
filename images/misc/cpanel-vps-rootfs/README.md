@@ -32,7 +32,7 @@ This is still not a full VM and not LXC. It is a `proot` userspace. That means:
 ## Publish flow
 
 1. Build the rootfs archives with the GitHub Actions workflow.
-2. Publish them to the `mihai209/cpanel-vps-rootfs` releases page.
+2. Publish them to the `mihai209/CPanel` releases page.
 3. Keep `ROOTFS_BASE_URL` and `ROOTFS_TAG` in the egg pointing there.
 
 ## Local build

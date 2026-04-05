@@ -16,7 +16,7 @@ This preserves the expected filesystem tree (`/etc`, `/bin`, `/usr`, `/var`, ...
 The image downloads rootfs archives from a URL you control, for example GitHub Releases:
 
 ```text
-https://github.com/mihai209/cpanel-vps-rootfs/releases/download/latest/
+https://github.com/mihai209/CPanel/releases/download/latest/
 ```
 
 Expected filenames:
