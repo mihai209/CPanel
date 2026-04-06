@@ -90,6 +90,39 @@ function parseMetric(value) {
     return Math.max(0, numeric);
 }
 
+function formatBytes(value) {
+    const bytes = Math.max(0, Number.parseFloat(String(value || '0')) || 0);
+    if (!bytes) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let current = bytes;
+    let index = 0;
+    while (current >= 1024 && index < units.length - 1) {
+        current /= 1024;
+        index += 1;
+    }
+    return `${current >= 100 || index === 0 ? current.toFixed(0) : current.toFixed(2)} ${units[index]}`;
+}
+
+function formatDuration(value) {
+    const seconds = Math.max(0, Number.parseInt(String(value || '0'), 10) || 0);
+    if (!seconds) return '0s';
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    const parts = [];
+    if (days) parts.push(`${days}d`);
+    if (hours) parts.push(`${hours}h`);
+    if (minutes) parts.push(`${minutes}m`);
+    if (secs || parts.length === 0) parts.push(`${secs}s`);
+    return parts.slice(0, 3).join(' ');
+}
+
+function formatRuntimeSource(source) {
+    const value = String(source || 'system').trim().toLowerCase().replace(/_/g, ' ');
+    return value ? value.charAt(0).toUpperCase() + value.slice(1) : 'System';
+}
+
 function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
@@ -231,7 +264,24 @@ export function ServerConsolePage({ pageData = data }) {
     const [stats, setStats] = React.useState({
         cpu: parseMetric(pageData.initialStats && pageData.initialStats.cpu),
         memory: parseMetric(pageData.initialStats && pageData.initialStats.memory),
-        disk: parseMetric(pageData.initialStats && pageData.initialStats.disk)
+        disk: parseMetric(pageData.initialStats && pageData.initialStats.disk),
+        networkRx: parseMetric(pageData.initialStats && pageData.initialStats.network_rx),
+        networkTx: parseMetric(pageData.initialStats && pageData.initialStats.network_tx),
+        uptimeSeconds: parseMetric(pageData.initialStats && pageData.initialStats.uptime_seconds)
+    });
+    const [exitInfo, setExitInfo] = React.useState({
+        exitCode: null,
+        oomKilled: false
+    });
+    const [runtimeMeta, setRuntimeMeta] = React.useState(() => {
+        const incoming = pageData.runtimeMeta || {};
+        return {
+            lastSource: incoming.lastSource || 'system',
+            lastReason: incoming.lastReason || '',
+            cooldownUntil: incoming.cooldownUntil || null,
+            crashLoopCount: incoming.crashLoopCount || 0,
+            history: Array.isArray(incoming.history) ? incoming.history.slice(0, 6) : []
+        };
     });
     const [connectionState, setConnectionState] = React.useState('Connecting...');
     const [followOutput, setFollowOutput] = React.useState(true);
@@ -375,6 +425,12 @@ export function ServerConsolePage({ pageData = data }) {
                             }
                             case 'server_status_update':
                                 setStatus(normalizeStatus(payload.status));
+                                setExitInfo({
+                                    exitCode: payload.exitCode !== undefined && payload.exitCode !== null && String(payload.exitCode).trim() !== ''
+                                        ? String(payload.exitCode)
+                                        : null,
+                                    oomKilled: payload.oomKilled === true || String(payload.oomKilled || '').toLowerCase() === 'true'
+                                });
                                 break;
                             case 'connector_status':
                                 setConnectorOnline(Boolean(payload.online));
@@ -383,9 +439,28 @@ export function ServerConsolePage({ pageData = data }) {
                                 const nextCpu = parseMetric(payload.cpu);
                                 const nextMemory = parseMetric(payload.memory);
                                 const nextDisk = parseMetric(payload.disk);
-                                setStats({ cpu: nextCpu, memory: nextMemory, disk: nextDisk });
+                                const nextNetworkRx = parseMetric(payload.network_rx);
+                                const nextNetworkTx = parseMetric(payload.network_tx);
+                                const nextUptime = parseMetric(payload.uptime_seconds);
+                                setStats({
+                                    cpu: nextCpu,
+                                    memory: nextMemory,
+                                    disk: nextDisk,
+                                    networkRx: nextNetworkRx,
+                                    networkTx: nextNetworkTx,
+                                    uptimeSeconds: nextUptime
+                                });
                                 break;
                             }
+                            case 'server_runtime_meta':
+                                setRuntimeMeta({
+                                    lastSource: payload.lastSource || 'system',
+                                    lastReason: payload.lastReason || '',
+                                    cooldownUntil: payload.cooldownUntil || null,
+                                    crashLoopCount: payload.crashLoopCount || 0,
+                                    history: Array.isArray(payload.history) ? payload.history.slice(0, 6) : []
+                                });
+                                break;
                             case 'server_action_ack': {
                                 const phase = String(payload.phase || '').toLowerCase();
                                 const actionType = String(payload.actionType || 'action');
@@ -513,6 +588,16 @@ export function ServerConsolePage({ pageData = data }) {
 
     const memoryPercent = usagePercent(stats.memory, limits.memory);
     const diskPercent = usagePercent(stats.disk, limits.disk);
+    const lastExitValue = exitInfo.exitCode ? `Exit code ${exitInfo.exitCode}` : 'No exit data';
+    const lastExitNote = exitInfo.exitCode
+        ? (exitInfo.oomKilled ? 'OOM kill detected for the last exit.' : 'Last stop did not carry an OOM kill flag.')
+        : 'The runtime has not reported an exit event in this session.';
+    const cooldownUntil = Number.parseInt(String(runtimeMeta.cooldownUntil || 0), 10) || 0;
+    const cooldownActive = cooldownUntil > Date.now();
+    const cooldownValue = cooldownActive ? 'Active' : 'Idle';
+    const cooldownNote = cooldownActive
+        ? `Cooldown until ${new Date(cooldownUntil).toLocaleString()}${runtimeMeta.crashLoopCount ? ` · loop count ${runtimeMeta.crashLoopCount}` : ''}`
+        : (runtimeMeta.crashLoopCount ? `Crash loop count tracked: ${runtimeMeta.crashLoopCount}` : 'No crash cooldown is active.');
 
     return (
         <ReactAppShell pageData={pageData} subtitle="React server console" pageClassName="react-console-page" shellClassName="react-console-shell">
@@ -661,6 +746,82 @@ export function ServerConsolePage({ pageData = data }) {
                                         note={`${diskPercent.toFixed(0)}% used`}
                                         tone="warning"
                                     />
+                                    <InlineMetric
+                                        title="Uptime"
+                                        value={formatDuration(stats.uptimeSeconds)}
+                                        note="Current runtime session"
+                                        tone="info"
+                                    />
+                                    <InlineMetric
+                                        title="Net RX"
+                                        value={formatBytes(stats.networkRx)}
+                                        note="Inbound since start"
+                                        tone="success"
+                                    />
+                                    <InlineMetric
+                                        title="Net TX"
+                                        value={formatBytes(stats.networkTx)}
+                                        note="Outbound since start"
+                                        tone="warning"
+                                    />
+                                </div>
+                            </section>
+
+                            <section className="react-console-side-card">
+                                <div className="react-console-panel-title">Restart Source</div>
+                                <div className="react-console-side-list">
+                                    <InlineMetric
+                                        title="Last Trigger"
+                                        value={formatRuntimeSource(runtimeMeta.lastSource)}
+                                        note={runtimeMeta.lastReason || 'No restart source captured yet.'}
+                                        tone="info"
+                                    />
+                                </div>
+                            </section>
+
+                            <section className="react-console-side-card">
+                                <div className="react-console-panel-title">Crash Cooldown</div>
+                                <div className="react-console-side-list">
+                                    <InlineMetric
+                                        title="Guard State"
+                                        value={cooldownValue}
+                                        note={cooldownNote}
+                                        tone={cooldownActive ? 'warning' : 'info'}
+                                    />
+                                </div>
+                            </section>
+
+                            <section className="react-console-side-card">
+                                <div className="react-console-panel-title">Last Exit</div>
+                                <div className="react-console-side-list">
+                                    <InlineMetric
+                                        title="Exit Summary"
+                                        value={lastExitValue}
+                                        note={lastExitNote}
+                                        tone={exitInfo.oomKilled ? 'danger' : 'info'}
+                                    />
+                                </div>
+                            </section>
+
+                            <section className="react-console-side-card">
+                                <div className="react-console-panel-title">Recent Runtime Events</div>
+                                <div className="react-console-side-list">
+                                    {Array.isArray(runtimeMeta.history) && runtimeMeta.history.length ? runtimeMeta.history.map((entry, index) => (
+                                        <InlineMetric
+                                            key={`${entry.kind || 'runtime'}-${entry.ts || index}-${index}`}
+                                            title={`${entry.kind || 'runtime'} · ${formatRuntimeSource(entry.source)}`}
+                                            value={entry.summary || 'Runtime event recorded.'}
+                                            note={entry.ts ? new Date(entry.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Live'}
+                                            tone={entry.tone || 'info'}
+                                        />
+                                    )) : (
+                                        <InlineMetric
+                                            title="Runtime"
+                                            value="No recent events"
+                                            note="Recent restart reasons and crash transitions will appear here."
+                                            tone="info"
+                                        />
+                                    )}
                                 </div>
                             </section>
                         </aside>

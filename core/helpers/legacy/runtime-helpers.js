@@ -2333,8 +2333,15 @@ async function dispatchAutoRemediation(serverId, requestedAction, reason, detail
         action = 'start';
     }
 
+    const remediationSource = String(reason || '').trim().toLowerCase().startsWith('playbook_')
+        ? 'policy'
+        : (String(reason || '').trim().toLowerCase() === 'crash' ? 'crash_auto_recovery' : 'policy');
+
     if (action === 'stop' || action === 'restart') {
-        rememberServerPowerIntent(server.id, action);
+        rememberServerPowerIntent(server.id, action, {
+            source: remediationSource,
+            reason: String(reason || '').trim().toLowerCase() || 'policy_remediation'
+        });
     } else if (action === 'start') {
         consumeServerPowerIntent(server.id);
     }
@@ -2621,10 +2628,15 @@ async function runScheduledLogCleanupSweep() {
     }
 }
 
-function rememberServerPowerIntent(serverId, action) {
+function rememberServerPowerIntent(serverId, action, meta = {}) {
     if (!Number.isInteger(serverId) || serverId <= 0) return;
+    const sourceRaw = String(meta && meta.source || '').trim().toLowerCase();
+    const source = sourceRaw || 'manual';
+    const reason = String(meta && meta.reason || '').trim().slice(0, 160);
     serverPowerActionIntent.set(serverId, {
         action: String(action || '').toLowerCase(),
+        source,
+        reason,
         ts: Date.now()
     });
 }

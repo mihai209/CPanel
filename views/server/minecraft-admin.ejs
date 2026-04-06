@@ -113,15 +113,17 @@
         .page-body {
             flex: 1;
             min-height: 0;
-            overflow: hidden;
-            padding: 1rem;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 1rem 1rem 1.15rem;
         }
 
         .control-layout {
             display: grid;
-            grid-template-columns: 340px minmax(0, 1fr);
+            grid-template-columns: 310px minmax(0, 1fr);
             gap: 1rem;
-            height: 100%;
+            min-height: 100%;
+            align-items: start;
         }
 
         .panel-card {
@@ -157,6 +159,9 @@
             display: flex;
             flex-direction: column;
             min-height: 0;
+            position: sticky;
+            top: 0;
+            max-height: calc(100vh - 150px);
         }
 
         .player-search-wrap {
@@ -260,8 +265,8 @@
 
         .player-content {
             min-height: 0;
-            overflow-y: auto;
-            padding-right: 0.2rem;
+            overflow: visible;
+            padding-right: 0.15rem;
         }
 
         .content-stack {
@@ -272,7 +277,7 @@
         .hero-card {
             padding: 1.15rem;
             display: grid;
-            grid-template-columns: minmax(0, 1fr) 420px;
+            grid-template-columns: minmax(0, 1fr) 360px;
             gap: 1rem;
         }
 
@@ -417,6 +422,12 @@
             gap: 0.8rem;
         }
 
+        .insight-grid {
+            display: grid;
+            grid-template-columns: 1.25fr 1fr;
+            gap: 0.85rem;
+        }
+
         .summary-card,
         .stats-card,
         .world-card {
@@ -453,7 +464,7 @@
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 0.8rem;
         }
 
@@ -642,11 +653,105 @@
             font-size: 0.84rem;
         }
 
+        .source-pill-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.7rem;
+        }
+
+        .source-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.38rem;
+            padding: 0.32rem 0.62rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.05);
+            color: #d7e8ff;
+        }
+
+        .source-pill.live {
+            background: rgba(76, 215, 178, 0.12);
+            border-color: rgba(76, 215, 178, 0.24);
+            color: #c9ffef;
+        }
+
+        .source-pill.stored {
+            background: rgba(91, 140, 255, 0.12);
+            border-color: rgba(91, 140, 255, 0.24);
+            color: #d7e4ff;
+        }
+
+        .source-pill.missing {
+            background: rgba(255,255,255,0.04);
+            color: var(--pm-muted);
+        }
+
+        .progress-shell {
+            margin-top: 0.7rem;
+            height: 10px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.08);
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #4cd7b2 0%, #5b8cff 100%);
+            width: 0%;
+        }
+
+        .history-list {
+            display: grid;
+            gap: 0.7rem;
+            max-height: 260px;
+            overflow-y: auto;
+        }
+
+        .history-row {
+            padding: 0.8rem 0.9rem;
+            border-radius: 0.95rem;
+            border: 1px solid rgba(255,255,255,0.06);
+            background: rgba(255,255,255,0.04);
+        }
+
+        .history-topline {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.28rem;
+        }
+
+        .history-title {
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: #edf4ff;
+        }
+
+        .history-meta {
+            color: var(--pm-muted);
+            font-size: 0.8rem;
+        }
+
+        .history-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            margin-top: 0.48rem;
+        }
+
         @media (max-width: 1450px) {
             .hero-card { grid-template-columns: 1fr; }
             .summary-grid,
             .stats-grid,
-            .inline-control-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .inline-control-grid,
+            .insight-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .inventory-layout { grid-template-columns: 1fr; }
         }
 
@@ -656,9 +761,11 @@
             .server-sidebar-shell { width: 100%; border-right: 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
             .page-main, .page-body, .player-content { overflow: visible; }
             .control-layout { grid-template-columns: 1fr; height: auto; }
+            .player-directory { position: static; max-height: none; }
             .summary-grid,
             .stats-grid,
-            .inline-control-grid { grid-template-columns: 1fr; }
+            .inline-control-grid,
+            .insight-grid { grid-template-columns: 1fr; }
             .hero-main { flex-direction: column; }
             .meter-row { grid-template-columns: 1fr; }
         }
@@ -767,6 +874,49 @@
                             <div class="summary-card">
                                 <div class="label">Deaths</div>
                                 <div id="summaryDeaths" class="value">-</div>
+                            </div>
+                        </div>
+
+                        <div class="insight-grid">
+                            <div class="panel-card p-3">
+                                <div class="panel-card-header px-0 pt-0">
+                                    <div>
+                                        <h3 class="panel-card-title mb-0">Data Sources</h3>
+                                        <p class="panel-card-subtitle">See what is live, what comes from stored world data, and what can be edited safely offline.</p>
+                                    </div>
+                                </div>
+                                <div class="summary-grid">
+                                    <div class="world-card">
+                                        <div class="label">Identity</div>
+                                        <div id="identitySummary" class="value">-</div>
+                                    </div>
+                                    <div class="world-card">
+                                        <div class="label">Inventory Source</div>
+                                        <div id="inventorySourceSummary" class="value">-</div>
+                                    </div>
+                                    <div class="world-card">
+                                        <div class="label">Ender Source</div>
+                                        <div id="enderSourceSummary" class="value">-</div>
+                                    </div>
+                                    <div class="world-card">
+                                        <div class="label">Offline Edit Mode</div>
+                                        <div id="offlineEditSummary" class="value">-</div>
+                                    </div>
+                                </div>
+                                <div id="sourcePillRow" class="source-pill-row"></div>
+                            </div>
+
+                            <div class="panel-card p-3">
+                                <div class="panel-card-header px-0 pt-0">
+                                    <div>
+                                        <h3 class="panel-card-title mb-0">Recent Control History</h3>
+                                        <p class="panel-card-subtitle">Last player actions, world resets, moderation changes, and offline edits on this server.</p>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-light" id="refreshHistoryBtn">
+                                        <i class="bi bi-clock-history"></i>
+                                    </button>
+                                </div>
+                                <div id="historyList" class="history-list"></div>
                             </div>
                         </div>
 
@@ -892,14 +1042,15 @@
                                 <div class="world-card">
                                     <div class="label">Advancements</div>
                                     <div id="advancementsSummary" class="value">-</div>
+                                    <div class="progress-shell"><div id="advancementProgressFill" class="progress-fill"></div></div>
                                 </div>
                                 <div class="world-card">
                                     <div class="label">Stored Playerdata</div>
                                     <div id="playerdataFilePath" class="value small-muted">-</div>
                                 </div>
                                 <div class="world-card">
-                                    <div class="label">Identity Source</div>
-                                    <div id="identitySummary" class="value">-</div>
+                                    <div class="label">World Metrics</div>
+                                    <div id="worldMetricsSummary" class="value">-</div>
                                 </div>
                             </div>
                             <div class="d-flex flex-wrap gap-2 mb-3">
@@ -922,6 +1073,7 @@
     const serverId = <%- JSON.stringify(server.containerId) %>;
     const permissions = <%- JSON.stringify(minecraftAdminPermissions || {}) %>;
     const defaultPlayer = <%- JSON.stringify(minecraftAdminPlayer || '') %>;
+    const initialRecentEvents = <%- JSON.stringify(minecraftAdminRecentEvents || []) %>;
     const textureBase = `/server/${serverId}/minecraft/admin/item-texture?item=`;
     const state = {
         players: [],
@@ -930,10 +1082,12 @@
         selectedData: null,
         selectedInventoryTab: 'inventory',
         selectedItem: null,
+        recentEvents: Array.isArray(initialRecentEvents) ? initialRecentEvents : [],
         listTimer: null,
         inspectTimer: null,
         listRequestId: 0,
-        inspectRequestId: 0
+        inspectRequestId: 0,
+        historyRequestId: 0
     };
 
     const elements = {
@@ -976,7 +1130,15 @@
         advancementsSummary: document.getElementById('advancementsSummary'),
         playerdataFilePath: document.getElementById('playerdataFilePath'),
         identitySummary: document.getElementById('identitySummary'),
-        advancementsList: document.getElementById('advancementsList')
+        advancementsList: document.getElementById('advancementsList'),
+        inventorySourceSummary: document.getElementById('inventorySourceSummary'),
+        enderSourceSummary: document.getElementById('enderSourceSummary'),
+        offlineEditSummary: document.getElementById('offlineEditSummary'),
+        sourcePillRow: document.getElementById('sourcePillRow'),
+        historyList: document.getElementById('historyList'),
+        refreshHistoryBtn: document.getElementById('refreshHistoryBtn'),
+        advancementProgressFill: document.getElementById('advancementProgressFill'),
+        worldMetricsSummary: document.getElementById('worldMetricsSummary')
     };
 
     const apiFetch = async (url, opts = {}) => {
@@ -1196,6 +1358,49 @@
         `).join('');
     };
 
+    const normalizeHistoryActionLabel = (action) => {
+        const text = String(action || '').trim();
+        if (!text) return 'Action';
+        return text
+            .replace(/^player_state_/, 'state ')
+            .replace(/^inventory_/, 'inventory ')
+            .replace(/^world_/, 'world ')
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, (char) => char.toUpperCase());
+    };
+
+    const renderRecentEvents = () => {
+        if (!elements.historyList) return;
+        const events = Array.isArray(state.recentEvents) ? state.recentEvents : [];
+        if (!events.length) {
+            elements.historyList.innerHTML = '<div class="empty-state">No Minecraft control events recorded yet on this server.</div>';
+            return;
+        }
+        elements.historyList.innerHTML = events.map((entry) => {
+            const when = entry && entry.createdAt ? new Date(entry.createdAt).toLocaleString() : 'Just now';
+            const source = String(entry && entry.source || '').trim();
+            const badges = [];
+            if (source) badges.push(`<span class="source-pill ${source.includes('offline') ? 'stored' : 'live'}">${escapeHtml(source.replace(/_/g, ' '))}</span>`);
+            if (entry && entry.field) badges.push(`<span class="source-pill">${escapeHtml(String(entry.field))}</span>`);
+            if (entry && entry.online === false) badges.push('<span class="source-pill stored">Offline</span>');
+            if (entry && entry.online === true) badges.push('<span class="source-pill live">Online</span>');
+            const extraBits = [];
+            if (entry && entry.reason) extraBits.push(`Reason: ${escapeHtml(String(entry.reason))}`);
+            if (entry && entry.extra && entry.extra.destination) extraBits.push(`Target: ${escapeHtml(String(entry.extra.destination))}`);
+            if (entry && entry.command) extraBits.push(`<code>${escapeHtml(String(entry.command))}</code>`);
+            return `
+                <div class="history-row">
+                    <div class="history-topline">
+                        <div class="history-title">${escapeHtml(normalizeHistoryActionLabel(entry && entry.action))}${entry && entry.playerName ? ` · ${escapeHtml(String(entry.playerName))}` : ''}</div>
+                        <div class="history-meta">${escapeHtml(when)}</div>
+                    </div>
+                    <div class="history-meta">${extraBits.length ? extraBits.join(' · ') : 'No extra context recorded.'}</div>
+                    <div class="history-badges">${badges.join('')}</div>
+                </div>
+            `;
+        }).join('');
+    };
+
     const renderEquipSlot = (elementId, metaId, item, emptyLabel) => {
         const slot = document.getElementById(elementId);
         const meta = document.getElementById(metaId);
@@ -1211,7 +1416,9 @@
         const sourceLabel = state.selectedInventoryTab === 'inventory'
             ? (payload.sources && payload.sources.inventory ? payload.sources.inventory : 'none')
             : (payload.sources && payload.sources.ender ? payload.sources.ender : 'none');
-        elements.inventoryMeta.textContent = `Source: ${sourceLabel}. Click any populated slot to remove that stack type.`;
+        const profile = payload && payload.profile ? payload.profile : {};
+        const canEditOffline = Boolean(profile.playerdataFilePath);
+        elements.inventoryMeta.textContent = `Source: ${sourceLabel}. ${profile.online ? 'Live edits are enabled.' : (canEditOffline ? 'Offline playerdata edits are enabled for safe actions.' : 'No offline playerdata file is available for edits.')}`;
         elements.inventoryGrid.innerHTML = '';
         state.selectedItem = null;
         elements.selectedItemMeta.textContent = 'Select an item slot to remove a specific stack.';
@@ -1269,7 +1476,7 @@
         state.selectedItem = { ...item, scope };
         elements.selectedItemMeta.textContent = `${String(item.id || '').split(':').pop()} ×${item.count || 1} selected. Delete will remove that item type from the player.`;
         const profile = state.selectedData && state.selectedData.profile ? state.selectedData.profile : null;
-        elements.deleteSelectedItemBtn.disabled = !(profile && profile.online);
+        elements.deleteSelectedItemBtn.disabled = !(profile && (profile.online || profile.playerdataFilePath));
     };
 
     const renderPlayerDetails = (payload) => {
@@ -1305,8 +1512,10 @@
         elements.gamemodeSelect.value = ['survival', 'creative', 'adventure', 'spectator'].includes(String(profile.gamemode || '').toLowerCase())
             ? String(profile.gamemode || '').toLowerCase()
             : 'survival';
-        elements.gamemodeSelect.disabled = !profile.online;
-        if (elements.applyGamemodeBtn) elements.applyGamemodeBtn.disabled = !profile.online;
+        const canEditOffline = Boolean(profile.playerdataFilePath);
+        const canAdjustState = Boolean(profile.online || canEditOffline);
+        elements.gamemodeSelect.disabled = !canAdjustState;
+        if (elements.applyGamemodeBtn) elements.applyGamemodeBtn.disabled = !canAdjustState;
         if (elements.teleportTargetInput) elements.teleportTargetInput.disabled = !profile.online;
         if (elements.teleportBtn) elements.teleportBtn.disabled = !profile.online;
 
@@ -1320,9 +1529,30 @@
         elements.identitySummary.textContent = profile.uuid
             ? `${profile.online ? 'Live + stored profile' : 'Stored profile only'}`
             : 'Unresolved identity';
+        elements.inventorySourceSummary.textContent = payload.sources && payload.sources.inventory ? String(payload.sources.inventory) : 'Unavailable';
+        elements.enderSourceSummary.textContent = payload.sources && payload.sources.ender ? String(payload.sources.ender) : 'Unavailable';
+        elements.offlineEditSummary.textContent = profile.online
+            ? 'Live runtime edits'
+            : (canEditOffline ? 'Safe offline edits enabled' : 'Read-only offline view');
         const advancementCompleted = payload.advancementsSummary ? Number(payload.advancementsSummary.completed || 0) : 0;
         const advancementTotal = payload.advancementsSummary ? Number(payload.advancementsSummary.total || 0) : 0;
         elements.advancementsSummary.textContent = advancementTotal ? `${advancementCompleted}/${advancementTotal} completed` : 'No stored advancements';
+        if (elements.advancementProgressFill) {
+            elements.advancementProgressFill.style.width = advancementTotal ? `${Math.max(0, Math.min(100, (advancementCompleted / advancementTotal) * 100))}%` : '0%';
+        }
+        if (elements.worldMetricsSummary) {
+            const movementCount = payload.statsSummary && Array.isArray(payload.statsSummary.movement) ? payload.statsSummary.movement.length : 0;
+            const itemCount = Array.isArray(payload.offlineItems && payload.offlineItems.inventory) ? payload.offlineItems.inventory.length : 0;
+            elements.worldMetricsSummary.textContent = `${movementCount} movement metrics · ${itemCount} stored inventory stacks`;
+        }
+        if (elements.sourcePillRow) {
+            const pills = [];
+            pills.push(`<span class="source-pill ${profile.online ? 'live' : 'stored'}">${profile.online ? 'Live player entity' : 'Stored playerdata only'}</span>`);
+            pills.push(`<span class="source-pill ${(payload.sources && payload.sources.inventory) === 'online' ? 'live' : ((payload.sources && payload.sources.inventory) ? 'stored' : 'missing')}">Inventory ${escapeHtml(payload.sources && payload.sources.inventory ? payload.sources.inventory : 'missing')}</span>`);
+            pills.push(`<span class="source-pill ${(payload.sources && payload.sources.ender) === 'online' ? 'live' : ((payload.sources && payload.sources.ender) ? 'stored' : 'missing')}">Ender ${escapeHtml(payload.sources && payload.sources.ender ? payload.sources.ender : 'missing')}</span>`);
+            pills.push(`<span class="source-pill ${profile.playerdataFilePath ? 'stored' : 'missing'}">${profile.playerdataFilePath ? 'Offline write safe' : 'Offline write unavailable'}</span>`);
+            elements.sourcePillRow.innerHTML = pills.join('');
+        }
         const advancementEntries = payload.advancementsSummary && Array.isArray(payload.advancementsSummary.entries)
             ? payload.advancementsSummary.entries
             : [];
@@ -1337,11 +1567,11 @@
 
         renderInventoryGrid(payload);
         document.querySelectorAll('[data-adjust-field]').forEach((button) => {
-            button.disabled = !profile.online;
+            button.disabled = !canAdjustState;
         });
-        document.getElementById('clearInventoryBtn').disabled = !profile.online;
-        document.getElementById('clearEnderBtn').disabled = !profile.online;
-        if (!profile.online) {
+        document.getElementById('clearInventoryBtn').disabled = !canAdjustState;
+        document.getElementById('clearEnderBtn').disabled = !canAdjustState;
+        if (!canAdjustState) {
             elements.deleteSelectedItemBtn.disabled = true;
         }
         setLastRefresh(payload.generatedAt);
@@ -1400,6 +1630,21 @@
         }
     };
 
+    const loadRecentEvents = async () => {
+        const requestId = Date.now();
+        state.historyRequestId = requestId;
+        try {
+            const payload = await apiFetch(`/server/${serverId}/minecraft/admin/history`);
+            if (state.historyRequestId !== requestId) return;
+            state.recentEvents = Array.isArray(payload.events) ? payload.events : [];
+            renderRecentEvents();
+        } catch (error) {
+            if (!state.recentEvents.length) {
+                elements.historyList.innerHTML = '<div class="empty-state">Failed to load recent control history.</div>';
+            }
+        }
+    };
+
     const clearInspectLoop = () => {
         if (state.inspectTimer) {
             clearInterval(state.inspectTimer);
@@ -1440,9 +1685,10 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
-        setMessage(`${action} sent for ${state.selectedPlayer}.`, 'success');
+        setMessage(`${action} applied for ${state.selectedPlayer}${payload.mode === 'offline' ? ' via offline playerdata' : ''}.`, 'success');
         await loadPlayerList(true);
         await loadPlayerDetails(true);
+        await loadRecentEvents();
         return payload;
     };
 
@@ -1454,6 +1700,7 @@
             body: JSON.stringify({ player: state.selectedPlayer, action })
         });
         setMessage(`${action === 'freeze' ? 'Freeze' : 'Unfreeze'} applied for ${state.selectedPlayer}.`, 'success');
+        await loadRecentEvents();
     };
 
     const applyStateDelta = async (field, delta) => {
@@ -1469,8 +1716,9 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ player: profile.name, field, value: nextValue })
         });
-        setMessage(`${field} updated for ${profile.name}.`, 'success');
+        setMessage(`${field} updated for ${profile.name}${profile.online ? '' : ' via offline playerdata'}.`, 'success');
         await loadPlayerDetails(true);
+        await loadRecentEvents();
     };
 
     const applyGamemode = async () => {
@@ -1486,6 +1734,7 @@
         });
         setMessage(`Gamemode updated for ${state.selectedPlayer}.`, 'success');
         await loadPlayerDetails(true);
+        await loadRecentEvents();
     };
 
     const teleportSelectedPlayer = async () => {
@@ -1501,11 +1750,12 @@
             body: JSON.stringify({ player: state.selectedPlayer, destination })
         });
         setMessage(`Teleport queued for ${state.selectedPlayer}.`, 'success');
+        await loadRecentEvents();
     };
 
     const runInventoryAction = async (action, itemId = '', count = 1) => {
         if (!state.selectedPlayer) return;
-        await apiFetch(`/server/${serverId}/minecraft/admin/inventory`, {
+        const payload = await apiFetch(`/server/${serverId}/minecraft/admin/inventory`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1515,8 +1765,9 @@
                 count
             })
         });
-        setMessage(`Inventory action "${action}" sent for ${state.selectedPlayer}.`, 'success');
+        setMessage(`Inventory action "${action}" applied for ${state.selectedPlayer}${payload.mode === 'offline' ? ' via offline playerdata' : ''}.`, 'success');
         await loadPlayerDetails(true);
+        await loadRecentEvents();
     };
 
     const runWorldDataAction = async (action) => {
@@ -1532,9 +1783,11 @@
         });
         setMessage(`${action === 'reset_stats' ? 'Stats' : 'Advancements'} reset for ${state.selectedPlayer}.`, 'success');
         await loadPlayerDetails(true);
+        await loadRecentEvents();
     };
 
     document.getElementById('refreshDirectoryBtn')?.addEventListener('click', () => loadPlayerList(true));
+    document.getElementById('refreshHistoryBtn')?.addEventListener('click', () => loadRecentEvents().catch(() => {}));
     document.getElementById('applyGamemodeBtn')?.addEventListener('click', () => applyGamemode().catch((error) => setMessage(error.message, 'error')));
     document.getElementById('teleportBtn')?.addEventListener('click', () => teleportSelectedPlayer().catch((error) => setMessage(error.message, 'error')));
     document.getElementById('clearInventoryBtn')?.addEventListener('click', () => runInventoryAction('clear_inventory').catch((error) => setMessage(error.message, 'error')));
@@ -1575,7 +1828,9 @@
 
     (async () => {
         try {
+            renderRecentEvents();
             await loadPlayerList(false);
+            await loadRecentEvents();
             if (state.selectedPlayer) {
                 await loadPlayerDetails(false);
                 startInspectLoop();

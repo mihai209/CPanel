@@ -64,6 +64,7 @@ const {
 } = require('./core/db');
 const { registerSecurityMiddleware } = require('./core/middleware/security');
 const { registerLocalsMiddleware } = require('./core/middleware/locals');
+const { recordServerChange } = require('./core/server-change-log');
 const { createSessionAuthGuards, createTokenAuthenticator } = require('./core/middleware/auth');
 const { createRequireAdminApiPermission } = require('./core/middleware/admin-api');
 const { registerInternalApiRoutes } = require('./routes/internal/api');
@@ -680,6 +681,8 @@ registerWebSocketRuntime({
     ServerSubuser,
     AuditLog,
     ServerResourceSample,
+    ServerChangeLog,
+    recordServerChange,
     Allocation,
     Image,
     Connector,

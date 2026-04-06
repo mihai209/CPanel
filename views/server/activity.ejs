@@ -15,10 +15,79 @@
         .table-dark{--bs-table-bg:transparent}
         .section-title{font-size:.82rem;color:#8b8b9a;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
         .badge-soft{display:inline-block;padding:.2rem .55rem;border-radius:999px;font-size:.72rem;border:1px solid #2d2d35;background:#17171d;color:#d2d2db}
+        .activity-badge{display:inline-flex;align-items:center;gap:.35rem;padding:.28rem .62rem;border-radius:999px;font-size:.72rem;font-weight:700;letter-spacing:.04em;border:1px solid transparent}
+        .activity-badge.is-transition{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.26);color:#93c5fd}
+        .activity-badge.is-mismatch{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.26);color:#fda4af}
+        .activity-badge.is-recovery{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.26);color:#fcd34d}
+        .activity-badge.is-debug{background:rgba(148,163,184,.12);border-color:rgba(148,163,184,.22);color:#cbd5e1}
+        .activity-badge.is-power{background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.26);color:#86efac}
+        .activity-meta-line{color:#8b8b9a;font-size:.78rem;margin-top:.18rem}
     </style>
     <link rel="stylesheet" href="/css/mobile-layout.css">
 </head>
 <body>
+<%
+function activityActionLabel(action) {
+    const value = String(action || '').trim();
+    const map = {
+        'server:state.transition': 'Runtime state transition',
+        'server:state.mismatch': 'Runtime/DB mismatch',
+        'server:recovery.policy': 'Policy recovery action',
+        'server:recovery.auto': 'Automatic crash recovery',
+        'server:recovery.action': 'Recovery assistant action',
+        'server:power.action': 'Power action',
+        'server:debug.crash': 'Crash detected',
+        'server:debug.stop': 'Graceful stop',
+        'server:debug.install_fail': 'Install failed'
+    };
+    return map[value] || value || '-';
+}
+
+function activityActionTone(action) {
+    const value = String(action || '').trim();
+    if (value === 'server:state.transition') return 'transition';
+    if (value === 'server:state.mismatch') return 'mismatch';
+    if (value === 'server:recovery.policy' || value === 'server:recovery.auto' || value === 'server:recovery.action') return 'recovery';
+    if (value === 'server:power.action') return 'power';
+    return 'debug';
+}
+
+function formatMetaDate(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString();
+}
+
+function activitySummary(log) {
+    const action = String(log && log.action || '').trim();
+    const metadata = log && log.metadata && typeof log.metadata === 'object' ? log.metadata : {};
+    if (action === 'server:state.transition' || action === 'server:state.mismatch') {
+        const prev = metadata.previousStatus || 'unknown';
+        const next = metadata.nextStatus || 'unknown';
+        const src = metadata.source || 'system';
+        const reason = metadata.reason ? ` · ${metadata.reason}` : '';
+        const startedAt = formatMetaDate(metadata.startedAt);
+        const finishedAt = formatMetaDate(metadata.finishedAt);
+        const timeBits = [startedAt ? `started ${startedAt}` : '', finishedAt ? `finished ${finishedAt}` : ''].filter(Boolean);
+        return `${prev} -> ${next} via ${src}${reason}${timeBits.length ? ` · ${timeBits.join(' · ')}` : ''}`;
+    }
+    if (action === 'server:recovery.policy') {
+        return `${metadata.playbook || 'policy'} -> ${metadata.action || 'unknown'}`;
+    }
+    if (action === 'server:recovery.auto') {
+        return `${metadata.action || 'start'} after crash`;
+    }
+    if (action === 'server:power.action') {
+        return `${metadata.powerAction || 'unknown'} requested`;
+    }
+    if (action === 'server:debug.crash') {
+        const exit = metadata.exitCode !== undefined && metadata.exitCode !== null ? `exit ${metadata.exitCode}` : 'no exit code';
+        return metadata.oomKilled ? `${exit} · OOM killed` : exit;
+    }
+    return '';
+}
+%>
 
 <%- include('../partials/error-modal') %>
 <div class="wrapper">
@@ -73,7 +142,7 @@
                                 <th>When</th>
                                 <th>Actor</th>
                                 <th>Action</th>
-                                <th>Target</th>
+                                <th>Summary</th>
                                 <th>IP</th>
                             </tr>
                         </thead>
@@ -84,8 +153,26 @@
                                 <tr>
                                     <td><%= new Date(log.createdAt).toLocaleString() %></td>
                                     <td><%= log.actor ? log.actor.username : 'system' %></td>
-                                    <td><code><%= log.action || '-' %></code></td>
-                                    <td><%= [log.targetType || '', log.targetId || ''].filter(Boolean).join(' / ') || '-' %></td>
+                                    <td>
+                                        <div>
+                                            <span class="activity-badge is-<%= activityActionTone(log.action) %>">
+                                                <%= activityActionLabel(log.action) %>
+                                            </span>
+                                        </div>
+                                        <% if (log.action && log.action !== activityActionLabel(log.action)) { %>
+                                            <div class="activity-meta-line"><%= log.action %></div>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <div><%= activitySummary(log) || ([log.targetType || '', log.targetId || ''].filter(Boolean).join(' / ') || '-') %></div>
+                                        <% if (log.metadata && (log.metadata.source || log.metadata.reason || log.metadata.mismatch)) { %>
+                                            <div class="activity-meta-line">
+                                                <% if (log.metadata.source) { %><span>source=<code><%= log.metadata.source %></code></span><% } %>
+                                                <% if (log.metadata.reason) { %><span class="ms-2">reason=<code><%= log.metadata.reason %></code></span><% } %>
+                                                <% if (log.metadata.mismatch) { %><span class="ms-2 text-warning">mismatch</span><% } %>
+                                            </div>
+                                        <% } %>
+                                    </td>
                                     <td><%= log.ip || '-' %></td>
                                 </tr>
                             <% }) } %>

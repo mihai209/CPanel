@@ -49,7 +49,8 @@ function registerServerPagesRoutes(ctx) {
         getServerConsoleBuffer,
         getServerTickSamples,
         getServerResourcePackStatus,
-        getServerCrashLoopState
+        getServerCrashLoopState,
+        getServerRuntimeMeta
     } = require('../../core/websocket-runtime');
     for (const [key, value] of Object.entries(ctx || {})) {
         try {
@@ -178,7 +179,10 @@ function registerServerPagesRoutes(ctx) {
         if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
             throw new Error('Connector is offline.');
         }
-        rememberServerPowerIntent(server.id, 'restart');
+        rememberServerPowerIntent(server.id, 'restart', {
+            source: 'policy',
+            reason: 'restart_after_players_zero'
+        });
         connectorWs.send(JSON.stringify({
             type: 'server_power',
             serverId: server.id,
@@ -4144,7 +4148,10 @@ function registerServerPagesRoutes(ctx) {
         }
 
         if (normalized === 'stop' || normalized === 'restart' || normalized === 'kill') {
-            rememberServerPowerIntent(serverRecord.id, normalized);
+            rememberServerPowerIntent(serverRecord.id, normalized, {
+                source: 'manual',
+                reason: 'proxy_network_control'
+            });
         }
         if (normalized === 'start') {
             consumeServerPowerIntent(serverRecord.id);
@@ -4628,6 +4635,18 @@ function registerServerPagesRoutes(ctx) {
             const result = await readConnectorFileContentBase64(connectorWs, serverId, filePath, timeoutMs);
             if (!result || !result.success || !result.contentBase64) continue;
             const parsed = await parseMinecraftPlayerNbt(result.contentBase64);
+            if (!parsed) continue;
+            return { filePath, payload: parsed };
+        }
+        return { filePath: '', payload: null };
+    }
+
+    async function readFirstMinecraftPlayerdataDetailed(connectorWs, serverId, candidatePaths = [], timeoutMs = 8000) {
+        for (const filePath of candidatePaths) {
+            if (!filePath) continue;
+            const result = await readConnectorFileContentBase64(connectorWs, serverId, filePath, timeoutMs);
+            if (!result || !result.success || !result.contentBase64) continue;
+            const parsed = await parseMinecraftPlayerNbtDetailed(result.contentBase64);
             if (!parsed) continue;
             return { filePath, payload: parsed };
         }
@@ -5670,6 +5689,169 @@ function registerServerPagesRoutes(ctx) {
         }
     }
 
+    async function parseMinecraftPlayerNbtDetailed(base64Content) {
+        if (!base64Content) return null;
+        const raw = Buffer.from(base64Content, 'base64');
+        let buffer = raw;
+        let compressed = false;
+        try {
+            buffer = zlib.gunzipSync(raw);
+            compressed = true;
+        } catch {
+            buffer = raw;
+        }
+        try {
+            const parsed = await nbt.parse(buffer);
+            return {
+                raw,
+                buffer,
+                compressed,
+                typed: parsed.parsed,
+                simplified: nbt.simplify(parsed.parsed)
+            };
+        } catch {
+            if (buffer !== raw) {
+                try {
+                    const parsed = await nbt.parse(raw);
+                    return {
+                        raw,
+                        buffer: raw,
+                        compressed: false,
+                        typed: parsed.parsed,
+                        simplified: nbt.simplify(parsed.parsed)
+                    };
+                } catch {
+                    return null;
+                }
+            }
+            return null;
+        }
+    }
+
+    function ensureMinecraftCompoundRoot(typedRoot) {
+        if (!typedRoot || typedRoot.type !== 'compound') {
+            return { type: 'compound', name: '', value: {} };
+        }
+        if (!typedRoot.value || typeof typedRoot.value !== 'object') {
+            typedRoot.value = {};
+        }
+        return typedRoot;
+    }
+
+    function setMinecraftTypedScalar(typedRoot, key, fallbackType, value) {
+        const root = ensureMinecraftCompoundRoot(typedRoot);
+        const existing = root.value[key];
+        const chosenType = existing && typeof existing.type === 'string' ? existing.type : fallbackType;
+        root.value[key] = { type: chosenType, value };
+        return root.value[key];
+    }
+
+    function ensureMinecraftTypedList(typedRoot, key) {
+        const root = ensureMinecraftCompoundRoot(typedRoot);
+        const existing = root.value[key];
+        if (existing && existing.type === 'list' && existing.value && Array.isArray(existing.value.value)) {
+            return existing;
+        }
+        const next = {
+            type: 'list',
+            value: {
+                type: 'compound',
+                value: []
+            }
+        };
+        root.value[key] = next;
+        return next;
+    }
+
+    function mutateMinecraftOfflinePlayerdata(typedRoot, mutation = {}) {
+        const root = ensureMinecraftCompoundRoot(typedRoot);
+        const action = String(mutation.action || '').trim().toLowerCase();
+        const field = String(mutation.field || '').trim().toLowerCase();
+
+        if (action === 'state') {
+            if (field === 'health') {
+                const nextHealth = Math.max(1, Math.min(40, Number.parseFloat(mutation.value)));
+                if (!Number.isFinite(nextHealth)) return { success: false, error: 'Invalid offline health value.' };
+                setMinecraftTypedScalar(root, 'Health', 'float', Number(nextHealth.toFixed(1)));
+                return { success: true };
+            }
+            if (field === 'food') {
+                const nextFood = clampInteger(mutation.value, NaN, 0, 20);
+                if (!Number.isInteger(nextFood)) return { success: false, error: 'Invalid offline hunger value.' };
+                setMinecraftTypedScalar(root, 'FoodLevel', 'int', nextFood);
+                return { success: true };
+            }
+            if (field === 'xplevel') {
+                const nextLevel = clampInteger(mutation.value, NaN, 0, 10000);
+                if (!Number.isInteger(nextLevel)) return { success: false, error: 'Invalid offline XP level.' };
+                setMinecraftTypedScalar(root, 'XpLevel', 'int', nextLevel);
+                return { success: true };
+            }
+            if (field === 'gamemode') {
+                const mode = String(mutation.value || '').trim().toLowerCase();
+                const modeMap = { survival: 0, creative: 1, adventure: 2, spectator: 3 };
+                if (!Object.prototype.hasOwnProperty.call(modeMap, mode)) {
+                    return { success: false, error: 'Invalid offline gamemode.' };
+                }
+                setMinecraftTypedScalar(root, 'playerGameType', 'int', modeMap[mode]);
+                return { success: true };
+            }
+            return { success: false, error: 'Unsupported offline player state field.' };
+        }
+
+        if (action === 'inventory') {
+            const inventoryAction = String(mutation.inventoryAction || '').trim().toLowerCase();
+            const listKey = inventoryAction === 'clear_ender' ? 'EnderItems' : 'Inventory';
+            const listTag = ensureMinecraftTypedList(root, listKey);
+            const existingItems = Array.isArray(listTag.value.value) ? listTag.value.value : [];
+            if (inventoryAction === 'clear_inventory' || inventoryAction === 'clear_ender') {
+                listTag.value.value = [];
+                return { success: true };
+            }
+            if (inventoryAction === 'clear_item') {
+                const itemId = sanitizeMinecraftItemId(mutation.itemId || '');
+                let remaining = clampInteger(mutation.count, 1, 1, 9999);
+                if (!itemId || !Number.isInteger(remaining)) {
+                    return { success: false, error: 'Invalid offline inventory removal request.' };
+                }
+                const nextItems = [];
+                existingItems.forEach((entry) => {
+                    const entryId = normalizeMinecraftItemId(entry && entry.value && entry.value.id ? entry.value.id.value : '');
+                    if (!entryId || entryId !== itemId || remaining <= 0) {
+                        nextItems.push(entry);
+                        return;
+                    }
+                    const countTag = entry && entry.value ? entry.value.Count : null;
+                    const currentCount = countTag ? Number.parseInt(countTag.value, 10) || 0 : 0;
+                    if (currentCount <= 0) {
+                        nextItems.push(entry);
+                        return;
+                    }
+                    if (currentCount <= remaining) {
+                        remaining -= currentCount;
+                        return;
+                    }
+                    countTag.value = currentCount - remaining;
+                    remaining = 0;
+                    nextItems.push(entry);
+                });
+                listTag.value.value = nextItems;
+                return { success: true };
+            }
+            return { success: false, error: 'Unsupported offline inventory action.' };
+        }
+
+        return { success: false, error: 'Unsupported offline playerdata mutation.' };
+    }
+
+    function serializeMinecraftPlayerdataNbt(detailedPayload) {
+        if (!detailedPayload || !detailedPayload.typed) {
+            throw new Error('Missing NBT payload.');
+        }
+        const raw = nbt.writeUncompressed(detailedPayload.typed, 'big');
+        return detailedPayload.compressed ? zlib.gzipSync(raw) : raw;
+    }
+
     function mapMinecraftNbtItemList(list) {
         if (!Array.isArray(list)) return [];
         return list.map((entry) => {
@@ -5726,6 +5908,74 @@ function registerServerPagesRoutes(ctx) {
             return null;
         }
         return { server, access, connectorWs };
+    }
+
+    async function writeMinecraftAdminAuditAndChange(req, server, payload = {}) {
+        const actorUserId = req && req.session && req.session.user ? req.session.user.id : null;
+        const playerName = String(payload.playerName || '').trim();
+        const source = String(payload.source || '').trim() || 'runtime';
+        const action = String(payload.action || '').trim() || 'inspect';
+        const summary = String(payload.summary || `${action} for ${playerName || 'player'}`).slice(0, 255);
+        const metadata = {
+            playerName,
+            playerUuid: String(payload.playerUuid || '').trim(),
+            source,
+            online: Boolean(payload.online),
+            field: payload.field || null,
+            reason: payload.reason || null,
+            command: payload.command || null,
+            extra: payload.extra && typeof payload.extra === 'object' ? payload.extra : null
+        };
+
+        await writeServerAuditSafe({
+            actorUserId,
+            serverId: server.id,
+            action: `server:minecraft.admin.${action}`,
+            ip: req.headers['x-forwarded-for'] || req.ip || null,
+            userAgent: req.headers['user-agent'] || null,
+            metadata
+        });
+
+        await recordServerChange(ServerChangeLog, {
+            serverId: server.id,
+            actorUserId,
+            category: 'minecraft_admin',
+            changeKey: action,
+            summary,
+            beforeValue: payload.beforeValue === undefined ? null : payload.beforeValue,
+            afterValue: payload.afterValue === undefined ? metadata : payload.afterValue,
+            metadata
+        });
+    }
+
+    async function loadMinecraftAdminRecentEvents(serverId, limit = 18) {
+        if (!AuditLog) return [];
+        const rows = await AuditLog.findAll({
+            where: {
+                targetType: 'server',
+                targetId: String(serverId),
+                action: { [Op.like]: 'server:minecraft.admin.%' }
+            },
+            order: [['createdAt', 'DESC']],
+            limit
+        });
+        return (rows || []).map((row) => {
+            const meta = row && row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+            const action = String(row && row.action || '').replace(/^server:minecraft\.admin\./, '');
+            return {
+                id: row.id,
+                action,
+                playerName: String(meta.playerName || ''),
+                playerUuid: String(meta.playerUuid || ''),
+                source: String(meta.source || ''),
+                online: Boolean(meta.online),
+                field: meta.field || '',
+                reason: meta.reason || '',
+                command: meta.command || '',
+                extra: meta.extra && typeof meta.extra === 'object' ? meta.extra : {},
+                createdAt: row.createdAt
+            };
+        });
     }
 
     function normalizeMinecraftConsoleCommand(value) {
@@ -6655,6 +6905,46 @@ function registerServerPagesRoutes(ctx) {
         }, timeoutMs);
 
         return response || { success: false, error: 'Timed out waiting for connector file write.' };
+    }
+
+    async function writeConnectorBinaryFile(connectorWs, serverId, filePath, buffer, timeoutMs = 15000) {
+        if (!Buffer.isBuffer(buffer)) {
+            return { success: false, error: 'Binary payload must be a Buffer.' };
+        }
+        if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+            return { success: false, error: 'Connector is offline.' };
+        }
+
+        try {
+            connectorWs.send(JSON.stringify({
+                type: 'write_file',
+                serverId,
+                filePath,
+                encoding: 'base64',
+                contentBase64: buffer.toString('base64')
+            }));
+        } catch (error) {
+            return {
+                success: false,
+                error: error && error.message ? error.message : 'Failed to send binary write request to connector.'
+            };
+        }
+
+        const response = await waitForConnectorMessage(connectorWs, (message) => {
+            if (Number.parseInt(message.serverId, 10) !== Number.parseInt(serverId, 10)) return null;
+            if (String(message.type || '') === 'write_success' && String(message.filePath || '') === filePath) {
+                return { success: true };
+            }
+            if (String(message.type || '') === 'error') {
+                return {
+                    success: false,
+                    error: String(message.message || 'Connector returned an error.')
+                };
+            }
+            return null;
+        }, timeoutMs);
+
+        return response || { success: false, error: 'Timed out waiting for connector binary file write.' };
     }
 
     function sanitizeUploadFileName(rawName) {
@@ -10566,7 +10856,10 @@ function registerServerPagesRoutes(ctx) {
                 initialStats: {
                     cpu: '0',
                     memory: '0',
-                    disk: '0'
+                    disk: '0',
+                    network_rx: '0',
+                    network_tx: '0',
+                    uptime_seconds: 0
                 },
                 user: {
                     id: userSession.id,
@@ -10588,6 +10881,7 @@ function registerServerPagesRoutes(ctx) {
                         disk: Number.parseInt(server.disk, 10) || 0
                     }
                 },
+                runtimeMeta: getServerRuntimeMeta(server.id),
                 serverNavItems
             };
 
@@ -10635,6 +10929,7 @@ function registerServerPagesRoutes(ctx) {
                     disabledReason: aiDisabledReason,
                     policy: aiPolicy
                 },
+                runtimeMeta: getServerRuntimeMeta(server.id),
                 success: req.query.success || null,
                 error: req.query.error || null
             });
@@ -12694,7 +12989,10 @@ function registerServerPagesRoutes(ctx) {
                     return res.redirect(`/server/${server.containerId}/recovery?error=${encodeURIComponent('Missing permission: server.power')}`);
                 }
                 if (action === 'stop' || action === 'restart' || action === 'kill') {
-                    rememberServerPowerIntent(server.id, action);
+                    rememberServerPowerIntent(server.id, action, {
+                        source: 'manual',
+                        reason: 'recovery_assistant'
+                    });
                 }
                 if (action === 'start') {
                     consumeServerPowerIntent(server.id);
@@ -16511,6 +16809,8 @@ function registerServerPagesRoutes(ctx) {
                 return res.redirect(`/server/${server.containerId}/suspended`);
             }
 
+            const minecraftAdminRecentEvents = await loadMinecraftAdminRecentEvents(server.id, 18).catch(() => []);
+
             return res.render('server/minecraft-admin', {
                 server,
                 user: req.session.user,
@@ -16531,7 +16831,8 @@ function registerServerPagesRoutes(ctx) {
                     chat: hasServerPermission(access, 'minecraft.chat'),
                     whitelist: hasServerPermission(access, 'minecraft.whitelist'),
                     playerData: hasServerPermission(access, 'minecraft.inspect')
-                }
+                },
+                minecraftAdminRecentEvents
             });
         } catch (err) {
             console.error('Error loading Minecraft admin:', err);
@@ -19808,6 +20109,14 @@ function registerServerPagesRoutes(ctx) {
             for (const cmd of commands) {
                 await dispatchMinecraftCommand(connectorWs, server.id, cmd);
             }
+            await writeMinecraftAdminAuditAndChange(req, server, {
+                action: action === 'unfreeze' ? 'unfreeze' : 'freeze',
+                playerName: String(req.body.player || req.body.username || '').trim(),
+                source: 'runtime_command',
+                online: true,
+                command: commands.join(' && '),
+                summary: `${action === 'unfreeze' ? 'Unfreeze' : 'Freeze'} applied to ${String(req.body.player || req.body.username || '').trim()}`
+            });
             return res.json({ success: true });
         } catch (error) {
             console.error('Error freezing player:', error);
@@ -19823,8 +20132,20 @@ function registerServerPagesRoutes(ctx) {
             const target = formatMinecraftCommandTarget(req.body.player || '');
             const destination = normalizeMinecraftTeleportTarget(req.body.destination || '');
             if (!target || !destination) return res.status(400).json({ success: false, error: 'Player and destination are required.' });
-            const result = await dispatchMinecraftCommand(connectorWs, server.id, `tp ${target} ${destination}`);
+            const command = `tp ${target} ${destination}`;
+            const result = await dispatchMinecraftCommand(connectorWs, server.id, command);
             if (!result.success) return res.status(500).json({ success: false, error: result.error || 'Failed to teleport player.' });
+            await writeMinecraftAdminAuditAndChange(req, server, {
+                action: 'teleport',
+                playerName: String(req.body.player || '').trim(),
+                source: 'runtime_command',
+                online: true,
+                command,
+                summary: `Teleport queued for ${String(req.body.player || '').trim()}`,
+                extra: {
+                    destination
+                }
+            });
             return res.json({ success: true });
         } catch (error) {
             console.error('Error teleporting player:', error);
@@ -19873,6 +20194,18 @@ function registerServerPagesRoutes(ctx) {
         }
     });
 
+    app.get('/server/:containerId/minecraft/admin/history', requireAuth, async (req, res) => {
+        try {
+            const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.inspect']);
+            if (!ctx) return;
+            const rows = await loadMinecraftAdminRecentEvents(ctx.server.id, 24);
+            return res.json({ success: true, events: rows });
+        } catch (error) {
+            console.error('Error loading minecraft admin history:', error);
+            return res.status(500).json({ success: false, error: 'Failed to load player control history.' });
+        }
+    });
+
     app.post('/server/:containerId/minecraft/admin/player-action', requireAuth, async (req, res) => {
         try {
             const action = String(req.body.action || '').trim().toLowerCase();
@@ -19917,6 +20250,19 @@ function registerServerPagesRoutes(ctx) {
             if (!result.success) {
                 return res.status(500).json({ success: false, error: result.error || 'Failed to execute player action.' });
             }
+            await writeMinecraftAdminAuditAndChange(req, server, {
+                action,
+                playerName: rawTarget,
+                source: 'runtime_command',
+                online: true,
+                reason,
+                command,
+                summary: `${action} queued for ${rawTarget}`,
+                extra: {
+                    duration: duration || '',
+                    requestId: result.requestId || null
+                }
+            });
             return res.json({
                 success: true,
                 action,
@@ -19942,40 +20288,120 @@ function registerServerPagesRoutes(ctx) {
             const runtime = await resolveMinecraftAdminRuntimeContext(server, connectorWs, res.locals.settings || {});
             const online = Array.isArray(runtime.statusPreview && runtime.statusPreview.playersList)
                 && runtime.statusPreview.playersList.some((entry) => String(entry && entry.name || '').trim().toLowerCase() === targetName.toLowerCase());
-            if (!online) {
-                return res.status(409).json({ success: false, error: 'Player must be online for live stat edits.' });
-            }
+            const usercacheUuid = resolvePlayerUuidFromUsercache(JSON.stringify(runtime.usercacheEntries || []), targetName);
+            const offlineUuid = computeOfflinePlayerUuid(targetName);
+            const onlineEntry = Array.isArray(runtime.statusPreview && runtime.statusPreview.playersList)
+                ? runtime.statusPreview.playersList.find((entry) => String(entry && entry.name || '').trim().toLowerCase() === targetName.toLowerCase())
+                : null;
+            const candidateUuids = buildMinecraftCandidateUuids(targetName, runtime.onlineMode, usercacheUuid, offlineUuid, String(req.body.uuid || '').trim() || (onlineEntry && onlineEntry.uuid));
 
             const field = String(req.body.field || '').trim().toLowerCase();
             const valueRaw = req.body.value;
             let command = '';
+            let nextValue;
             if (field === 'health') {
                 const value = Math.max(1, Math.min(40, Number.parseFloat(valueRaw)));
                 if (!Number.isFinite(value)) return res.status(400).json({ success: false, error: 'Invalid health value.' });
-                command = `data modify entity ${target} Health set value ${Number(value.toFixed(1))}f`;
+                nextValue = Number(value.toFixed(1));
+                command = `data modify entity ${target} Health set value ${nextValue}f`;
             } else if (field === 'food') {
                 const value = clampInteger(valueRaw, NaN, 0, 20);
                 if (!Number.isInteger(value)) return res.status(400).json({ success: false, error: 'Invalid hunger value.' });
+                nextValue = value;
                 command = `data modify entity ${target} foodLevel set value ${value}`;
             } else if (field === 'xplevel') {
                 const value = clampInteger(valueRaw, NaN, 0, 10000);
                 if (!Number.isInteger(value)) return res.status(400).json({ success: false, error: 'Invalid XP level.' });
+                nextValue = value;
                 command = `xp set ${target} ${value} levels`;
             } else if (field === 'gamemode') {
                 const mode = String(valueRaw || '').trim().toLowerCase();
                 if (!['survival', 'creative', 'adventure', 'spectator'].includes(mode)) {
                     return res.status(400).json({ success: false, error: 'Invalid gamemode.' });
                 }
+                nextValue = mode;
                 command = `gamemode ${mode} ${target}`;
             } else {
                 return res.status(400).json({ success: false, error: 'Unsupported state field.' });
             }
 
-            const result = await dispatchMinecraftCommand(connectorWs, server.id, command);
-            if (!result.success) {
-                return res.status(500).json({ success: false, error: result.error || 'Failed to update player state.' });
+            const inspectBefore = await buildMinecraftPlayerAdminPayload(server, connectorWs, targetName, res.locals.settings || {}, {
+                explicitUuid: String(req.body.uuid || '').trim(),
+                refresh: true
+            }).catch(() => null);
+            const beforeValue = inspectBefore && inspectBefore.profile ? {
+                health: inspectBefore.profile.health,
+                food: inspectBefore.profile.food,
+                xpLevel: inspectBefore.profile.xpLevel,
+                gamemode: inspectBefore.profile.gamemode,
+                source: online ? 'online_runtime' : 'offline_playerdata'
+            } : null;
+
+            if (online) {
+                const result = await dispatchMinecraftCommand(connectorWs, server.id, command);
+                if (!result.success) {
+                    return res.status(500).json({ success: false, error: result.error || 'Failed to update player state.' });
+                }
+                await writeMinecraftAdminAuditAndChange(req, server, {
+                    action: `player_state_${field}`,
+                    playerName: targetName,
+                    playerUuid: inspectBefore && inspectBefore.profile ? inspectBefore.profile.uuid : '',
+                    source: 'online_runtime',
+                    online: true,
+                    field,
+                    command,
+                    beforeValue,
+                    afterValue: {
+                        ...beforeValue,
+                        [field === 'xplevel' ? 'xpLevel' : field]: nextValue,
+                        source: 'online_runtime'
+                    },
+                    summary: `Updated ${field} for ${targetName} while online`
+                });
+                return res.json({ success: true, field, command, mode: 'online', requestId: result.requestId || null });
             }
-            return res.json({ success: true, field, command, requestId: result.requestId || null });
+
+            const playerdataResult = await readFirstMinecraftPlayerdataDetailed(
+                connectorWs,
+                server.id,
+                candidateUuids.map((uuid) => `/${runtime.levelName}/playerdata/${uuid}.dat`),
+                8000
+            );
+            if (!playerdataResult.filePath || !playerdataResult.payload) {
+                return res.status(409).json({ success: false, error: 'Offline playerdata file was not found for this player.' });
+            }
+            const mutation = mutateMinecraftOfflinePlayerdata(playerdataResult.payload.typed, {
+                action: 'state',
+                field,
+                value: nextValue
+            });
+            if (!mutation.success) {
+                return res.status(400).json({ success: false, error: mutation.error || 'Failed to mutate offline playerdata.' });
+            }
+            const encoded = serializeMinecraftPlayerdataNbt(playerdataResult.payload);
+            const writeResult = await writeConnectorBinaryFile(connectorWs, server.id, playerdataResult.filePath, encoded, 15000);
+            if (!writeResult.success) {
+                return res.status(500).json({ success: false, error: writeResult.error || 'Failed to write offline playerdata.' });
+            }
+            await writeMinecraftAdminAuditAndChange(req, server, {
+                action: `player_state_${field}`,
+                playerName: targetName,
+                playerUuid: inspectBefore && inspectBefore.profile ? inspectBefore.profile.uuid : offlineUuid,
+                source: 'offline_playerdata',
+                online: false,
+                field,
+                beforeValue,
+                afterValue: {
+                    ...beforeValue,
+                    [field === 'xplevel' ? 'xpLevel' : field]: nextValue,
+                    source: 'offline_playerdata'
+                },
+                summary: `Updated ${field} for ${targetName} via offline playerdata`,
+                extra: {
+                    filePath: playerdataResult.filePath
+                }
+            });
+            return res.json({ success: true, field, mode: 'offline', filePath: playerdataResult.filePath });
         } catch (error) {
             console.error('Error updating minecraft player state:', error);
             return res.status(500).json({ success: false, error: 'Failed to update player state.' });
@@ -19995,13 +20421,16 @@ function registerServerPagesRoutes(ctx) {
             const runtime = await resolveMinecraftAdminRuntimeContext(server, connectorWs, res.locals.settings || {});
             const online = Array.isArray(runtime.statusPreview && runtime.statusPreview.playersList)
                 && runtime.statusPreview.playersList.some((entry) => String(entry && entry.name || '').trim().toLowerCase() === targetName.toLowerCase());
-            if (!online) {
-                return res.status(409).json({ success: false, error: 'Inventory actions require the player to be online.' });
-            }
             const action = String(req.body.action || '').trim().toLowerCase();
             const itemId = sanitizeMinecraftItemId(req.body.itemId || '');
             const count = clampInteger(req.body.count, 1, 1, 9999);
             let command = '';
+            const usercacheUuid = resolvePlayerUuidFromUsercache(JSON.stringify(runtime.usercacheEntries || []), targetName);
+            const offlineUuid = computeOfflinePlayerUuid(targetName);
+            const onlineEntry = Array.isArray(runtime.statusPreview && runtime.statusPreview.playersList)
+                ? runtime.statusPreview.playersList.find((entry) => String(entry && entry.name || '').trim().toLowerCase() === targetName.toLowerCase())
+                : null;
+            const candidateUuids = buildMinecraftCandidateUuids(targetName, runtime.onlineMode, usercacheUuid, offlineUuid, String(req.body.uuid || '').trim() || (onlineEntry && onlineEntry.uuid));
 
             if (action === 'clear_inventory') {
                 command = `clear ${target}`;
@@ -20016,11 +20445,93 @@ function registerServerPagesRoutes(ctx) {
                 return res.status(400).json({ success: false, error: 'Invalid inventory action.' });
             }
 
-            const result = await dispatchMinecraftCommand(connectorWs, server.id, command);
-            if (!result.success) {
-                return res.status(500).json({ success: false, error: result.error || 'Failed to execute inventory action.' });
+            const inspectBefore = await buildMinecraftPlayerAdminPayload(server, connectorWs, targetName, res.locals.settings || {}, {
+                explicitUuid: String(req.body.uuid || '').trim(),
+                refresh: true
+            }).catch(() => null);
+            const beforeValue = inspectBefore ? {
+                inventoryCount: Array.isArray(inspectBefore.items && inspectBefore.items.inventory) ? inspectBefore.items.inventory.length : 0,
+                offlineInventoryCount: Array.isArray(inspectBefore.offlineItems && inspectBefore.offlineItems.inventory) ? inspectBefore.offlineItems.inventory.length : 0,
+                enderCount: Array.isArray(inspectBefore.items && inspectBefore.items.ender) ? inspectBefore.items.ender.length : 0,
+                offlineEnderCount: Array.isArray(inspectBefore.offlineItems && inspectBefore.offlineItems.ender) ? inspectBefore.offlineItems.ender.length : 0,
+                inventorySource: inspectBefore.sources && inspectBefore.sources.inventory || '',
+                enderSource: inspectBefore.sources && inspectBefore.sources.ender || ''
+            } : null;
+
+            if (online) {
+                const result = await dispatchMinecraftCommand(connectorWs, server.id, command);
+                if (!result.success) {
+                    return res.status(500).json({ success: false, error: result.error || 'Failed to execute inventory action.' });
+                }
+                await writeMinecraftAdminAuditAndChange(req, server, {
+                    action: `inventory_${action}`,
+                    playerName: targetName,
+                    playerUuid: inspectBefore && inspectBefore.profile ? inspectBefore.profile.uuid : '',
+                    source: 'online_runtime',
+                    online: true,
+                    command,
+                    beforeValue,
+                    afterValue: {
+                        source: 'online_runtime',
+                        action,
+                        itemId,
+                        count
+                    },
+                    summary: `Inventory action ${action} queued for ${targetName}`,
+                    extra: {
+                        itemId,
+                        count,
+                        requestId: result.requestId || null
+                    }
+                });
+                return res.json({ success: true, action, command, mode: 'online', requestId: result.requestId || null });
             }
-            return res.json({ success: true, action, command, requestId: result.requestId || null });
+
+            const playerdataResult = await readFirstMinecraftPlayerdataDetailed(
+                connectorWs,
+                server.id,
+                candidateUuids.map((uuid) => `/${runtime.levelName}/playerdata/${uuid}.dat`),
+                8000
+            );
+            if (!playerdataResult.filePath || !playerdataResult.payload) {
+                return res.status(409).json({ success: false, error: 'Offline playerdata file was not found for this player.' });
+            }
+            const mutation = mutateMinecraftOfflinePlayerdata(playerdataResult.payload.typed, {
+                action: 'inventory',
+                inventoryAction: action,
+                itemId,
+                count
+            });
+            if (!mutation.success) {
+                return res.status(400).json({ success: false, error: mutation.error || 'Failed to mutate offline inventory.' });
+            }
+            const encoded = serializeMinecraftPlayerdataNbt(playerdataResult.payload);
+            const writeResult = await writeConnectorBinaryFile(connectorWs, server.id, playerdataResult.filePath, encoded, 15000);
+            if (!writeResult.success) {
+                return res.status(500).json({ success: false, error: writeResult.error || 'Failed to write offline playerdata.' });
+            }
+            await writeMinecraftAdminAuditAndChange(req, server, {
+                action: `inventory_${action}`,
+                playerName: targetName,
+                playerUuid: inspectBefore && inspectBefore.profile ? inspectBefore.profile.uuid : offlineUuid,
+                source: 'offline_playerdata',
+                online: false,
+                beforeValue,
+                afterValue: {
+                    source: 'offline_playerdata',
+                    action,
+                    itemId,
+                    count,
+                    filePath: playerdataResult.filePath
+                },
+                summary: `Inventory action ${action} applied offline for ${targetName}`,
+                extra: {
+                    itemId,
+                    count,
+                    filePath: playerdataResult.filePath
+                }
+            });
+            return res.json({ success: true, action, mode: 'offline', filePath: playerdataResult.filePath });
         } catch (error) {
             console.error('Error updating minecraft inventory:', error);
             return res.status(500).json({ success: false, error: 'Failed to update inventory.' });
@@ -20078,6 +20589,24 @@ function registerServerPagesRoutes(ctx) {
             if (!result.success) {
                 return res.status(500).json({ success: false, error: result.error || 'Failed to clear player world data.' });
             }
+            await writeMinecraftAdminAuditAndChange(req, server, {
+                action: `world_${action}`,
+                playerName,
+                playerUuid: explicitUuid || offlineUuid,
+                source: 'stored_world_data',
+                online: false,
+                beforeValue: {
+                    path: targetPath
+                },
+                afterValue: {
+                    cleared: true,
+                    path: targetPath
+                },
+                summary: `${action === 'reset_stats' ? 'Stats' : 'Advancements'} reset for ${playerName}`,
+                extra: {
+                    filePath: targetPath
+                }
+            });
             return res.json({
                 success: true,
                 action,
@@ -21005,7 +21534,10 @@ function registerServerPagesRoutes(ctx) {
             }
 
             if (action === 'stop' || action === 'restart' || action === 'kill') {
-                rememberServerPowerIntent(server.id, action);
+                rememberServerPowerIntent(server.id, action, {
+                    source: 'manual',
+                    reason: 'server_api'
+                });
             }
             if (action === 'start') {
                 consumeServerPowerIntent(server.id);

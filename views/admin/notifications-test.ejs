@@ -124,10 +124,37 @@
                                     <h5 class="text-light mb-1">Delivery logs</h5>
                                     <div class="notify-muted small">Recent manual notification probes. Targets are masked in UI.</div>
                                 </div>
-                                <form method="POST" action="/admin/notifications-test/retry-last-failed">
-                                    <button type="submit" class="btn btn-outline-warning btn-sm" <%= lastFailedLog ? '' : 'disabled' %>>Retry Last Failed</button>
-                                </form>
+                                <div class="d-flex flex-wrap gap-2 justify-content-end">
+                                    <a href="/admin/notifications-test?channel=<%= encodeURIComponent((filters && filters.channel) || 'all') %>&status=<%= encodeURIComponent((filters && filters.status) || 'all') %>&export=json" class="btn btn-outline-light btn-sm">
+                                        <i class="bi bi-download me-1"></i> Export JSON
+                                    </a>
+                                    <form method="POST" action="/admin/notifications-test/retry-last-failed">
+                                        <button type="submit" class="btn btn-outline-warning btn-sm" <%= lastFailedLog ? '' : 'disabled' %>>Retry Last Failed</button>
+                                    </form>
+                                </div>
                             </div>
+                            <form method="GET" action="/admin/notifications-test" class="row g-2 mb-3">
+                                <div class="col-sm-5">
+                                    <select name="channel" class="form-select form-select-sm bg-dark text-light border-secondary">
+                                        <option value="all" <%= !filters || filters.channel === 'all' ? 'selected' : '' %>>All channels</option>
+                                        <option value="discord" <%= filters && filters.channel === 'discord' ? 'selected' : '' %>>Discord</option>
+                                        <option value="telegram" <%= filters && filters.channel === 'telegram' ? 'selected' : '' %>>Telegram</option>
+                                        <option value="webhook" <%= filters && filters.channel === 'webhook' ? 'selected' : '' %>>Webhook</option>
+                                        <option value="email" <%= filters && filters.channel === 'email' ? 'selected' : '' %>>Email</option>
+                                    </select>
+                                </div>
+                                <div class="col-sm-4">
+                                    <select name="status" class="form-select form-select-sm bg-dark text-light border-secondary">
+                                        <option value="all" <%= !filters || filters.status === 'all' ? 'selected' : '' %>>All statuses</option>
+                                        <option value="sent" <%= filters && filters.status === 'sent' ? 'selected' : '' %>>Sent</option>
+                                        <option value="failed" <%= filters && filters.status === 'failed' ? 'selected' : '' %>>Failed</option>
+                                        <option value="unsupported" <%= filters && filters.status === 'unsupported' ? 'selected' : '' %>>Unsupported</option>
+                                    </select>
+                                </div>
+                                <div class="col-sm-3 d-grid">
+                                    <button type="submit" class="btn btn-outline-light btn-sm">Apply Filters</button>
+                                </div>
+                            </form>
                             <div class="table-responsive">
                                 <table class="table table-dark table-hover align-middle mb-0">
                                     <thead>

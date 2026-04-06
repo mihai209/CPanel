@@ -16,6 +16,10 @@
         .lab-check-ok { border-color: rgba(16, 185, 129, 0.28); }
         .lab-check-fail { border-color: rgba(239, 68, 68, 0.28); }
         .lab-pre { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; max-height: 220px; overflow: auto; background: #0b1120; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 14px; padding: 14px; color: #dbeafe; }
+        .lab-triage { padding: 16px; border-radius: 16px; border: 1px solid rgba(148, 163, 184, 0.18); }
+        .lab-triage-ok { border-color: rgba(16, 185, 129, 0.28); background: rgba(16, 185, 129, 0.08); }
+        .lab-triage-warning { border-color: rgba(245, 158, 11, 0.28); background: rgba(245, 158, 11, 0.08); }
+        .lab-triage-critical { border-color: rgba(239, 68, 68, 0.28); background: rgba(239, 68, 68, 0.08); }
     </style>
 </head>
 <body>
@@ -40,17 +44,37 @@
                 <div class="row g-4">
                     <div class="col-lg-4">
                         <div class="lab-card p-4 h-100">
-                            <h5 class="text-light mb-3">Connectors</h5>
+                            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                                <h5 class="text-light mb-0">Connectors</h5>
+                                <a href="/admin/connector-lab?connectorId=<%= selectedConnector ? selectedConnector.id : '' %>&health=<%= encodeURIComponent(healthFilter || 'all') %>&export=json" class="btn btn-sm btn-outline-light <%= selectedConnector ? '' : 'disabled' %>">
+                                    <i class="bi bi-download me-1"></i> Export
+                                </a>
+                            </div>
+                            <form method="GET" action="/admin/connector-lab" class="mb-3">
+                                <% if (selectedConnector) { %><input type="hidden" name="connectorId" value="<%= selectedConnector.id %>"><% } %>
+                                <div class="input-group input-group-sm">
+                                    <select name="health" class="form-select bg-dark text-light border-secondary-subtle">
+                                        <option value="all" <%= healthFilter === 'all' ? 'selected' : '' %>>All connectors</option>
+                                        <option value="online" <%= healthFilter === 'online' ? 'selected' : '' %>>Online only</option>
+                                        <option value="offline" <%= healthFilter === 'offline' ? 'selected' : '' %>>Offline only</option>
+                                        <option value="issues" <%= healthFilter === 'issues' ? 'selected' : '' %>>Needs attention</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-outline-light">Filter</button>
+                                </div>
+                            </form>
                             <div class="list-group list-group-flush">
-                                <% if (!connectors || connectors.length === 0) { %>
+                                <% if (!connectorCards || connectorCards.length === 0) { %>
                                     <div class="lab-muted">No connectors registered yet.</div>
                                 <% } %>
-                                <% (connectors || []).forEach((connector) => { const statusData = connectorStatus && connectorStatus[connector.id] ? connectorStatus[connector.id] : null; %>
-                                    <a href="/admin/connector-lab?connectorId=<%= connector.id %>" class="list-group-item list-group-item-action bg-transparent text-light border-secondary-subtle <%= selectedConnector && Number(selectedConnector.id) === Number(connector.id) ? 'active' : '' %>">
+                                <% (connectorCards || []).forEach((entry) => { const connector = entry.connector; const statusData = entry.statusData; const triage = entry.triage; %>
+                                    <a href="/admin/connector-lab?connectorId=<%= connector.id %>&health=<%= encodeURIComponent(healthFilter || 'all') %>" class="list-group-item list-group-item-action bg-transparent text-light border-secondary-subtle <%= selectedConnector && Number(selectedConnector.id) === Number(connector.id) ? 'active' : '' %>">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <div>
                                                 <div class="fw-semibold"><%= connector.name %></div>
                                                 <div class="small lab-muted"><%= connector.location && connector.location.name ? connector.location.name : 'No location' %></div>
+                                                <div class="small <%= triage && triage.severity === 'critical' ? 'text-danger' : (triage && triage.severity === 'warning' ? 'text-warning' : 'text-success') %>">
+                                                    <%= triage ? triage.title : 'No triage available' %>
+                                                </div>
                                             </div>
                                             <span class="badge <%= statusData && String(statusData.status || '').toLowerCase() === 'online' ? 'bg-success' : 'bg-secondary' %>"><%= statusData && statusData.status ? statusData.status : 'offline' %></span>
                                         </div>
@@ -68,7 +92,27 @@
                                         <h5 class="text-light mb-1"><%= selectedConnector.name %></h5>
                                         <div class="lab-muted small"><%= selectedConnector.fqdn || selectedConnector.ip || 'No connector endpoint details saved.' %></div>
                                     </div>
-                                    <span class="badge <%= selectedStatus && String(selectedStatus.status || '').toLowerCase() === 'online' ? 'bg-success' : 'bg-secondary' %> fs-6"><%= selectedStatus && selectedStatus.status ? selectedStatus.status : 'offline' %></span>
+                                    <div class="d-flex flex-wrap gap-2 justify-content-end">
+                                        <span class="badge <%= selectedStatus && String(selectedStatus.status || '').toLowerCase() === 'online' ? 'bg-success' : 'bg-secondary' %> fs-6"><%= selectedStatus && selectedStatus.status ? selectedStatus.status : 'offline' %></span>
+                                        <form method="POST" action="/admin/connectors/<%= selectedConnector.id %>/run-diagnostics">
+                                            <input type="hidden" name="redirect" value="/admin/connector-lab?connectorId=<%= selectedConnector.id %>&health=<%= encodeURIComponent(healthFilter || 'all') %>">
+                                            <button type="submit" class="btn btn-sm btn-outline-light" <%= selectedStatus && String(selectedStatus.status || '').toLowerCase() === 'online' ? '' : 'disabled' %>>
+                                                <i class="bi bi-arrow-repeat me-1"></i> Run Diagnostics Now
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                                <div class="lab-triage lab-triage-<%= selectedTriage && selectedTriage.severity === 'critical' ? 'critical' : (selectedTriage && selectedTriage.severity === 'ok' ? 'ok' : 'warning') %> mb-3">
+                                    <div class="d-flex justify-content-between align-items-start gap-3">
+                                        <div>
+                                            <div class="text-light fw-semibold mb-1"><%= selectedTriage ? selectedTriage.title : 'No triage available' %></div>
+                                            <div class="lab-muted small mb-2"><%= selectedTriage ? selectedTriage.summary : 'No triage summary generated.' %></div>
+                                            <div class="small text-light opacity-75"><%= selectedTriage ? selectedTriage.action : 'Wait for diagnostics before triaging this connector.' %></div>
+                                        </div>
+                                        <% if (selectedTriage && Array.isArray(selectedTriage.failedChecks) && selectedTriage.failedChecks.length > 0) { %>
+                                            <span class="badge <%= selectedTriage.severity === 'critical' ? 'bg-danger' : 'bg-warning text-dark' %>"><%= selectedTriage.failedChecks.length %> open</span>
+                                        <% } %>
+                                    </div>
                                 </div>
                                 <div class="row g-3">
                                     <div class="col-md-4"><div class="lab-check"><div class="lab-muted small">Servers on connector</div><div class="fs-3 text-light fw-semibold"><%= selectedServerCount %></div></div></div>

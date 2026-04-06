@@ -129,6 +129,116 @@ function parseLinesInput(value) {
         .filter(Boolean);
 }
 
+function normalizeConnectorHealthFilter(raw) {
+    const value = String(raw || '').trim().toLowerCase();
+    return ['all', 'online', 'offline', 'issues'].includes(value) ? value : 'all';
+}
+
+function getConnectorDiagnosticChecks(diagnostics) {
+    if (!diagnostics || typeof diagnostics !== 'object' || !diagnostics.checks || typeof diagnostics.checks !== 'object') {
+        return [];
+    }
+
+    return Object.entries(diagnostics.checks).map(([key, raw]) => {
+        const item = raw && typeof raw === 'object' ? raw : {};
+        return {
+            key,
+            status: String(item.status || 'warn').trim().toLowerCase(),
+            ok: Boolean(item.ok),
+            summary: String(item.summary || '').trim(),
+            detail: String(item.detail || '').trim(),
+            metadata: item.metadata || null,
+            timestamp: item.timestamp || null
+        };
+    });
+}
+
+function buildConnectorTriageSummary(diagnostics) {
+    const checks = getConnectorDiagnosticChecks(diagnostics);
+    const failingChecks = checks.filter((entry) => !entry.ok);
+    const byKey = new Map(checks.map((entry) => [entry.key, entry]));
+
+    if (failingChecks.length === 0) {
+        return {
+            severity: 'ok',
+            title: 'Connector looks healthy',
+            summary: 'No failing diagnostics were reported in the latest snapshot.',
+            nextAction: 'No immediate operator action is required.',
+            failedChecks: []
+        };
+    }
+
+    const rules = [
+        {
+            key: 'docker_access',
+            severity: 'critical',
+            title: 'Docker runtime unavailable',
+            summary: 'Container lifecycle actions will fail until Docker access is restored.',
+            nextAction: 'Check the Docker daemon, connector permissions, and rootless/runtime mode on the host.'
+        },
+        {
+            key: 'disk_perms',
+            severity: 'critical',
+            title: 'Volume path permission issue',
+            summary: 'Install, edit, upload, extract, and backup flows can fail on this connector.',
+            nextAction: 'Verify ownership and write permissions under the connector volumes directory.'
+        },
+        {
+            key: 'dns',
+            severity: 'critical',
+            title: 'Outbound DNS resolution issue',
+            summary: 'Image pulls, downloads, and panel/provider requests are at risk.',
+            nextAction: 'Inspect resolver configuration, bridge DNS settings, and outbound network reachability.'
+        },
+        {
+            key: 'image_pull',
+            severity: 'critical',
+            title: 'Image pull support is failing',
+            summary: 'New installs and redeploy operations can fail on this connector.',
+            nextAction: 'Validate registry access, Docker auth, and outbound connectivity from the host.'
+        },
+        {
+            key: 'sftp_auth',
+            severity: 'warning',
+            title: 'Recent SFTP auth issues detected',
+            summary: 'User file access may fail intermittently or return confusing auth errors.',
+            nextAction: 'Review panel auth endpoints, connector token validity, and recent SFTP auth logs.'
+        },
+        {
+            key: 'websocket_payload_size',
+            severity: 'warning',
+            title: 'WebSocket payload limit needs attention',
+            summary: 'Large actions may fail if payload headroom is too low.',
+            nextAction: 'Raise the connector WS payload limit and resync the connector configuration.'
+        },
+        {
+            key: 'archive_tools',
+            severity: 'warning',
+            title: 'Archive toolchain is incomplete',
+            summary: 'Import, extract, world operations, or backup helpers may degrade.',
+            nextAction: 'Install the missing archive utilities on the connector host.'
+        }
+    ];
+
+    for (const rule of rules) {
+        if (byKey.has(rule.key) && !byKey.get(rule.key).ok) {
+            return Object.assign({}, rule, { failedChecks });
+        }
+    }
+
+    return {
+        severity: 'warning',
+        title: 'Connector needs operator attention',
+        summary: `${failingChecks.length} diagnostic check(s) are failing or degraded in the latest snapshot.`,
+        nextAction: 'Open the connector lab details, inspect failing metadata, and rerun diagnostics after remediation.',
+        failedChecks
+    };
+}
+
+function canRunConnectorDiagnostics(socket) {
+    return Boolean(socket && socket.readyState === 1);
+}
+
 function registerAdminConnectorsOverviewRoutes(ctx) {
     for (const [key, value] of Object.entries(ctx || {})) {
         try {
@@ -140,8 +250,10 @@ function registerAdminConnectorsOverviewRoutes(ctx) {
 app.get('/admin/connect-info', requireAuth, requireAdmin, async (req, res) => {
     try {
         const connectors = await Connector.findAll({
-            include: [{ model: Location, as: 'location' }]
+            include: [{ model: Location, as: 'location' }],
+            order: [['name', 'ASC']]
         });
+        const healthFilter = normalizeConnectorHealthFilter(req.query.health);
 
         // Fetch allocation counts for each connector
         const nodeStats = {};
@@ -161,11 +273,55 @@ app.get('/admin/connect-info', requireAuth, requireAdmin, async (req, res) => {
             };
         }
 
+        const connectorStatus = global.connectorStatus || {};
+        const connectorsView = connectors.map((conn) => {
+            const statusData = connectorStatus[conn.id] || null;
+            const diagnostics = statusData && statusData.diagnostics ? statusData.diagnostics : null;
+            const triage = buildConnectorTriageSummary(diagnostics);
+            const isOnline = Boolean(statusData && String(statusData.status || '').toLowerCase() === 'online' && (new Date() - new Date(statusData.lastSeen)) < 30000);
+            const failingCount = triage && Array.isArray(triage.failedChecks) ? triage.failedChecks.length : 0;
+            return {
+                connector: conn,
+                statusData,
+                triage,
+                isOnline,
+                failingCount,
+                nodeStats: nodeStats[conn.id] || {},
+                canRunDiagnostics: canRunConnectorDiagnostics(connectorConnections.get(conn.id))
+            };
+        }).filter((entry) => {
+            if (healthFilter === 'online') return entry.isOnline;
+            if (healthFilter === 'offline') return !entry.isOnline;
+            if (healthFilter === 'issues') return entry.failingCount > 0;
+            return true;
+        });
+
+        if (String(req.query.export || '').trim().toLowerCase() === 'json') {
+            return res.json({
+                generatedAt: new Date().toISOString(),
+                filter: healthFilter,
+                connectors: connectorsView.map((entry) => ({
+                    id: entry.connector.id,
+                    name: entry.connector.name,
+                    fqdn: entry.connector.fqdn,
+                    location: entry.connector.location && entry.connector.location.name ? entry.connector.location.name : null,
+                    status: entry.statusData && entry.statusData.status ? entry.statusData.status : 'offline',
+                    lastSeen: entry.statusData && entry.statusData.lastSeen ? entry.statusData.lastSeen : null,
+                    usage: entry.statusData && entry.statusData.usage ? entry.statusData.usage : null,
+                    diagnostics: entry.statusData && entry.statusData.diagnostics ? entry.statusData.diagnostics : null,
+                    triage: entry.triage,
+                    nodeStats: entry.nodeStats
+                }))
+            });
+        }
+
         res.render('admin/connect-info', {
             user: req.session.user,
             connectors,
-            connectorStatus: global.connectorStatus || {},
+            connectorCards: connectorsView,
+            connectorStatus,
             nodeStats,
+            healthFilter,
             success: req.query.success || null,
             error: req.query.error || null,
             path: '/admin/connect-info',
@@ -174,6 +330,36 @@ app.get('/admin/connect-info', requireAuth, requireAdmin, async (req, res) => {
     } catch (error) {
         console.error("Error loading connect-info:", error);
         res.redirect('/admin/overview?error=Failed to load node health dashboard');
+    }
+});
+
+app.post('/admin/connectors/:id/run-diagnostics', requireAuth, requireAdmin, async (req, res) => {
+    const redirectTarget = String(req.body.redirect || req.get('referer') || `/admin/connect-info`).trim();
+    try {
+        const connectorId = Number.parseInt(req.params.id, 10);
+        if (!Number.isInteger(connectorId) || connectorId <= 0) {
+            return res.redirect(`${redirectTarget.includes('?') ? redirectTarget + '&' : redirectTarget + '?'}error=${encodeURIComponent('Invalid connector id.')}`);
+        }
+
+        const connector = await Connector.findByPk(connectorId, { attributes: ['id', 'name'] });
+        if (!connector) {
+            return res.redirect(`${redirectTarget.includes('?') ? redirectTarget + '&' : redirectTarget + '?'}error=${encodeURIComponent('Connector not found.')}`);
+        }
+
+        const socket = connectorConnections.get(connectorId);
+        if (!canRunConnectorDiagnostics(socket)) {
+            return res.redirect(`${redirectTarget.includes('?') ? redirectTarget + '&' : redirectTarget + '?'}error=${encodeURIComponent('Connector is offline or not ready for diagnostics.')}`);
+        }
+
+        socket.send(JSON.stringify({
+            type: 'run_diagnostics',
+            requestedBy: req.session && req.session.user ? req.session.user.username : 'admin'
+        }));
+
+        return res.redirect(`${redirectTarget.includes('?') ? redirectTarget + '&' : redirectTarget + '?'}success=${encodeURIComponent(`Diagnostics refresh queued for ${connector.name}.`)}`);
+    } catch (error) {
+        console.error('Error dispatching connector diagnostics refresh:', error);
+        return res.redirect(`${redirectTarget.includes('?') ? redirectTarget + '&' : redirectTarget + '?'}error=${encodeURIComponent('Failed to queue diagnostics refresh.')}`);
     }
 });
 

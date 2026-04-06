@@ -1,0 +1,2366 @@
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" data-turbo-eval="false"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm@5.2.1/lib/xterm.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.7.0/lib/xterm-addon-fit.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm-addon-search@0.13.0/lib/xterm-addon-search.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.8.0/lib/xterm-addon-web-links.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm-addon-unicode11@0.6.0/lib/xterm-addon-unicode11.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm-addon-webgl@0.16.0/lib/xterm-addon-webgl.js"></script>
+        <% if (canUseConsoleFiles) { %>
+            <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.32.6/src-min-noconflict/ace.js"></script>
+        <% } %>
+
+<script>
+            // Sidebar toggle functionality (for mobile and desktop)
+            const sidebar = document.getElementById('sidebar');
+            const sidebarToggle = document.getElementById('sidebarToggle');
+
+            sidebarToggle.addEventListener('click', () => {
+                sidebar.classList.toggle('show');
+                setTimeout(() => {
+                    if (typeof fitAddon !== 'undefined') fitAddon.fit();
+                }, 300);
+            });
+
+            // Close sidebar on outside click for mobile
+            document.addEventListener('click', (e) => {
+                if (window.innerWidth <= 768) {
+                    if (!sidebar.contains(e.target) && !sidebarToggle.contains(e.target)) {
+                        sidebar.classList.remove('show');
+                    }
+                }
+            });
+
+            const consoleInfoBar = document.getElementById('consoleInfoBar');
+            const toggleConsoleInfo = document.getElementById('toggleConsoleInfo');
+            toggleConsoleInfo?.addEventListener('click', () => {
+                if (!consoleInfoBar) return;
+                consoleInfoBar.classList.toggle('d-none');
+            });
+
+            // ================== Existing console functionality (preserved) ==================
+            const serverId = '<%= server.id %>';
+            const serverContainerId = '<%= server.containerId %>';
+            const serverCpuLimit = <%= Number.isFinite(Number(server.cpu)) ? Number(server.cpu) : 0 %>;
+            const serverMemory = <%= server.memory || 0 %>;
+            const serverDisk = <%= server.disk || 0 %>;
+            let currentServerStatus = '<%= String(server.status || "stopped").toLowerCase() %>';
+            const consoleReplayStorageKey = `cpanel.console.replay.<%= server.containerId %>`;
+            const restrictedProvisioningViewer = <%= isRestrictedProvisioningViewer ? 'true' : 'false' %>;
+            const promptBrand = <%- JSON.stringify(String((settings && settings.brandName) ? settings.brandName : 'cpanel').toLowerCase()) %>;
+            const isAdminConsoleViewer = <%= user && user.isAdmin ? 'true' : 'false' %>;
+            const showMinecraftEulaModal = <%- JSON.stringify(Boolean(showMinecraftEulaModal)) %>;
+            const minecraftPanelEnabled = <%- JSON.stringify(Boolean(isMinecraftServer && canViewMinecraft)) %>;
+            const minecraftStatusAddress = <%- JSON.stringify(minecraftStatusAddress || '') %>;
+            const minecraftBedrockMode = <%- JSON.stringify(Boolean(minecraftBedrockMode)) %>;
+            const minecraftActionPerms = {
+                canKick: <%= minecraftActionPermissions && minecraftActionPermissions.canKick ? 'true' : 'false' %>,
+                canBan: <%= minecraftActionPermissions && minecraftActionPermissions.canBan ? 'true' : 'false' %>,
+                canOp: <%= minecraftActionPermissions && minecraftActionPermissions.canOp ? 'true' : 'false' %>,
+                canDeop: <%= minecraftActionPermissions && minecraftActionPermissions.canDeop ? 'true' : 'false' %>,
+                canTempban: <%= minecraftActionPermissions && minecraftActionPermissions.canTempban ? 'true' : 'false' %>,
+                canTeleport: <%= minecraftActionPermissions && minecraftActionPermissions.canTeleport ? 'true' : 'false' %>
+            };
+            const canUseConsoleFiles = <%= canUseConsoleFiles ? 'true' : 'false' %>;
+            const canWriteConsoleFiles = <%= canWriteConsoleFiles ? 'true' : 'false' %>;
+            const consoleFilesWriteLocked = <%= filesWriteLocked ? 'true' : 'false' %>;
+            const consoleWebUploadEnabled = <%= webUploadEnabled ? 'true' : 'false' %>;
+            const consoleWebUploadMaxMb = <%= Number.isFinite(Number(webUploadMaxMb)) ? Number(webUploadMaxMb) : 50 %>;
+            const consolePolicyReadOnlyPatterns = <%- JSON.stringify(Array.isArray(policyReadOnlyPatterns) ? policyReadOnlyPatterns : []) %>;
+            const eulaModalEl = showMinecraftEulaModal ? document.getElementById('eulaModal') : null;
+            const eulaModalInstance = eulaModalEl && window.bootstrap ? bootstrap.Modal.getOrCreateInstance(eulaModalEl) : null;
+
+            let connectorOnline = true;
+
+            const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (ch) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[ch]));
+
+            const showConsoleStatus = (message) => {
+                if (window.showStatusModal) {
+                    window.showStatusModal(message, 'info');
+                    return;
+                }
+                console.log(message);
+            };
+
+            const formatBytes = (value) => {
+                const bytes = Number(value || 0);
+                if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+                const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+                let index = 0;
+                let current = bytes;
+                while (current >= 1024 && index < units.length - 1) {
+                    current /= 1024;
+                    index += 1;
+                }
+                return `${current >= 100 || index === 0 ? current.toFixed(0) : current.toFixed(2)} ${units[index]}`;
+            };
+
+            const formatDuration = (value) => {
+                const seconds = Math.max(0, Number.parseInt(String(value || 0), 10) || 0);
+                if (seconds <= 0) return '0s';
+                const days = Math.floor(seconds / 86400);
+                const hours = Math.floor((seconds % 86400) / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                const secs = seconds % 60;
+                const parts = [];
+                if (days) parts.push(`${days}d`);
+                if (hours) parts.push(`${hours}h`);
+                if (minutes) parts.push(`${minutes}m`);
+                if (secs || parts.length === 0) parts.push(`${secs}s`);
+                return parts.slice(0, 3).join(' ');
+            };
+
+            const detailAddress = document.getElementById('consoleDetailAddress');
+            const detailRuntime = document.getElementById('consoleDetailRuntime');
+            const detailConnector = document.getElementById('consoleDetailConnector');
+            const detailCpu = document.getElementById('consoleDetailCpu');
+            const detailCpuNote = document.getElementById('consoleDetailCpuNote');
+            const detailMemory = document.getElementById('consoleDetailMemory');
+            const detailMemoryNote = document.getElementById('consoleDetailMemoryNote');
+            const detailDisk = document.getElementById('consoleDetailDisk');
+            const detailDiskNote = document.getElementById('consoleDetailDiskNote');
+            const detailUptime = document.getElementById('consoleDetailUptime');
+            const detailNetRx = document.getElementById('consoleDetailNetRx');
+            const detailNetTx = document.getElementById('consoleDetailNetTx');
+            const detailRestartSource = document.getElementById('consoleDetailRestartSource');
+            const detailRestartReason = document.getElementById('consoleDetailRestartReason');
+            const detailCooldown = document.getElementById('consoleDetailCooldown');
+            const detailCooldownMeta = document.getElementById('consoleDetailCooldownMeta');
+            const detailExitCode = document.getElementById('consoleDetailExitCode');
+            const detailExitMeta = document.getElementById('consoleDetailExitMeta');
+            const runtimeHistoryList = document.getElementById('consoleRuntimeHistoryList');
+            const initialRuntimeMeta = <%- JSON.stringify(runtimeMeta || null) %>;
+
+            function updateConsoleDetails(stats = {}) {
+                const cpu = Number.parseFloat(String(stats.cpu ?? 0)) || 0;
+                const memory = Number.parseFloat(String(stats.memory ?? 0)) || 0;
+                const disk = Number.parseFloat(String(stats.disk ?? 0)) || 0;
+                const netRx = Number.parseFloat(String(stats.network_rx ?? 0)) || 0;
+                const netTx = Number.parseFloat(String(stats.network_tx ?? 0)) || 0;
+                const uptimeSeconds = Number.parseInt(String(stats.uptime_seconds ?? 0), 10) || 0;
+                if (detailCpu) detailCpu.textContent = `${cpu.toFixed(2)}%`;
+                if (detailMemory) detailMemory.textContent = formatBytes(memory);
+                if (detailDisk) detailDisk.textContent = formatBytes(disk);
+                if (detailNetRx) detailNetRx.textContent = formatBytes(netRx);
+                if (detailNetTx) detailNetTx.textContent = formatBytes(netTx);
+                if (detailUptime) detailUptime.textContent = formatDuration(uptimeSeconds);
+                if (detailCpuNote) detailCpuNote.textContent = serverCpuLimit ? `${serverCpuLimit}% limit` : 'No CPU limit';
+                if (detailMemoryNote) detailMemoryNote.textContent = serverMemory ? `${serverMemory} MB limit` : 'No memory limit';
+                if (detailDiskNote) detailDiskNote.textContent = serverDisk ? `${serverDisk} MB limit` : 'No disk limit';
+            }
+
+            function updateExitDetails(payload = {}) {
+                const exitCodeRaw = payload.exitCode;
+                const hasExitCode = exitCodeRaw !== undefined && exitCodeRaw !== null && String(exitCodeRaw).trim() !== '';
+                const oomKilled = payload.oomKilled === true || String(payload.oomKilled).toLowerCase() === 'true';
+                if (detailExitCode) {
+                    detailExitCode.textContent = hasExitCode ? `Exit code ${exitCodeRaw}` : 'No exit data';
+                }
+                if (detailExitMeta) {
+                    if (!hasExitCode && !oomKilled) {
+                        detailExitMeta.textContent = 'The server has not reported an exit event in this session.';
+                    } else if (oomKilled) {
+                        detailExitMeta.textContent = 'Container was terminated by the kernel OOM killer.';
+                    } else {
+                        detailExitMeta.textContent = 'Process exited without an OOM kill flag.';
+                    }
+                }
+            }
+
+            function formatRuntimeSource(source) {
+                const value = String(source || 'system').trim().toLowerCase().replace(/_/g, ' ');
+                return value ? value.charAt(0).toUpperCase() + value.slice(1) : 'System';
+            }
+
+            function formatRuntimeEventTime(value) {
+                const ts = Number.parseInt(String(value || 0), 10);
+                if (!ts) return '';
+                try {
+                    return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                } catch {
+                    return '';
+                }
+            }
+
+            function renderRuntimeHistory(entries = []) {
+                if (!runtimeHistoryList) return;
+                if (!Array.isArray(entries) || entries.length === 0) {
+                    runtimeHistoryList.innerHTML = '<div class="console-runtime-empty">No recent runtime events recorded yet.</div>';
+                    return;
+                }
+                runtimeHistoryList.innerHTML = entries.slice(0, 6).map((entry) => {
+                    const tone = escapeHtml(String(entry && entry.tone || 'muted').toLowerCase());
+                    const kind = escapeHtml(String(entry && entry.kind || 'runtime'));
+                    const source = escapeHtml(formatRuntimeSource(entry && entry.source));
+                    const summary = escapeHtml(String(entry && entry.summary || 'Runtime event recorded.'));
+                    const time = escapeHtml(formatRuntimeEventTime(entry && entry.ts));
+                    return `
+                        <div class="console-runtime-event tone-${tone}">
+                            <div class="console-runtime-event-top">
+                                <span class="console-runtime-event-kind">${kind}</span>
+                                <span class="console-runtime-event-source">${source}${time ? ` · ${time}` : ''}</span>
+                            </div>
+                            <div class="console-runtime-event-summary">${summary}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            function updateRuntimeMeta(payload = {}) {
+                const source = String(payload.lastSource || payload.source || 'system').trim();
+                const reason = String(payload.lastReason || payload.reason || '').trim();
+                const cooldownUntil = Number.parseInt(String(payload.cooldownUntil || 0), 10) || 0;
+                const crashLoopCount = Number.parseInt(String(payload.crashLoopCount || 0), 10) || 0;
+                const now = Date.now();
+                const cooldownActive = cooldownUntil > now;
+                if (detailRestartSource) detailRestartSource.textContent = formatRuntimeSource(source);
+                if (detailRestartReason) detailRestartReason.textContent = reason || 'No restart source captured yet.';
+                if (detailCooldown) detailCooldown.textContent = cooldownActive ? 'Active' : 'Idle';
+                if (detailCooldownMeta) {
+                    detailCooldownMeta.textContent = cooldownActive
+                        ? `Cooldown active until ${new Date(cooldownUntil).toLocaleString()}${crashLoopCount ? ` · crash loop count ${crashLoopCount}` : ''}`
+                        : (crashLoopCount > 0 ? `Crash loop count tracked: ${crashLoopCount}. No active cooldown.` : 'No crash loop cooldown is active.');
+                }
+                renderRuntimeHistory(Array.isArray(payload.history) ? payload.history : []);
+            }
+
+            const dispatchMinecraftAction = (action, player, extra = {}) => {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/server/${serverContainerId}/minecraft/configs`;
+                form.setAttribute('data-turbo', 'false');
+
+                const appendInput = (name, value) => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = name;
+                    input.value = value;
+                    form.appendChild(input);
+                };
+
+                appendInput('action', action);
+                appendInput('player', player);
+                appendInput('bedrock', minecraftBedrockMode ? '1' : '0');
+                if (extra.reason) appendInput('reason', extra.reason);
+                if (extra.duration) appendInput('duration', extra.duration);
+                if (extra.destination) appendInput('destination', extra.destination);
+
+                document.body.appendChild(form);
+                form.submit();
+            };
+
+            const promptMinecraftAction = (action, player) => {
+                if (!player) return;
+                const requiresReason = ['kick', 'ban', 'tempban'].includes(action);
+                const requiresDuration = action === 'tempban';
+                const requiresDestination = action === 'teleport';
+
+                const extra = {};
+                if (requiresDestination) {
+                    const destination = window.prompt(`Teleport destination for ${player}:`, '');
+                    if (destination === null) return;
+                    const trimmed = String(destination || '').trim();
+                    if (!trimmed) return showConsoleStatus('Destination is required.');
+                    extra.destination = trimmed.slice(0, 64);
+                }
+
+                if (requiresDuration) {
+                    const duration = window.prompt(`Tempban duration for ${player} (e.g. 1h):`, '');
+                    if (duration === null) return;
+                    const trimmed = String(duration || '').trim();
+                    if (!trimmed) return showConsoleStatus('Duration is required.');
+                    extra.duration = trimmed.slice(0, 16);
+                }
+
+                if (requiresReason) {
+                    const reason = window.prompt(`Reason for ${action.toUpperCase()} ${player}:`, '');
+                    if (reason === null) return;
+                    const trimmed = String(reason || '').trim();
+                    if (trimmed.length < 3) return showConsoleStatus('Reason must be at least 3 characters.');
+                    extra.reason = trimmed.slice(0, 96);
+                }
+
+                dispatchMinecraftAction(action, player, extra);
+            };
+
+            const playerPanelList = document.getElementById('playerPanelList');
+            const playerPanelCount = document.getElementById('playerPanelCount');
+            const playerPanelRefreshBtn = document.getElementById('playerPanelRefreshBtn');
+
+            const renderPlayerPanel = (players = []) => {
+                if (!playerPanelList) return;
+                if (!Array.isArray(players) || players.length === 0) {
+                    playerPanelList.innerHTML = '<div class="text-secondary small">No players online.</div>';
+                    if (playerPanelCount) playerPanelCount.textContent = '0 online';
+                    return;
+                }
+
+                if (playerPanelCount) playerPanelCount.textContent = `${players.length} online`;
+                playerPanelList.innerHTML = players.map((entry) => {
+                    const name = escapeHtml(entry.name || '');
+                    const head = escapeHtml(entry.headUrl || '');
+                    return `
+                        <div class="player-card">
+                            <div class="d-flex align-items-center gap-2">
+                                <img src="${head}" alt="Head" onerror="if(!this.dataset.fallback){this.dataset.fallback='1';this.src='https://minotar.net/avatar/Steve/40';}else{this.onerror=null;}">
+                                <div class="player-name">${name}</div>
+                            </div>
+                            <div class="player-actions">
+                                <button class="btn btn-outline-success btn-sm" data-action="op" data-player="${name}" ${!minecraftActionPerms.canOp ? 'disabled' : ''}>OP</button>
+                                <button class="btn btn-outline-warning btn-sm" data-action="deop" data-player="${name}" ${!minecraftActionPerms.canDeop ? 'disabled' : ''}>DEOP</button>
+                                <button class="btn btn-outline-light btn-sm" data-action="kick" data-player="${name}" ${!minecraftActionPerms.canKick ? 'disabled' : ''}>Kick</button>
+                                <button class="btn btn-outline-info btn-sm" data-action="teleport" data-player="${name}" ${!minecraftActionPerms.canTeleport ? 'disabled' : ''}>TP</button>
+                                <button class="btn btn-outline-danger btn-sm" data-action="ban" data-player="${name}" ${!minecraftActionPerms.canBan ? 'disabled' : ''}>Ban</button>
+                                <button class="btn btn-outline-danger btn-sm" data-action="tempban" data-player="${name}" ${!minecraftActionPerms.canTempban ? 'disabled' : ''}>Temp</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            };
+
+            const refreshPlayerPanel = async () => {
+                if (!minecraftPanelEnabled) return;
+                if (!playerPanelList) return;
+                playerPanelList.innerHTML = '<div class="text-secondary small">Refreshing players...</div>';
+                try {
+                    const response = await fetch(`/server/${serverContainerId}/minecraft/configs/status?bedrock=${minecraftBedrockMode ? '1' : '0'}`);
+                    const payload = await response.json();
+                    if (!response.ok || !payload.success) {
+                        throw new Error(payload.error || 'Failed to refresh players.');
+                    }
+                    const status = payload.status || {};
+                    renderPlayerPanel(status.playersList || []);
+                } catch (error) {
+                    playerPanelList.innerHTML = `<div class="text-secondary small">${escapeHtml(error.message || 'Failed to refresh players.')}</div>`;
+                }
+            };
+
+            let consoleFilesVisible = false;
+            let consolePlayersVisible = false;
+
+            if (minecraftPanelEnabled) {
+                if (playerPanelRefreshBtn) {
+                    playerPanelRefreshBtn.addEventListener('click', refreshPlayerPanel);
+                }
+                playerPanelList?.addEventListener('click', (event) => {
+                    const target = event.target;
+                    if (!target || !target.dataset) return;
+                    const action = String(target.dataset.action || '');
+                    const player = String(target.dataset.player || '');
+                    if (!action || !player) return;
+                    promptMinecraftAction(action, player);
+                });
+                setInterval(() => {
+                    if (consolePlayersVisible) {
+                        refreshPlayerPanel();
+                    }
+                }, 30000);
+            }
+
+            const consoleSideRail = document.getElementById('consoleSideRail');
+            const consoleFilesPanel = document.getElementById('consoleFilesPanel');
+            const btnToggleConsoleFiles = document.getElementById('btnToggleConsoleFiles');
+            const btnTogglePlayerPanel = document.getElementById('btnTogglePlayerPanel');
+            const consoleFilesRefreshBtn = document.getElementById('consoleFilesRefreshBtn');
+            const consoleFilesTreeList = document.getElementById('consoleFilesTreeList');
+            const consoleFilesPath = document.getElementById('consoleFilesPath');
+            const consoleFilesFooterLabel = document.getElementById('consoleFilesFooterLabel');
+            const consoleFilesModeLabel = document.getElementById('consoleFilesModeLabel');
+            const consoleTreeDropzone = document.getElementById('consoleTreeDropzone');
+            const consoleFileEditorModalEl = document.getElementById('consoleFileEditorModal');
+            const consoleFileEditorCloseBtn = document.getElementById('consoleFileEditorCloseBtn');
+            const consoleFileEditorDismissBtn = document.getElementById('consoleFileEditorDismissBtn');
+            const consoleFileEditorSaveBtn = document.getElementById('consoleFileEditorSaveBtn');
+            const consoleEditorPath = document.getElementById('consoleEditorPath');
+            const consoleEditorState = document.getElementById('consoleEditorState');
+
+            const consoleFilesVisibleStorageKey = `cpanel.console.files.visible.<%= server.containerId %>`;
+            const consolePlayersVisibleStorageKey = `cpanel.console.players.visible.<%= server.containerId %>`;
+            const consoleFileTreeCache = new Map();
+            const consoleFileTreeExpanded = new Set(['/']);
+            let consoleTreeSelectedDirectory = '/';
+            let consoleEditorPendingReadPath = '';
+            let consoleEditorPendingWritePath = '';
+            let consoleEditorCurrentPath = '';
+            let consoleEditorOriginalContent = '';
+            let consoleEditorReadOnly = true;
+            let consoleAceEditor = null;
+            const consoleEditorModalInstance = consoleFileEditorModalEl && window.bootstrap
+                ? bootstrap.Modal.getOrCreateInstance(consoleFileEditorModalEl)
+                : null;
+
+            try {
+                consoleFilesVisible = canUseConsoleFiles && localStorage.getItem(consoleFilesVisibleStorageKey) === '1';
+                consolePlayersVisible = minecraftPanelEnabled && localStorage.getItem(consolePlayersVisibleStorageKey) === '1';
+            } catch (error) {
+                consoleFilesVisible = false;
+                consolePlayersVisible = false;
+            }
+
+            function normalizeServerPath(value) {
+                const raw = String(value || '/').replace(/\\/g, '/').trim() || '/';
+                const pieces = [];
+                raw.split('/').forEach((part) => {
+                    if (!part || part === '.') return;
+                    if (part === '..') {
+                        pieces.pop();
+                        return;
+                    }
+                    pieces.push(part);
+                });
+                return `/${pieces.join('/')}`.replace(/\/+/g, '/').replace(/\/$/, '') || '/';
+            }
+
+            function joinServerPath(parentPath, entryName) {
+                const base = normalizeServerPath(parentPath);
+                return base === '/' ? `/${entryName}` : `${base}/${entryName}`;
+            }
+
+            function escapePolicyPatternRegExp(value) {
+                return String(value || '').replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+            }
+
+            function compilePolicyPattern(pattern) {
+                const normalized = String(pattern || '').trim().replace(/\\/g, '/');
+                if (!normalized) return null;
+                let regexSource = '';
+                for (let index = 0; index < normalized.length; index += 1) {
+                    const current = normalized[index];
+                    const next = normalized[index + 1];
+                    if (current === '*' && next === '*') {
+                        regexSource += '.*';
+                        index += 1;
+                        continue;
+                    }
+                    if (current === '*') {
+                        regexSource += '[^/]*';
+                        continue;
+                    }
+                    regexSource += escapePolicyPatternRegExp(current);
+                }
+                try {
+                    return new RegExp(`^${regexSource}$`, 'i');
+                } catch {
+                    return null;
+                }
+            }
+
+            function getConsoleReadOnlyReason(targetPath) {
+                const normalizedPath = normalizeServerPath(targetPath || '/');
+                if (consoleFilesWriteLocked) {
+                    return 'Edits are locked for this server. Only admins can modify files right now.';
+                }
+                if (!canWriteConsoleFiles) {
+                    return 'You do not have permission to edit files on this server.';
+                }
+                for (const pattern of consolePolicyReadOnlyPatterns) {
+                    const matcher = compilePolicyPattern(pattern);
+                    if (matcher && matcher.test(normalizedPath)) {
+                        return 'This file is read-only by server policy.';
+                    }
+                }
+                return '';
+            }
+
+            function sortConsoleTreeEntries(entries) {
+                return (Array.isArray(entries) ? [...entries] : []).sort((a, b) => {
+                    if (a.isDirectory && !b.isDirectory) return -1;
+                    if (!a.isDirectory && b.isDirectory) return 1;
+                    return String(a.name || '').localeCompare(String(b.name || ''));
+                });
+            }
+
+            function canEditConsoleFile(name) {
+                const value = String(name || '').trim().toLowerCase();
+                if (!value) return false;
+                const directNames = new Set([
+                    'dockerfile',
+                    'docker-compose.yml',
+                    'docker-compose.yaml',
+                    '.env',
+                    'server.properties',
+                    'eula.txt',
+                    'package.json',
+                    'package-lock.json',
+                    'pnpm-lock.yaml',
+                    'yarn.lock',
+                    'requirements.txt',
+                    'go.mod',
+                    'go.sum',
+                    'cargo.toml',
+                    'cargo.lock',
+                    'makefile',
+                    'readme',
+                    'readme.md'
+                ]);
+                if (directNames.has(value)) return true;
+                const ext = value.includes('.') ? value.split('.').pop() : '';
+                const allowedExts = new Set([
+                    'txt', 'log', 'md', 'json', 'json5', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'properties',
+                    'env', 'js', 'cjs', 'mjs', 'ts', 'jsx', 'tsx', 'sh', 'bash', 'zsh', 'php', 'py', 'rb', 'java',
+                    'kt', 'kts', 'go', 'rs', 'c', 'cpp', 'h', 'hpp', 'cs', 'html', 'htm', 'css', 'scss', 'less',
+                    'xml', 'svg', 'sql', 'mcmeta', 'gradle', 'lock', 'gitignore', 'gitattributes'
+                ]);
+                return allowedExts.has(ext);
+            }
+
+            function guessConsoleAceMode(filePath) {
+                const name = String(filePath || '').toLowerCase();
+                if (name.endsWith('.js') || name.endsWith('.cjs') || name.endsWith('.mjs')) return 'javascript';
+                if (name.endsWith('.json') || name.endsWith('.json5') || name.endsWith('.mcmeta')) return 'json';
+                if (name.endsWith('.html') || name.endsWith('.htm')) return 'html';
+                if (name.endsWith('.css') || name.endsWith('.scss') || name.endsWith('.less')) return 'css';
+                if (name.endsWith('.yaml') || name.endsWith('.yml')) return 'yaml';
+                if (name.endsWith('.xml') || name.endsWith('.svg')) return 'xml';
+                if (name.endsWith('.md')) return 'markdown';
+                if (name.endsWith('.sh') || name.endsWith('.bash') || name.endsWith('.zsh') || name === '/dockerfile') return 'sh';
+                if (name.endsWith('.py')) return 'python';
+                if (name.endsWith('.php')) return 'php';
+                if (name.endsWith('.sql')) return 'sql';
+                if (name.endsWith('.java')) return 'java';
+                return 'text';
+            }
+
+            function persistConsolePanelState() {
+                try {
+                    localStorage.setItem(consoleFilesVisibleStorageKey, consoleFilesVisible ? '1' : '0');
+                    localStorage.setItem(consolePlayersVisibleStorageKey, consolePlayersVisible ? '1' : '0');
+                } catch (error) {
+                    console.warn('Failed to persist console panel state.', error);
+                }
+            }
+
+            function syncConsoleSideRailVisibility() {
+                const anyVisible = (canUseConsoleFiles && consoleFilesVisible) || (minecraftPanelEnabled && consolePlayersVisible);
+                consoleSideRail?.classList.toggle('d-none', !anyVisible);
+                consoleFilesPanel?.classList.toggle('d-none', !(canUseConsoleFiles && consoleFilesVisible));
+                document.getElementById('playerPanel')?.classList.toggle('d-none', !(minecraftPanelEnabled && consolePlayersVisible));
+                btnToggleConsoleFiles?.classList.toggle('follow-active', consoleFilesVisible);
+                btnTogglePlayerPanel?.classList.toggle('follow-active', consolePlayersVisible);
+                persistConsolePanelState();
+            }
+
+            async function fetchConsoleTreeEntries(directory, force = false) {
+                const normalized = normalizeServerPath(directory);
+                if (!force && consoleFileTreeCache.has(normalized)) {
+                    return consoleFileTreeCache.get(normalized);
+                }
+                const response = await fetch(`/server/${serverContainerId}/files-fetch?path=${encodeURIComponent(normalized)}`);
+                if (!response.ok) {
+                    const payload = await response.json().catch(() => ({}));
+                    throw new Error(payload.error || `Failed to load ${normalized}`);
+                }
+                const payload = await response.json();
+                const files = sortConsoleTreeEntries(Array.isArray(payload.files) ? payload.files : []);
+                consoleFileTreeCache.set(normalized, files);
+                return files;
+            }
+
+            async function ensureConsoleTreeContext(targetPath) {
+                const normalized = normalizeServerPath(targetPath || '/');
+                const parts = normalized.split('/').filter(Boolean);
+                let current = '/';
+                consoleFileTreeExpanded.add('/');
+                await fetchConsoleTreeEntries('/', false);
+                for (const part of parts) {
+                    const next = current === '/' ? `/${part}` : `${current}/${part}`;
+                    consoleFileTreeExpanded.add(current);
+                    await fetchConsoleTreeEntries(current, false);
+                    current = next;
+                }
+            }
+
+            function renderConsoleTreeBranch(directory, depth = 0) {
+                const entries = consoleFileTreeCache.get(directory) || [];
+                if (!entries.length && depth > 0) {
+                    return '';
+                }
+                return entries.map((entry) => {
+                    const name = String(entry && entry.name || '').trim();
+                    if (!name) return '';
+                    const fullPath = normalizeServerPath(joinServerPath(directory, name));
+                    const isDirectory = Boolean(entry && entry.isDirectory);
+                    const expanded = isDirectory && consoleFileTreeExpanded.has(fullPath);
+                    const isActiveDir = isDirectory && normalizeServerPath(consoleTreeSelectedDirectory) === fullPath;
+                    const editable = !isDirectory && canEditConsoleFile(name);
+                    const disabled = !isDirectory && !editable;
+                    const childMarkup = isDirectory && expanded ? renderConsoleTreeBranch(fullPath, depth + 1) : '';
+                    return `
+                        <div class="console-tree-entry">
+                            <button type="button"
+                                class="console-tree-row ${isDirectory ? 'is-folder' : 'is-file'} ${isActiveDir ? 'is-active' : ''} ${disabled ? 'is-disabled' : ''}"
+                                data-tree-path="${escapeHtml(fullPath)}"
+                                data-tree-dir="${isDirectory ? '1' : '0'}"
+                                style="--tree-indent:${depth * 14}px">
+                                <span class="console-tree-indent" aria-hidden="true"></span>
+                                <i class="bi ${isDirectory ? (expanded ? 'bi-folder2-open' : 'bi-folder2') : (editable ? 'bi-file-earmark-code' : 'bi-file-earmark-lock')}"></i>
+                                <span class="console-tree-name">${escapeHtml(name)}</span>
+                            </button>
+                            ${childMarkup}
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            function renderConsoleTree() {
+                if (!consoleFilesTreeList) return;
+                const rootEntries = consoleFileTreeCache.get('/') || [];
+                if (!rootEntries.length) {
+                    consoleFilesTreeList.innerHTML = '<div class="console-tree-empty">No files available or connector did not return a directory listing yet.</div>';
+                } else {
+                    consoleFilesTreeList.innerHTML = renderConsoleTreeBranch('/', 0);
+                }
+                if (consoleFilesPath) consoleFilesPath.textContent = normalizeServerPath(consoleTreeSelectedDirectory);
+                if (consoleFilesFooterLabel) consoleFilesFooterLabel.textContent = `Selected folder: ${normalizeServerPath(consoleTreeSelectedDirectory)}`;
+                if (consoleFilesModeLabel) {
+                    consoleFilesModeLabel.textContent = canWriteConsoleFiles && !consoleFilesWriteLocked
+                        ? `Upload max ${consoleWebUploadMaxMb} MB`
+                        : 'Read-only';
+                }
+            }
+
+            async function refreshConsoleTree(targetDirectory = consoleTreeSelectedDirectory, force = true) {
+                if (!canUseConsoleFiles) return;
+                const normalized = normalizeServerPath(targetDirectory || '/');
+                await ensureConsoleTreeContext(normalized);
+                const directories = new Set(['/']);
+                const parts = normalized.split('/').filter(Boolean);
+                let walker = '/';
+                for (const part of parts) {
+                    directories.add(walker);
+                    walker = walker === '/' ? `/${part}` : `${walker}/${part}`;
+                }
+                directories.add(normalized);
+                for (const dir of directories) {
+                    await fetchConsoleTreeEntries(dir, force && dir === normalized);
+                }
+                consoleTreeSelectedDirectory = normalized;
+                renderConsoleTree();
+            }
+
+            async function ensureConsoleAceEditor() {
+                if (consoleAceEditor) return consoleAceEditor;
+                if (typeof ace === 'undefined') {
+                    throw new Error('Ace editor failed to load.');
+                }
+                consoleAceEditor = ace.edit('consoleAceEditor');
+                consoleAceEditor.setTheme('ace/theme/monokai');
+                consoleAceEditor.session.setUseWrapMode(true);
+                consoleAceEditor.setShowPrintMargin(false);
+                return consoleAceEditor;
+            }
+
+            function setConsoleEditorState(message, isReadOnly = consoleEditorReadOnly) {
+                if (consoleEditorState) {
+                    consoleEditorState.textContent = message;
+                }
+                if (consoleFileEditorSaveBtn) {
+                    consoleFileEditorSaveBtn.disabled = isReadOnly;
+                }
+            }
+
+            async function openConsoleEditor(filePath) {
+                const normalized = normalizeServerPath(filePath);
+                const fileName = normalized.split('/').pop() || normalized;
+                if (!canEditConsoleFile(fileName)) {
+                    showConsoleStatus('This file type is not editable from the console mini editor.');
+                    return;
+                }
+                const directory = normalizeServerPath(normalized.slice(0, Math.max(1, normalized.lastIndexOf('/'))) || '/');
+                consoleTreeSelectedDirectory = directory;
+                renderConsoleTree();
+                consoleEditorPendingReadPath = normalized;
+                consoleEditorCurrentPath = normalized;
+                consoleEditorOriginalContent = '';
+                consoleEditorReadOnly = Boolean(getConsoleReadOnlyReason(normalized));
+                if (consoleEditorPath) consoleEditorPath.textContent = normalized;
+                setConsoleEditorState(consoleEditorReadOnly ? getConsoleReadOnlyReason(normalized) : 'Loading file...', true);
+                consoleEditorModalInstance?.show();
+                const editor = await ensureConsoleAceEditor();
+                editor.setValue('// Loading file...\n', -1);
+                editor.setReadOnly(true);
+                editor.session.setMode(`ace/mode/${guessConsoleAceMode(normalized)}`);
+                client.send('read_file', { filePath: normalized });
+            }
+
+            function closeConsoleEditor() {
+                if (!consoleEditorModalInstance) return;
+                consoleEditorModalInstance.hide();
+            }
+
+            async function saveConsoleEditor() {
+                if (!consoleAceEditor || !consoleEditorCurrentPath || consoleEditorReadOnly) return;
+                const policyReason = getConsoleReadOnlyReason(consoleEditorCurrentPath);
+                if (policyReason) {
+                    consoleEditorReadOnly = true;
+                    consoleAceEditor.setReadOnly(true);
+                    setConsoleEditorState(policyReason, true);
+                    showConsoleStatus(policyReason);
+                    return;
+                }
+                consoleEditorPendingWritePath = consoleEditorCurrentPath;
+                setConsoleEditorState('Saving file...', true);
+                client.send('write_file', {
+                    filePath: consoleEditorCurrentPath,
+                    content: consoleAceEditor.getValue()
+                });
+            }
+
+            async function uploadConsoleTreeFiles(fileList) {
+                if (!canUseConsoleFiles || !fileList || !fileList.length) return;
+                if (!canWriteConsoleFiles || consoleFilesWriteLocked) {
+                    showConsoleStatus('Files are read-only for your session right now.');
+                    return;
+                }
+                if (!consoleWebUploadEnabled) {
+                    showConsoleStatus('Web upload is disabled by admin.');
+                    return;
+                }
+                const targetDirectory = normalizeServerPath(consoleTreeSelectedDirectory || '/');
+                for (const file of Array.from(fileList)) {
+                    const response = await fetch(`/server/${serverContainerId}/files/upload?path=${encodeURIComponent(targetDirectory)}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/octet-stream',
+                            'X-File-Name': file.name
+                        },
+                        body: file
+                    });
+                    const payload = await response.json().catch(() => ({}));
+                    if (!response.ok || !payload.success) {
+                        throw new Error(payload.error || `Upload failed for ${file.name}`);
+                    }
+                }
+                await refreshConsoleTree(targetDirectory, true);
+                showConsoleStatus(`Uploaded ${fileList.length} file(s) to ${targetDirectory}.`);
+            }
+
+            const term = new Terminal({
+                theme: {
+                    background: '#0d0d10',
+                    foreground: '#e1e1e6',
+                    cursor: '#e1e1e6',
+                    black: '#16161a',
+                    red: '#ef4444',
+                    green: '#10b981',
+                    yellow: '#f59e0b',
+                    blue: '#3b82f6',
+                    magenta: '#8b5cf6',
+                    cyan: '#06b6d4',
+                    white: '#e1e1e6'
+                },
+                allowProposedApi: true,
+                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                fontSize: 13,
+                cursorBlink: true,
+                scrollback: 5000,
+                convertEol: true
+            });
+            const consoleStateStorageKey = `cpanel.console.state.<%= server.containerId %>`;
+            const commandHistoryStorageKey = `cpanel.console.history.<%= server.containerId %>`;
+            const persistedConsoleState = (() => {
+                try {
+                    return JSON.parse(localStorage.getItem(consoleStateStorageKey) || '{}') || {};
+                } catch (error) {
+                    return {};
+                }
+            })();
+            let consoleFontSize = Number(persistedConsoleState.fontSize) || 13;
+            let followConsoleOutput = persistedConsoleState.follow !== false;
+            let hasReceivedLiveConsoleOutput = false;
+            let consoleReplayCache = '';
+            const maxReplayChars = 250000;
+            let consolePlainBuffer = '';
+            let commandHistory = (() => {
+                try {
+                    const parsed = JSON.parse(localStorage.getItem(commandHistoryStorageKey) || '[]');
+                    return Array.isArray(parsed) ? parsed.filter((entry) => typeof entry === 'string' && entry.trim()).slice(0, 32) : [];
+                } catch (error) {
+                    return [];
+                }
+            })();
+            let commandHistoryIndex = -1;
+            let unreadConsoleLines = 0;
+
+            const fitAddon = new FitAddon.FitAddon();
+            const searchAddon = new SearchAddon.SearchAddon();
+            const webLinksAddon = new WebLinksAddon.WebLinksAddon();
+            const unicode11Addon = new Unicode11Addon.Unicode11Addon();
+            term.loadAddon(fitAddon);
+            term.loadAddon(searchAddon);
+            term.loadAddon(webLinksAddon);
+            term.loadAddon(unicode11Addon);
+            term.open(document.getElementById('terminal'));
+            try {
+                term.unicode.activeVersion = '11';
+            } catch (error) {
+                console.warn('Unicode11 addon could not be activated.', error);
+            }
+
+            try {
+                const webglAddon = new WebglAddon.WebglAddon();
+                webglAddon.onContextLoss(() => { webglAddon.dispose(); });
+                term.loadAddon(webglAddon);
+                console.log('xterm WebGL addon loaded successfully.');
+            } catch (e) {
+                console.warn('xterm WebGL addon could not load. Falling back to default renderer.', e);
+            }
+
+            term.options.fontSize = consoleFontSize;
+            fitAddon.fit();
+
+            const provisioningPanel = document.getElementById('provisioningPanel');
+            const provisioningScreen = document.getElementById('provisioningScreen');
+            const provisioningScreenTitle = document.getElementById('provisioningScreenTitle');
+            const provisioningScreenMessage = document.getElementById('provisioningScreenMessage');
+            const provisioningScreenStatus = document.getElementById('provisioningScreenStatus');
+            const adminInstallScreen = document.getElementById('adminInstallScreen');
+            const adminInstallTitle = document.getElementById('adminInstallTitle');
+            const adminInstallMessage = document.getElementById('adminInstallMessage');
+            const adminInstallStatus = document.getElementById('adminInstallStatus');
+            const adminInstallLog = document.getElementById('adminInstallLog');
+            const terminalWrapper = document.getElementById('terminalWrapper');
+            const consoleGrid = document.getElementById('consoleGrid');
+            const provisioningTitle = document.getElementById('provisioningTitle');
+            const provisioningSummary = document.getElementById('provisioningSummary');
+            const provisioningBadgeText = document.getElementById('provisioningBadgeText');
+            const provisioningStagesEl = document.getElementById('provisioningStages');
+            const provisioningAdminWrap = document.getElementById('provisioningAdminWrap');
+            const provisioningAdminLog = document.getElementById('provisioningAdminLog');
+            const provisioningStageDefs = [
+                { key: 'prepare', label: 'Prepare Runtime' },
+                { key: 'install', label: isAdminConsoleViewer ? 'Install Packages' : 'Create Files' },
+                { key: 'config', label: 'Apply Config' },
+                { key: 'container', label: 'Create Container' },
+                { key: 'start', label: 'Start Server' }
+            ];
+            const provisioningState = {
+                active: ['installing', 'reinstalling', 'starting'].includes(currentServerStatus),
+                stages: Object.fromEntries(provisioningStageDefs.map((entry) => [entry.key, { status: 'pending', note: '' }])),
+                adminLines: [],
+                lastSummary: ''
+            };
+            const adminInstallLogLines = [];
+
+            const stripAnsiSequences = (value) => String(value || '').replace(/\x1B\[[0-9;]*[A-Za-z]/g, '');
+            const isProvisioningStatus = (status) => ['installing', 'reinstalling', 'starting'].includes(String(status || '').toLowerCase());
+            const isReinstallingStatus = (status) => String(status || '').toLowerCase() === 'reinstalling';
+
+            function renderProvisioningPanel() {
+                if (!provisioningPanel || !provisioningStagesEl) return;
+
+                const shouldShow = provisioningState.active;
+                provisioningPanel.classList.toggle('d-none', !shouldShow);
+                if (!shouldShow) return;
+
+                provisioningTitle.textContent = isAdminConsoleViewer
+                    ? (isReinstallingStatus(currentServerStatus) ? 'Server Reinstall' : 'Server Provisioning')
+                    : (isReinstallingStatus(currentServerStatus) ? 'Reinstalling server' : 'Creating server');
+                provisioningSummary.textContent = provisioningState.lastSummary || (isAdminConsoleViewer
+                    ? (isReinstallingStatus(currentServerStatus) ? 'Waiting for connector reinstall activity.' : 'Waiting for connector install activity.')
+                    : (isReinstallingStatus(currentServerStatus) ? 'The server runtime is being refreshed. This can take a minute.' : 'The server is being prepared. This can take a minute.'));
+
+                const failed = provisioningStageDefs.some((entry) => provisioningState.stages[entry.key].status === 'fail');
+                const done = provisioningStageDefs.every((entry) => {
+                    const current = provisioningState.stages[entry.key].status;
+                    return current === 'done' || current === 'pending';
+                }) && ['running', 'stopped'].includes(currentServerStatus) && !failed;
+
+                provisioningBadgeText.textContent = failed ? 'Failed' : (done ? 'Ready' : 'Working');
+                provisioningStagesEl.innerHTML = provisioningStageDefs.map((entry) => {
+                    const current = provisioningState.stages[entry.key] || { status: 'pending', note: '' };
+                    const cssClass = current.status === 'done'
+                        ? 'is-done'
+                        : current.status === 'active'
+                            ? 'is-active'
+                            : current.status === 'fail'
+                                ? 'is-fail'
+                                : '';
+                    const label = current.status === 'done'
+                        ? 'Done'
+                        : current.status === 'active'
+                            ? 'Working'
+                            : current.status === 'fail'
+                                ? 'Failed'
+                                : 'Pending';
+                    return `
+                        <div class="provisioning-stage ${cssClass}">
+                            <div class="provisioning-stage-label">${escapeHtml(entry.label)}</div>
+                            <div class="provisioning-stage-value">${label}</div>
+                            ${current.note ? `<div class="provisioning-stage-note">${escapeHtml(current.note)}</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+
+                if (provisioningAdminWrap && provisioningAdminLog) {
+                    provisioningAdminWrap.classList.toggle('d-none', !isAdminConsoleViewer);
+                    if (isAdminConsoleViewer) {
+                        provisioningAdminLog.textContent = provisioningState.adminLines.length
+                            ? provisioningState.adminLines.join('\n')
+                            : 'Waiting for install output...';
+                    }
+                }
+            }
+
+            function activateProvisioning(summary) {
+                provisioningState.active = true;
+                if (summary) provisioningState.lastSummary = summary;
+                renderProvisioningPanel();
+            }
+
+            function deactivateProvisioning() {
+                provisioningState.active = false;
+                renderProvisioningPanel();
+            }
+
+            function updateProvisioningStage(stageKey, status, note = '', summary = '') {
+                const current = provisioningState.stages[stageKey];
+                if (!current) return;
+                current.status = status;
+                if (note) current.note = note;
+                if (summary) provisioningState.lastSummary = summary;
+                activateProvisioning(provisioningState.lastSummary);
+            }
+
+            function completeProvisioningStage(stageKey, note = '', summary = '') {
+                updateProvisioningStage(stageKey, 'done', note, summary);
+            }
+
+            function failProvisioningStage(stageKey, note = '', summary = '') {
+                updateProvisioningStage(stageKey, 'fail', note, summary || 'Provisioning failed. Inspect the logs below.');
+            }
+
+            function appendProvisioningAdminLine(line) {
+                if (!isAdminConsoleViewer) return;
+                const trimmed = String(line || '').trim();
+                if (!trimmed) return;
+                provisioningState.adminLines.push(trimmed);
+                if (provisioningState.adminLines.length > 40) {
+                    provisioningState.adminLines = provisioningState.adminLines.slice(-40);
+                }
+                renderProvisioningPanel();
+            }
+
+            function isProvisioningContext() {
+                return provisioningState.active || isProvisioningStatus(currentServerStatus);
+            }
+
+            function appendAdminInstallLog(rawLine) {
+                if (!isAdminConsoleViewer || !adminInstallLog) return;
+                const normalized = String(rawLine || '').replace(/\r/g, '');
+                if (!normalized) return;
+                const pieces = normalized.split('\n').filter((entry, index, array) => entry.length > 0 || index < array.length - 1);
+                if (!pieces.length) return;
+                adminInstallLogLines.push(...pieces);
+                if (adminInstallLogLines.length > 600) {
+                    adminInstallLogLines.splice(0, adminInstallLogLines.length - 600);
+                }
+                adminInstallLog.textContent = adminInstallLogLines.join('\n');
+                adminInstallLog.scrollTop = adminInstallLog.scrollHeight;
+            }
+
+            function renderProvisioningAccessState(status) {
+                const lowerStatus = String(status || '').toLowerCase();
+                const blocked = ['installing', 'reinstalling', 'starting'].includes(lowerStatus);
+                const adminBlocked = isAdminConsoleViewer && blocked;
+                const userBlocked = restrictedProvisioningViewer && blocked;
+                if (terminalWrapper) {
+                    terminalWrapper.classList.toggle('provisioning-focused', userBlocked);
+                }
+                if (provisioningScreen) {
+                    provisioningScreen.classList.toggle('d-none', !userBlocked);
+                }
+                if (adminInstallScreen) {
+                    adminInstallScreen.classList.toggle('d-none', !adminBlocked);
+                }
+                if (consoleGrid) {
+                    consoleGrid.classList.toggle('d-none', userBlocked || adminBlocked);
+                }
+                if (!blocked) {
+                    requestAnimationFrame(() => fitAddon.fit());
+                    return;
+                }
+
+                if (provisioningScreenStatus && userBlocked) {
+                    provisioningScreenStatus.textContent = lowerStatus.toUpperCase();
+                }
+                if (provisioningScreenTitle && userBlocked) {
+                    provisioningScreenTitle.textContent = lowerStatus === 'starting'
+                        ? 'Starting Server'
+                        : (lowerStatus === 'reinstalling' ? 'Reinstalling Server' : 'Running Installer');
+                }
+                if (provisioningScreenMessage && userBlocked) {
+                    provisioningScreenMessage.textContent = lowerStatus === 'starting'
+                        ? 'Your server is starting for the first time. Most actions stay locked until the runtime container is ready.'
+                        : (lowerStatus === 'reinstalling'
+                            ? 'Your server is being reinstalled. Existing runtime content is being refreshed before the console becomes available again.'
+                            : 'Your server is being created and configured. This usually finishes in under a minute.');
+                }
+                if (adminInstallStatus && adminBlocked) {
+                    adminInstallStatus.textContent = lowerStatus.toUpperCase();
+                }
+                if (adminInstallTitle && adminBlocked) {
+                    adminInstallTitle.textContent = lowerStatus === 'starting'
+                        ? 'Starting Runtime Container'
+                        : (lowerStatus === 'reinstalling' ? 'Reinstalling Server Runtime' : 'Running Installer');
+                }
+                if (adminInstallMessage && adminBlocked) {
+                    adminInstallMessage.textContent = lowerStatus === 'starting'
+                        ? 'The runtime container is starting. Full connector and installer output is streamed below.'
+                        : (lowerStatus === 'reinstalling'
+                            ? 'Complete reinstall output from the runtime builder is shown below.'
+                            : 'Complete install output from the runtime builder is shown below.');
+                }
+            }
+
+            function handleProvisioningLogLine(line) {
+                if (!isProvisioningContext()) {
+                    return false;
+                }
+                const plain = stripAnsiSequences(line).trim();
+                if (!plain) return false;
+                let matched = false;
+
+                if (/running egg installation script/i.test(plain)) {
+                    matched = true;
+                    activateProvisioning(isAdminConsoleViewer ? 'Running egg installation script inside the installer container.' : 'Downloading files and preparing the server.');
+                    updateProvisioningStage('prepare', 'done', 'Volume ready');
+                    updateProvisioningStage('install', 'active', 'Installing packages');
+                } else if (/skipping egg installation script/i.test(plain)) {
+                    matched = true;
+                    activateProvisioning(isAdminConsoleViewer ? 'Install script skipped; using imported files/runtime config.' : 'Preparing server files.');
+                    completeProvisioningStage('prepare', 'Volume ready');
+                    completeProvisioningStage('install', 'Skipped');
+                } else if (/egg installation completed/i.test(plain)) {
+                    matched = true;
+                    completeProvisioningStage('install', 'Packages installed', isAdminConsoleViewer ? 'Egg installation completed successfully.' : 'Base server files are ready.');
+                } else if (/applying egg config file parsers/i.test(plain)) {
+                    matched = true;
+                    updateProvisioningStage('config', 'active', 'Writing config files', isAdminConsoleViewer ? 'Applying egg config file parsers.' : 'Applying server configuration.');
+                } else if (/sending start command/i.test(plain)) {
+                    matched = true;
+                    completeProvisioningStage('config', 'Config applied');
+                    completeProvisioningStage('container', 'Created');
+                    updateProvisioningStage('start', 'active', 'Dispatching start request', isAdminConsoleViewer ? 'Panel is sending the start command.' : 'Starting the server.');
+                } else if (/runtime container is missing\. rebuilding it from the last saved install config/i.test(plain)) {
+                    matched = true;
+                    updateProvisioningStage('container', 'active', 'Recreating missing container', 'Runtime container was missing and is being rebuilt automatically.');
+                } else if (/docker start .*no such container/i.test(plain) || /failed to start containers:/i.test(plain)) {
+                    matched = true;
+                    updateProvisioningStage('container', 'active', 'Container missing');
+                    updateProvisioningStage('start', 'active', 'Retrying start');
+                } else if (/power action 'start' accepted/i.test(plain)) {
+                    matched = true;
+                    completeProvisioningStage('config', 'Config applied');
+                    updateProvisioningStage('start', 'active', 'Start accepted', isAdminConsoleViewer ? 'Connector accepted the power start request.' : 'Server start was accepted.');
+                } else if (/install failed/i.test(plain)) {
+                    matched = true;
+                    failProvisioningStage('install', plain, 'Installation failed before the server could finish provisioning.');
+                } else if (/power action failed \(start\)/i.test(plain)) {
+                    matched = true;
+                    failProvisioningStage('start', plain, 'Start failed while provisioning the server.');
+                }
+
+                if (matched) {
+                    appendProvisioningAdminLine(plain);
+                }
+                return matched;
+            }
+
+            if (isProvisioningStatus(currentServerStatus)) {
+                activateProvisioning(isAdminConsoleViewer
+                    ? (isReinstallingStatus(currentServerStatus)
+                        ? 'Waiting for connector reinstall activity.'
+                        : 'Waiting for connector install activity.')
+                    : (isReinstallingStatus(currentServerStatus)
+                        ? 'Your server is being reinstalled. You can keep this page open while the runtime is refreshed.'
+                        : 'Your server is being created. You can keep this page open while it finishes.'));
+            }
+            renderProvisioningPanel();
+            renderProvisioningAccessState(currentServerStatus);
+
+            // WebSocket Manager Class for Robust Connection
+            class ConsoleClient {
+                constructor(url) {
+                    this.url = url;
+                    this.ws = null;
+                    this.reconnectInterval = 1000;
+                    this.maxReconnectInterval = 5000;
+                    this.isExplicitDisconnect = false;
+                    this.heartbeatTimer = null;
+                }
+
+                connect() {
+                    this.isExplicitDisconnect = false;
+                    this.ws = new WebSocket(this.url);
+                    this.updateStatus('connecting');
+
+                    this.ws.onopen = () => {
+                        this.updateStatus('connected');
+                        this.reconnectInterval = 1000; // Reset backoff
+                        term.writeln('\x1b[1;32m[✓] Console stream connected.\x1b[0m');
+                        this.startHeartbeat();
+                    };
+
+                    this.ws.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            this.handleMessage(data);
+                        } catch (e) {
+                            console.error('Failed to parse WS message:', e);
+                        }
+                    };
+
+                    this.ws.onclose = (e) => {
+                        this.stopHeartbeat();
+                        this.updateStatus('disconnected');
+                        if (!this.isExplicitDisconnect) {
+                            term.writeln('\x1b[1;33m[!] Connection lost. Reconnecting in ' + (this.reconnectInterval / 1000) + 's...\x1b[0m');
+                            setTimeout(() => {
+                                this.reconnectInterval = Math.min(this.reconnectInterval * 1.5, this.maxReconnectInterval);
+                                this.connect();
+                            }, this.reconnectInterval);
+                        }
+                    };
+
+                    this.ws.onerror = (err) => {
+                        console.error('WebSocket error:', err);
+                        this.ws.close();
+                    };
+                }
+
+                send(type, payload = {}) {
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        this.ws.send(JSON.stringify({ type, ...payload }));
+                    }
+                }
+
+                handleMessage(data) {
+                    switch (data.type) {
+                        case 'file_content': {
+                            const targetPath = normalizeServerPath(data.filePath || '');
+                            if (!consoleEditorPendingReadPath || targetPath !== normalizeServerPath(consoleEditorPendingReadPath)) {
+                                break;
+                            }
+                            consoleEditorPendingReadPath = '';
+                            ensureConsoleAceEditor().then((editor) => {
+                                const content = typeof data.content === 'string' ? data.content : String(data.content || '');
+                                consoleEditorOriginalContent = content;
+                                editor.setValue(content, -1);
+                                editor.session.setMode(`ace/mode/${guessConsoleAceMode(targetPath)}`);
+                                const policyReason = getConsoleReadOnlyReason(targetPath);
+                                consoleEditorReadOnly = Boolean(policyReason);
+                                editor.setReadOnly(consoleEditorReadOnly);
+                                setConsoleEditorState(consoleEditorReadOnly ? policyReason : 'Ready to edit.', consoleEditorReadOnly);
+                            }).catch((error) => {
+                                console.error('Console file editor failed to initialize:', error);
+                                setConsoleEditorState(error.message || 'Ace editor failed to load.', true);
+                            });
+                            break;
+                        }
+                        case 'write_success': {
+                            const targetPath = normalizeServerPath(data.filePath || '');
+                            if (!consoleEditorPendingWritePath || targetPath !== normalizeServerPath(consoleEditorPendingWritePath)) {
+                                break;
+                            }
+                            consoleEditorPendingWritePath = '';
+                            consoleEditorOriginalContent = consoleAceEditor ? consoleAceEditor.getValue() : consoleEditorOriginalContent;
+                            if (consoleAceEditor) consoleAceEditor.setReadOnly(consoleEditorReadOnly);
+                            setConsoleEditorState(consoleEditorReadOnly ? getConsoleReadOnlyReason(targetPath) : 'Saved.', consoleEditorReadOnly);
+                            showConsoleStatus(`Saved ${targetPath}.`);
+                            break;
+                        }
+                        case 'console_output':
+                            const cleanOutput = this.scrubAnsi(data.output);
+                            hasReceivedLiveConsoleOutput = true;
+                            appendAdminInstallLog(stripAnsiSequences(cleanOutput));
+                            const provisioningMatched = handleProvisioningLogLine(cleanOutput);
+                            if (!provisioningMatched || isAdminConsoleViewer) {
+                                const mcStyledOutput = this.translateMinecraftFormatting(cleanOutput);
+                                const styledOutput = this.translateAdventureFormatting(mcStyledOutput);
+                                const finalOutput = this.rewritePromptBrand(styledOutput);
+                                term.write(finalOutput);
+                                appendReplayChunk(finalOutput);
+                                appendPlainBuffer(stripAnsiSequences(finalOutput));
+                                updateSearchMatchCount(terminalSearchInput?.value || '');
+                                if (followConsoleOutput || isTerminalAtBottom()) {
+                                    term.scrollToBottom();
+                                    resetUnreadConsole();
+                                } else {
+                                    unreadConsoleLines += Math.max(1, String(cleanOutput || '').split('\n').filter(Boolean).length);
+                                    if (terminalUnreadCount) terminalUnreadCount.textContent = String(unreadConsoleLines);
+                                    btnJumpLatest?.classList.remove('d-none');
+                                }
+                            }
+                            break;
+                        case 'server_status_update':
+                            updateUIStatus(data.status, data);
+                            break;
+                        case 'connector_status':
+                            updateConnectorStatus(data.online);
+                            break;
+                        case 'server_action_ack': {
+                            const phase = String(data.phase || '').toLowerCase();
+                            const actionType = String(data.actionType || 'action');
+                            const text = String(data.message || '').trim() || `${actionType} ${phase}`;
+                            const isProvisionStartAck = isProvisioningContext() && actionType === 'power' && /start/i.test(text);
+                            if (isProvisionStartAck) {
+                                completeProvisioningStage('container', 'Created');
+                                updateProvisioningStage('start', phase === 'failed' ? 'fail' : 'active', text, phase === 'failed'
+                                    ? 'Start request failed while provisioning the server.'
+                                    : (isAdminConsoleViewer ? 'Connector acknowledged the start request.' : 'Server start request accepted.'));
+                                if (phase === 'failed') {
+                                    failProvisioningStage('start', text, 'Start request failed while provisioning the server.');
+                                }
+                            }
+                            if (phase === 'failed') {
+                                term.writeln(`\x1b[1;31m[ACK] ${actionType}: ${text}\x1b[0m`);
+                            } else if (phase === 'executed') {
+                                if (!isProvisionStartAck || isAdminConsoleViewer) {
+                                    term.writeln(`\x1b[1;32m[ACK] ${actionType}: ${text}\x1b[0m`);
+                                }
+                            } else {
+                                if (!isProvisionStartAck || isAdminConsoleViewer) {
+                                    term.writeln(`\x1b[1;34m[ACK] ${actionType}: ${text}\x1b[0m`);
+                                }
+                            }
+                            break;
+                        }
+                        case 'resource_limits_result':
+                            if (data.success) {
+                                term.writeln('\x1b[1;32m[✓] Live resource limits were applied.\x1b[0m');
+                            } else {
+                                term.writeln(`\x1b[1;31m[!] Live resource apply failed: ${data.error || 'unknown error'}\x1b[0m`);
+                            }
+                            break;
+                        case 'server_stats':
+                            updateConsoleDetails({
+                                cpu: data.cpu,
+                                memory: data.memory,
+                                disk: data.disk,
+                                network_rx: data.network_rx,
+                                network_tx: data.network_tx,
+                                uptime_seconds: data.uptime_seconds
+                            });
+                            break;
+                        case 'server_runtime_meta':
+                            updateRuntimeMeta(data);
+                            break;
+                        case 'eula_status':
+                            if (showMinecraftEulaModal && eulaModalInstance) {
+                                if (data.accepted) {
+                                    eulaModalInstance.hide();
+                                } else {
+                                    eulaModalInstance.show();
+                                }
+                            }
+                            break;
+                        case 'error':
+                            if (consoleEditorPendingReadPath || consoleEditorPendingWritePath) {
+                                const editorError = String(data.message || 'File operation failed.');
+                                consoleEditorPendingReadPath = '';
+                                consoleEditorPendingWritePath = '';
+                                if (consoleAceEditor) {
+                                    consoleAceEditor.setReadOnly(true);
+                                }
+                                setConsoleEditorState(editorError, true);
+                                showConsoleStatus(editorError);
+                                break;
+                            }
+                            term.writeln(`\x1b[1;31m[!] Error: ${data.message}\x1b[0m`);
+                            break;
+                    }
+                }
+
+                scrubAnsi(text) {
+                    if (!text) return '';
+                    return text.replace(/\\x1b/g, '\x1b');
+                }
+
+                translateMinecraftFormatting(text) {
+                    if (!text || text.indexOf('§') === -1) return text || '';
+
+                    const colorMap = {
+                        '0': '\x1b[0m\x1b[30m',
+                        '1': '\x1b[0m\x1b[34m',
+                        '2': '\x1b[0m\x1b[32m',
+                        '3': '\x1b[0m\x1b[36m',
+                        '4': '\x1b[0m\x1b[31m',
+                        '5': '\x1b[0m\x1b[35m',
+                        '6': '\x1b[0m\x1b[33m',
+                        '7': '\x1b[0m\x1b[37m',
+                        '8': '\x1b[0m\x1b[90m',
+                        '9': '\x1b[0m\x1b[94m',
+                        'a': '\x1b[0m\x1b[92m',
+                        'b': '\x1b[0m\x1b[96m',
+                        'c': '\x1b[0m\x1b[91m',
+                        'd': '\x1b[0m\x1b[95m',
+                        'e': '\x1b[0m\x1b[93m',
+                        'f': '\x1b[0m\x1b[97m'
+                    };
+
+                    const formatMap = {
+                        'l': '\x1b[1m',
+                        'm': '\x1b[9m',
+                        'n': '\x1b[4m',
+                        'o': '\x1b[3m',
+                        'r': '\x1b[0m'
+                    };
+
+                    const isHex = (ch) => /[0-9a-f]/i.test(ch);
+                    const longHexToAnsi = (hex) => {
+                        const r = parseInt(hex.slice(0, 2), 16);
+                        const g = parseInt(hex.slice(2, 4), 16);
+                        const b = parseInt(hex.slice(4, 6), 16);
+                        return `\x1b[0m\x1b[38;2;${r};${g};${b}m`;
+                    };
+
+                    let out = '';
+                    let i = 0;
+                    while (i < text.length) {
+                        const ch = text[i];
+                        if (ch !== '§' || i + 1 >= text.length) {
+                            out += ch;
+                            i += 1;
+                            continue;
+                        }
+
+                        const codeRaw = text[i + 1];
+                        const code = String(codeRaw || '').toLowerCase();
+
+                        // Hex format: §x§R§R§G§G§B§B
+                        if (code === 'x') {
+                            if (i + 13 < text.length) {
+                                let hex = '';
+                                let validLongHex = true;
+                                for (let n = 0; n < 6; n += 1) {
+                                    const markerIdx = i + 2 + (n * 2);
+                                    const digitIdx = markerIdx + 1;
+                                    if (text[markerIdx] !== '§' || !isHex(text[digitIdx])) {
+                                        validLongHex = false;
+                                        break;
+                                    }
+                                    hex += text[digitIdx];
+                                }
+                                if (validLongHex) {
+                                    out += longHexToAnsi(hex);
+                                    i += 14;
+                                    continue;
+                                }
+                            }
+
+                            // Fallback hex format: §xRRGGBB
+                            if (i + 7 < text.length) {
+                                const compactHex = text.slice(i + 2, i + 8);
+                                if (/^[0-9a-f]{6}$/i.test(compactHex)) {
+                                    out += longHexToAnsi(compactHex);
+                                    i += 8;
+                                    continue;
+                                }
+                            }
+
+                            // Unknown §x variant, strip control token.
+                            i += 2;
+                            continue;
+                        }
+
+                        // Alternate hex format: §#RRGGBB
+                        if (code === '#' && i + 7 < text.length) {
+                            const hashHex = text.slice(i + 2, i + 8);
+                            if (/^[0-9a-f]{6}$/i.test(hashHex)) {
+                                out += longHexToAnsi(hashHex);
+                                i += 8;
+                                continue;
+                            }
+                        }
+
+                        if (colorMap[code]) {
+                            out += colorMap[code];
+                            i += 2;
+                            continue;
+                        }
+
+                        if (formatMap[code]) {
+                            out += formatMap[code];
+                            i += 2;
+                            continue;
+                        }
+
+                        // Ignore unsupported formatting code and keep parsing.
+                        i += 2;
+                    }
+
+                    return out;
+                }
+
+                translateAdventureFormatting(text) {
+                    if (!text || text.indexOf('<') === -1) return text || '';
+
+                    const colorTags = {
+                        'black': '\x1b[30m',
+                        'dark_blue': '\x1b[34m',
+                        'dark_green': '\x1b[32m',
+                        'dark_aqua': '\x1b[36m',
+                        'dark_red': '\x1b[31m',
+                        'dark_purple': '\x1b[35m',
+                        'gold': '\x1b[33m',
+                        'gray': '\x1b[37m',
+                        'grey': '\x1b[37m',
+                        'dark_gray': '\x1b[90m',
+                        'dark_grey': '\x1b[90m',
+                        'blue': '\x1b[94m',
+                        'green': '\x1b[92m',
+                        'aqua': '\x1b[96m',
+                        'red': '\x1b[91m',
+                        'light_purple': '\x1b[95m',
+                        'yellow': '\x1b[93m',
+                        'white': '\x1b[97m'
+                    };
+
+                    const styleOn = {
+                        'bold': '\x1b[1m',
+                        'b': '\x1b[1m',
+                        'italic': '\x1b[3m',
+                        'i': '\x1b[3m',
+                        'underlined': '\x1b[4m',
+                        'underline': '\x1b[4m',
+                        'u': '\x1b[4m',
+                        'strikethrough': '\x1b[9m',
+                        'st': '\x1b[9m',
+                        'obfuscated': '\x1b[2m',
+                        'obf': '\x1b[2m'
+                    };
+
+                    const styleOff = {
+                        'bold': '\x1b[22m',
+                        'b': '\x1b[22m',
+                        'italic': '\x1b[23m',
+                        'i': '\x1b[23m',
+                        'underlined': '\x1b[24m',
+                        'underline': '\x1b[24m',
+                        'u': '\x1b[24m',
+                        'strikethrough': '\x1b[29m',
+                        'st': '\x1b[29m',
+                        'obfuscated': '\x1b[22m',
+                        'obf': '\x1b[22m'
+                    };
+
+                    const osc8Link = (url, label) => `\x1b]8;;${url}\x1b\\${label}\x1b]8;;\x1b\\`;
+                    const hexToAnsi = (hex) => {
+                        const r = parseInt(hex.slice(0, 2), 16);
+                        const g = parseInt(hex.slice(2, 4), 16);
+                        const b = parseInt(hex.slice(4, 6), 16);
+                        return `\x1b[38;2;${r};${g};${b}m`;
+                    };
+
+                    // Common MiniMessage case: <link:url>https://... (without explicit </link>)
+                    let input = text.replace(/<link:([^>\s]+)>([^\s<]+)/gi, (match, rawUrl, label) => {
+                        const url = String(rawUrl || '').trim();
+                        if (!url) return label || '';
+                        return osc8Link(url, label || url);
+                    });
+
+                    let out = '';
+                    let i = 0;
+                    while (i < input.length) {
+                        if (input[i] !== '<') {
+                            out += input[i];
+                            i += 1;
+                            continue;
+                        }
+
+                        const end = input.indexOf('>', i + 1);
+                        if (end === -1) {
+                            out += input[i];
+                            i += 1;
+                            continue;
+                        }
+
+                        const rawTag = input.slice(i + 1, end).trim();
+                        if (!rawTag) {
+                            out += input[i];
+                            i += 1;
+                            continue;
+                        }
+
+                        const lowerTag = rawTag.toLowerCase();
+
+                        if (lowerTag === 'reset' || lowerTag === 'r') {
+                            out += '\x1b[0m';
+                            i = end + 1;
+                            continue;
+                        }
+
+                        if (lowerTag.startsWith('/')) {
+                            const closeTag = lowerTag.slice(1).trim();
+                            if (!closeTag) {
+                                i = end + 1;
+                                continue;
+                            }
+
+                            if (closeTag === 'reset' || closeTag === 'r') {
+                                out += '\x1b[0m';
+                                i = end + 1;
+                                continue;
+                            }
+                            if (closeTag === 'link') {
+                                out += '\x1b]8;;\x1b\\';
+                                i = end + 1;
+                                continue;
+                            }
+                            if (styleOff[closeTag]) {
+                                out += styleOff[closeTag];
+                                i = end + 1;
+                                continue;
+                            }
+                            if (colorTags[closeTag] || /^#[0-9a-f]{6}$/i.test(closeTag)) {
+                                out += '\x1b[39m';
+                                i = end + 1;
+                                continue;
+                            }
+                        } else {
+                            if (lowerTag.startsWith('link:')) {
+                                const rawUrl = rawTag.slice(rawTag.indexOf(':') + 1).trim();
+                                if (rawUrl) out += `\x1b]8;;${rawUrl}\x1b\\`;
+                                i = end + 1;
+                                continue;
+                            }
+                            if (/^#[0-9a-f]{6}$/i.test(lowerTag)) {
+                                out += hexToAnsi(lowerTag.slice(1));
+                                i = end + 1;
+                                continue;
+                            }
+                            if (colorTags[lowerTag]) {
+                                out += colorTags[lowerTag];
+                                i = end + 1;
+                                continue;
+                            }
+                            if (styleOn[lowerTag]) {
+                                out += styleOn[lowerTag];
+                                i = end + 1;
+                                continue;
+                            }
+                        }
+
+                        // Unknown tag: keep text untouched.
+                        out += input.slice(i, end + 1);
+                        i = end + 1;
+                    }
+
+                    return out;
+                }
+
+                rewritePromptBrand(text) {
+                    if (!text || !promptBrand) return text || '';
+                    return text.replace(/@pterodactyl/gi, `@${promptBrand}`);
+                }
+
+                updateStatus(state) {
+                    const badge = document.getElementById('wsStatusBadge');
+                    if (!badge) return;
+
+                    if (state === 'connected') {
+                        badge.className = 'badge bg-success ms-2';
+                        badge.innerHTML = '<i class="bi bi-hdd-network"></i> Connected';
+                    } else if (state === 'connecting') {
+                        badge.className = 'badge bg-warning text-dark ms-2';
+                        badge.innerHTML = '<i class="bi bi-arrow-repeat"></i> Reconnecting...';
+                    } else {
+                        badge.className = 'badge bg-danger ms-2';
+                        badge.innerHTML = '<i class="bi bi-hdd-network"></i> Disconnected';
+                    }
+                }
+
+                startHeartbeat() {
+                    this.stopHeartbeat();
+                    this.heartbeatTimer = setInterval(() => {
+                        this.send('ping');
+                    }, 30000);
+                }
+
+                stopHeartbeat() {
+                    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+                }
+            }
+
+
+            // Persistent Status Polling
+            let statusPollingTimer = null;
+            const statusUrl = `/server/<%= server.containerId %>/status`;
+
+            function startStatusCheck() {
+                if (statusPollingTimer) return;
+                console.log('Starting persistent status polling (5.5s)...');
+                statusPollingTimer = setInterval(checkStatus, 5500);
+            }
+
+            async function checkStatus() {
+                try {
+                    const response = await fetch(statusUrl);
+                    const data = await response.json();
+
+                    if (data.online) {
+                        if (!connectorOnline) {
+                            console.log('Connector is back online (polling detected)');
+                            updateConnectorStatus(true);
+                        }
+                    } else {
+                        if (connectorOnline) {
+                            console.log('Connector went offline (polling detected)');
+                            updateConnectorStatus(false);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Status check error:', err);
+                    if (connectorOnline) {
+                        updateConnectorStatus(false);
+                    }
+                }
+            }
+
+            // Initialize Client
+            const wsToken = '<%= wsToken || "" %>';
+            const finalWsUrl = window.location.protocol.replace('http', 'ws') + '//' + window.location.host + '/ws/server/<%= server.containerId %>?token=' + encodeURIComponent(wsToken);
+
+            const client = new ConsoleClient(finalWsUrl);
+            client.connect();
+            startStatusCheck();
+
+            // UI Event Listeners
+            const consoleInput = document.getElementById('consoleInput');
+            const macroSelect = document.getElementById('macroSelect');
+            const btnRunMacro = document.getElementById('btnRunMacro');
+            const btnSearch = document.getElementById('btnSearch');
+            const btnFollow = document.getElementById('btnFollow');
+            const btnJumpLatest = document.getElementById('btnJumpLatest');
+            const terminalUnreadCount = document.getElementById('terminalUnreadCount');
+            const terminalSearchbar = document.getElementById('terminalSearchbar');
+            const terminalSearchInput = document.getElementById('terminalSearchInput');
+            const btnSearchPrev = document.getElementById('btnSearchPrev');
+            const btnSearchNext = document.getElementById('btnSearchNext');
+            const btnSearchClose = document.getElementById('btnSearchClose');
+            const terminalSearchCount = document.getElementById('terminalSearchCount');
+            const terminalContextMenu = document.getElementById('terminalContextMenu');
+
+            function persistConsoleState() {
+                localStorage.setItem(consoleStateStorageKey, JSON.stringify({
+                    fontSize: consoleFontSize,
+                    follow: followConsoleOutput
+                }));
+            }
+
+            function persistReplayCache() {
+                try {
+                    sessionStorage.setItem(consoleReplayStorageKey, consoleReplayCache);
+                } catch (error) {
+                    console.warn('Failed to persist console replay cache.', error);
+                }
+            }
+
+            function appendReplayChunk(chunk) {
+                if (!chunk) return;
+                consoleReplayCache += String(chunk);
+                if (consoleReplayCache.length > maxReplayChars) {
+                    consoleReplayCache = consoleReplayCache.slice(-maxReplayChars);
+                }
+                persistReplayCache();
+            }
+
+            function clearReplayCache() {
+                consoleReplayCache = '';
+                consolePlainBuffer = '';
+                try {
+                    sessionStorage.removeItem(consoleReplayStorageKey);
+                } catch (error) {
+                    console.warn('Failed to clear console replay cache.', error);
+                }
+            }
+
+            function appendPlainBuffer(chunk) {
+                if (!chunk) return;
+                consolePlainBuffer += String(chunk);
+                if (consolePlainBuffer.length > maxReplayChars) {
+                    consolePlainBuffer = consolePlainBuffer.slice(-maxReplayChars);
+                }
+            }
+
+            function updateSearchMatchCount(query) {
+                if (!terminalSearchCount) return;
+                const needle = String(query || '');
+                if (!needle) {
+                    terminalSearchCount.textContent = '0 matches';
+                    return;
+                }
+                try {
+                    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const matches = consolePlainBuffer.match(new RegExp(escaped, 'gi'));
+                    terminalSearchCount.textContent = `${matches ? matches.length : 0} matches`;
+                } catch (error) {
+                    terminalSearchCount.textContent = '0 matches';
+                }
+            }
+
+            function persistCommandHistory() {
+                localStorage.setItem(commandHistoryStorageKey, JSON.stringify(commandHistory.slice(0, 32)));
+            }
+
+            function resetUnreadConsole() {
+                unreadConsoleLines = 0;
+                if (terminalUnreadCount) terminalUnreadCount.textContent = '0';
+                btnJumpLatest?.classList.add('d-none');
+            }
+
+            function isTerminalAtBottom() {
+                return term.buffer.active.viewportY >= term.buffer.active.baseY;
+            }
+
+            function setFollowConsoleOutput(nextValue) {
+                followConsoleOutput = Boolean(nextValue);
+                btnFollow?.classList.toggle('follow-active', followConsoleOutput);
+                btnFollow?.setAttribute('title', followConsoleOutput ? 'Following output' : 'Follow output');
+                if (followConsoleOutput) {
+                    term.scrollToBottom();
+                    resetUnreadConsole();
+                }
+                persistConsoleState();
+            }
+
+            function recordCommandHistory(command) {
+                const trimmed = String(command || '').trim();
+                if (!trimmed) return;
+                commandHistory = [trimmed, ...commandHistory.filter((entry) => entry !== trimmed)].slice(0, 32);
+                commandHistoryIndex = -1;
+                persistCommandHistory();
+            }
+
+            function sendConsoleCommand(command) {
+                const value = String(command || '').trim();
+                if (!connectorOnline || !value) return false;
+                client.send('console_input', { command: value });
+                recordCommandHistory(value);
+                if (consoleInput) consoleInput.value = '';
+                return true;
+            }
+
+            function setCommandInputFromHistory(direction) {
+                if (!consoleInput || !commandHistory.length) return;
+                if (direction === 'up') {
+                    commandHistoryIndex = Math.min(commandHistoryIndex + 1, commandHistory.length - 1);
+                } else {
+                    commandHistoryIndex = Math.max(commandHistoryIndex - 1, -1);
+                }
+                consoleInput.value = commandHistoryIndex >= 0 ? (commandHistory[commandHistoryIndex] || '') : '';
+                requestAnimationFrame(() => {
+                    const len = consoleInput.value.length;
+                    consoleInput.setSelectionRange(len, len);
+                });
+            }
+
+            function toggleTerminalSearch(forceOpen = null) {
+                if (!terminalSearchbar) return;
+                const shouldOpen = forceOpen === null ? terminalSearchbar.classList.contains('d-none') : Boolean(forceOpen);
+                terminalSearchbar.classList.toggle('d-none', !shouldOpen);
+                if (shouldOpen) {
+                    updateSearchMatchCount(terminalSearchInput?.value || '');
+                    terminalSearchInput?.focus();
+                    terminalSearchInput?.select();
+                } else {
+                    consoleInput?.focus();
+                }
+            }
+
+            async function copyTerminalSelection() {
+                const selected = term.getSelection();
+                if (!selected) return false;
+                try {
+                    await navigator.clipboard.writeText(selected);
+                    showConsoleStatus('Selection copied to clipboard.');
+                    return true;
+                } catch (error) {
+                    showConsoleStatus('Clipboard copy failed.');
+                    return false;
+                }
+            }
+
+            function hideTerminalContextMenu() {
+                terminalContextMenu?.classList.add('d-none');
+            }
+
+            function showTerminalContextMenu(x, y) {
+                if (!terminalContextMenu) return;
+                terminalContextMenu.classList.remove('d-none');
+                const maxX = window.innerWidth - terminalContextMenu.offsetWidth - 12;
+                const maxY = window.innerHeight - terminalContextMenu.offsetHeight - 12;
+                terminalContextMenu.style.left = `${Math.max(12, Math.min(x, maxX))}px`;
+                terminalContextMenu.style.top = `${Math.max(12, Math.min(y, maxY))}px`;
+            }
+
+            function restoreReplayCacheIfNeeded() {
+                if (currentServerStatus !== 'stopped') return;
+                try {
+                    const saved = sessionStorage.getItem(consoleReplayStorageKey) || '';
+                    if (!saved || hasReceivedLiveConsoleOutput) return;
+                    consoleReplayCache = saved.slice(-maxReplayChars);
+                    term.write(consoleReplayCache);
+                    appendPlainBuffer(stripAnsiSequences(consoleReplayCache));
+                    updateSearchMatchCount(terminalSearchInput?.value || '');
+                    if (followConsoleOutput) {
+                        term.scrollToBottom();
+                    }
+                } catch (error) {
+                    console.warn('Failed to restore console replay cache.', error);
+                }
+            }
+
+            term.onScroll(() => {
+                if (isTerminalAtBottom()) {
+                    resetUnreadConsole();
+                }
+            });
+
+            setFollowConsoleOutput(followConsoleOutput);
+            restoreReplayCacheIfNeeded();
+            syncConsoleSideRailVisibility();
+
+            if (canUseConsoleFiles && consoleFilesVisible) {
+                refreshConsoleTree('/', false).catch((error) => {
+                    console.error('Initial console tree load failed:', error);
+                    renderConsoleTree();
+                });
+            }
+            if (minecraftPanelEnabled && consolePlayersVisible) {
+                refreshPlayerPanel();
+            }
+
+            btnToggleConsoleFiles?.addEventListener('click', () => {
+                consoleFilesVisible = !consoleFilesVisible;
+                syncConsoleSideRailVisibility();
+                if (consoleFilesVisible) {
+                    refreshConsoleTree(consoleTreeSelectedDirectory || '/', false).catch((error) => {
+                        console.error('Console tree refresh failed:', error);
+                        showConsoleStatus(error.message || 'Failed to load mini file tree.');
+                    });
+                }
+            });
+
+            btnTogglePlayerPanel?.addEventListener('click', () => {
+                consolePlayersVisible = !consolePlayersVisible;
+                syncConsoleSideRailVisibility();
+                if (consolePlayersVisible && minecraftPanelEnabled) {
+                    refreshPlayerPanel();
+                }
+            });
+
+            consoleFilesRefreshBtn?.addEventListener('click', () => {
+                refreshConsoleTree(consoleTreeSelectedDirectory || '/', true).catch((error) => {
+                    console.error('Console tree refresh failed:', error);
+                    showConsoleStatus(error.message || 'Failed to refresh mini file tree.');
+                });
+            });
+
+            consoleFilesTreeList?.addEventListener('click', async (event) => {
+                const target = event.target && event.target.closest ? event.target.closest('[data-tree-path]') : null;
+                if (!target) return;
+                const targetPath = normalizeServerPath(target.getAttribute('data-tree-path') || '/');
+                const isDir = target.getAttribute('data-tree-dir') === '1';
+                if (isDir) {
+                    consoleTreeSelectedDirectory = targetPath;
+                    if (consoleFileTreeExpanded.has(targetPath)) {
+                        consoleFileTreeExpanded.delete(targetPath);
+                        renderConsoleTree();
+                    } else {
+                        consoleFileTreeExpanded.add(targetPath);
+                        try {
+                            await fetchConsoleTreeEntries(targetPath, false);
+                        } catch (error) {
+                            showConsoleStatus(error.message || 'Failed to open directory.');
+                        }
+                        renderConsoleTree();
+                    }
+                    return;
+                }
+                openConsoleEditor(targetPath);
+            });
+
+            const setConsoleTreeDragState = (active) => {
+                consoleTreeDropzone?.classList.toggle('is-dragover', Boolean(active));
+            };
+
+            ['dragenter', 'dragover'].forEach((eventName) => {
+                consoleTreeDropzone?.addEventListener(eventName, (event) => {
+                    event.preventDefault();
+                    setConsoleTreeDragState(true);
+                });
+            });
+            ['dragleave', 'dragend', 'drop'].forEach((eventName) => {
+                consoleTreeDropzone?.addEventListener(eventName, (event) => {
+                    event.preventDefault();
+                    setConsoleTreeDragState(false);
+                });
+            });
+            consoleTreeDropzone?.addEventListener('drop', async (event) => {
+                event.preventDefault();
+                const files = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files : null;
+                if (!files || !files.length) return;
+                try {
+                    await uploadConsoleTreeFiles(files);
+                } catch (error) {
+                    console.error('Console tree upload failed:', error);
+                    showConsoleStatus(error.message || 'Upload failed.');
+                }
+            });
+
+            consoleFileEditorSaveBtn?.addEventListener('click', () => {
+                saveConsoleEditor().catch((error) => {
+                    console.error('Console file save failed:', error);
+                    showConsoleStatus(error.message || 'Failed to save file.');
+                });
+            });
+            consoleFileEditorCloseBtn?.addEventListener('click', closeConsoleEditor);
+            consoleFileEditorDismissBtn?.addEventListener('click', closeConsoleEditor);
+            consoleFileEditorModalEl?.addEventListener('hide.bs.modal', (event) => {
+                const editor = consoleAceEditor;
+                if (editor && !consoleEditorReadOnly && editor.getValue() !== consoleEditorOriginalContent) {
+                    const shouldClose = window.confirm('Close the editor and discard unsaved changes?');
+                    if (!shouldClose) {
+                        event.preventDefault();
+                    }
+                }
+            });
+
+            function submitMacroRun(macroId) {
+                const id = Number.parseInt(macroId, 10);
+                if (!Number.isInteger(id) || id <= 0) return false;
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = `/server/<%= server.containerId %>/macros/${encodeURIComponent(String(id))}/run`;
+                form.style.display = 'none';
+
+                const returnInput = document.createElement('input');
+                returnInput.type = 'hidden';
+                returnInput.name = 'returnTo';
+                returnInput.value = `${window.location.pathname}${window.location.search || ''}`;
+                form.appendChild(returnInput);
+
+                document.body.appendChild(form);
+                form.submit();
+                return true;
+            }
+            consoleInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && connectorOnline) {
+                    sendConsoleCommand(consoleInput.value);
+                }
+            });
+
+            consoleInput.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setCommandInputFromHistory('up');
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setCommandInputFromHistory('down');
+                }
+            });
+
+            const btnStart = document.getElementById('btnStart');
+            const btnStop = document.getElementById('btnStop');
+            const btnRestart = document.getElementById('btnRestart');
+            const btnClear = document.getElementById('btnClear');
+
+            document.addEventListener('keydown', (e) => {
+                const isInput = document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
+                const key = String(e.key || '').toLowerCase();
+
+                if ((e.ctrlKey || e.metaKey) && key === 'k') {
+                    e.preventDefault();
+                    consoleInput?.focus();
+                    return;
+                }
+                if ((e.ctrlKey || e.metaKey) && key === 'l') {
+                    if (btnClear) {
+                        e.preventDefault();
+                        btnClear.click();
+                    }
+                    return;
+                }
+                if ((e.ctrlKey || e.metaKey) && key === 'f') {
+                    e.preventDefault();
+                    toggleTerminalSearch(true);
+                    return;
+                }
+                if ((e.ctrlKey || e.metaKey) && key === 'enter') {
+                    e.preventDefault();
+                    sendConsoleCommand(consoleInput ? consoleInput.value : '');
+                    return;
+                }
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 'r') {
+                    if (btnRestart && !btnRestart.disabled) {
+                        e.preventDefault();
+                        btnRestart.click();
+                    }
+                    return;
+                }
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 's') {
+                    e.preventDefault();
+                    const startVisible = btnStart && !btnStart.classList.contains('d-none');
+                    const stopVisible = btnStop && !btnStop.classList.contains('d-none');
+                    if (startVisible && btnStart && !btnStart.disabled) {
+                        btnStart.click();
+                    } else if (stopVisible && btnStop && !btnStop.disabled) {
+                        btnStop.click();
+                    }
+                }
+            });
+
+            if (btnRunMacro && macroSelect) {
+                btnRunMacro.addEventListener('click', () => {
+                    if (!connectorOnline) {
+                        term.writeln('\x1b[1;31m[!] Cannot run macro: connector is offline.\x1b[0m');
+                        return;
+                    }
+                    const macroId = String(macroSelect.value || '').trim();
+                    if (!macroId) return;
+                    term.writeln('\x1b[1;36m[*] Running macro flow...\x1b[0m');
+                    submitMacroRun(macroId);
+                });
+            }
+
+            const btnPopout = document.getElementById('btnPopout');
+            if (btnPopout) {
+                btnPopout.addEventListener('click', function () {
+                    const srvId = this.getAttribute('data-server-id');
+                    window.open(`/server/${srvId}?popout=true`, `console_popout_${srvId}`, 'width=900,height=600');
+                });
+            }
+
+            const btnFontMinus = document.getElementById('btnFontMinus');
+            const btnFontPlus = document.getElementById('btnFontPlus');
+
+            function applyConsoleFontSize(nextSize) {
+                const size = Math.max(10, Math.min(18, nextSize));
+                consoleFontSize = size;
+                term.options.fontSize = size;
+                fitAddon.fit();
+                persistConsoleState();
+            }
+
+            if (btnFontMinus) {
+                btnFontMinus.addEventListener('click', () => applyConsoleFontSize(consoleFontSize - 1));
+            }
+
+            if (btnFontPlus) {
+                btnFontPlus.addEventListener('click', () => applyConsoleFontSize(consoleFontSize + 1));
+            }
+
+            if (btnClear) {
+                btnClear.addEventListener('click', () => {
+                    term.clear();
+                    clearReplayCache();
+                    updateSearchMatchCount(terminalSearchInput?.value || '');
+                });
+            }
+
+            btnSearch?.addEventListener('click', () => toggleTerminalSearch());
+            btnFollow?.addEventListener('click', () => setFollowConsoleOutput(!followConsoleOutput));
+            btnJumpLatest?.addEventListener('click', () => {
+                term.scrollToBottom();
+                setFollowConsoleOutput(true);
+            });
+            btnSearchPrev?.addEventListener('click', () => {
+                searchAddon.findPrevious(terminalSearchInput?.value || '', { incremental: true, decorations: true });
+            });
+            btnSearchNext?.addEventListener('click', () => {
+                searchAddon.findNext(terminalSearchInput?.value || '', { incremental: true, decorations: true });
+            });
+            btnSearchClose?.addEventListener('click', () => toggleTerminalSearch(false));
+            terminalSearchInput?.addEventListener('input', () => {
+                updateSearchMatchCount(terminalSearchInput.value || '');
+                searchAddon.findNext(terminalSearchInput.value || '', { incremental: true, decorations: true });
+            });
+            terminalSearchInput?.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    searchAddon.findNext(terminalSearchInput.value || '', { incremental: true, decorations: true });
+                } else if (event.key === 'Escape') {
+                    event.preventDefault();
+                    toggleTerminalSearch(false);
+                }
+            });
+
+            const terminalHost = document.getElementById('terminal');
+            terminalHost?.addEventListener('mouseup', () => {
+                if (term.getSelection()) {
+                    copyTerminalSelection();
+                }
+            });
+            terminalHost?.addEventListener('contextmenu', (event) => {
+                event.preventDefault();
+                showTerminalContextMenu(event.clientX, event.clientY);
+            });
+            terminalContextMenu?.addEventListener('click', async (event) => {
+                const target = event.target && event.target.closest ? event.target.closest('[data-terminal-action]') : null;
+                if (!target) return;
+                const action = target.getAttribute('data-terminal-action');
+                hideTerminalContextMenu();
+                if (action === 'copy-selection') {
+                    await copyTerminalSelection();
+                } else if (action === 'paste-input') {
+                    try {
+                        const text = await navigator.clipboard.readText();
+                        if (consoleInput) {
+                            consoleInput.value += text;
+                            consoleInput.focus();
+                        }
+                    } catch (error) {
+                        showConsoleStatus('Clipboard paste failed.');
+                    }
+                } else if (action === 'search-console') {
+                    toggleTerminalSearch(true);
+                } else if (action === 'clear-console') {
+                    btnClear?.click();
+                }
+            });
+            document.addEventListener('click', (event) => {
+                if (!terminalContextMenu || terminalContextMenu.classList.contains('d-none')) return;
+                if (terminalContextMenu.contains(event.target)) return;
+                hideTerminalContextMenu();
+            });
+            window.addEventListener('blur', hideTerminalContextMenu);
+
+            document.getElementById('btnStart').addEventListener('click', () => sendPower('start'));
+            document.getElementById('btnRestart').addEventListener('click', () => sendPower('restart'));
+            document.getElementById('btnStop').addEventListener('click', function () {
+                sendPower('stop');
+                this.classList.add('d-none');
+                document.getElementById('btnKill').classList.remove('d-none');
+            });
+            document.getElementById('btnKill').addEventListener('click', () => sendPower('kill'));
+
+            const btnAcceptEula = document.getElementById('btnAcceptEula');
+            if (btnAcceptEula) {
+                btnAcceptEula.addEventListener('click', () => {
+                    client.send('accept_eula');
+                    if (eulaModalInstance) eulaModalInstance.hide();
+                    term.writeln('\x1b[1;32m[*] EULA accepted! Please start your server now.\x1b[0m');
+                });
+            }
+
+            function sendPower(action) {
+                if (!connectorOnline) {
+                    term.writeln('\x1b[1;31m[!] Cannot execute command: connector is offline.\x1b[0m');
+                    return;
+                }
+                client.send('power_action', { action });
+                term.writeln(`\x1b[1;33m[*] Sending ${action} command...\x1b[0m`);
+            }
+
+            function updateUIStatus(status, payload = {}) {
+                const nextStatus = String(status || '').toLowerCase();
+                const previousStatus = currentServerStatus;
+                currentServerStatus = nextStatus;
+                renderProvisioningAccessState(nextStatus);
+
+                const badge = document.getElementById('statusBadge');
+                const text = document.getElementById('statusText');
+                badge.className = `status-badge status-${nextStatus}`;
+                text.textContent = nextStatus.toUpperCase();
+                if (detailRuntime) detailRuntime.textContent = nextStatus.toUpperCase();
+                updateExitDetails(payload);
+
+                if (connectorOnline) {
+                    const btnStart = document.getElementById('btnStart');
+                    const btnRestart = document.getElementById('btnRestart');
+                    const btnStop = document.getElementById('btnStop');
+                    const btnKill = document.getElementById('btnKill');
+
+                    if (nextStatus === 'running') {
+                        btnStart.disabled = true;
+                        btnRestart.disabled = false;
+                        btnStop.disabled = false;
+                        btnStop.classList.remove('d-none');
+                        btnKill.disabled = false;
+                        btnKill.classList.add('d-none');
+                    } else if (nextStatus === 'stopping') {
+                        btnStart.disabled = true;
+                        btnRestart.disabled = true;
+                        btnStop.disabled = true;
+                        btnStop.classList.add('d-none');
+                        btnKill.disabled = false;
+                        btnKill.classList.remove('d-none');
+                    } else if (isProvisioningStatus(nextStatus) || nextStatus === 'error') {
+                        btnStart.disabled = true;
+                        btnRestart.disabled = true;
+                        btnStop.disabled = true;
+                        btnStop.classList.remove('d-none');
+                        btnKill.disabled = true;
+                        btnKill.classList.add('d-none');
+                    } else {
+                        btnStart.disabled = false;
+                        btnRestart.disabled = true;
+                        btnStop.disabled = true;
+                        btnStop.classList.remove('d-none');
+                        btnKill.disabled = true;
+                        btnKill.classList.add('d-none');
+                    }
+                }
+
+                if (previousStatus === nextStatus) return;
+                if (nextStatus === 'running') {
+                    clearReplayCache();
+                }
+
+                const provisioningContext = provisioningState.active || isProvisioningStatus(previousStatus) || isProvisioningStatus(nextStatus);
+                if (provisioningContext) {
+                    if (isProvisioningStatus(nextStatus)) {
+                        activateProvisioning(isAdminConsoleViewer
+                            ? (isReinstallingStatus(nextStatus)
+                                ? 'Connector is reinstalling the runtime container and refreshing server files.'
+                                : 'Connector is provisioning the runtime container.')
+                            : (isReinstallingStatus(nextStatus)
+                                ? 'Your server is being reinstalled. Existing runtime content is being refreshed now.'
+                                : 'Your server is being created. This usually takes less than a minute.'));
+                    } else if (nextStatus === 'running') {
+                        completeProvisioningStage('prepare', 'Ready');
+                        completeProvisioningStage('install', 'Ready');
+                        completeProvisioningStage('config', 'Applied');
+                        completeProvisioningStage('container', 'Created');
+                        completeProvisioningStage('start', 'Running', 'Provisioning finished. Server is running.');
+                        setTimeout(() => {
+                            if (currentServerStatus === 'running') {
+                                deactivateProvisioning();
+                            }
+                        }, 2500);
+                    } else if (nextStatus === 'error') {
+                        failProvisioningStage('start', 'Provisioning error', 'Provisioning failed. Admins can inspect the detailed install activity above.');
+                    }
+                }
+
+                if (nextStatus === 'running') {
+                    term.writeln('\x1b[1;32m[✓] Server is now running.\x1b[0m');
+                } else if (nextStatus === 'stopped') {
+                    term.writeln('\x1b[1;31m[✗] Server has stopped.\x1b[0m');
+                }
+            }
+
+            function updateConnectorStatus(online) {
+                connectorOnline = online;
+                const alert = document.getElementById('connectionAlert');
+                const buttons = [
+                    document.getElementById('btnStart'),
+                    document.getElementById('btnRestart'),
+                    document.getElementById('btnStop'),
+                    document.getElementById('btnKill')
+                ];
+                const input = document.getElementById('consoleInput');
+
+                if (online) {
+                    alert.classList.add('d-none');
+                    buttons.forEach(btn => btn.disabled = false);
+                    input.disabled = false;
+                    if (detailConnector) detailConnector.textContent = 'Connector online';
+                } else {
+                    alert.classList.remove('d-none');
+                    buttons.forEach(btn => btn.disabled = true);
+                    input.disabled = true;
+                    if (detailConnector) detailConnector.textContent = 'Connector offline';
+                }
+            }
+
+            updateConsoleDetails({ cpu: 0, memory: 0, disk: 0, network_rx: 0, network_tx: 0, uptime_seconds: 0 });
+            updateRuntimeMeta(initialRuntimeMeta || {});
+
+            const handleResize = () => fitAddon.fit();
+            window.addEventListener('resize', handleResize);
+
+            let consoleRuntimeCleaned = false;
+            function cleanupConsoleRuntime() {
+                if (consoleRuntimeCleaned) return;
+                consoleRuntimeCleaned = true;
+
+                if (statusPollingTimer) {
+                    clearInterval(statusPollingTimer);
+                    statusPollingTimer = null;
+                }
+
+                try {
+                    client.isExplicitDisconnect = true;
+                    client.stopHeartbeat();
+                    if (client.ws && (client.ws.readyState === WebSocket.OPEN || client.ws.readyState === WebSocket.CONNECTING)) {
+                        client.ws.close(1000, 'Leaving console page');
+                    }
+                } catch (error) {
+                    console.warn('Console cleanup warning:', error);
+                }
+
+                window.removeEventListener('resize', handleResize);
+            }
+
+            window.addEventListener('beforeunload', cleanupConsoleRuntime);
+            document.addEventListener('turbo:before-cache', cleanupConsoleRuntime);
+        </script>
+        <%- include('../partials/modal-chat') %>
+        <script>
+            (() => {
+                const aiEnabled = <%- JSON.stringify(aiChat && aiChat.enabled) %>;
+                if (!aiEnabled) return;
+
+                const serverId = <%- JSON.stringify(server.containerId) %>;
+                const form = document.getElementById('rockyAiForm');
+                const input = document.getElementById('rockyAiInput');
+                const messages = document.getElementById('rockyAiMessages');
+                const sendButton = document.getElementById('rockyAiSend');
+
+                const appendMessage = (role, text) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = `rocky-ai-message ${role}`;
+                    wrapper.textContent = text;
+                    messages.appendChild(wrapper);
+                    messages.scrollTop = messages.scrollHeight;
+                };
+
+                const sendMessage = async () => {
+                    const content = input.value.trim();
+                    if (!content) return;
+                    appendMessage('user', content);
+                    input.value = '';
+                    input.disabled = true;
+                    if (sendButton) sendButton.disabled = true;
+
+                    try {
+                        const resp = await fetch(`/server/${serverId}/ai/chat`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ message: content })
+                        });
+                        const data = await resp.json();
+                        if (!resp.ok || !data || !data.success) {
+                            appendMessage('system', data && data.error ? data.error : 'AI request failed.');
+                        } else {
+                            appendMessage('assistant', data.reply || 'No response.');
+                        }
+                    } catch (err) {
+                        appendMessage('system', 'AI request failed.');
+                    } finally {
+                        input.disabled = false;
+                        if (sendButton) sendButton.disabled = false;
+                        input.focus();
+                    }
+                };
+
+                form?.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    sendMessage();
+                });
+
+                sendButton?.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    sendMessage();
+                });
+            })();
+        </script>
+        <%- include('../partials/shortcuts-modal', { shortcutsId: 'consoleShortcutsModal', shortcutsTitle: 'Console Shortcuts', shortcutsList: consoleShortcuts }) %>

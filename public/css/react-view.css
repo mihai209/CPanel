@@ -1284,6 +1284,10 @@ body.react-view-body {
     color: #ffd08a;
 }
 
+.react-console-inline-metric.is-danger strong {
+    color: #ff9b9b;
+}
+
 .react-console-graph-card {
     display: grid;
     gap: 14px;

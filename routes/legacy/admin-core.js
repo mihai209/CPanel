@@ -512,6 +512,89 @@ const buildConnectorLabChecks = (diagnostics) => {
     ];
 };
 
+const buildConnectorIssueTriage = (diagnostics) => {
+    const checks = buildConnectorLabChecks(diagnostics);
+    const failingChecks = checks.filter((check) => !check.ok);
+    const byKey = new Map(checks.map((check) => [check.key, check]));
+    const definitions = [
+        {
+            key: 'docker_access',
+            severity: 'critical',
+            title: 'Docker runtime unavailable',
+            summary: 'Container power actions and installs are blocked until Docker is reachable.',
+            action: 'Check the Docker daemon, service user privileges, and host runtime mode.'
+        },
+        {
+            key: 'disk_perms',
+            severity: 'critical',
+            title: 'Volume write path is failing',
+            summary: 'Installs, uploads, edits, backups, and extracts can break on this connector.',
+            action: 'Verify ownership and permissions of the connector volume root on disk.'
+        },
+        {
+            key: 'dns',
+            severity: 'critical',
+            title: 'DNS resolution is failing',
+            summary: 'Image pulls, external downloads, and provider integrations are at risk.',
+            action: 'Inspect resolver settings, bridge DNS, and outbound network access on the host.'
+        },
+        {
+            key: 'image_pull',
+            severity: 'critical',
+            title: 'Image pull support is unhealthy',
+            summary: 'New installs and runtime redeploys can fail on this connector.',
+            action: 'Validate registry reachability, auth, and Docker pull behavior from the host.'
+        },
+        {
+            key: 'sftp_auth',
+            severity: 'warning',
+            title: 'SFTP auth path is degraded',
+            summary: 'Owners and subusers may see SFTP auth failures or inconsistent file access.',
+            action: 'Review connector token sync, panel auth endpoints, and recent SFTP auth logs.'
+        },
+        {
+            key: 'websocket_payload_size',
+            severity: 'warning',
+            title: 'WebSocket payload limit is tight',
+            summary: 'Large requests may fail or truncate under current payload headroom.',
+            action: 'Increase the connector WS payload limit and resync connector config.'
+        },
+        {
+            key: 'archive_tools',
+            severity: 'warning',
+            title: 'Archive helpers are incomplete',
+            summary: 'Import, extract, world operations, and archive jobs may degrade.',
+            action: 'Install the missing zip/tar helpers on the connector host.'
+        }
+    ];
+
+    for (const definition of definitions) {
+        if (byKey.has(definition.key) && !byKey.get(definition.key).ok) {
+            return Object.assign({}, definition, { failedChecks, checks });
+        }
+    }
+
+    if (failingChecks.length === 0) {
+        return {
+            severity: 'ok',
+            title: 'Connector looks healthy',
+            summary: 'No failing compatibility checks were reported in the latest diagnostics snapshot.',
+            action: 'No immediate operator action required.',
+            failedChecks,
+            checks
+        };
+    }
+
+    return {
+        severity: 'warning',
+        title: 'Connector needs operator review',
+        summary: `${failingChecks.length} compatibility check(s) are failing or degraded.`,
+        action: 'Inspect metadata on the failing checks, fix the host issue, then rerun diagnostics.',
+        failedChecks,
+        checks
+    };
+};
+
 const readLanguageCatalog = async () => {
     await ensureLanguageDirectory();
     const entries = await nodeFsPromises.readdir(LANG_DIRECTORY, { withFileTypes: true });
@@ -2479,10 +2562,20 @@ app.get('/admin/egg-debugger', requireAuth, requireAdmin, async (req, res) => {
 app.get('/admin/notifications-test', requireAuth, requireAdmin, async (req, res) => {
     try {
         const notificationConfig = await getAdminNotificationConfig();
+        const channelFilter = String(req.query.channel || 'all').trim().toLowerCase();
+        const statusFilter = String(req.query.status || 'all').trim().toLowerCase();
+        const where = {};
+        if (['discord', 'telegram', 'webhook', 'email', 'unknown'].includes(channelFilter) && channelFilter !== 'all') {
+            where.channel = channelFilter;
+        }
+        if (['sent', 'failed', 'unsupported'].includes(statusFilter) && statusFilter !== 'all') {
+            where.status = statusFilter;
+        }
         const recentLogs = NotificationDeliveryLog
             ? await NotificationDeliveryLog.findAll({
+                where,
                 order: [['createdAt', 'DESC']],
-                limit: 30,
+                limit: 100,
                 include: [{ model: User, as: 'actor', attributes: ['id', 'username'] }]
             })
             : [];
@@ -2496,6 +2589,33 @@ app.get('/admin/notifications-test', requireAuth, requireAdmin, async (req, res)
         };
         const lastFailedLog = recentLogs.find((entry) => String(entry.status || '') === 'failed') || null;
 
+        if (String(req.query.export || '').trim().toLowerCase() === 'json') {
+            return res.json({
+                generatedAt: new Date().toISOString(),
+                filters: {
+                    channel: channelFilter,
+                    status: statusFilter
+                },
+                logs: recentLogs.map((log) => ({
+                    id: log.id,
+                    channel: log.channel,
+                    status: log.status,
+                    target: log.target,
+                    templateKey: log.templateKey,
+                    eventKey: log.eventKey,
+                    requestPayload: log.requestPayload,
+                    responsePayload: log.responsePayload,
+                    errorText: log.errorText,
+                    attemptedByUserId: log.attemptedByUserId,
+                    retriedFromId: log.retriedFromId,
+                    metadata: log.metadata,
+                    actor: log.actor && log.actor.username ? log.actor.username : null,
+                    createdAt: log.createdAt,
+                    updatedAt: log.updatedAt
+                }))
+            });
+        }
+
         res.render('admin/notifications-test', {
             user: req.session.user,
             path: '/admin/notifications-test',
@@ -2506,6 +2626,10 @@ app.get('/admin/notifications-test', requireAuth, requireAdmin, async (req, res)
             previews,
             deliveryLogs: recentLogs,
             lastFailedLog,
+            filters: {
+                channel: channelFilter,
+                status: statusFilter
+            },
             emailSupported: false,
             maskNotificationTarget
         });
@@ -2526,6 +2650,10 @@ app.get('/admin/notifications-test', requireAuth, requireAdmin, async (req, res)
             },
             deliveryLogs: [],
             lastFailedLog: null,
+            filters: {
+                channel: 'all',
+                status: 'all'
+            },
             emailSupported: false,
             maskNotificationTarget
         });
@@ -2719,12 +2847,26 @@ app.get('/admin/connector-lab', requireAuth, requireAdmin, async (req, res) => {
             order: [['name', 'ASC']]
         });
         const connectorStatus = global.connectorStatus || {};
+        const healthFilter = String(req.query.health || 'all').trim().toLowerCase();
         const selectedConnectorId = Number.parseInt(req.query.connectorId, 10);
+        const connectorCards = connectors.map((connector) => {
+            const statusData = connectorStatus[connector.id] || null;
+            const triage = buildConnectorIssueTriage(statusData && statusData.diagnostics ? statusData.diagnostics : null);
+            const isOnline = Boolean(statusData && String(statusData.status || '').toLowerCase() === 'online');
+            const hasIssues = Array.isArray(triage.failedChecks) && triage.failedChecks.length > 0;
+            return { connector, statusData, triage, isOnline, hasIssues };
+        }).filter((entry) => {
+            if (healthFilter === 'online') return entry.isOnline;
+            if (healthFilter === 'offline') return !entry.isOnline;
+            if (healthFilter === 'issues') return entry.hasIssues;
+            return true;
+        });
         const selectedConnector = Number.isInteger(selectedConnectorId) && selectedConnectorId > 0
-            ? connectors.find((entry) => Number(entry.id) === selectedConnectorId) || null
-            : (connectors[0] || null);
+            ? (connectorCards.find((entry) => Number(entry.connector.id) === selectedConnectorId)?.connector || null)
+            : ((connectorCards[0] && connectorCards[0].connector) || null);
         const selectedStatus = selectedConnector ? connectorStatus[selectedConnector.id] || null : null;
         const selectedChecks = selectedStatus ? buildConnectorLabChecks(selectedStatus.diagnostics || null) : [];
+        const selectedTriage = buildConnectorIssueTriage(selectedStatus && selectedStatus.diagnostics ? selectedStatus.diagnostics : null);
         const selectedServerCount = selectedConnector
             ? await Server.count({
                 include: [{
@@ -2738,6 +2880,25 @@ app.get('/admin/connector-lab', requireAuth, requireAdmin, async (req, res) => {
             ? await Allocation.count({ where: { connectorId: selectedConnector.id } })
             : 0;
 
+        if (String(req.query.export || '').trim().toLowerCase() === 'json' && selectedConnector) {
+            return res.json({
+                generatedAt: new Date().toISOString(),
+                connector: {
+                    id: selectedConnector.id,
+                    name: selectedConnector.name,
+                    fqdn: selectedConnector.fqdn,
+                    location: selectedConnector.location && selectedConnector.location.name ? selectedConnector.location.name : null
+                },
+                status: selectedStatus,
+                triage: selectedTriage,
+                checks: selectedChecks,
+                counts: {
+                    servers: selectedServerCount,
+                    allocations: selectedAllocationCount
+                }
+            });
+        }
+
         res.render('admin/connector-lab', {
             user: req.session.user,
             path: '/admin/connector-lab',
@@ -2745,10 +2906,13 @@ app.get('/admin/connector-lab', requireAuth, requireAdmin, async (req, res) => {
             success: req.query.success || null,
             error: req.query.error || null,
             connectors,
+            connectorCards,
             connectorStatus,
+            healthFilter,
             selectedConnector,
             selectedStatus,
             selectedChecks,
+            selectedTriage,
             selectedServerCount,
             selectedAllocationCount
         });
@@ -2761,10 +2925,13 @@ app.get('/admin/connector-lab', requireAuth, requireAdmin, async (req, res) => {
             success: null,
             error: 'Failed to load connector lab.',
             connectors: [],
+            connectorCards: [],
             connectorStatus: {},
+            healthFilter: 'all',
             selectedConnector: null,
             selectedStatus: null,
             selectedChecks: [],
+            selectedTriage: buildConnectorIssueTriage(null),
             selectedServerCount: 0,
             selectedAllocationCount: 0
         });

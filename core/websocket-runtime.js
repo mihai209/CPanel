@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 
 const SERVER_CRASH_COOLDOWN_STATE = new Map(); // serverId -> last crash ts
 const SERVER_CRASH_LOOP_STATE = new Map(); // serverId -> { count, firstAt, cooldownUntil }
+const SERVER_RUNTIME_META_STATE = new Map(); // serverId -> { lastSource, lastReason, lastAction, lastStatus, lastChangedAt, cooldownUntil, crashLoopCount, stateTone, history }
 const SERVER_TICK_SAMPLES = new Map(); // serverId -> [{ ts, tps1m, tps5m, tps15m, mspt1m, mspt5m, mspt15m, tickLag }]
 const SERVER_TICK_STATE = new Map(); // serverId -> { lastMspt1m, lastMspt5m, lastMspt15m, pendingTps }
 const SERVER_RESOURCE_PACK_STATE = new Map(); // serverId -> { updatedAt, players: Map(name -> { status, updatedAt }) }
@@ -10,6 +11,7 @@ const SERVER_TICK_SAMPLE_LIMIT = 240;
 const CRASH_LOOP_WINDOW_MS = 5 * 60 * 1000;
 const CRASH_LOOP_THRESHOLD = 3;
 const CRASH_LOOP_COOLDOWN_MS = 10 * 60 * 1000;
+const SERVER_RUNTIME_HISTORY_LIMIT = 12;
 let getServerConsoleBuffer = () => '';
 
 function getServerTickSamples(serverId) {
@@ -38,6 +40,161 @@ function getServerCrashLoopState(serverId) {
     return { active: false, count: state.count || 0, cooldownUntil: state.cooldownUntil || null };
 }
 
+function normalizeRuntimeSource(source) {
+    const value = String(source || '').trim().toLowerCase();
+    if (['manual', 'admin', 'policy', 'crash_auto_recovery', 'install', 'reinstall', 'system'].includes(value)) {
+        return value;
+    }
+    return 'system';
+}
+
+function classifyRuntimeState(status) {
+    const value = String(status || '').trim().toLowerCase();
+    if (value === 'running') return { phase: 'online', tone: 'success' };
+    if (value === 'error') return { phase: 'error', tone: 'danger' };
+    if (['installing', 'reinstalling', 'starting'].includes(value)) return { phase: 'provisioning', tone: 'warning' };
+    if (['offline', 'stopped'].includes(value)) return { phase: 'offline', tone: 'muted' };
+    if (value === 'stopping') return { phase: 'stopping', tone: 'warning' };
+    return { phase: value || 'unknown', tone: 'muted' };
+}
+
+function isUnexpectedRuntimeTransition(previousStatus, nextStatus) {
+    const previous = String(previousStatus || '').trim().toLowerCase() || 'unknown';
+    const next = String(nextStatus || '').trim().toLowerCase() || 'unknown';
+    const allowedFrom = {
+        running: new Set(['running', 'stopping', 'stopped', 'error', 'offline', 'suspended']),
+        stopping: new Set(['stopping', 'stopped', 'offline', 'error', 'running']),
+        stopped: new Set(['stopped', 'starting', 'running', 'installing', 'reinstalling', 'suspended', 'error']),
+        offline: new Set(['offline', 'starting', 'running', 'installing', 'reinstalling', 'error', 'suspended', 'stopped']),
+        error: new Set(['error', 'starting', 'running', 'reinstalling', 'installing', 'offline', 'stopped', 'suspended']),
+        installing: new Set(['installing', 'starting', 'running', 'error', 'offline', 'stopped']),
+        reinstalling: new Set(['reinstalling', 'starting', 'running', 'error', 'offline', 'stopped']),
+        starting: new Set(['starting', 'running', 'error', 'stopped', 'offline', 'reinstalling']),
+        suspended: new Set(['suspended', 'offline', 'stopped', 'starting', 'running'])
+    };
+    const allowed = allowedFrom[previous];
+    if (!allowed) return false;
+    return !allowed.has(next);
+}
+
+function formatStatusLabelForAudit(source, reason) {
+    const sourceText = String(source || 'system').trim().toLowerCase().replace(/_/g, ' ') || 'system';
+    const reasonText = String(reason || '').trim().toLowerCase().replace(/_/g, ' ');
+    return reasonText ? `${sourceText} / ${reasonText}` : sourceText;
+}
+
+function getServerRuntimeMeta(serverId) {
+    const state = SERVER_RUNTIME_META_STATE.get(serverId) || {};
+    const history = Array.isArray(state.history) ? state.history.slice(0, SERVER_RUNTIME_HISTORY_LIMIT) : [];
+    return {
+        lastSource: state.lastSource || 'system',
+        lastReason: state.lastReason || '',
+        lastAction: state.lastAction || '',
+        lastStatus: state.lastStatus || 'offline',
+        lastChangedAt: state.lastChangedAt || null,
+        cooldownUntil: state.cooldownUntil || null,
+        crashLoopCount: Number.isFinite(Number(state.crashLoopCount)) ? Number(state.crashLoopCount) : 0,
+        statePhase: state.statePhase || classifyRuntimeState(state.lastStatus || 'offline').phase,
+        stateTone: state.stateTone || classifyRuntimeState(state.lastStatus || 'offline').tone,
+        history
+    };
+}
+
+function setServerRuntimeMeta(serverId, patch = {}) {
+    if (!Number.isInteger(Number.parseInt(serverId, 10))) return getServerRuntimeMeta(serverId);
+    const parsedServerId = Number.parseInt(serverId, 10);
+    const existing = getServerRuntimeMeta(parsedServerId);
+    const nextStatus = patch.lastStatus !== undefined ? String(patch.lastStatus || '').trim().toLowerCase() : existing.lastStatus;
+    const classified = classifyRuntimeState(nextStatus);
+    const next = {
+        ...existing,
+        ...patch,
+        lastSource: patch.lastSource !== undefined ? normalizeRuntimeSource(patch.lastSource) : existing.lastSource,
+        lastReason: patch.lastReason !== undefined ? String(patch.lastReason || '').trim().slice(0, 160) : existing.lastReason,
+        lastAction: patch.lastAction !== undefined ? String(patch.lastAction || '').trim().slice(0, 64) : existing.lastAction,
+        lastStatus: nextStatus || existing.lastStatus || 'offline',
+        lastChangedAt: patch.lastChangedAt !== undefined ? patch.lastChangedAt : (existing.lastChangedAt || Date.now()),
+        cooldownUntil: patch.cooldownUntil !== undefined ? patch.cooldownUntil : existing.cooldownUntil,
+        crashLoopCount: patch.crashLoopCount !== undefined ? Math.max(0, Number.parseInt(patch.crashLoopCount, 10) || 0) : existing.crashLoopCount,
+        statePhase: patch.statePhase !== undefined ? String(patch.statePhase || '').trim().toLowerCase() : classified.phase,
+        stateTone: patch.stateTone !== undefined ? String(patch.stateTone || '').trim().toLowerCase() : classified.tone,
+        history: Array.isArray(existing.history) ? existing.history.slice(0, SERVER_RUNTIME_HISTORY_LIMIT) : []
+    };
+    SERVER_RUNTIME_META_STATE.set(parsedServerId, next);
+    return getServerRuntimeMeta(parsedServerId);
+}
+
+function pushServerRuntimeEvent(serverId, event = {}) {
+    if (!Number.isInteger(Number.parseInt(serverId, 10))) return getServerRuntimeMeta(serverId);
+    const parsedServerId = Number.parseInt(serverId, 10);
+    const current = getServerRuntimeMeta(parsedServerId);
+    const history = Array.isArray(current.history) ? current.history.slice(0, SERVER_RUNTIME_HISTORY_LIMIT) : [];
+    history.unshift({
+        kind: String(event.kind || 'runtime').trim().toLowerCase().slice(0, 48) || 'runtime',
+        source: normalizeRuntimeSource(event.source),
+        status: String(event.status || current.lastStatus || '').trim().toLowerCase(),
+        summary: String(event.summary || '').trim().slice(0, 220),
+        ts: Number.isFinite(Number(event.ts)) ? Number(event.ts) : Date.now(),
+        tone: String(event.tone || '').trim().toLowerCase() || classifyRuntimeState(event.status || current.lastStatus).tone
+    });
+    return setServerRuntimeMeta(parsedServerId, { history: history.slice(0, SERVER_RUNTIME_HISTORY_LIMIT) });
+}
+
+async function writeRuntimeTransitionAudit(serverId, previousStatus, nextStatus, meta = {}) {
+    const mismatch = Boolean(meta.mismatch);
+    await writeServerAuditLog({
+        actorUserId: meta.actorUserId || null,
+        serverId,
+        action: mismatch ? 'server:state.mismatch' : 'server:state.transition',
+        metadata: {
+            previousStatus,
+            nextStatus,
+            source: meta.source || 'system',
+            reason: meta.reason || '',
+            action: meta.action || '',
+            mismatch,
+            cooldownUntil: meta.cooldownUntil || null,
+            crashLoopCount: meta.crashLoopCount || 0,
+            exitCode: meta.exitCode ?? null,
+            oomKilled: meta.oomKilled === true,
+            startedAt: meta.startedAt || null,
+            finishedAt: meta.finishedAt || null,
+            capturedAt: new Date().toISOString()
+        }
+    });
+}
+
+async function writeRuntimeTransitionChange(ServerChangeLogModel, changeRecorder, serverId, previousStatus, nextStatus, meta = {}) {
+    if (!ServerChangeLogModel || typeof changeRecorder !== 'function') return;
+    await changeRecorder(ServerChangeLogModel, {
+        serverId,
+        actorUserId: meta.actorUserId || null,
+        category: meta.mismatch ? 'runtime_mismatch' : 'runtime_state',
+        changeKey: meta.mismatch ? 'runtime.status.mismatch' : 'runtime.status',
+        summary: meta.summary || `Runtime status changed: ${previousStatus || 'unknown'} -> ${nextStatus || 'unknown'}`,
+        beforeValue: {
+            status: previousStatus || 'unknown'
+        },
+        afterValue: {
+            status: nextStatus || 'unknown',
+            source: meta.source || 'system',
+            reason: meta.reason || ''
+        },
+        metadata: {
+            source: meta.source || 'system',
+            reason: meta.reason || '',
+            action: meta.action || '',
+            mismatch: Boolean(meta.mismatch),
+            cooldownUntil: meta.cooldownUntil || null,
+            crashLoopCount: meta.crashLoopCount || 0,
+            exitCode: meta.exitCode ?? null,
+            oomKilled: meta.oomKilled === true,
+            startedAt: meta.startedAt || null,
+            finishedAt: meta.finishedAt || null
+        }
+    }).catch(() => {});
+}
+
 function registerWebSocketRuntime(deps) {
     const {
         server,
@@ -52,6 +209,8 @@ function registerWebSocketRuntime(deps) {
         Image,
         Connector,
         Settings,
+        ServerChangeLog,
+        recordServerChange,
         getServerPolicyEngineConfig,
         isServerPolicyEditLocked,
         isServerPolicyPathReadOnly,
@@ -779,6 +938,13 @@ function sendToServerConsole(serverId, data) {
     }
 }
 
+function broadcastServerRuntimeMeta(serverId) {
+    sendToServerConsole(serverId, {
+        type: 'server_runtime_meta',
+        ...getServerRuntimeMeta(serverId)
+    });
+}
+
 function shouldForwardConsoleOutput(serverId, output) {
     if (typeof output !== 'string') {
         return true;
@@ -1451,7 +1617,10 @@ wss.on('connection', (ws, request) => {
                         type: 'server_stats',
                         cpu: '0.0',
                         memory: '0',
-                        disk: '0'
+                        disk: '0',
+                        network_rx: '0',
+                        network_tx: '0',
+                        uptime_seconds: 0
                     }));
                 }
             }, 350);
@@ -1553,11 +1722,28 @@ wss.on('connection', (ws, request) => {
                         });
                         const normalizedAction = String(data.action || '').toLowerCase();
                         if (normalizedAction === 'stop' || normalizedAction === 'kill' || normalizedAction === 'restart') {
-                            rememberServerPowerIntent(serverId, normalizedAction);
+                            rememberServerPowerIntent(serverId, normalizedAction, {
+                                source: consoleUserId ? 'manual' : 'system',
+                                reason: 'console_power_action'
+                            });
                         }
                         if (normalizedAction === 'start') {
                             consumeServerPowerIntent(serverId);
                         }
+                        setServerRuntimeMeta(serverId, {
+                            lastSource: consoleUserId ? 'manual' : 'system',
+                            lastReason: 'console_power_action',
+                            lastAction: normalizedAction,
+                            lastChangedAt: Date.now()
+                        });
+                        pushServerRuntimeEvent(serverId, {
+                            kind: 'request',
+                            source: consoleUserId ? 'manual' : 'system',
+                            status: serverObj && serverObj.status ? serverObj.status : 'offline',
+                            summary: `Power request queued: ${normalizedAction}`,
+                            tone: normalizedAction === 'stop' || normalizedAction === 'kill' ? 'warning' : 'info'
+                        });
+                        broadcastServerRuntimeMeta(serverId);
                         let runtimeConfig = null;
                         if (normalizedAction === 'start' && serverObj.image && serverObj.allocation) {
                             try {
@@ -1977,6 +2163,26 @@ wss.on('connection', (ws, request) => {
                 });
             }
 
+            if (data.type === 'diagnostics_result') {
+                if (!global.connectorStatus) global.connectorStatus = {};
+                const existingStatus = global.connectorStatus[connectorId] || {};
+                global.connectorStatus[connectorId] = {
+                    ...existingStatus,
+                    status: 'online',
+                    lastSeen: new Date(),
+                    diagnostics: data.diagnostics || null
+                };
+
+                broadcastToUI({
+                    type: 'status_update',
+                    connectorId: connectorId,
+                    status: 'online',
+                    lastSeen: new Date(),
+                    usage: existingStatus.usage || null,
+                    diagnostics: data.diagnostics || null
+                });
+            }
+
             // Handle Install Results
             if (data.type === 'install_success') {
                 const server = await Server.findByPk(data.serverId);
@@ -1990,6 +2196,23 @@ wss.on('connection', (ws, request) => {
                     server.status = nextStatus;
                     console.log(`Server ${data.serverId} installed (status: ${nextStatus}): ${data.containerId}`);
                     sendToServerConsole(data.serverId, { type: 'server_status_update', status: nextStatus, containerId: data.containerId });
+                    const installSource = previousStatus === 'reinstalling' ? 'reinstall' : 'install';
+                    setServerRuntimeMeta(data.serverId, {
+                        lastSource: installSource,
+                        lastReason: previousStatus === 'reinstalling' ? 'reinstall_completed' : 'install_completed',
+                        lastAction: 'start',
+                        lastStatus: nextStatus,
+                        lastChangedAt: Date.now(),
+                        cooldownUntil: null
+                    });
+                    pushServerRuntimeEvent(data.serverId, {
+                        kind: previousStatus === 'reinstalling' ? 'reinstall' : 'install',
+                        source: installSource,
+                        status: nextStatus,
+                        summary: started ? 'Provisioning completed and runtime is available.' : 'Provisioning completed without starting the runtime.',
+                        tone: started ? 'success' : 'warning'
+                    });
+                    broadcastServerRuntimeMeta(data.serverId);
                     if (started && previousStatus !== 'running') {
                         sendServerSmartAlert(server, 'reinstallSuccess', {
                             previousStatus
@@ -2062,6 +2285,22 @@ wss.on('connection', (ws, request) => {
                     server.status = 'error';
                     console.log(`Server ${data.serverId} installation FAILED: ${data.error}`);
                     sendToServerConsole(data.serverId, { type: 'server_status_update', status: 'error', error: data.error });
+                    const failSource = previousStatus === 'reinstalling' ? 'reinstall' : 'install';
+                    setServerRuntimeMeta(data.serverId, {
+                        lastSource: failSource,
+                        lastReason: previousStatus === 'reinstalling' ? 'reinstall_failed' : 'install_failed',
+                        lastAction: 'start',
+                        lastStatus: 'error',
+                        lastChangedAt: Date.now()
+                    });
+                    pushServerRuntimeEvent(data.serverId, {
+                        kind: 'error',
+                        source: failSource,
+                        status: 'error',
+                        summary: String(data.error || 'Provisioning failed.').slice(0, 220),
+                        tone: 'danger'
+                    });
+                    broadcastServerRuntimeMeta(data.serverId);
                     sendServerSmartAlert(server, 'reinstallFailed', {
                         previousStatus,
                         message: data.error
@@ -2132,13 +2371,95 @@ wss.on('connection', (ws, request) => {
                     const previousStatus = String(server.status || '').toLowerCase();
                     await server.update({ status: data.status });
                     server.status = data.status;
-                    sendToServerConsole(data.serverId, { type: 'server_status_update', status: data.status });
+                    sendToServerConsole(data.serverId, {
+                        type: 'server_status_update',
+                        status: data.status,
+                        exitCode: data.exitCode,
+                        oomKilled: data.oomKilled,
+                        finishedAt: data.finishedAt,
+                        startedAt: data.startedAt
+                    });
 
                     const normalizedStatus = String(data.status || '').toLowerCase();
+                    const transitionMismatch = previousStatus !== normalizedStatus
+                        ? isUnexpectedRuntimeTransition(previousStatus, normalizedStatus)
+                        : false;
+                    if (previousStatus !== normalizedStatus) {
+                        setServerRuntimeMeta(data.serverId, {
+                            lastStatus: normalizedStatus,
+                            lastChangedAt: Date.now()
+                        });
+                    }
+                    if (previousStatus !== normalizedStatus && ['installing', 'reinstalling', 'starting'].includes(normalizedStatus)) {
+                        const provisioningSource = normalizedStatus === 'reinstalling'
+                            ? 'reinstall'
+                            : (normalizedStatus === 'installing' ? 'install' : 'system');
+                        setServerRuntimeMeta(data.serverId, {
+                            lastSource: provisioningSource,
+                            lastReason: `${normalizedStatus}_entered`,
+                            lastAction: 'start',
+                            lastStatus: normalizedStatus,
+                            lastChangedAt: Date.now()
+                        });
+                        pushServerRuntimeEvent(data.serverId, {
+                            kind: normalizedStatus,
+                            source: provisioningSource,
+                            status: normalizedStatus,
+                            summary: `Server entered ${normalizedStatus} state from ${previousStatus || 'unknown'}.`,
+                            tone: 'warning'
+                        });
+                        broadcastServerRuntimeMeta(data.serverId);
+                    }
                     if (normalizedStatus === 'running' && previousStatus !== 'running') {
-                        consumeServerPowerIntent(data.serverId);
+                        const intent = consumeServerPowerIntent(data.serverId);
                         SERVER_CRASH_COOLDOWN_STATE.delete(data.serverId);
                         clearCrashLoopState(data.serverId);
+                        let runningSource = 'system';
+                        let runningReason = 'runtime_ready';
+                        if (previousStatus === 'reinstalling') {
+                            runningSource = 'reinstall';
+                            runningReason = 'reinstall_completed';
+                        } else if (previousStatus === 'installing') {
+                            runningSource = 'install';
+                            runningReason = 'install_completed';
+                        } else if (intent && intent.source) {
+                            runningSource = intent.source;
+                            runningReason = intent.reason || (intent.action === 'restart' ? 'manual_restart' : 'manual_start');
+                        }
+                        setServerRuntimeMeta(data.serverId, {
+                            lastSource: runningSource,
+                            lastReason: runningReason,
+                            lastAction: intent && intent.action ? intent.action : 'start',
+                            lastStatus: normalizedStatus,
+                            lastChangedAt: Date.now(),
+                            cooldownUntil: null,
+                            crashLoopCount: 0
+                        });
+                        pushServerRuntimeEvent(data.serverId, {
+                            kind: 'status',
+                            source: runningSource,
+                            status: normalizedStatus,
+                            summary: `Server entered running state from ${previousStatus || 'unknown'}.`,
+                            tone: 'success'
+                        });
+                        await writeRuntimeTransitionAudit(data.serverId, previousStatus, normalizedStatus, {
+                            source: runningSource,
+                            reason: runningReason,
+                            action: intent && intent.action ? intent.action : 'start',
+                            mismatch: transitionMismatch,
+                            startedAt: data.startedAt || null,
+                            finishedAt: data.finishedAt || null
+                        });
+                        await writeRuntimeTransitionChange(ServerChangeLog, recordServerChange, data.serverId, previousStatus, normalizedStatus, {
+                            source: runningSource,
+                            reason: runningReason,
+                            action: intent && intent.action ? intent.action : 'start',
+                            mismatch: transitionMismatch,
+                            startedAt: data.startedAt || null,
+                            finishedAt: data.finishedAt || null,
+                            summary: `Runtime entered running (${formatStatusLabelForAudit(runningSource, runningReason)})`
+                        });
+                        broadcastServerRuntimeMeta(data.serverId);
                         sendServerSmartAlert(server, 'started', {
                             previousStatus
                         });
@@ -2158,6 +2479,9 @@ wss.on('connection', (ws, request) => {
                         const oomKilled = Boolean(data.oomKilled);
                         let expectedStop = Boolean(intent && (intent.action === 'stop' || intent.action === 'kill' || intent.action === 'restart'));
                         let crashSuppressed = false;
+                        const resolvedStopSource = intent && intent.source ? intent.source : (expectedStop ? 'manual' : 'system');
+                        const resolvedStopReason = (intent && intent.reason)
+                            || (expectedStop ? 'expected_stop' : (crashSuppressed ? 'crash_suppressed' : 'unexpected_stop'));
 
                         if (!crashPolicy.enabled) {
                             expectedStop = true;
@@ -2206,8 +2530,60 @@ wss.on('connection', (ws, request) => {
                             );
                             if (!expectedStop) {
                                 const crashLoopState = recordCrashLoopEvent(data.serverId);
+                                setServerRuntimeMeta(data.serverId, {
+                                    lastSource: 'system',
+                                    lastReason: crashSuppressed ? 'crash_suppressed' : 'unexpected_stop',
+                                    lastAction: 'stop',
+                                    lastStatus: normalizedStatus,
+                                    lastChangedAt: Date.now(),
+                                    cooldownUntil: crashLoopState && crashLoopState.cooldownUntil ? crashLoopState.cooldownUntil : null,
+                                    crashLoopCount: crashLoopState && crashLoopState.count ? crashLoopState.count : 0
+                                });
+                                pushServerRuntimeEvent(data.serverId, {
+                                    kind: 'crash',
+                                    source: 'system',
+                                    status: normalizedStatus,
+                                    summary: oomKilled
+                                        ? `Unexpected stop detected. OOM kill flagged${exitCode !== null ? ` (exit ${exitCode})` : ''}.`
+                                        : `Unexpected stop detected${exitCode !== null ? ` (exit ${exitCode})` : ''}.`,
+                                    tone: 'danger'
+                                });
+                                await writeRuntimeTransitionAudit(data.serverId, previousStatus, normalizedStatus, {
+                                    source: 'system',
+                                    reason: crashSuppressed ? 'crash_suppressed' : 'unexpected_stop',
+                                    action: 'stop',
+                                    mismatch: transitionMismatch,
+                                    cooldownUntil: crashLoopState && crashLoopState.cooldownUntil ? crashLoopState.cooldownUntil : null,
+                                    crashLoopCount: crashLoopState && crashLoopState.count ? crashLoopState.count : 0,
+                                    exitCode,
+                                    oomKilled,
+                                    startedAt: data.startedAt || null,
+                                    finishedAt: data.finishedAt || null
+                                });
+                                await writeRuntimeTransitionChange(ServerChangeLog, recordServerChange, data.serverId, previousStatus, normalizedStatus, {
+                                    source: 'system',
+                                    reason: crashSuppressed ? 'crash_suppressed' : 'unexpected_stop',
+                                    action: 'stop',
+                                    mismatch: transitionMismatch,
+                                    cooldownUntil: crashLoopState && crashLoopState.cooldownUntil ? crashLoopState.cooldownUntil : null,
+                                    crashLoopCount: crashLoopState && crashLoopState.count ? crashLoopState.count : 0,
+                                    exitCode,
+                                    oomKilled,
+                                    startedAt: data.startedAt || null,
+                                    finishedAt: data.finishedAt || null,
+                                    summary: oomKilled ? 'Runtime crashed (OOM kill detected)' : 'Runtime crashed unexpectedly'
+                                });
+                                broadcastServerRuntimeMeta(data.serverId);
                                 if (crashLoopState && crashLoopState.cooldownUntil) {
                                     const cooldownMinutes = Math.round(CRASH_LOOP_COOLDOWN_MS / 60000);
+                                    pushServerRuntimeEvent(data.serverId, {
+                                        kind: 'cooldown',
+                                        source: 'system',
+                                        status: normalizedStatus,
+                                        summary: `Crash loop cooldown active for ${cooldownMinutes} minutes.`,
+                                        tone: 'warning'
+                                    });
+                                    broadcastServerRuntimeMeta(data.serverId);
                                     sendToServerConsole(data.serverId, {
                                         type: 'console_output',
                                         output: `[!] Crash loop detected. Cooldown active for ${cooldownMinutes} minutes.\n`
@@ -2238,6 +2614,33 @@ wss.on('connection', (ws, request) => {
                                 });
                                 if (playbook && playbook.handled) {
                                     playbookHandled = true;
+                                    setServerRuntimeMeta(data.serverId, {
+                                        lastSource: 'policy',
+                                        lastReason: playbook.reason || 'policy_playbook',
+                                        lastAction: playbook.action || 'restart',
+                                        lastStatus: normalizedStatus,
+                                        lastChangedAt: Date.now()
+                                    });
+                                    pushServerRuntimeEvent(data.serverId, {
+                                        kind: 'policy',
+                                        source: 'policy',
+                                        status: normalizedStatus,
+                                        summary: `Policy playbook triggered: ${playbook.playbook || 'policy'} -> ${playbook.action || 'unknown'}.`,
+                                        tone: 'warning'
+                                    });
+                                    await writeServerAuditLog({
+                                        serverId: data.serverId,
+                                        action: 'server:recovery.policy',
+                                        metadata: {
+                                            previousStatus,
+                                            currentStatus: normalizedStatus,
+                                            playbook: playbook.playbook || 'policy',
+                                            action: playbook.action || 'unknown',
+                                            reason: playbook.reason || 'policy_playbook',
+                                            capturedAt: new Date().toISOString()
+                                        }
+                                    });
+                                    broadcastServerRuntimeMeta(data.serverId);
                                     sendToServerConsole(data.serverId, {
                                         type: 'console_output',
                                         output: `[!] Automated playbook triggered (${playbook.playbook || 'policy'}): ${playbook.action || 'unknown'}\n`
@@ -2247,16 +2650,133 @@ wss.on('connection', (ws, request) => {
                             if (!playbookHandled && !expectedStop && typeof handleCrashAutoRemediation === 'function') {
                                 const remediation = await handleCrashAutoRemediation(data.serverId);
                                 if (remediation && remediation.handled) {
+                                    setServerRuntimeMeta(data.serverId, {
+                                        lastSource: 'crash_auto_recovery',
+                                        lastReason: remediation.reason || 'crash_auto_recovery',
+                                        lastAction: remediation.action || 'start',
+                                        lastStatus: normalizedStatus,
+                                        lastChangedAt: Date.now()
+                                    });
+                                    pushServerRuntimeEvent(data.serverId, {
+                                        kind: 'recovery',
+                                        source: 'crash_auto_recovery',
+                                        status: normalizedStatus,
+                                        summary: `Crash recovery queued: ${remediation.action || 'start'}.`,
+                                        tone: 'warning'
+                                    });
+                                    await writeServerAuditLog({
+                                        serverId: data.serverId,
+                                        action: 'server:recovery.auto',
+                                        metadata: {
+                                            previousStatus,
+                                            currentStatus: normalizedStatus,
+                                            action: remediation.action || 'start',
+                                            reason: remediation.reason || 'crash_auto_recovery',
+                                            capturedAt: new Date().toISOString()
+                                        }
+                                    });
+                                    broadcastServerRuntimeMeta(data.serverId);
                                     sendToServerConsole(data.serverId, {
                                         type: 'console_output',
                                         output: `[!] Auto-remediation policy triggered after crash: ${remediation.action || 'start'}\n`
                                     });
                                 }
                             }
+                        } else {
+                            setServerRuntimeMeta(data.serverId, {
+                                lastSource: resolvedStopSource,
+                                lastReason: resolvedStopReason,
+                                lastAction: intent && intent.action ? intent.action : 'stop',
+                                lastStatus: normalizedStatus,
+                                lastChangedAt: Date.now(),
+                                cooldownUntil: null
+                            });
+                            pushServerRuntimeEvent(data.serverId, {
+                                kind: expectedStop ? 'stop' : 'status',
+                                source: resolvedStopSource,
+                                status: normalizedStatus,
+                                summary: expectedStop ? 'Server stopped gracefully.' : 'Server entered stopped state.',
+                                tone: expectedStop ? 'warning' : 'muted'
+                            });
+                            await writeRuntimeTransitionAudit(data.serverId, previousStatus, normalizedStatus, {
+                                source: resolvedStopSource,
+                                reason: resolvedStopReason,
+                                action: intent && intent.action ? intent.action : 'stop',
+                                mismatch: transitionMismatch,
+                                exitCode,
+                                oomKilled,
+                                startedAt: data.startedAt || null,
+                                finishedAt: data.finishedAt || null
+                            });
+                            await writeRuntimeTransitionChange(ServerChangeLog, recordServerChange, data.serverId, previousStatus, normalizedStatus, {
+                                source: resolvedStopSource,
+                                reason: resolvedStopReason,
+                                action: intent && intent.action ? intent.action : 'stop',
+                                mismatch: transitionMismatch,
+                                exitCode,
+                                oomKilled,
+                                startedAt: data.startedAt || null,
+                                finishedAt: data.finishedAt || null,
+                                summary: expectedStop ? `Runtime stopped (${formatStatusLabelForAudit(resolvedStopSource, resolvedStopReason)})` : 'Runtime entered stopped state'
+                            });
+                            broadcastServerRuntimeMeta(data.serverId);
+                        }
+                        if (previousStatus === 'running' && expectedStop) {
+                            setServerRuntimeMeta(data.serverId, {
+                                lastSource: resolvedStopSource,
+                                lastReason: resolvedStopReason,
+                                lastAction: intent && intent.action ? intent.action : 'stop',
+                                lastStatus: normalizedStatus,
+                                lastChangedAt: Date.now(),
+                                cooldownUntil: null
+                            });
+                            pushServerRuntimeEvent(data.serverId, {
+                                kind: 'stop',
+                                source: resolvedStopSource,
+                                status: normalizedStatus,
+                                summary: `Server stopped gracefully${intent && intent.action ? ` after ${intent.action}` : ''}.`,
+                                tone: 'warning'
+                            });
+                            broadcastServerRuntimeMeta(data.serverId);
                         }
                         clearServerConsoleBuffer(data.serverId);
                     } else if (normalizedStatus === 'stopped') {
                         clearServerConsoleBuffer(data.serverId);
+                    } else if (normalizedStatus === 'error' && previousStatus !== 'error') {
+                        const errorSource = previousStatus === 'reinstalling' ? 'reinstall' : 'install';
+                        const errorReason = previousStatus === 'reinstalling' ? 'reinstall_failed' : 'runtime_error';
+                        setServerRuntimeMeta(data.serverId, {
+                            lastSource: errorSource,
+                            lastReason: errorReason,
+                            lastAction: 'start',
+                            lastStatus: normalizedStatus,
+                            lastChangedAt: Date.now()
+                        });
+                        pushServerRuntimeEvent(data.serverId, {
+                            kind: 'error',
+                            source: errorSource,
+                            status: normalizedStatus,
+                            summary: `Server transitioned to error from ${previousStatus || 'unknown'}.`,
+                            tone: 'danger'
+                        });
+                        await writeRuntimeTransitionAudit(data.serverId, previousStatus, normalizedStatus, {
+                            source: errorSource,
+                            reason: errorReason,
+                            action: 'start',
+                            mismatch: transitionMismatch,
+                            startedAt: data.startedAt || null,
+                            finishedAt: data.finishedAt || null
+                        });
+                        await writeRuntimeTransitionChange(ServerChangeLog, recordServerChange, data.serverId, previousStatus, normalizedStatus, {
+                            source: errorSource,
+                            reason: errorReason,
+                            action: 'start',
+                            mismatch: transitionMismatch,
+                            startedAt: data.startedAt || null,
+                            finishedAt: data.finishedAt || null,
+                            summary: `Runtime entered error state (${formatStatusLabelForAudit(errorSource, errorReason)})`
+                        });
+                        broadcastServerRuntimeMeta(data.serverId);
                     }
                 }
             }
@@ -2352,7 +2872,10 @@ wss.on('connection', (ws, request) => {
                     type: 'server_stats',
                     cpu: data.cpu,
                     memory: data.memory,
-                    disk: data.disk || '0'
+                    disk: data.disk || '0',
+                    network_rx: data.network_rx || '0',
+                    network_tx: data.network_tx || '0',
+                    uptime_seconds: data.uptime_seconds || 0
                 });
                 await persistResourceTimelineSample(data.serverId, data.cpu, data.memory, data.disk || '0');
                 await handleResourceAnomalyAlert(data.serverId, data.cpu, data.memory, data.disk);
@@ -2592,5 +3115,6 @@ module.exports = {
     getServerConsoleBuffer,
     getServerTickSamples,
     getServerResourcePackStatus,
-    getServerCrashLoopState
+    getServerCrashLoopState,
+    getServerRuntimeMeta
 };

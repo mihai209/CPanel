@@ -2486,7 +2486,10 @@ app.post('/admin/servers/suspend/:containerId', requireAuth, requireAdmin, async
         if (server.allocation && server.allocation.connectorId) {
             const connectorWs = connectorConnections.get(server.allocation.connectorId);
             if (connectorWs && connectorWs.readyState === WebSocket.OPEN) {
-                rememberServerPowerIntent(server.id, 'stop');
+                rememberServerPowerIntent(server.id, 'stop', {
+                    source: 'admin',
+                    reason: 'server_suspend'
+                });
                 connectorWs.send(JSON.stringify({ type: 'server_power', serverId: server.id, action: 'stop' }));
             }
         }
