@@ -37,8 +37,8 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
 
 <body data-turbo="false">
     <%- include('../partials/error-modal') %>
-    <%- include('./partials/console/layout') %>
-    <%- include('./partials/console/scripts') %>
+    <%- include('./partials/console/layout', { consoleShortcuts, initialProvisioningStatus, isRestrictedProvisioningViewer }) %>
+    <%- include('./partials/console/scripts', { consoleShortcuts, initialProvisioningStatus, isRestrictedProvisioningViewer }) %>
 </body>
 
 </html>
