@@ -15,7 +15,7 @@ const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing',
             <!-- Sidebar -->
             <nav id="sidebar" class="sidebar">
                 <div class="sidebar-content">
-                    <%- include('../partials/server-sidebar', { server, active: 'console' , settings }) %>
+                    <%- include('../../partials/server-sidebar', { server, active: 'console' , settings }) %>
                 </div>
             </nav>
 

@@ -2303,7 +2303,7 @@
             window.addEventListener('beforeunload', cleanupConsoleRuntime);
             document.addEventListener('turbo:before-cache', cleanupConsoleRuntime);
         </script>
-        <%- include('../partials/modal-chat') %>
+        <%- include('../../partials/modal-chat') %>
         <script>
             (() => {
                 const aiEnabled = <%- JSON.stringify(aiChat && aiChat.enabled) %>;
@@ -2363,4 +2363,4 @@
                 });
             })();
         </script>
-        <%- include('../partials/shortcuts-modal', { shortcutsId: 'consoleShortcutsModal', shortcutsTitle: 'Console Shortcuts', shortcutsList: consoleShortcuts }) %>
+        <%- include('../../partials/shortcuts-modal', { shortcutsId: 'consoleShortcutsModal', shortcutsTitle: 'Console Shortcuts', shortcutsList: consoleShortcuts }) %>
