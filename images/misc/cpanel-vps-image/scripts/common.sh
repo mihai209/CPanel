@@ -148,7 +148,7 @@ Available helper commands:
   help / vps-help    Show this help
   status / vps-status Show system summary
   ports / vps-ports  Show detected panel allocation info
-  get-ssh           Start the custom VPS SSH listener from ssh-conf.yml
+  ssh / get-ssh     Start the custom VPS SSH listener from ssh-conf.yml
   clear / cls        Clear the terminal
   exit               Stop the VPS container
 
@@ -159,7 +159,7 @@ Regular Debian/Ubuntu shell commands work normally:
 
 Notes:
   - install.sh downloads the selected rootfs archive directly from ROOTFS_BASE_URL.
-  - get-ssh reads /home/container/ssh-conf.yml.
+  - ssh/get-ssh reads /home/container/ssh-conf.yml.
   - For external SSH access, assign an extra allocation (PORT2 recommended).
 EOF
 }

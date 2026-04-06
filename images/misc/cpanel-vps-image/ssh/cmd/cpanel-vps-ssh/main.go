@@ -165,8 +165,21 @@ func loadConfig() (*appConfig, error) {
 	}
 
 	prootBinary := "proot"
-	if resolved, err := exec.LookPath("proot"); err == nil {
-		prootBinary = resolved
+	for _, candidate := range []string{
+		"/opt/cpanel-vps/bin/proot-host",
+		"/usr/bin/proot",
+		"/bin/proot",
+		"/usr/local/bin/proot",
+	} {
+		if stat, err := os.Stat(candidate); err == nil && !stat.IsDir() {
+			prootBinary = candidate
+			break
+		}
+	}
+	if prootBinary == "proot" {
+		if resolved, err := exec.LookPath("proot"); err == nil {
+			prootBinary = resolved
+		}
 	}
 
 	cfg := &appConfig{

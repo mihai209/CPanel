@@ -28,11 +28,15 @@ fi
 cp /opt/cpanel-vps/scripts/common.sh /tmp/cpanel-vps-common.sh
 chmod 644 /tmp/cpanel-vps-common.sh
 
+set +e +u
+set +o pipefail
+
 exec "${PROOT_BIN}" \
     --rootfs="${ROOTFS_DIR}" \
     -0 \
     -w /root \
     -b /dev \
+    -b /etc/ssl:/etc/ssl \
     -b /sys \
     -b /proc \
     -b /tmp:/tmp \

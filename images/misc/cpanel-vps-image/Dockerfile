@@ -52,7 +52,8 @@ COPY scripts/install.sh /opt/cpanel-vps/scripts/install.sh
 COPY scripts/run.sh /opt/cpanel-vps/scripts/run.sh
 COPY scripts/start-ssh.sh /opt/cpanel-vps/scripts/start-ssh.sh
 
-RUN chmod +x /opt/cpanel-vps/scripts/*.sh /opt/cpanel-vps/bin/cpanel-vps-ssh
+RUN cp "$(command -v proot)" /opt/cpanel-vps/bin/proot-host \
+    && chmod +x /opt/cpanel-vps/scripts/*.sh /opt/cpanel-vps/bin/cpanel-vps-ssh /opt/cpanel-vps/bin/proot-host
 
 WORKDIR /home/container
 ENTRYPOINT ["/opt/cpanel-vps/scripts/entrypoint.sh"]

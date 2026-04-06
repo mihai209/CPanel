@@ -71,6 +71,8 @@ alias vps-help='vps_help'
 alias vps-status='vps_status'
 alias vps-ports='vps_ports'
 get-ssh() { /opt/cpanel-vps/scripts/start-ssh.sh; }
+ssh() { get-ssh "$@"; }
+alias ssh='get-ssh'
 alias vps-ssh='get-ssh'
 PS1='\[\033[0;32m\]root@\[\033[1;37m\]${VPS_HOSTNAME}\[\033[0;32m\]:\[\033[0;36m\]\w\[\033[0m\]# '
 if [[ -z "\${CPANEL_VPS_BANNER_SHOWN:-}" ]]; then
