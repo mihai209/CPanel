@@ -21,6 +21,19 @@
     <%- include('./partials/console/styles') %>
     <link rel="stylesheet" href="/css/mobile-layout.css">
 </head>
+<%
+const consoleShortcuts = [
+    { action: 'Focus command input', keys: 'Ctrl + K' },
+    { action: 'Send command', keys: 'Ctrl + Enter' },
+    { action: 'Clear console output', keys: 'Ctrl + L' },
+    { action: 'Search console', keys: 'Ctrl + F' },
+    { action: 'Browse command history', keys: 'Arrow Up / Arrow Down' },
+    { action: 'Restart server', keys: 'Ctrl + Shift + R' },
+    { action: 'Start/Stop server', keys: 'Ctrl + Shift + S' }
+];
+const initialProvisioningStatus = String(server.status || '').toLowerCase();
+const isRestrictedProvisioningViewer = !(user && user.isAdmin) && ['installing', 'reinstalling', 'starting'].includes(initialProvisioningStatus);
+%>
 
 <body data-turbo="false">
     <%- include('../partials/error-modal') %>
