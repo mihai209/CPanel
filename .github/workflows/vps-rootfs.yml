@@ -27,10 +27,9 @@ jobs:
           - distro: debian
             release: "13"
             arch: amd64
-    permissions:
-      contents: write
+
     steps:
-      - name: Checkout
+      - name: Checkout (source repo)
         uses: actions/checkout@v4
 
       - name: Install debootstrap
@@ -41,10 +40,30 @@ jobs:
       - name: Build rootfs archive
         run: |
           chmod +x images/misc/cpanel-vps-rootfs/build-rootfs.sh
-          images/misc/cpanel-vps-rootfs/build-rootfs.sh "${{ matrix.distro }}" "${{ matrix.release }}" "${{ matrix.arch }}" "${{ github.workspace }}/dist"
+          images/misc/cpanel-vps-rootfs/build-rootfs.sh \
+            "${{ matrix.distro }}" \
+            "${{ matrix.release }}" \
+            "${{ matrix.arch }}" \
+            "${{ github.workspace }}/dist"
 
-      - name: Publish release asset
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.release_tag }}
-          files: dist/*.tar.xz
+      # 🔴 Clone target repo
+      - name: Clone target repo
+        run: |
+          git clone https://x-access-token:${{ secrets.TARGET_REPO_TOKEN }}@github.com/mihai209/cpanel-vps-rootfs.git target-repo
+
+      # 🔴 Copy artifacts
+      - name: Copy artifacts
+        run: |
+          mkdir -p target-repo/releases/${{ github.event.inputs.release_tag }}
+          cp dist/*.tar.xz target-repo/releases/${{ github.event.inputs.release_tag }}/
+
+      # 🔴 Commit + push
+      - name: Commit and push
+        run: |
+          cd target-repo
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git add .
+          git commit -m "Add rootfs build for ${{ github.event.inputs.release_tag }} (${{ matrix.distro }} ${{ matrix.release }})" || echo "No changes"
+          git push
