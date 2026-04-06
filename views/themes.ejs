@@ -242,7 +242,7 @@
         if (!value) return null;
         const lower = value.toLowerCase();
         // Disallow dangerous schemes or protocol-like patterns
-        if (lower.startsWith('javascript:') || lower.startsWith('data:') || lower.includes('://')) {
+        if (lower.startsWith('javascript:') || lower.startsWith('data:') || lower.startsWith('vbscript:') || lower.includes('://')) {
             return null;
         }
         // Only allow paths under /themes/ and basic safe characters

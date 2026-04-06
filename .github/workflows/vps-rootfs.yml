@@ -27,8 +27,7 @@ jobs:
           - distro: debian
             release: "13"
             arch: amd64
-    permissions:
-      contents: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,10 +40,19 @@ jobs:
       - name: Build rootfs archive
         run: |
           chmod +x images/misc/cpanel-vps-rootfs/build-rootfs.sh
-          images/misc/cpanel-vps-rootfs/build-rootfs.sh "${{ matrix.distro }}" "${{ matrix.release }}" "${{ matrix.arch }}" "${{ github.workspace }}/dist"
+          images/misc/cpanel-vps-rootfs/build-rootfs.sh \
+            "${{ matrix.distro }}" \
+            "${{ matrix.release }}" \
+            "${{ matrix.arch }}" \
+            "${{ github.workspace }}/dist"
 
-      - name: Publish release asset
+      # 🔴 Publish to DIFFERENT repo release
+      - name: Publish release asset (external repo)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.release_tag }}
+          name: RootFS ${{ github.event.inputs.release_tag }}
           files: dist/*.tar.xz
+          repository: mihai209/cpanel-vps-rootfs
+        env:
+          GITHUB_TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
