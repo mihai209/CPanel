@@ -309,7 +309,7 @@ function getUserUiConnectionCount(userId) {
     if (!bucket) return 0;
     let count = 0;
     bucket.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) count += 1;
+        if (client && client.readyState === 1) count += 1;
     });
     return count;
 }
@@ -322,7 +322,7 @@ function sendToUserUI(userId, data) {
     const message = JSON.stringify(data);
     let delivered = 0;
     bucket.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
+        if (client && client.readyState === 1) {
             client.send(message);
             delivered += 1;
         }
