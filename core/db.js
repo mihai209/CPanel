@@ -422,6 +422,48 @@ const NotificationDeliveryLog = sequelize.define('NotificationDeliveryLog', {
     ]
 });
 
+const UserNotification = sequelize.define('UserNotification', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    userId: { type: DataTypes.INTEGER, allowNull: false },
+    title: { type: DataTypes.STRING(160), allowNull: false },
+    message: { type: DataTypes.TEXT, allowNull: false },
+    severity: { type: DataTypes.STRING(24), allowNull: false, defaultValue: 'info' },
+    category: { type: DataTypes.STRING(40), allowNull: false, defaultValue: 'general' },
+    linkUrl: { type: DataTypes.STRING(512), allowNull: true },
+    sourceType: { type: DataTypes.STRING(40), allowNull: false, defaultValue: 'admin_manual' },
+    createdByUserId: { type: DataTypes.INTEGER, allowNull: true },
+    isRead: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    readAt: { type: DataTypes.DATE, allowNull: true },
+    browserEligible: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    emailEligible: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false }
+}, {
+    indexes: [
+        { fields: ['userId'] },
+        { fields: ['createdByUserId'] },
+        { fields: ['isRead'] },
+        { fields: ['severity'] },
+        { fields: ['createdAt'] },
+        { fields: ['userId', 'isRead', 'createdAt'] }
+    ]
+});
+
+const UserBrowserSubscription = sequelize.define('UserBrowserSubscription', {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    userId: { type: DataTypes.INTEGER, allowNull: false },
+    endpoint: { type: DataTypes.STRING(512), allowNull: false },
+    keys: { type: DataTypes.JSON, allowNull: true },
+    userAgent: { type: DataTypes.STRING(512), allowNull: true },
+    lastSeenAt: { type: DataTypes.DATE, allowNull: true },
+    revokedAt: { type: DataTypes.DATE, allowNull: true }
+}, {
+    indexes: [
+        { fields: ['userId'] },
+        { fields: ['endpoint'] },
+        { fields: ['revokedAt'] },
+        { unique: true, fields: ['userId', 'endpoint'] }
+    ]
+});
+
 const ServerBackupPolicy = sequelize.define('ServerBackupPolicy', {
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     serverId: { type: DataTypes.INTEGER, allowNull: false, unique: true },
@@ -570,6 +612,44 @@ NotificationDeliveryLog.belongsTo(User, {
     foreignKey: 'attemptedByUserId',
     as: 'actor',
     onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+});
+User.hasMany(UserNotification, {
+    foreignKey: 'userId',
+    as: 'notifications',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+    hooks: true
+});
+UserNotification.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
+});
+User.hasMany(UserNotification, {
+    foreignKey: 'createdByUserId',
+    as: 'createdNotifications',
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+});
+UserNotification.belongsTo(User, {
+    foreignKey: 'createdByUserId',
+    as: 'creator',
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
+});
+User.hasMany(UserBrowserSubscription, {
+    foreignKey: 'userId',
+    as: 'browserSubscriptions',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+    hooks: true
+});
+UserBrowserSubscription.belongsTo(User, {
+    foreignKey: 'userId',
+    as: 'user',
+    onDelete: 'CASCADE',
     onUpdate: 'CASCADE'
 });
 
@@ -748,6 +828,8 @@ module.exports = {
     AuditLog,
     SecurityEvent,
     NotificationDeliveryLog,
+    UserNotification,
+    UserBrowserSubscription,
     ServerBackupPolicy,
     ServerBackup,
     Mount,

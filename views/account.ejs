@@ -147,6 +147,48 @@
                     <div class="col-12">
                         <div class="card border-0 shadow-sm"
                             style="background-color: #141419; border: 1px solid rgba(255,255,255,0.05) !important; border-radius: 15px;">
+                            <div class="card-header border-bottom border-secondary border-opacity-10 bg-transparent py-3 d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0 fs-6 fw-bold text-light">
+                                    <i class="bi bi-bell me-2 text-primary"></i>Notifications
+                                </h5>
+                                <a href="/notifications" class="btn btn-outline-info btn-sm">Open History</a>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="row g-4 align-items-start">
+                                    <div class="col-lg-7">
+                                        <p class="text-light mb-1">Live notifications in panel and browser</p>
+                                        <p class="text-muted small mb-3">In-app notifications are always saved. Browser popups only work if you grant permission in this browser.</p>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <button type="button" class="btn btn-primary btn-sm" id="enableBrowserNotificationsBtn">Enable Browser Notifications</button>
+                                            <button type="button" class="btn btn-outline-light btn-sm" id="disableBrowserNotificationsBtn">Disable Browser Notifications</button>
+                                        </div>
+                                        <div class="small text-muted mt-2">
+                                            Browser delivery: <span id="browserNotificationStatus"><%= browserSubscriptionCount > 0 ? 'enabled' : 'not enabled' %></span>
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-5">
+                                        <div class="text-muted small text-uppercase fw-bold mb-2">Recent</div>
+                                        <% if (!(recentNotifications && recentNotifications.length)) { %>
+                                            <div class="text-muted small">No notifications yet.</div>
+                                        <% } %>
+                                        <% (recentNotifications || []).forEach((notification) => { %>
+                                            <div class="p-3 rounded-3 mb-2" style="background: rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.05);">
+                                                <div class="d-flex justify-content-between gap-2">
+                                                    <strong class="text-light small"><%= notification.title %></strong>
+                                                    <span class="badge <%= notification.isRead ? 'bg-secondary' : 'bg-primary' %>"><%= notification.isRead ? 'Read' : 'Unread' %></span>
+                                                </div>
+                                                <div class="text-muted small mt-1"><%= new Date(notification.createdAt).toLocaleString() %></div>
+                                            </div>
+                                        <% }) %>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="card border-0 shadow-sm"
+                            style="background-color: #141419; border: 1px solid rgba(255,255,255,0.05) !important; border-radius: 15px;">
                             <div class="card-body p-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
                                 <div>
                                     <h5 class="mb-1 text-light"><i class="bi bi-palette2 me-2 text-primary"></i>Theme Settings Moved</h5>
@@ -570,6 +612,55 @@
                     showSuccess();
                 }
 
+                async function enableBrowserNotifications() {
+                    if (!('Notification' in window)) {
+                        showRockySweetAlert({
+                            title: 'Unsupported',
+                            text: 'This browser does not support desktop notifications.',
+                            icon: 'warning'
+                        });
+                        return;
+                    }
+                    const permission = await Notification.requestPermission();
+                    if (permission !== 'granted') {
+                        showRockySweetAlert({
+                            title: 'Permission Not Granted',
+                            text: 'Browser notifications stay disabled until permission is granted.',
+                            icon: 'info'
+                        });
+                        return;
+                    }
+                    const response = await fetch('/api/account/browser-notifications/subscribe', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            permission,
+                            endpoint: `browser:${navigator.userAgent}:${window.location.host}`,
+                            keys: {}
+                        })
+                    });
+                    const payload = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        throw new Error(payload.error || 'Failed to enable browser notifications.');
+                    }
+                    const statusEl = document.getElementById('browserNotificationStatus');
+                    if (statusEl) statusEl.textContent = 'enabled';
+                }
+
+                async function disableBrowserNotifications() {
+                    const response = await fetch('/api/account/browser-notifications/unsubscribe', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({})
+                    });
+                    const payload = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        throw new Error(payload.error || 'Failed to disable browser notifications.');
+                    }
+                    const statusEl = document.getElementById('browserNotificationStatus');
+                    if (statusEl) statusEl.textContent = 'not enabled';
+                }
+
                 const initAccountPage = () => {
                     const profileForm = document.querySelector('form[action="/account/update"]');
                     if (!profileForm) return;
@@ -588,6 +679,24 @@
                     bind(document.getElementById('confirmEnableBtn'), 'click', showEnableConfirmation);
                     bind(document.getElementById('finalEnableBtn'), 'click', processEnable2FA);
                     bind(document.getElementById('confirmDisableBtn'), 'click', confirmDisable2FA);
+                    bind(document.getElementById('enableBrowserNotificationsBtn'), 'click', () => {
+                        enableBrowserNotifications().catch((error) => {
+                            showRockySweetAlert({
+                                title: 'Enable Failed',
+                                text: String(error && error.message ? error.message : 'Failed to enable browser notifications.'),
+                                icon: 'error'
+                            });
+                        });
+                    });
+                    bind(document.getElementById('disableBrowserNotificationsBtn'), 'click', () => {
+                        disableBrowserNotifications().catch((error) => {
+                            showRockySweetAlert({
+                                title: 'Disable Failed',
+                                text: String(error && error.message ? error.message : 'Failed to disable browser notifications.'),
+                                icon: 'error'
+                            });
+                        });
+                    });
 
                     document.querySelectorAll('.unlink-account-btn').forEach((button) => {
                         const unlinkHandler = () => {

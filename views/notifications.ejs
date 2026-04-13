@@ -1,0 +1,76 @@
+<%- include('partials/header') %>
+<%- include('partials/navbar') %>
+<%- include('partials/error-modal') %>
+<div class="container-fluid py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h2 class="mb-1 text-light">Notifications</h2>
+            <div class="text-muted">Unread: <span id="notificationsUnreadCount"><%= unreadCount %></span></div>
+        </div>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-light btn-sm" id="markAllNotificationsReadBtn">Mark all read</button>
+            <a href="/account" class="btn btn-outline-info btn-sm">Account Settings</a>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm" style="background:#141419;">
+        <div class="card-body">
+            <% if (!notifications.length) { %>
+                <div class="text-center text-muted py-5">No notifications yet.</div>
+            <% } %>
+            <div class="list-group list-group-flush" id="notificationsHistoryList">
+                <% notifications.forEach((notification) => { %>
+                    <div class="list-group-item bg-transparent text-light border-secondary border-opacity-25" data-notification-id="<%= notification.id %>">
+                        <div class="d-flex justify-content-between align-items-start gap-3">
+                            <div>
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <strong><%= notification.title %></strong>
+                                    <span class="badge <%= notification.isRead ? 'bg-secondary' : 'bg-primary' %>"><%= notification.isRead ? 'Read' : 'Unread' %></span>
+                                    <span class="badge bg-dark border border-secondary"><%= notification.severity %></span>
+                                </div>
+                                <div class="text-muted small mb-2"><%= new Date(notification.createdAt).toLocaleString() %></div>
+                                <div style="white-space:pre-wrap;"><%= notification.message %></div>
+                                <% if (notification.linkUrl) { %>
+                                    <div class="mt-2"><a href="<%= notification.linkUrl %>" class="btn btn-sm btn-outline-info">Open Link</a></div>
+                                <% } %>
+                            </div>
+                            <% if (!notification.isRead) { %>
+                                <button type="button" class="btn btn-sm btn-outline-light" data-mark-read="<%= notification.id %>">Mark read</button>
+                            <% } %>
+                        </div>
+                    </div>
+                <% }) %>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    (() => {
+        const unreadCountEl = document.getElementById('notificationsUnreadCount');
+        const updateUnread = (value) => {
+            if (unreadCountEl) unreadCountEl.textContent = String(value || 0);
+        };
+        document.querySelectorAll('[data-mark-read]').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const id = button.getAttribute('data-mark-read');
+                const response = await fetch('/api/account/notifications/' + encodeURIComponent(id) + '/read', { method: 'POST' });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) return;
+                updateUnread(payload.unreadCount || 0);
+                const row = document.querySelector('[data-notification-id="' + CSS.escape(String(id)) + '"]');
+                if (row) {
+                    const badge = row.querySelector('.badge');
+                    if (badge) badge.textContent = 'Read';
+                    button.remove();
+                }
+            });
+        });
+        document.getElementById('markAllNotificationsReadBtn')?.addEventListener('click', async () => {
+            const response = await fetch('/api/account/notifications/read-all', { method: 'POST' });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) return;
+            updateUnread(payload.unreadCount || 0);
+            window.location.reload();
+        });
+    })();
+</script>

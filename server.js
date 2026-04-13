@@ -49,6 +49,8 @@ const {
     AuditLog,
     SecurityEvent,
     NotificationDeliveryLog,
+    UserNotification,
+    UserBrowserSubscription,
     ServerBackupPolicy,
     ServerBackup,
     Mount,
@@ -200,7 +202,7 @@ async function enforceRedisRequired(source = 'env') {
     return false;
 }
 
-const { loginLimiter } = bootstrapApp({
+const { loginLimiter, sessionMiddleware } = bootstrapApp({
     app,
     sequelize,
     redisClient,
@@ -542,6 +544,8 @@ const legacyRouteContextData = {
     AuditLog,
     SecurityEvent,
     NotificationDeliveryLog,
+    UserNotification,
+    UserBrowserSubscription,
     ServerBackupPolicy,
     ServerBackup,
     Mount,
@@ -656,7 +660,10 @@ registerAccountRoutes({
     APP_URL,
     speakeasy,
     QRCode,
-    bcrypt
+    bcrypt,
+    UserNotification,
+    UserBrowserSubscription,
+    NotificationDeliveryLog
 });
 
 // 404 Handler - Catch all other routes
@@ -677,6 +684,7 @@ registerWebSocketRuntime({
     WebSocket,
     jwt,
     SECRET_KEY,
+    sessionMiddleware,
     Server,
     ServerSubuser,
     AuditLog,

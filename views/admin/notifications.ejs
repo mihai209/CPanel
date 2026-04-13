@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= (settings.brandName || 'CPanel').toUpperCase() %> - User Notifications</title>
+    <%- include('../partials/favicon') %>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/mobile-layout.css">
+</head>
+<body>
+    <%- include('../partials/error-modal') %>
+    <div class="admin-wrapper">
+        <%- include('../partials/admin-sidebar') %>
+        <div class="admin-content">
+            <div class="admin-header">
+                <div class="d-flex align-items-baseline gap-3">
+                    <h4 class="mb-0 text-light fw-normal">User Notifications</h4>
+                    <small class="text-muted">In-panel, browser, and email delivery from one place.</small>
+                </div>
+                <div class="breadcrumb-admin mb-0">
+                    <a href="/admin/overview">Admin</a> <span class="mx-2">&gt;</span> <span class="text-light">User Notifications</span>
+                </div>
+            </div>
+
+            <div class="container-fluid py-4 px-lg-4">
+                <% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+                <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+
+                <div class="row g-4">
+                    <div class="col-xl-7">
+                        <div class="card border-0 shadow-sm" style="background:#141419;">
+                            <div class="card-header bg-transparent border-secondary border-opacity-25">
+                                <h5 class="mb-0 fs-6 fw-bold text-light"><i class="bi bi-send me-2"></i>Send Notification</h5>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST" action="/admin/notifications/send" class="row g-3">
+                                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                    <div class="col-md-4">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Target Mode</label>
+                                        <select name="targetMode" id="targetMode" class="form-select bg-dark text-light border-secondary">
+                                            <option value="single">Single user</option>
+                                            <option value="selected">Selected users</option>
+                                            <option value="all">All users</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4" id="singleUserWrap">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">User</label>
+                                        <select name="userId" class="form-select bg-dark text-light border-secondary">
+                                            <option value="">Select user...</option>
+                                            <% users.forEach((entry) => { %>
+                                                <option value="<%= entry.id %>"><%= entry.username %> (<%= entry.email %>)</option>
+                                            <% }) %>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-8 d-none" id="multiUserWrap">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Selected Users</label>
+                                        <select name="userIds" multiple size="8" class="form-select bg-dark text-light border-secondary">
+                                            <% users.forEach((entry) => { %>
+                                                <option value="<%= entry.id %>"><%= entry.username %> (<%= entry.email %>)<%= entry.isSuspended ? ' [suspended]' : '' %></option>
+                                            <% }) %>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Title</label>
+                                        <input type="text" name="title" maxlength="160" required class="form-control bg-dark text-light border-secondary">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Severity</label>
+                                        <select name="severity" class="form-select bg-dark text-light border-secondary">
+                                            <option value="info">Info</option>
+                                            <option value="success">Success</option>
+                                            <option value="warning">Warning</option>
+                                            <option value="danger">Danger</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Message</label>
+                                        <textarea name="message" rows="5" required class="form-control bg-dark text-light border-secondary"></textarea>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Optional Link</label>
+                                        <input type="text" name="linkUrl" class="form-control bg-dark text-light border-secondary" placeholder="/server/abc123 or https://example.com/status">
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="d-flex flex-wrap gap-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" checked disabled id="sendPanel">
+                                                <label class="form-check-label" for="sendPanel">Always save in panel</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="sendBrowser" id="sendBrowser" <%= notificationSettings && notificationSettings.delivery && notificationSettings.delivery.browserEnabled ? '' : 'disabled' %>>
+                                                <label class="form-check-label" for="sendBrowser">Send browser popup</label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="sendEmail" id="sendEmail" <%= notificationSettings && notificationSettings.delivery && notificationSettings.delivery.resendEnabled ? '' : 'disabled' %>>
+                                                <label class="form-check-label" for="sendEmail">Send email with Resend</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 text-end">
+                                        <button type="submit" class="btn btn-primary fw-bold"><i class="bi bi-bell me-2"></i>Send Notification</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-5">
+                        <div class="card border-0 shadow-sm mb-4" style="background:#141419;">
+                            <div class="card-header bg-transparent border-secondary border-opacity-25">
+                                <h5 class="mb-0 fs-6 fw-bold text-light"><i class="bi bi-envelope-gear me-2"></i>Delivery Settings</h5>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST" action="/admin/notifications/settings" class="row g-3">
+                                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                    <div class="col-12">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" name="browserEnabled" id="browserEnabled" <%= notificationSettings && notificationSettings.delivery && notificationSettings.delivery.browserEnabled ? 'checked' : '' %>>
+                                            <label class="form-check-label text-light" for="browserEnabled">Enable browser delivery</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" name="resendEnabled" id="resendEnabled" <%= notificationSettings && notificationSettings.delivery && notificationSettings.delivery.resendEnabled ? 'checked' : '' %>>
+                                            <label class="form-check-label text-light" for="resendEnabled">Enable Resend email delivery</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Sender Name</label>
+                                        <input type="text" name="senderName" class="form-control bg-dark text-light border-secondary" value="<%= notificationSettings && notificationSettings.delivery ? notificationSettings.delivery.senderName : '' %>">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Reply-To</label>
+                                        <input type="email" name="replyTo" class="form-control bg-dark text-light border-secondary" value="<%= notificationSettings && notificationSettings.delivery ? notificationSettings.delivery.replyTo : '' %>">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">Resend API Key</label>
+                                        <input type="password" name="resendApiKey" class="form-control bg-dark text-light border-secondary" placeholder="<%= maskedResendApiKey || 're_xxx...' %>">
+                                        <div class="form-text text-muted">Current: <%= maskedResendApiKey || 'not saved' %></div>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">From Email</label>
+                                        <input type="email" name="resendFromEmail" class="form-control bg-dark text-light border-secondary" value="<%= notificationSettings && notificationSettings.resend ? notificationSettings.resend.fromEmail : '' %>">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label text-muted small text-uppercase fw-bold">From Name</label>
+                                        <input type="text" name="resendFromName" class="form-control bg-dark text-light border-secondary" value="<%= notificationSettings && notificationSettings.resend ? notificationSettings.resend.fromName : '' %>">
+                                    </div>
+                                    <div class="col-12 text-end">
+                                        <button type="submit" class="btn btn-outline-light fw-bold">Save Settings</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="card border-0 shadow-sm" style="background:#141419;">
+                            <div class="card-header bg-transparent border-secondary border-opacity-25">
+                                <h5 class="mb-0 fs-6 fw-bold text-light"><i class="bi bi-journal-check me-2"></i>Recent Delivery Logs</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-sm align-middle mb-0">
+                                        <thead><tr><th>When</th><th>Channel</th><th>Status</th><th>Target</th></tr></thead>
+                                        <tbody>
+                                            <% if (!recentLogs.length) { %>
+                                                <tr><td colspan="4" class="text-center text-muted py-3">No user notification deliveries yet.</td></tr>
+                                            <% } %>
+                                            <% recentLogs.forEach((log) => { %>
+                                                <tr>
+                                                    <td class="small text-muted"><%= new Date(log.createdAt).toLocaleString() %></td>
+                                                    <td><code><%= log.channel %></code></td>
+                                                    <td><span class="badge <%= log.status === 'sent' ? 'bg-success' : (log.status === 'skipped' ? 'bg-secondary' : 'bg-danger') %>"><%= log.status %></span></td>
+                                                    <td class="small text-muted"><%= log.target || '-' %></td>
+                                                </tr>
+                                            <% }) %>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (() => {
+            const targetMode = document.getElementById('targetMode');
+            const singleWrap = document.getElementById('singleUserWrap');
+            const multiWrap = document.getElementById('multiUserWrap');
+            if (!targetMode || !singleWrap || !multiWrap) return;
+            const syncMode = () => {
+                const value = String(targetMode.value || '').trim().toLowerCase();
+                singleWrap.classList.toggle('d-none', value !== 'single');
+                multiWrap.classList.toggle('d-none', value !== 'selected');
+            };
+            targetMode.addEventListener('change', syncMode);
+            syncMode();
+        })();
+    </script>
+</body>
+</html>

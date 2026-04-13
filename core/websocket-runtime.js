@@ -201,6 +201,7 @@ function registerWebSocketRuntime(deps) {
         WebSocket,
         jwt,
         SECRET_KEY,
+        sessionMiddleware,
         Server,
         ServerSubuser,
         AuditLog,
@@ -248,16 +249,86 @@ function registerWebSocketRuntime(deps) {
         PLUGIN_CONFLICT_STATE
     } = deps;
 
+    function getSessionForUpgrade(request) {
+        return new Promise((resolve, reject) => {
+            if (typeof sessionMiddleware !== 'function') {
+                resolve(null);
+                return;
+            }
+            const responseStub = {
+                getHeader() { return undefined; },
+                setHeader() {},
+                end() {}
+            };
+            sessionMiddleware(request, responseStub, (error) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                resolve(request.session || null);
+            });
+        });
+    }
+
+    function registerUserUiClient(userId, ws) {
+        const parsedUserId = Number.parseInt(userId, 10);
+        if (!Number.isInteger(parsedUserId) || parsedUserId <= 0 || !ws) return;
+        const bucket = userUiClients.get(parsedUserId) || new Set();
+        bucket.add(ws);
+        userUiClients.set(parsedUserId, bucket);
+        ws.__uiUserId = parsedUserId;
+    }
+
+    function unregisterUserUiClient(ws) {
+        const parsedUserId = Number.parseInt(ws && ws.__uiUserId, 10);
+        if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) return;
+        const bucket = userUiClients.get(parsedUserId);
+        if (!bucket) return;
+        bucket.delete(ws);
+        if (bucket.size === 0) {
+            userUiClients.delete(parsedUserId);
+        }
+    }
+
 // WebSocket Server for Connectors & UI
 // Allow larger payloads for modded inventory/icon data while staying bounded.
 const wss = new WebSocket.Server({ noServer: true, maxPayload: 64 * 1024 * 1024 });
 const uiClients = new Set();
+const userUiClients = new Map(); // userId -> Set<ws>
 const serverConsoleClients = new Map(); // serverId -> Set<ws>
 const recentConsolePayloads = new Map(); // serverId -> { output: string, ts: number }
 const serverConsoleBuffers = new Map(); // serverId -> { lines: string[], bytes: number }
 const SERVER_CONSOLE_BUFFER_MAX_LINES = 1200;
 const SERVER_CONSOLE_BUFFER_MAX_BYTES = 1024 * 1024;
 const SERVER_DEBUG_LOG_TAIL_MAX_CHARS = 32 * 1024;
+
+function getUserUiConnectionCount(userId) {
+    const parsedUserId = Number.parseInt(userId, 10);
+    if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) return 0;
+    const bucket = userUiClients.get(parsedUserId);
+    if (!bucket) return 0;
+    let count = 0;
+    bucket.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) count += 1;
+    });
+    return count;
+}
+
+function sendToUserUI(userId, data) {
+    const parsedUserId = Number.parseInt(userId, 10);
+    if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) return 0;
+    const bucket = userUiClients.get(parsedUserId);
+    if (!bucket || bucket.size === 0) return 0;
+    const message = JSON.stringify(data);
+    let delivered = 0;
+    bucket.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+            client.send(message);
+            delivered += 1;
+        }
+    });
+    return delivered;
+}
 const CONNECTOR_WS_READ_LIMIT_MIN_MB = 8;
 const CONNECTOR_WS_READ_LIMIT_MAX_MB = 1024;
 const CONNECTOR_WS_READ_LIMIT_DEFAULT_UPLOAD_MB = 50;
@@ -907,7 +978,28 @@ server.on('upgrade', (request, socket, head) => {
         return;
     }
 
-    if (pathname === '/ws/connector' || pathname === '/ws/ui') {
+    if (pathname === '/ws/ui') {
+        (async () => {
+            try {
+                const session = await getSessionForUpgrade(request);
+                const sessionUserId = Number.parseInt(session && session.user ? session.user.id : 0, 10);
+                if (!Number.isInteger(sessionUserId) || sessionUserId <= 0) {
+                    rejectUpgrade(socket, 401, 'Unauthorized');
+                    return;
+                }
+                request.__uiUserId = sessionUserId;
+                wss.handleUpgrade(request, socket, head, (ws) => {
+                    wss.emit('connection', ws, request);
+                });
+            } catch (error) {
+                console.error('Failed to authorize UI websocket upgrade:', error);
+                rejectUpgrade(socket, 500, 'Internal Server Error');
+            }
+        })();
+        return;
+    }
+
+    if (pathname === '/ws/connector') {
         wss.handleUpgrade(request, socket, head, (ws) => {
             wss.emit('connection', ws, request);
         });
@@ -1508,8 +1600,15 @@ wss.on('connection', (ws, request) => {
 
     if (pathname === '/ws/ui') {
         uiClients.add(ws);
-        ws.on('close', () => uiClients.delete(ws));
-        ws.send(JSON.stringify({ type: 'connected' }));
+        registerUserUiClient(request.__uiUserId, ws);
+        ws.on('close', () => {
+            uiClients.delete(ws);
+            unregisterUserUiClient(ws);
+        });
+        ws.send(JSON.stringify({
+            type: 'connected',
+            userId: Number.parseInt(request.__uiUserId, 10) || null
+        }));
         return;
     }
 
@@ -3112,6 +3211,8 @@ setTimeout(() => {
 
 module.exports = {
     registerWebSocketRuntime,
+    sendToUserUI,
+    getUserUiConnectionCount,
     getServerConsoleBuffer,
     getServerTickSamples,
     getServerResourcePackStatus,

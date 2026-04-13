@@ -269,6 +269,7 @@
                                             </div>
                                         </div>
                                     </div>
+                        </form>
 
                                     <div class="card border-0 shadow-sm mb-4" style="background-color: #141419;">
                                         <div class="card-header border-bottom border-secondary border-opacity-10 py-3 bg-transparent">
@@ -414,7 +415,7 @@
                                                 </div>
 
                                                 <button type="button" class="btn btn-primary w-100 mb-3 fw-bold"
-                                                    id="saveChangesBtn">
+                                                    id="saveChangesBtn" form="edit-server-form">
                                                     <i class="bi bi-save me-2"></i>Save Changes
                                                 </button>
 
@@ -468,7 +469,6 @@
                                     </div>
                                 </div>
                             </div>
-                        </form>
 
                         <form id="delete-form" action="/admin/servers/delete/<%= server.containerId %>" method="POST"
                             style="display: none;">

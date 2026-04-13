@@ -21,6 +21,17 @@ const REDIS_SETTING_KEYS = [
 const nodeFs = require('fs');
 const nodeFsPromises = nodeFs.promises;
 const nodePath = require('path');
+const {
+    getNotificationSettings,
+    createUserNotifications,
+    deliverBrowserNotifications,
+    deliverEmailNotifications,
+    saveNotificationSettings,
+    sanitizeLinkUrl
+} = require('../../core/notifications/service');
+const {
+    maskSecret
+} = require('../../core/notifications/resend-client');
 const getGoogleTokenSettingKey = (userId) => {
     const parsed = Number.parseInt(userId, 10);
     if (!Number.isInteger(parsed) || parsed <= 0) return '';
@@ -2837,6 +2848,131 @@ app.post('/admin/notifications-test/retry-last-failed', requireAuth, requireAdmi
         return res.redirect('/admin/notifications-test?success=' + encodeURIComponent(`Retried ${log.channel} notification successfully.`));
     } catch (error) {
         return res.redirect('/admin/notifications-test?error=' + encodeURIComponent(error.message || 'Failed to retry last failed notification.'));
+    }
+});
+
+app.get('/admin/notifications', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const [users, settings, recentLogs] = await Promise.all([
+            User.findAll({
+                attributes: ['id', 'username', 'email', 'isSuspended', 'isAdmin'],
+                order: [['username', 'ASC']]
+            }),
+            getNotificationSettings(Settings),
+            NotificationDeliveryLog.findAll({
+                where: { eventKey: 'admin_user_notification' },
+                include: [{ model: User, as: 'actor', attributes: ['id', 'username', 'email'], required: false }],
+                order: [['createdAt', 'DESC']],
+                limit: 50
+            })
+        ]);
+        return res.render('admin/notifications', {
+            user: req.session.user,
+            path: '/admin/notifications',
+            title: 'User Notifications',
+            success: req.query.success || null,
+            error: req.query.error || null,
+            users,
+            notificationSettings: settings,
+            maskedResendApiKey: maskSecret(settings && settings.resend ? settings.resend.apiKey : ''),
+            recentLogs
+        });
+    } catch (error) {
+        console.error('Failed to load admin notifications page:', error);
+        return res.render('admin/notifications', {
+            user: req.session.user,
+            path: '/admin/notifications',
+            title: 'User Notifications',
+            success: null,
+            error: 'Failed to load notifications center.',
+            users: [],
+            notificationSettings: { delivery: { browserEnabled: true, resendEnabled: false, senderName: '', replyTo: '' }, resend: {}, resendConfigured: false },
+            maskedResendApiKey: '',
+            recentLogs: []
+        });
+    }
+});
+
+app.post('/admin/notifications/settings', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        await saveNotificationSettings(Settings, {
+            browserEnabled: req.body.browserEnabled,
+            resendEnabled: req.body.resendEnabled,
+            senderName: req.body.senderName,
+            replyTo: req.body.replyTo,
+            resendApiKey: req.body.resendApiKey,
+            resendFromEmail: req.body.resendFromEmail,
+            resendFromName: req.body.resendFromName
+        });
+        return res.redirect('/admin/notifications?success=' + encodeURIComponent('Notification delivery settings updated.'));
+    } catch (error) {
+        console.error('Failed to save notification settings:', error);
+        return res.redirect('/admin/notifications?error=' + encodeURIComponent(error.message || 'Failed to save notification settings.'));
+    }
+});
+
+app.post('/admin/notifications/send', requireAuth, requireAdmin, async (req, res) => {
+    try {
+        const targetMode = String(req.body.targetMode || '').trim().toLowerCase();
+        const rawUserIds = Array.isArray(req.body.userIds)
+            ? req.body.userIds
+            : (req.body.userIds ? [req.body.userIds] : []);
+        const singleUserId = req.body.userId ? [req.body.userId] : [];
+        const targetUserIds = targetMode === 'single' ? singleUserId : rawUserIds;
+        const settings = await getNotificationSettings(Settings);
+        const created = await createUserNotifications({
+            User,
+            UserNotification,
+            NotificationDeliveryLog,
+            payload: {
+                targetMode,
+                userIds: targetUserIds,
+                title: req.body.title,
+                message: req.body.message,
+                severity: req.body.severity,
+                category: req.body.category,
+                linkUrl: sanitizeLinkUrl(req.body.linkUrl),
+                sendBrowser: req.body.sendBrowser === 'on',
+                sendEmail: req.body.sendEmail === 'on',
+                createdByUserId: req.session.user.id
+            }
+        });
+
+        let browserSummary = { sent: 0, failed: 0, skipped: 0 };
+        let emailSummary = { sent: 0, failed: 0, skipped: 0, error: '' };
+
+        if (req.body.sendBrowser === 'on') {
+            browserSummary = await deliverBrowserNotifications({
+                UserNotification,
+                UserBrowserSubscription,
+                NotificationDeliveryLog,
+                notifications: created.notifications,
+                attemptedByUserId: req.session.user.id,
+                settings
+            });
+        }
+
+        if (req.body.sendEmail === 'on') {
+            emailSummary = await deliverEmailNotifications({
+                NotificationDeliveryLog,
+                notifications: created.notifications,
+                attemptedByUserId: req.session.user.id,
+                settings,
+                brandName: String(res.locals.settings.brandName || 'CPanel').trim() || 'CPanel'
+            });
+        }
+
+        const summary = [
+            `${created.notifications.length} in-panel`,
+            `${browserSummary.sent || 0} browser sent`,
+            `${browserSummary.skipped || 0} browser skipped`,
+            `${emailSummary.sent || 0} email sent`,
+            `${emailSummary.failed || 0} email failed`
+        ].join(', ');
+        return res.redirect('/admin/notifications?success=' + encodeURIComponent(`Notifications queued: ${summary}.`));
+    } catch (error) {
+        console.error('Failed to send user notifications:', error);
+        return res.redirect('/admin/notifications?error=' + encodeURIComponent(error.message || 'Failed to send notifications.'));
     }
 });
 

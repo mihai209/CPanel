@@ -185,6 +185,52 @@
         border-color: rgba(79,124,255,0.2);
     }
 
+    .cpanel-notify-btn {
+        position: relative;
+        min-width: 44px;
+        justify-content: center;
+    }
+
+    .cpanel-notify-badge {
+        position: absolute;
+        top: -5px;
+        right: -4px;
+        min-width: 20px;
+        height: 20px;
+        border-radius: 999px;
+        background: #ef4444;
+        color: #fff;
+        font-size: 0.72rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 6px;
+        border: 2px solid rgba(12, 18, 34, 0.95);
+    }
+
+    .cpanel-notify-menu {
+        width: min(420px, calc(100vw - 24px));
+        background: #0f172a;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 18px;
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .cpanel-notify-list {
+        max-height: 360px;
+        overflow: auto;
+    }
+
+    .cpanel-notify-item {
+        border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+        padding: 14px 16px;
+    }
+
+    .cpanel-notify-item:last-child {
+        border-bottom: 0;
+    }
+
     @media (max-width: 768px) {
         .cpanel-topbar {
             padding: 0.75rem 0.85rem;
@@ -229,6 +275,25 @@
                     <span><%= new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(user.coins || 0)) %></span>
                 </a>
 
+                <div class="dropdown">
+                    <button type="button" class="cpanel-chip-btn cpanel-notify-btn dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" id="notificationBellButton">
+                        <i class="bi bi-bell"></i>
+                        <span class="cpanel-notify-badge d-none" id="notificationBellCount">0</span>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end cpanel-notify-menu">
+                        <div class="d-flex justify-content-between align-items-center px-3 py-3 border-bottom border-secondary border-opacity-25">
+                            <strong class="text-light">Notifications</strong>
+                            <a href="/notifications" class="btn btn-sm btn-outline-light">Open All</a>
+                        </div>
+                        <div class="cpanel-notify-list" id="notificationDropdownList">
+                            <div class="text-center text-muted py-4">Loading...</div>
+                        </div>
+                        <div class="px-3 py-2 border-top border-secondary border-opacity-25 text-end">
+                            <button type="button" class="btn btn-sm btn-link text-decoration-none text-info" id="notificationMarkAllBtn">Mark all read</button>
+                        </div>
+                    </div>
+                </div>
+
                 <button type="button"
                     class="btn cpanel-profile-btn border-0 shadow-none"
                     id="userProfileButton"
@@ -257,6 +322,115 @@
         </div>
     </div>
 </nav>
+
+<% if (user) { %>
+<script>
+    (() => {
+        if (window.__cpanelNotificationUiInit) return;
+        window.__cpanelNotificationUiInit = true;
+        const countEl = document.getElementById('notificationBellCount');
+        const listEl = document.getElementById('notificationDropdownList');
+        const markAllBtn = document.getElementById('notificationMarkAllBtn');
+        if (!countEl || !listEl) return;
+
+        const escapeHtml = (value) => String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+
+        const setCount = (value) => {
+            const count = Number(value || 0);
+            countEl.textContent = String(count);
+            countEl.classList.toggle('d-none', count <= 0);
+        };
+
+        const renderList = (notifications) => {
+            if (!Array.isArray(notifications) || notifications.length === 0) {
+                listEl.innerHTML = '<div class="text-center text-muted py-4">No notifications.</div>';
+                return;
+            }
+            listEl.innerHTML = notifications.map((notification) => {
+                const link = notification.linkUrl
+                    ? `<a href="${escapeHtml(notification.linkUrl)}" class="btn btn-sm btn-outline-info mt-2">Open</a>`
+                    : '';
+                const markRead = notification.isRead
+                    ? ''
+                    : `<button type="button" class="btn btn-sm btn-outline-light mt-2" data-navbar-mark-read="${notification.id}">Mark read</button>`;
+                return `
+                    <div class="cpanel-notify-item text-light" data-navbar-notification="${notification.id}">
+                        <div class="d-flex justify-content-between gap-2">
+                            <strong>${escapeHtml(notification.title)}</strong>
+                            <span class="badge ${notification.isRead ? 'bg-secondary' : 'bg-primary'}">${notification.isRead ? 'Read' : 'Unread'}</span>
+                        </div>
+                        <div class="text-muted small mt-1">${escapeHtml(new Date(notification.createdAt).toLocaleString())}</div>
+                        <div class="small mt-2" style="white-space:pre-wrap;">${escapeHtml(notification.message)}</div>
+                        <div class="d-flex gap-2">${link}${markRead}</div>
+                    </div>
+                `;
+            }).join('');
+            listEl.querySelectorAll('[data-navbar-mark-read]').forEach((button) => {
+                button.addEventListener('click', async () => {
+                    const id = button.getAttribute('data-navbar-mark-read');
+                    const response = await fetch('/api/account/notifications/' + encodeURIComponent(id) + '/read', { method: 'POST' });
+                    const payload = await response.json().catch(() => ({}));
+                    if (!response.ok) return;
+                    setCount(payload.unreadCount || 0);
+                    await loadNotifications();
+                });
+            });
+        };
+
+        const loadNotifications = async () => {
+            const response = await fetch('/api/account/notifications?limit=8', { headers: { Accept: 'application/json' } });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                listEl.innerHTML = '<div class="text-center text-warning py-4">Failed to load notifications.</div>';
+                return;
+            }
+            setCount(payload.unreadCount || 0);
+            renderList(payload.notifications || []);
+        };
+
+        markAllBtn?.addEventListener('click', async () => {
+            const response = await fetch('/api/account/notifications/read-all', { method: 'POST' });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) return;
+            setCount(payload.unreadCount || 0);
+            await loadNotifications();
+        });
+
+        try {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${protocol}//${window.location.host}/ws/ui`);
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'notification:unread_count') {
+                        setCount(data.unreadCount || 0);
+                    }
+                    if (data.type === 'notification:new' || data.type === 'notification:read') {
+                        loadNotifications().catch(() => {});
+                    }
+                    if (data.type === 'notification:new' && data.browserDelivery && window.Notification && Notification.permission === 'granted' && data.notification) {
+                        const browserNotification = new Notification(data.notification.title, {
+                            body: data.notification.message,
+                            tag: `cpanel-notification-${data.notification.id}`
+                        });
+                        browserNotification.onclick = () => {
+                            window.focus();
+                            window.location.href = data.notification.linkUrl || '/notifications';
+                        };
+                    }
+                } catch (_) {}
+            };
+        } catch (_) {}
+
+        loadNotifications().catch(() => {});
+    })();
+</script>
+<% } %>
 
 <% if (user) { %>
 <div class="modal fade" id="userProfileModal" tabindex="-1" aria-labelledby="userProfileModalLabel" aria-hidden="true">

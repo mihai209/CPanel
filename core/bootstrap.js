@@ -88,7 +88,7 @@ function bootstrapApp(deps) {
 
     const cookieSecure = process.env.NODE_ENV === 'production';
 
-    app.use(session({
+    const sessionMiddleware = session({
         secret: secretKey,
         store: sessionStore,
         resave: false,
@@ -100,7 +100,8 @@ function bootstrapApp(deps) {
             sameSite: 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000
         }
-    }));
+    });
+    app.use(sessionMiddleware);
 
     const csrfMiddleware = csrf();
     app.use((req, res, next) => {
@@ -172,7 +173,8 @@ function bootstrapApp(deps) {
     registerLocalsMiddleware(app, settingsModel, userModel, settingsCache);
 
     return {
-        loginLimiter
+        loginLimiter,
+        sessionMiddleware
     };
 }
 

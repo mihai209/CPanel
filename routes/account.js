@@ -11,6 +11,14 @@ const {
 } = require('../core/themes');
 const { getGoogleTokenSettingKey } = require('../core/backups/google-drive');
 const { formatLoginTypeLabel } = require('../core/helpers/login-history');
+const { sendToUserUI } = require('../core/websocket-runtime');
+const {
+    getNotificationSettings,
+    countUnreadNotifications,
+    listNotifications,
+    markNotificationRead,
+    markAllNotificationsRead
+} = require('../core/notifications/service');
 
 function registerAccountRoutes({
     app,
@@ -25,7 +33,10 @@ function registerAccountRoutes({
     APP_URL,
     speakeasy,
     QRCode,
-    bcrypt
+    bcrypt,
+    UserNotification,
+    UserBrowserSubscription,
+    NotificationDeliveryLog
 }) {
     const allowedThemeIds = new Set(getThemeCatalog().map((entry) => entry.id));
     const defaultCustomTheme = normalizeUserCustomThemeConfig(DEFAULT_USER_CUSTOM_THEME);
@@ -145,6 +156,25 @@ function registerAccountRoutes({
         };
     };
 
+    const buildNotificationPageState = async (userId) => {
+        const [settings, unreadCount, recentNotifications, browserSubscriptions] = await Promise.all([
+            getNotificationSettings(Settings),
+            countUnreadNotifications(UserNotification, userId),
+            listNotifications(UserNotification, userId, 8),
+            UserBrowserSubscription.findAll({
+                where: { userId, revokedAt: null },
+                order: [['updatedAt', 'DESC']],
+                limit: 5
+            })
+        ]);
+        return {
+            notificationSettings: settings,
+            notificationUnreadCount: unreadCount,
+            recentNotifications,
+            browserSubscriptionCount: browserSubscriptions.length
+        };
+    };
+
     // Account Page (GET)
     app.get('/account', requireAuth, async (req, res) => {
         try {
@@ -218,6 +248,7 @@ function registerAccountRoutes({
 
             const activeTheme = getUserThemeId(userData);
             const activeCustomTheme = getUserCustomTheme(userData);
+            const notificationState = await buildNotificationPageState(userData.id);
             if (req.session && req.session.user) {
                 req.session.user.uiTheme = activeTheme;
                 req.session.user.uiCustomTheme = activeCustomTheme;
@@ -240,9 +271,13 @@ function registerAccountRoutes({
                     avatarUrl: userData.avatarUrl || '',
                     avatarProvider: userData.avatarProvider || 'gravatar',
                     gravatarHash: userData.gravatarHash || md5(String(userData.email || '').trim().toLowerCase()),
-                    twoFactorEnabled: Boolean(userData.twoFactorEnabled)
+                    twoFactorEnabled: Boolean(userData.twoFactorEnabled),
+                    notificationUnreadCount: notificationState.notificationUnreadCount
                 },
-                linkedProviders
+                linkedProviders,
+                notificationSettings: notificationState.notificationSettings,
+                browserSubscriptionCount: notificationState.browserSubscriptionCount,
+                recentNotifications: notificationState.recentNotifications
             };
 
             if (wantsReactPageData(req)) {
@@ -263,8 +298,12 @@ function registerAccountRoutes({
                 activeTheme,
                 title: 'Account Settings',
                 appUrl: APP_URL,
+                path: '/account',
                 success: req.query.success || null,
-                error: req.query.error || null
+                error: req.query.error || null,
+                notificationSettings: notificationState.notificationSettings,
+                browserSubscriptionCount: notificationState.browserSubscriptionCount,
+                recentNotifications: notificationState.recentNotifications
             });
         } catch (err) {
             console.error('Error fetching account:', err);
@@ -727,6 +766,162 @@ function registerAccountRoutes({
         } catch (err) {
             console.error("Failed to update password:", err);
             return res.redirect('/account?error=' + encodeURIComponent('Failed to update password.'));
+        }
+    });
+
+    app.get('/notifications', requireAuth, async (req, res) => {
+        try {
+            const user = await User.findByPk(req.session.user.id);
+            if (!user) return res.redirect('/login');
+            const [notifications, unreadCount, notificationSettings, subscriptions] = await Promise.all([
+                listNotifications(UserNotification, user.id, 100),
+                countUnreadNotifications(UserNotification, user.id),
+                getNotificationSettings(Settings),
+                UserBrowserSubscription.findAll({
+                    where: { userId: user.id, revokedAt: null },
+                    order: [['updatedAt', 'DESC']],
+                    limit: 10
+                })
+            ]);
+            return res.render('notifications', {
+                title: 'Notifications',
+                path: '/notifications',
+                user: user.toJSON(),
+                notifications,
+                unreadCount,
+                notificationSettings,
+                browserSubscriptionCount: subscriptions.length,
+                success: req.query.success || null,
+                error: req.query.error || null
+            });
+        } catch (error) {
+            console.error('Failed to load notifications page:', error);
+            return res.redirect('/account?error=' + encodeURIComponent('Failed to load notifications.'));
+        }
+    });
+
+    app.get('/api/account/notifications', requireAuth, async (req, res) => {
+        try {
+            const userId = Number.parseInt(req.session.user.id, 10);
+            const [notifications, unreadCount, subscriptions] = await Promise.all([
+                listNotifications(UserNotification, userId, req.query.limit || 20),
+                countUnreadNotifications(UserNotification, userId),
+                UserBrowserSubscription.count({
+                    where: { userId, revokedAt: null }
+                })
+            ]);
+            return res.json({
+                notifications,
+                unreadCount,
+                browserSubscriptionCount: subscriptions
+            });
+        } catch (error) {
+            console.error('Failed to list account notifications:', error);
+            return res.status(500).json({ error: 'Failed to load notifications.' });
+        }
+    });
+
+    app.post('/api/account/notifications/:id/read', requireAuth, async (req, res) => {
+        try {
+            const userId = Number.parseInt(req.session.user.id, 10);
+            const notificationId = Number.parseInt(req.params.id, 10);
+            if (!Number.isInteger(notificationId) || notificationId <= 0) {
+                return res.status(400).json({ error: 'Invalid notification.' });
+            }
+            const notification = await markNotificationRead(UserNotification, notificationId, userId);
+            if (!notification) {
+                return res.status(404).json({ error: 'Notification not found.' });
+            }
+            const unreadCount = await countUnreadNotifications(UserNotification, userId);
+            sendToUserUI(userId, {
+                type: 'notification:read',
+                notificationId
+            });
+            sendToUserUI(userId, {
+                type: 'notification:unread_count',
+                unreadCount
+            });
+            return res.json({
+                success: true,
+                notificationId,
+                unreadCount
+            });
+        } catch (error) {
+            console.error('Failed to mark notification as read:', error);
+            return res.status(500).json({ error: 'Failed to update notification.' });
+        }
+    });
+
+    app.post('/api/account/notifications/read-all', requireAuth, async (req, res) => {
+        try {
+            const userId = Number.parseInt(req.session.user.id, 10);
+            await markAllNotificationsRead(UserNotification, userId);
+            sendToUserUI(userId, {
+                type: 'notification:read',
+                notificationId: null,
+                all: true
+            });
+            sendToUserUI(userId, {
+                type: 'notification:unread_count',
+                unreadCount: 0
+            });
+            return res.json({ success: true, unreadCount: 0 });
+        } catch (error) {
+            console.error('Failed to mark all notifications as read:', error);
+            return res.status(500).json({ error: 'Failed to update notifications.' });
+        }
+    });
+
+    app.post('/api/account/browser-notifications/subscribe', requireAuth, async (req, res) => {
+        try {
+            const userId = Number.parseInt(req.session.user.id, 10);
+            const permission = String(req.body && req.body.permission || '').trim().toLowerCase();
+            if (permission !== 'granted') {
+                return res.status(400).json({ error: 'Browser notification permission must be granted before subscribing.' });
+            }
+            const endpoint = String(req.body && req.body.endpoint || '').trim() || `web:${userId}:${Date.now()}`;
+            const subscriptionKeys = req.body && req.body.keys && typeof req.body.keys === 'object'
+                ? req.body.keys
+                : {};
+            await UserBrowserSubscription.upsert({
+                userId,
+                endpoint: endpoint.slice(0, 512),
+                keys: subscriptionKeys,
+                userAgent: String(req.headers['user-agent'] || '').slice(0, 512),
+                lastSeenAt: new Date(),
+                revokedAt: null
+            });
+            const count = await UserBrowserSubscription.count({
+                where: { userId, revokedAt: null }
+            });
+            return res.json({ success: true, browserSubscriptionCount: count });
+        } catch (error) {
+            console.error('Failed to save browser notification subscription:', error);
+            return res.status(500).json({ error: 'Failed to save browser notification preference.' });
+        }
+    });
+
+    app.post('/api/account/browser-notifications/unsubscribe', requireAuth, async (req, res) => {
+        try {
+            const userId = Number.parseInt(req.session.user.id, 10);
+            const endpoint = String(req.body && req.body.endpoint || '').trim();
+            const where = {
+                userId,
+                revokedAt: null
+            };
+            if (endpoint) {
+                where.endpoint = endpoint;
+            }
+            await UserBrowserSubscription.update({
+                revokedAt: new Date()
+            }, { where });
+            const count = await UserBrowserSubscription.count({
+                where: { userId, revokedAt: null }
+            });
+            return res.json({ success: true, browserSubscriptionCount: count });
+        } catch (error) {
+            console.error('Failed to revoke browser notification subscription:', error);
+            return res.status(500).json({ error: 'Failed to remove browser notification preference.' });
         }
     });
 
