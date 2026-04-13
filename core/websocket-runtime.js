@@ -14,6 +14,46 @@ const CRASH_LOOP_COOLDOWN_MS = 10 * 60 * 1000;
 const SERVER_RUNTIME_HISTORY_LIMIT = 12;
 let getServerConsoleBuffer = () => '';
 
+// WebSocket Server for Connectors & UI
+// Allow larger payloads for modded inventory/icon data while staying bounded.
+const wss = new (require('ws')).Server({ noServer: true, maxPayload: 64 * 1024 * 1024 });
+const uiClients = new Set();
+const userUiClients = new Map(); // userId -> Set<ws>
+const serverConsoleClients = new Map(); // serverId -> Set<ws>
+const recentConsolePayloads = new Map(); // serverId -> { output: string, ts: number }
+const serverConsoleBuffers = new Map(); // serverId -> { lines: string[], bytes: number }
+const SERVER_CONSOLE_BUFFER_MAX_LINES = 1200;
+const SERVER_CONSOLE_BUFFER_MAX_BYTES = 1024 * 1024;
+const SERVER_DEBUG_LOG_TAIL_MAX_CHARS = 32 * 1024;
+
+function getUserUiConnectionCount(userId) {
+    const parsedUserId = Number.parseInt(userId, 10);
+    if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) return 0;
+    const bucket = userUiClients.get(parsedUserId);
+    if (!bucket) return 0;
+    let count = 0;
+    bucket.forEach((client) => {
+        if (client && client.readyState === 1) count += 1;
+    });
+    return count;
+}
+
+function sendToUserUI(userId, data) {
+    const parsedUserId = Number.parseInt(userId, 10);
+    if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) return 0;
+    const bucket = userUiClients.get(parsedUserId);
+    if (!bucket || bucket.size === 0) return 0;
+    const message = JSON.stringify(data);
+    let delivered = 0;
+    bucket.forEach((client) => {
+        if (client && client.readyState === 1) {
+            client.send(message);
+            delivered += 1;
+        }
+    });
+    return delivered;
+}
+
 function getServerTickSamples(serverId) {
     const samples = SERVER_TICK_SAMPLES.get(serverId) || [];
     return samples.map((entry) => ({ ...entry }));
@@ -290,45 +330,6 @@ function registerWebSocketRuntime(deps) {
         }
     }
 
-// WebSocket Server for Connectors & UI
-// Allow larger payloads for modded inventory/icon data while staying bounded.
-const wss = new WebSocket.Server({ noServer: true, maxPayload: 64 * 1024 * 1024 });
-const uiClients = new Set();
-const userUiClients = new Map(); // userId -> Set<ws>
-const serverConsoleClients = new Map(); // serverId -> Set<ws>
-const recentConsolePayloads = new Map(); // serverId -> { output: string, ts: number }
-const serverConsoleBuffers = new Map(); // serverId -> { lines: string[], bytes: number }
-const SERVER_CONSOLE_BUFFER_MAX_LINES = 1200;
-const SERVER_CONSOLE_BUFFER_MAX_BYTES = 1024 * 1024;
-const SERVER_DEBUG_LOG_TAIL_MAX_CHARS = 32 * 1024;
-
-function getUserUiConnectionCount(userId) {
-    const parsedUserId = Number.parseInt(userId, 10);
-    if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) return 0;
-    const bucket = userUiClients.get(parsedUserId);
-    if (!bucket) return 0;
-    let count = 0;
-    bucket.forEach((client) => {
-        if (client && client.readyState === 1) count += 1;
-    });
-    return count;
-}
-
-function sendToUserUI(userId, data) {
-    const parsedUserId = Number.parseInt(userId, 10);
-    if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) return 0;
-    const bucket = userUiClients.get(parsedUserId);
-    if (!bucket || bucket.size === 0) return 0;
-    const message = JSON.stringify(data);
-    let delivered = 0;
-    bucket.forEach((client) => {
-        if (client && client.readyState === 1) {
-            client.send(message);
-            delivered += 1;
-        }
-    });
-    return delivered;
-}
 const CONNECTOR_WS_READ_LIMIT_MIN_MB = 8;
 const CONNECTOR_WS_READ_LIMIT_MAX_MB = 1024;
 const CONNECTOR_WS_READ_LIMIT_DEFAULT_UPLOAD_MB = 50;
