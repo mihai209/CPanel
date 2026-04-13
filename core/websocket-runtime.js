@@ -13,6 +13,12 @@ const CRASH_LOOP_THRESHOLD = 3;
 const CRASH_LOOP_COOLDOWN_MS = 10 * 60 * 1000;
 const SERVER_RUNTIME_HISTORY_LIMIT = 12;
 let getServerConsoleBuffer = () => '';
+let SettingsModel = null;
+let AuditLogModel = null;
+const auditStrictCache = {
+    ts: 0,
+    enabled: false
+};
 
 // WebSocket Server for Connectors & UI
 // Allow larger payloads for modded inventory/icon data while staying bounded.
@@ -180,6 +186,46 @@ function pushServerRuntimeEvent(serverId, event = {}) {
     return setServerRuntimeMeta(parsedServerId, { history: history.slice(0, SERVER_RUNTIME_HISTORY_LIMIT) });
 }
 
+async function getAuditStrictState(forceRefresh = false) {
+    if (!SettingsModel) return { enabled: false };
+    const now = Date.now();
+    if (!forceRefresh && (now - auditStrictCache.ts) < 15_000) {
+        return { enabled: Boolean(auditStrictCache.enabled) };
+    }
+    try {
+        const row = await SettingsModel.findByPk('featureStrictAuditEnabled');
+        const enabled = ['1', 'true', 'yes', 'on'].includes(String(row && row.value || '').trim().toLowerCase());
+        auditStrictCache.ts = now;
+        auditStrictCache.enabled = enabled;
+        return { enabled };
+    } catch {
+        return { enabled: false };
+    }
+}
+
+async function writeServerAuditLog(payload) {
+    try {
+        if (!AuditLogModel) return;
+        await AuditLogModel.create({
+            actorUserId: payload.actorUserId || null,
+            action: String(payload.action || '').slice(0, 120) || 'server:event',
+            targetType: 'server',
+            targetId: payload.serverId ? String(payload.serverId) : null,
+            method: null,
+            path: null,
+            ip: payload.ip || null,
+            userAgent: payload.userAgent || null,
+            metadata: payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {}
+        });
+    } catch (error) {
+        const strictState = await getAuditStrictState();
+        if (strictState.enabled) {
+            throw error;
+        }
+        // Ignore audit write errors when strict audit is disabled.
+    }
+}
+
 async function writeRuntimeTransitionAudit(serverId, previousStatus, nextStatus, meta = {}) {
     const mismatch = Boolean(meta.mismatch);
     await writeServerAuditLog({
@@ -288,6 +334,8 @@ function registerWebSocketRuntime(deps) {
         RESOURCE_ANOMALY_SAMPLE_TS,
         PLUGIN_CONFLICT_STATE
     } = deps;
+    SettingsModel = Settings;
+    AuditLogModel = AuditLog;
 
     function getSessionForUpgrade(request) {
         return new Promise((resolve, reject) => {
@@ -491,10 +539,6 @@ const webhooksConfigCache = {
     config: null,
     moduleEnabled: false,
     brandName: 'CPanel'
-};
-const auditStrictCache = {
-    ts: 0,
-    enabled: false
 };
 const serverMinecraftEligibilityCache = new Map(); // serverId -> boolean
 const connectorServerOwnershipCache = new Map(); // serverId -> { connectorId: number|null, ts: number }
@@ -1100,46 +1144,6 @@ function clearServerConsoleBuffer(serverId) {
     PLUGIN_CONFLICT_STATE.delete(serverId);
     ANTI_MINER_STATE.delete(serverId);
     RESOURCE_TIMELINE_LAST_WRITE_TS.delete(serverId);
-}
-
-async function getAuditStrictState(forceRefresh = false) {
-    if (!Settings) return { enabled: false };
-    const now = Date.now();
-    if (!forceRefresh && (now - auditStrictCache.ts) < 15_000) {
-        return { enabled: Boolean(auditStrictCache.enabled) };
-    }
-    try {
-        const row = await Settings.findByPk('featureStrictAuditEnabled');
-        const enabled = ['1', 'true', 'yes', 'on'].includes(String(row && row.value || '').trim().toLowerCase());
-        auditStrictCache.ts = now;
-        auditStrictCache.enabled = enabled;
-        return { enabled };
-    } catch {
-        return { enabled: false };
-    }
-}
-
-async function writeServerAuditLog(payload) {
-    try {
-        if (!AuditLog) return;
-        await AuditLog.create({
-            actorUserId: payload.actorUserId || null,
-            action: String(payload.action || '').slice(0, 120) || 'server:event',
-            targetType: 'server',
-            targetId: payload.serverId ? String(payload.serverId) : null,
-            method: null,
-            path: null,
-            ip: payload.ip || null,
-            userAgent: payload.userAgent || null,
-            metadata: payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {}
-        });
-    } catch (error) {
-        const strictState = await getAuditStrictState();
-        if (strictState.enabled) {
-            throw error;
-        }
-        // Ignore audit write errors when strict audit is disabled.
-    }
 }
 
 async function getWebhooksRuntimeState(forceRefresh = false) {

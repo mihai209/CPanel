@@ -134,22 +134,6 @@ function usagePercent(value, limit) {
     return clamp((safeValue / safeLimit) * 100, 0, 100);
 }
 
-function ServerSubnav({ items }) {
-    const navItems = Array.isArray(items) ? items.filter((item) => item && item.href && item.label) : [];
-    if (!navItems.length) return null;
-    return (
-        <nav className="react-console-subnav">
-            {navItems.map((item) => (
-                item.active ? (
-                    <span key={item.href} className="react-console-subnav-link is-active">{item.label}</span>
-                ) : (
-                    <a key={item.href} href={item.href} className="react-console-subnav-link">{item.label}</a>
-                )
-            ))}
-        </nav>
-    );
-}
-
 function ResourceBadge({ icon, label, value }) {
     return (
         <div className="react-console-resource">
@@ -602,7 +586,6 @@ export function ServerConsolePage({ pageData = data }) {
     return (
         <ReactAppShell pageData={pageData} subtitle="React server console" pageClassName="react-console-page" shellClassName="react-console-shell">
             <div className="react-console-frame">
-                <ServerSubnav items={pageData.serverNavItems} />
                 <main className="react-console-board">
                     {pageData.success ? <div className="react-account-flash is-success">{pageData.success}</div> : null}
                     {pageData.error ? <div className="react-account-flash is-danger">{pageData.error}</div> : null}

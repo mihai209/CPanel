@@ -1,6 +1,10 @@
 export const ReactRoutes = {
     dashboard: '/',
     serverConsolePattern: '/server/:containerId',
+    serverFilesPattern: '/server/:containerId/files',
+    serverBackupsPattern: '/server/:containerId/backups',
+    serverNetworkPattern: '/server/:containerId/network',
+    serverApiPattern: '/server/:containerId/api',
     account: '/account',
     deviceLogin: '/account/device-login',
     themes: '/themes',
@@ -28,13 +32,46 @@ export function buildServerConsoleRoute(containerId = '') {
     return `/server/${encodeURIComponent(String(containerId || '').trim())}`;
 }
 
-export function isServerConsolePath(pathname = '') {
+export function buildServerFilesRoute(containerId = '') {
+    return `/server/${encodeURIComponent(String(containerId || '').trim())}/files`;
+}
+
+export function buildServerBackupsRoute(containerId = '') {
+    return `/server/${encodeURIComponent(String(containerId || '').trim())}/backups`;
+}
+
+export function buildServerNetworkRoute(containerId = '') {
+    return `/server/${encodeURIComponent(String(containerId || '').trim())}/network`;
+}
+
+export function buildServerApiRoute(containerId = '') {
+    return `/server/${encodeURIComponent(String(containerId || '').trim())}/api`;
+}
+
+function parseServerRoute(pathname = '') {
     const normalized = String(pathname || '').trim().replace(/\/+$/, '') || '/';
-    const match = normalized.match(/^\/server\/([^/]+)$/);
-    if (!match) return false;
+    const match = normalized.match(/^\/server\/([^/]+)(?:\/(files|backups|network|api))?$/);
+    if (!match) return null;
+    let containerId = '';
     try {
-        return !RESERVED_SERVER_SEGMENTS.has(decodeURIComponent(match[1]).trim().toLowerCase());
+        containerId = decodeURIComponent(match[1]).trim();
     } catch {
-        return !RESERVED_SERVER_SEGMENTS.has(String(match[1] || '').trim().toLowerCase());
+        containerId = String(match[1] || '').trim();
     }
+    if (!containerId || RESERVED_SERVER_SEGMENTS.has(containerId.toLowerCase())) {
+        return null;
+    }
+    return {
+        containerId,
+        page: match[2] || 'console'
+    };
+}
+
+export function isServerConsolePath(pathname = '') {
+    const parsed = parseServerRoute(pathname);
+    return Boolean(parsed && parsed.page === 'console');
+}
+
+export function resolveServerReactPage(pathname = '') {
+    return parseServerRoute(pathname);
 }

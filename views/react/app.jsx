@@ -1,9 +1,13 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { ReactRoutes, isServerConsolePath } from './ReactRoutes.js';
+import { ReactRoutes, resolveServerReactPage } from './ReactRoutes.js';
 import { DashboardPage } from './dashboard.jsx';
 import { ServerConsolePage } from './server-console.jsx';
+import { ServerFilesPage } from './server-files.jsx';
+import { ServerBackupsPage } from './server-backups.jsx';
+import { ServerNetworkPage } from './server-network.jsx';
+import { ServerApiPage } from './server-api.jsx';
 import { AccountPage } from './account.jsx';
 import { DeviceLoginPage } from './device-login.jsx';
 import { ExperimentalFeaturesPage } from './experimental-features.jsx';
@@ -23,7 +27,14 @@ function normalizePathname(pathname) {
 function resolveComponentForPath(pathname) {
     const current = normalizePathname(pathname);
     if (current === ReactRoutes.dashboard) return DashboardPage;
-    if (isServerConsolePath(current)) return ServerConsolePage;
+    const serverRoute = resolveServerReactPage(current);
+    if (serverRoute) {
+        if (serverRoute.page === 'console') return ServerConsolePage;
+        if (serverRoute.page === 'files') return ServerFilesPage;
+        if (serverRoute.page === 'backups') return ServerBackupsPage;
+        if (serverRoute.page === 'network') return ServerNetworkPage;
+        if (serverRoute.page === 'api') return ServerApiPage;
+    }
     if (current === ReactRoutes.account) return AccountPage;
     if (current === ReactRoutes.deviceLogin) return DeviceLoginPage;
     if (current === ReactRoutes.experimentalFeatures) return ExperimentalFeaturesPage;
@@ -216,6 +227,10 @@ function AppRouter() {
             <Routes>
                 <Route path={ReactRoutes.dashboard} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverConsolePattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverFilesPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverBackupsPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverNetworkPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverApiPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.account} element={<RoutedPage />} />
                 <Route path={ReactRoutes.deviceLogin} element={<RoutedPage />} />
                 <Route path={ReactRoutes.experimentalFeatures} element={<RoutedPage />} />

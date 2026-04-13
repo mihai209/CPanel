@@ -106,6 +106,48 @@ function registerServerPagesRoutes(ctx) {
         return String(req && req.query ? req.query.__reactData || '' : '').trim() === '1';
     }
 
+    function wantsLegacyReactBypass(req) {
+        return String(req && req.query ? req.query.legacy || '' : '').trim() === '1';
+    }
+
+    function buildReactUserSummary(userSession = {}) {
+        const email = String(userSession.email || '').trim().toLowerCase();
+        return {
+            id: userSession.id || null,
+            username: userSession.username || '',
+            email: userSession.email || '',
+            avatarUrl: userSession.avatarUrl || '',
+            avatarProvider: userSession.avatarProvider || 'gravatar',
+            gravatarHash: userSession.gravatarHash || (email ? nodeCrypto.createHash('md5').update(email).digest('hex') : '')
+        };
+    }
+
+    function buildReactServerNavItems(server, access, activeKey) {
+        if (!server) return [];
+        const containerId = server.containerId;
+        return [
+            { key: 'console', label: 'Console', href: `/server/${containerId}`, active: activeKey === 'console' },
+            hasServerPermission(access, 'server.files')
+                ? { key: 'files', label: 'File Manager', href: `/server/${containerId}/files`, active: activeKey === 'files' }
+                : null,
+            hasServerPermission(access, 'server.backups.view')
+                ? { key: 'backups', label: 'Backups', href: `/server/${containerId}/backups`, active: activeKey === 'backups' }
+                : null,
+            hasServerPermission(access, 'server.network.view')
+                ? { key: 'network', label: 'Network', href: `/server/${containerId}/network`, active: activeKey === 'network' }
+                : null,
+            hasServerPermission(access, 'server.users.view')
+                ? { key: 'api', label: 'API Keys', href: `/server/${containerId}/api`, active: activeKey === 'api' }
+                : null,
+            hasServerPermission(access, 'server.startup')
+                ? { key: 'startup', label: 'Startup', href: `/server/${containerId}/startup`, active: activeKey === 'startup' }
+                : null,
+            hasServerPermission(access, 'server.activity.view')
+                ? { key: 'activity', label: 'Activity', href: `/server/${containerId}/activity`, active: activeKey === 'activity' }
+                : null
+        ].filter(Boolean);
+    }
+
     function buildServerPolicyTargetPath(directory, name = '') {
         const dirRaw = String(directory || '/').trim().replace(/\\/g, '/');
         const cleanDir = nodePath.posix.normalize(dirRaw.startsWith('/') ? dirRaw : `/${dirRaw}`);
@@ -970,7 +1012,7 @@ function registerServerPagesRoutes(ctx) {
                 return res.json(reactPageData);
             }
 
-            if (String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
+            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
                 return res.render('react/loader', {
                     title: 'React Dashboard',
                     reactEntry: 'app',
@@ -10828,21 +10870,11 @@ function registerServerPagesRoutes(ctx) {
             else if (!aiUsePermission) aiDisabledReason = 'No permission';
 
             const userSession = req.session && req.session.user ? req.session.user : {};
-            const userEmail = String(userSession.email || '').trim().toLowerCase();
-            const gravatarHash = userSession.gravatarHash || (userEmail ? nodeCrypto.createHash('md5').update(userEmail).digest('hex') : '');
+            const reactUser = buildReactUserSummary(userSession);
             const allocationAddress = server.allocation
                 ? `${server.allocation.alias || server.allocation.ip || 'unassigned'}:${server.allocation.port || 0}`
                 : 'No allocation';
-            const serverNavItems = [
-                { key: 'console', label: 'Console', href: `/server/${server.containerId}`, active: true },
-                hasServerPermission(access, 'server.files') ? { key: 'files', label: 'Files', href: `/server/${server.containerId}/files`, active: false } : null,
-                hasServerPermission(access, 'server.backups') ? { key: 'backups', label: 'Backups', href: `/server/${server.containerId}/backups`, active: false } : null,
-                hasServerPermission(access, 'server.startup') ? { key: 'startup', label: 'Startup', href: `/server/${server.containerId}/startup`, active: false } : null,
-                hasServerPermission(access, 'server.activity.view') ? { key: 'activity', label: 'Activity', href: `/server/${server.containerId}/activity`, active: false } : null,
-                isServerLikelyMinecraft(server) && hasServerPermission(access, 'server.minecraft')
-                    ? { key: 'players', label: 'Players', href: `/server/${server.containerId}/minecraft/admin`, active: false }
-                    : null
-            ].filter(Boolean);
+            const serverNavItems = buildReactServerNavItems(server, access, 'console');
 
             const reactPageData = {
                 routePath: `/server/${server.containerId}`,
@@ -10861,13 +10893,7 @@ function registerServerPagesRoutes(ctx) {
                     network_tx: '0',
                     uptime_seconds: 0
                 },
-                user: {
-                    id: userSession.id,
-                    username: userSession.username || '',
-                    avatarUrl: userSession.avatarUrl || '',
-                    avatarProvider: userSession.avatarProvider || 'gravatar',
-                    gravatarHash
-                },
+                user: reactUser,
                 server: {
                     id: server.id,
                     containerId: server.containerId,
@@ -10889,7 +10915,7 @@ function registerServerPagesRoutes(ctx) {
                 return res.json(reactPageData);
             }
 
-            if (String(userSession.experimentalViewMode || 'ejs').trim().toLowerCase() === 'react') {
+            if (!wantsLegacyReactBypass(req) && String(userSession.experimentalViewMode || 'ejs').trim().toLowerCase() === 'react') {
                 return res.render('react/loader', {
                     title: `Console · ${server.name}`,
                     reactEntry: 'app',
@@ -11870,6 +11896,46 @@ function registerServerPagesRoutes(ctx) {
                     ? isServerApiKeyActive(entry)
                     : !entry.revokedAt
             }));
+
+            const reactPageData = {
+                routePath: `/server/${server.containerId}/api`,
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                success: req.query.success || null,
+                error: req.query.error || null,
+                user: buildReactUserSummary(req.session.user),
+                server: {
+                    id: server.id,
+                    containerId: server.containerId,
+                    name: server.name,
+                    description: server.description || '',
+                    status: server.status || 'unknown'
+                },
+                serverNavItems: buildReactServerNavItems(server, access, 'api'),
+                owner,
+                apiKeys,
+                freshToken,
+                permissions: {
+                    canManageApiKeys: hasServerPermission(access, 'server.users.manage')
+                },
+                apiPermissionCatalog: SERVER_API_KEY_PERMISSIONS,
+                actions: {
+                    create: `/server/${server.containerId}/api-keys`,
+                    keyBase: `/server/${server.containerId}/api-keys`
+                }
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
+            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
+                return res.render('react/loader', {
+                    title: `API Keys · ${server.name}`,
+                    reactEntry: 'app',
+                    reactPageData
+                });
+            }
 
             return res.render('server/api-keys', {
                 server,
@@ -13400,6 +13466,61 @@ function registerServerPagesRoutes(ctx) {
                             : 'Google Drive is ready for backups.'))
             };
 
+            const reactPageData = {
+                routePath: `/server/${server.containerId}/backups`,
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                success: req.query.success || null,
+                error: req.query.error || null,
+                user: buildReactUserSummary(req.session.user),
+                server: {
+                    id: server.id,
+                    containerId: server.containerId,
+                    name: server.name,
+                    description: server.description || '',
+                    status: server.status || 'unknown'
+                },
+                serverNavItems: buildReactServerNavItems(server, access, 'backups'),
+                permissions: {
+                    canManageBackups,
+                    canManageBackupPolicy,
+                    canUseGdrive,
+                    canConnectGoogleDrive
+                },
+                backupPolicy: {
+                    autoEnabled,
+                    intervalMinutes,
+                    lastRunAt: policy && policy.lastRunAt ? policy.lastRunAt : null
+                },
+                googleDriveState,
+                backups: backupHistory,
+                activeJob: activeJob ? {
+                    id: activeJob.id,
+                    status: activeJob.status,
+                    type: activeJob.type,
+                    createdAt: activeJob.createdAt,
+                    updatedAt: activeJob.updatedAt,
+                    progress: activeJob.result && typeof activeJob.result === 'object' ? activeJob.result.progress || null : null
+                } : null,
+                actions: {
+                    savePolicy: `/server/${server.containerId}/backups/policy`,
+                    run: `/server/${server.containerId}/backups/run`,
+                    connectGoogle: `/auth/google?drive=1&next=${encodeURIComponent(`/server/${server.containerId}/backups`)}`
+                }
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
+            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
+                return res.render('react/loader', {
+                    title: `Backups · ${server.name}`,
+                    reactEntry: 'app',
+                    reactPageData
+                });
+            }
+
             return res.render('server/backups', {
                 server,
                 user: req.session.user,
@@ -13814,6 +13935,64 @@ function registerServerPagesRoutes(ctx) {
 
             if (inventoryEnabled && remainingAssignable >= 0 && availableAllocations.length > remainingAssignable) {
                 availableAllocations = availableAllocations.slice(0, remainingAssignable);
+            }
+
+            const reactPageData = {
+                routePath: `/server/${server.containerId}/network`,
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                success: req.query.success || null,
+                error: req.query.error || null,
+                user: buildReactUserSummary(req.session.user),
+                server: {
+                    id: server.id,
+                    containerId: server.containerId,
+                    name: server.name,
+                    description: server.description || '',
+                    status: server.status || 'unknown'
+                },
+                serverNavItems: buildReactServerNavItems(server, access, 'network'),
+                permissions: {
+                    canManageNetwork: hasServerPermission(access, 'server.network.manage')
+                },
+                networkSummary: {
+                    primaryAllocationId,
+                    inventoryEnabled,
+                    allocationTokens,
+                    additionalAssignedCount,
+                    remainingAssignable,
+                    inventoryAssignBlockedReason
+                },
+                allocations: assignedAllocations.map((entry) => ({
+                    id: entry.id,
+                    ip: entry.alias || entry.ip || '',
+                    port: entry.port,
+                    notes: entry.notes || '',
+                    isPrimary: Number.parseInt(entry.id, 10) === primaryAllocationId
+                })),
+                availableAllocations: availableAllocations.map((entry) => ({
+                    id: entry.id,
+                    ip: entry.alias || entry.ip || '',
+                    port: entry.port,
+                    notes: entry.notes || ''
+                })),
+                actions: {
+                    assign: `/server/${server.containerId}/network/allocations`,
+                    primaryBase: `/server/${server.containerId}/network/allocations`,
+                    removeBase: `/server/${server.containerId}/network/allocations`
+                }
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
+            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
+                return res.render('react/loader', {
+                    title: `Network · ${server.name}`,
+                    reactEntry: 'app',
+                    reactPageData
+                });
             }
 
             return res.render('server/network', {
@@ -16426,6 +16605,55 @@ function registerServerPagesRoutes(ctx) {
             const webUploadEnabled = uploadEnabledRaw === 'true' || uploadEnabledRaw === '1' || uploadEnabledRaw === 'on' || uploadEnabledRaw === 'yes';
             const uploadMaxMbRaw = Number.parseInt(String((res.locals.settings && res.locals.settings.featureWebUploadMaxMb) || '50').trim(), 10);
             const webUploadMaxMb = Math.max(1, Math.min(2048, Number.isInteger(uploadMaxMbRaw) ? uploadMaxMbRaw : 50));
+
+            const reactPageData = {
+                routePath: `/server/${server.containerId}/files`,
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                success: req.query.success || null,
+                error: req.query.error || null,
+                user: buildReactUserSummary(req.session.user),
+                server: {
+                    id: server.id,
+                    containerId: server.containerId,
+                    name: server.name,
+                    description: server.description || '',
+                    status: server.status || 'unknown'
+                },
+                serverNavItems: buildReactServerNavItems(server, access, 'files'),
+                initialPath,
+                sftpDetails,
+                permissions: {
+                    canWriteFiles: hasServerPermission(access, 'server.files.write'),
+                    canFixPermissions: hasServerPermission(access, 'server.files.write') || hasServerPermission(access, 'server.startup'),
+                    canDownloadFiles: hasServerPermission(access, 'server.files.download'),
+                    filesWriteLocked
+                },
+                policyReadOnlyPatterns: policyConfig && policyConfig.readOnlyFiles ? policyConfig.readOnlyFiles.patterns || [] : [],
+                fileManager: {
+                    wsToken,
+                    webUploadEnabled,
+                    webUploadMaxMb,
+                    fetchUrlBase: `/server/${server.containerId}/files-fetch`,
+                    searchUrlBase: `/server/${server.containerId}/files-search`,
+                    legacyUrl: `/server/${server.containerId}/files`,
+                    editUrlBase: `/server/${server.containerId}/files/edit`,
+                    previewUrlBase: `/server/${server.containerId}/files/preview`,
+                    downloadUrlBase: `/server/${server.containerId}/files/download`
+                }
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
+            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
+                return res.render('react/loader', {
+                    title: `File Manager · ${server.name}`,
+                    reactEntry: 'app',
+                    reactPageData
+                });
+            }
 
             res.render('server/files', {
                 server,
