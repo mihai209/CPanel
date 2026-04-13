@@ -45,6 +45,7 @@
             const serverDisk = <%= server.disk || 0 %>;
             let currentServerStatus = '<%= String(server.status || "stopped").toLowerCase() %>';
             const consoleReplayStorageKey = `cpanel.console.replay.<%= server.containerId %>`;
+            const consoleAutoCopyStorageKey = `cpanel.console.autocopy.<%= server.containerId %>`;
             const restrictedProvisioningViewer = <%= isRestrictedProvisioningViewer ? 'true' : 'false' %>;
             const promptBrand = <%- JSON.stringify(String((settings && settings.brandName) ? settings.brandName : 'cpanel').toLowerCase()) %>;
             const isAdminConsoleViewer = <%= user && user.isAdmin ? 'true' : 'false' %>;
@@ -1823,6 +1824,46 @@
                 }
             });
 
+            let autoCopyConsoleSelection = false;
+            try {
+                autoCopyConsoleSelection = localStorage.getItem(consoleAutoCopyStorageKey) === 'true';
+            } catch (_) {
+                autoCopyConsoleSelection = false;
+            }
+
+            const btnAutoCopy = document.getElementById('btnAutoCopy');
+            function syncAutoCopyButton() {
+                if (!btnAutoCopy) return;
+                btnAutoCopy.classList.toggle('btn-outline-secondary', !autoCopyConsoleSelection);
+                btnAutoCopy.classList.toggle('btn-info', autoCopyConsoleSelection);
+                btnAutoCopy.classList.toggle('btn-outline-info', autoCopyConsoleSelection);
+                btnAutoCopy.setAttribute('aria-pressed', autoCopyConsoleSelection ? 'true' : 'false');
+                btnAutoCopy.title = autoCopyConsoleSelection
+                    ? 'Auto-copy on selection is enabled'
+                    : 'Auto-copy on selection is disabled';
+                btnAutoCopy.innerHTML = autoCopyConsoleSelection
+                    ? '<i class="bi bi-clipboard-check me-1"></i>Auto Copy'
+                    : '<i class="bi bi-clipboard me-1"></i>Auto Copy';
+            }
+
+            function setAutoCopyConsoleSelection(nextValue, options = {}) {
+                autoCopyConsoleSelection = Boolean(nextValue);
+                try {
+                    localStorage.setItem(consoleAutoCopyStorageKey, autoCopyConsoleSelection ? 'true' : 'false');
+                } catch (_) {}
+                syncAutoCopyButton();
+                if (!options.silent) {
+                    showConsoleStatus(autoCopyConsoleSelection
+                        ? 'Auto-copy selection enabled.'
+                        : 'Auto-copy selection disabled.');
+                }
+            }
+
+            btnAutoCopy?.addEventListener('click', () => {
+                setAutoCopyConsoleSelection(!autoCopyConsoleSelection);
+            });
+            syncAutoCopyButton();
+
             setFollowConsoleOutput(followConsoleOutput);
             restoreReplayCacheIfNeeded();
             syncConsoleSideRailVisibility();
@@ -1993,6 +2034,11 @@
                     toggleTerminalSearch(true);
                     return;
                 }
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === 'c') {
+                    e.preventDefault();
+                    setAutoCopyConsoleSelection(!autoCopyConsoleSelection);
+                    return;
+                }
                 if ((e.ctrlKey || e.metaKey) && key === 'enter') {
                     e.preventDefault();
                     sendConsoleCommand(consoleInput ? consoleInput.value : '');
@@ -2094,7 +2140,7 @@
 
             const terminalHost = document.getElementById('terminal');
             terminalHost?.addEventListener('mouseup', () => {
-                if (term.getSelection()) {
+                if (autoCopyConsoleSelection && term.getSelection()) {
                     copyTerminalSelection();
                 }
             });
