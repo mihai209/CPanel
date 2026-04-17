@@ -5,6 +5,10 @@ export const ReactRoutes = {
     serverBackupsPattern: '/server/:containerId/backups',
     serverNetworkPattern: '/server/:containerId/network',
     serverApiPattern: '/server/:containerId/api',
+    serverDatabasesPattern: '/server/:containerId/databases',
+    serverUsersPattern: '/server/:containerId/users',
+    serverSchedulesPattern: '/server/:containerId/schedules',
+    serverStartupPattern: '/server/:containerId/startup',
     account: '/account',
     deviceLogin: '/account/device-login',
     themes: '/themes',
@@ -50,7 +54,7 @@ export function buildServerApiRoute(containerId = '') {
 
 function parseServerRoute(pathname = '') {
     const normalized = String(pathname || '').trim().replace(/\/+$/, '') || '/';
-    const match = normalized.match(/^\/server\/([^/]+)(?:\/(files|backups|network|api))?$/);
+    const match = normalized.match(/^\/server\/([^/]+)(?:\/(files|backups|network|api|databases|users|schedules|startup))?$/);
     if (!match) return null;
     let containerId = '';
     try {

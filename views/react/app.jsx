@@ -8,6 +8,10 @@ import { ServerFilesPage } from './server-files.jsx';
 import { ServerBackupsPage } from './server-backups.jsx';
 import { ServerNetworkPage } from './server-network.jsx';
 import { ServerApiPage } from './server-api.jsx';
+import { ServerDatabasesPage } from './server-databases.jsx';
+import { ServerUsersPage } from './server-users.jsx';
+import { ServerSchedulesPage } from './server-schedules.jsx';
+import { ServerStartupPage } from './server-startup.jsx';
 import { AccountPage } from './account.jsx';
 import { DeviceLoginPage } from './device-login.jsx';
 import { ExperimentalFeaturesPage } from './experimental-features.jsx';
@@ -34,6 +38,10 @@ function resolveComponentForPath(pathname) {
         if (serverRoute.page === 'backups') return ServerBackupsPage;
         if (serverRoute.page === 'network') return ServerNetworkPage;
         if (serverRoute.page === 'api') return ServerApiPage;
+        if (serverRoute.page === 'databases') return ServerDatabasesPage;
+        if (serverRoute.page === 'users') return ServerUsersPage;
+        if (serverRoute.page === 'schedules') return ServerSchedulesPage;
+        if (serverRoute.page === 'startup') return ServerStartupPage;
     }
     if (current === ReactRoutes.account) return AccountPage;
     if (current === ReactRoutes.deviceLogin) return DeviceLoginPage;
@@ -231,6 +239,10 @@ function AppRouter() {
                 <Route path={ReactRoutes.serverBackupsPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverNetworkPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverApiPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverDatabasesPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverUsersPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverSchedulesPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverStartupPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.account} element={<RoutedPage />} />
                 <Route path={ReactRoutes.deviceLogin} element={<RoutedPage />} />
                 <Route path={ReactRoutes.experimentalFeatures} element={<RoutedPage />} />
