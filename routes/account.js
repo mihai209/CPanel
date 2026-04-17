@@ -783,6 +783,35 @@ function registerAccountRoutes({
                     limit: 10
                 })
             ]);
+            const reactPageData = {
+                routePath: '/notifications',
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                user: {
+                    username: user.username,
+                    email: user.email || '',
+                    avatarUrl: user.avatarUrl || '',
+                    avatarProvider: user.avatarProvider || 'gravatar',
+                    gravatarHash: md5(String(user.email || '').trim().toLowerCase()),
+                    notificationUnreadCount: unreadCount,
+                    isAdmin: Boolean(user.isAdmin)
+                },
+                notifications,
+                unreadCount,
+                notificationSettings,
+                browserSubscriptionCount: subscriptions.length,
+                success: req.query.success || null,
+                error: req.query.error || null
+            };
+
+            if (normalizeExperimentalViewMode(user.experimentalViewMode) === 'react') {
+                return res.render('react/loader', {
+                    title: 'Notifications',
+                    reactEntry: 'notifications', // specific entry for clarity
+                    reactPageData
+                });
+            }
+
             return res.render('notifications', {
                 title: 'Notifications',
                 path: '/notifications',

@@ -1228,7 +1228,7 @@ function registerServerPagesRoutes(ctx) {
                 return true;
             });
 
-            return res.render('loader', {
+            return res.render('react/loader', {
                 title: 'Connectors Check',
                 reactPageData: {
                     routePath: '/connectors-check',

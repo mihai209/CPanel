@@ -8058,7 +8058,9 @@
     deviceLogin: "/account/device-login",
     themes: "/themes",
     experimentalFeatures: "/experimental-features",
-    changeView: "/experimental/change-view"
+    changeView: "/experimental/change-view",
+    connectorsCheck: "/connectors-check",
+    notifications: "/notifications"
   };
   function resolveBrandImage(pageData = {}) {
     return pageData.faviconUrl || "/assets/rocky.png";
@@ -8488,6 +8490,7 @@
             }
           ),
           /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "hidden md:flex items-center gap-2", children: [
+            pageData.user?.isAdmin && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(InternalTopAction, { to: ReactRoutes.connectorsCheck, icon: "bi-cpu", title: "Connectors Check" }),
             /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(NotificationBell, {}),
             /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "h-6 w-px bg-neutral-700 mx-2" }),
             /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(InternalTopAction, { to: ReactRoutes.experimentalFeatures, icon: "bi-sliders", title: "Experimental Features" }),

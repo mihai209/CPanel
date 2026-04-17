@@ -7279,9 +7279,12 @@
     }
   });
 
-  // views/react/dashboard.jsx
-  var import_react8 = __toESM(require_react());
+  // views/react/notifications.jsx
+  var import_react6 = __toESM(require_react());
   var import_client = __toESM(require_client());
+
+  // views/react/components/ReactAppShell.jsx
+  var import_react4 = __toESM(require_react());
 
   // node_modules/react-router-dom/dist/index.js
   var React2 = __toESM(require_react());
@@ -8075,9 +8078,6 @@
     return fallback;
   }
 
-  // views/react/components/ReactAppShell.jsx
-  var import_react4 = __toESM(require_react());
-
   // views/react/components/ProvisioningBarrier.jsx
   var import_react = __toESM(require_react());
   var import_jsx_runtime = __toESM(require_jsx_runtime());
@@ -8586,144 +8586,146 @@
     ] });
   }
 
-  // views/react/components/ServerRow.jsx
-  var import_react6 = __toESM(require_react());
+  // views/react/notifications.jsx
   var import_jsx_runtime6 = __toESM(require_jsx_runtime());
-  function formatLimit(mb) {
-    if (!mb || mb <= 0) return "N/A";
-    if (mb >= 1024) return `${(mb / 1024).toFixed(mb % 1024 === 0 ? 0 : 1)} GB`;
-    return `${mb} MB`;
-  }
-  function ServerRow({ server, isAdminDashboard }) {
-    const rawStatus = String(server.status || "unknown").toLowerCase();
-    let statusColor = "bg-neutral-600 text-neutral-200";
-    let statusLabel = rawStatus;
-    if (server.isSuspended) {
-      statusColor = "bg-red-600 text-white";
-      statusLabel = "suspended";
-    } else if (rawStatus === "running") {
-      statusColor = "bg-green-600 text-white";
-    } else if (rawStatus === "stopped") {
-      statusColor = "bg-red-600 text-white";
-    } else if (rawStatus === "installing") {
-      statusColor = "bg-yellow-500 text-neutral-900";
-    }
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-900/50 backdrop-blur-sm border border-neutral-800/80 rounded-[1.5rem] p-6 hover:border-primary-500/30 hover:bg-neutral-800/40 transition-all duration-300 flex flex-col lg:flex-row lg:items-center justify-between group shadow-lg hover:shadow-primary-900/5", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1 min-w-0", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-4 mb-2", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `w-2.5 h-2.5 rounded-full ${server.isSuspended ? "bg-red-500" : rawStatus === "running" ? "bg-green-500" : "bg-neutral-700"} shadow-[0_0_10px_rgba(34,197,94,0.3)]` }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h3", { className: "text-lg font-black text-neutral-100 truncate group-hover:text-primary-400 transition-colors tracking-tight", children: server.name }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: `text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-[0.1em] ${statusColor} bg-opacity-10 ring-1 ring-inset ring-current`, children: statusLabel })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-3 mt-2", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-[10px] text-neutral-500 font-black uppercase tracking-widest bg-neutral-800/50 px-2 py-0.5 rounded", children: server.containerId?.substring(0, 12) }),
-          isAdminDashboard && server.owner && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-2 pl-3 border-l border-neutral-800", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-person-badge text-xs text-primary-500/70" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-[10px] font-black text-neutral-400 uppercase tracking-widest", children: server.owner.username })
-          ] })
-        ] })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "mt-6 lg:mt-0 flex flex-wrap sm:flex-nowrap items-center gap-6 lg:ml-8 shrink-0", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1 sm:flex-none", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-[10px] text-neutral-500 uppercase font-black tracking-widest mb-1 opacity-60", children: "CPU Usage" }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-sm font-black text-neutral-200 tabular-nums", children: server.cpu ? `${server.cpu}%` : "0%" })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-px h-8 bg-neutral-800 hidden sm:block" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1 sm:flex-none", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-[10px] text-neutral-500 uppercase font-black tracking-widest mb-1 opacity-60", children: "Memory" }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-sm font-black text-neutral-200 tabular-nums", children: formatLimit(server.memory) })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-px h-8 bg-neutral-800 hidden sm:block" }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1 sm:flex-none", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-[10px] text-neutral-500 uppercase font-black tracking-widest mb-1 opacity-60", children: "Storage" }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-sm font-black text-neutral-200 tabular-nums", children: formatLimit(server.disk) })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-full sm:w-auto mt-4 sm:mt-0 sm:ml-4", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("a", { href: `/server/${server.containerId}`, className: "flex items-center justify-center gap-2 bg-neutral-800 hover:bg-primary-600 text-neutral-100 hover:text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all duration-300 shadow-xl shadow-black/20 hover:shadow-primary-900/20 active:scale-95", children: [
-          "Manage ",
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-arrow-right-short text-lg" })
-        ] }) })
-      ] })
-    ] });
-  }
-
-  // views/react/components/Spinner.jsx
-  var import_react7 = __toESM(require_react());
-  var import_jsx_runtime7 = __toESM(require_jsx_runtime());
-  function Spinner({ centered, size = "default" }) {
-    const sizeClasses = size === "large" ? "w-10 h-10 border-4" : "w-5 h-5 border-2";
-    const spinner = /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: `animate-spin rounded-full border-t-primary-500 border-neutral-700 ${sizeClasses}` });
-    if (centered) {
-      return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex justify-center items-center w-full py-16", children: spinner });
-    }
-    return spinner;
-  }
-
-  // views/react/dashboard.jsx
-  var import_jsx_runtime8 = __toESM(require_jsx_runtime());
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
-  var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "dashboard";
+  var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "notifications";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
-  function DashboardPage({ pageData = data }) {
-    const [servers, setServers] = import_react8.default.useState(Array.isArray(pageData.servers) ? pageData.servers : null);
-    import_react8.default.useEffect(() => {
-      if (!pageData.servers) {
-        setServers([]);
-      } else {
-        setServers(pageData.servers);
+  function getSeverityTheme(severity) {
+    const s = String(severity || "info").toLowerCase();
+    if (s === "danger" || s === "error" || s === "critical") {
+      return { icon: "bi-exclamation-octagon-fill", color: "text-red-500", bg: "bg-red-500/10", border: "border-red-500/20" };
+    }
+    if (s === "warning") {
+      return { icon: "bi-exclamation-triangle-fill", color: "text-yellow-500", bg: "bg-yellow-500/10", border: "border-yellow-500/20" };
+    }
+    if (s === "success") {
+      return { icon: "bi-check-circle-fill", color: "text-green-500", bg: "bg-green-500/10", border: "border-green-500/20" };
+    }
+    return { icon: "bi-info-circle-fill", color: "text-blue-500", bg: "bg-blue-500/10", border: "border-blue-500/20" };
+  }
+  function NotificationsPage({ pageData = data }) {
+    const [notifications, setNotifications] = import_react6.default.useState(Array.isArray(pageData.notifications) ? pageData.notifications : []);
+    const [unreadCount, setUnreadCount] = import_react6.default.useState(Number(pageData.unreadCount || 0));
+    const [processing, setProcessing] = import_react6.default.useState(false);
+    const markRead = async (id) => {
+      try {
+        const response = await fetch(`/api/account/notifications/${id}/read`, { method: "POST" });
+        const result = await response.json();
+        if (response.ok) {
+          setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, isRead: true } : n));
+          setUnreadCount(result.unreadCount);
+        }
+      } catch (error) {
+        console.error("Failed to mark notification as read:", error);
       }
-    }, [pageData]);
-    const isViewingAllServers = Boolean(pageData.showOthersServers);
-    const userIsAdmin = Boolean(pageData.isAdminDashboard);
-    return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(ReactAppShell, { pageData, subtitle: "React view beta", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+    };
+    const markAllRead = async () => {
+      if (processing) return;
+      setProcessing(true);
+      try {
+        const response = await fetch("/api/account/notifications/read-all", { method: "POST" });
+        const result = await response.json();
+        if (response.ok) {
+          setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+          setUnreadCount(0);
+        }
+      } catch (error) {
+        console.error("Failed to mark all as read:", error);
+      } finally {
+        setProcessing(false);
+      }
+    };
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ReactAppShell, { pageData: { ...pageData, user: { ...pageData.user, notificationUnreadCount: unreadCount } }, subtitle: "User Notifications", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
       PageContentBlock,
       {
-        title: isViewingAllServers ? "System Overview" : "Dashboard",
-        description: isViewingAllServers ? "Viewing all active servers across the system." : "Individual overview of your servers and instances.",
+        title: "Notifications",
+        description: "Stay informed about your servers, security events, and platform updates.",
         children: [
-          userIsAdmin && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "mb-10 group relative", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "absolute -inset-1 bg-gradient-to-r from-primary-600/20 to-purple-600/20 rounded-[2.5rem] blur-xl opacity-50 group-hover:opacity-100 transition duration-1000 group-hover:duration-200" }),
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "relative flex flex-col sm:flex-row justify-between items-center bg-neutral-900/80 backdrop-blur-xl border border-neutral-800/50 p-6 sm:p-8 rounded-[2rem] shadow-2xl overflow-hidden ring-1 ring-white/5", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center gap-6 mb-6 sm:mb-0", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: `w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-inner ${isViewingAllServers ? "bg-primary-500/10 text-primary-400 ring-2 ring-primary-500/20" : "bg-neutral-800 text-neutral-500"}`, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: `bi ${isViewingAllServers ? "bi-shield-check" : "bi-shield-lock"} text-2xl` }) }),
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("h4", { className: "text-[11px] font-black text-white uppercase tracking-[0.2em] leading-none mb-2 opacity-90", children: isViewingAllServers ? "System-Wide Administration" : "Personal Instance Dashboard" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: "text-[10px] text-neutral-500 font-bold uppercase tracking-widest opacity-70", children: isViewingAllServers ? "Global visibility enabled: Viewing all network servers" : "Filtered view: Only showing your private instances" })
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-3", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h2", { className: "text-2xl font-black text-white uppercase tracking-tight", children: "Activity Feed" }),
+                unreadCount > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "bg-primary-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest animate-pulse", children: [
+                  unreadCount,
+                  " Unread"
                 ] })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-xs text-neutral-500 font-bold uppercase tracking-widest mt-1", children: "Viewing your 100 most recent alerts" })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex gap-2 w-full sm:w-auto", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                "button",
+                {
+                  onClick: markAllRead,
+                  disabled: unreadCount === 0 || processing,
+                  className: `flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all border ${unreadCount > 0 ? "bg-neutral-800 border-neutral-700 text-white hover:bg-neutral-700 active:scale-95" : "bg-neutral-900 border-neutral-800 text-neutral-700 cursor-not-allowed"}`,
+                  children: processing ? "Processing..." : "Mark All Read"
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
                 "a",
                 {
-                  href: isViewingAllServers ? "/" : "/?others=true",
-                  className: `group relative px-8 py-4 rounded-xl text-xs font-black uppercase tracking-[0.25em] transition-all duration-300 flex items-center gap-3 overflow-hidden ${isViewingAllServers ? "bg-neutral-800 hover:bg-neutral-700 text-primary-400 border border-neutral-700" : "bg-primary-600 hover:bg-primary-500 text-white shadow-2xl shadow-primary-900/40"}`,
-                  children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "relative z-10 flex items-center gap-3", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: `bi ${isViewingAllServers ? "bi-toggle-on text-lg" : "bi-toggle-off text-lg opacity-50"}` }),
-                    isViewingAllServers ? "Leave Admin View" : "Enter Admin View"
-                  ] })
+                  href: "/account",
+                  className: "px-4 py-2.5 bg-neutral-800 border border-neutral-700 rounded-xl text-neutral-400 hover:text-white transition-colors flex items-center justify-center",
+                  title: "Notification Settings",
+                  children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-gear-fill" })
                 }
               )
             ] })
           ] }),
-          !servers ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(Spinner, { centered: true, size: "large" }) : servers.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "flex flex-col gap-2", children: servers.map((server) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-            ServerRow,
-            {
-              server,
-              isAdminDashboard: isViewingAllServers
-            },
-            server.id || server.containerId
-          )) }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex flex-col items-center justify-center py-24 bg-neutral-900/30 border border-neutral-800/50 border-dashed rounded-3xl", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-stack text-4xl text-neutral-800 mb-4" }),
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: "text-center text-sm font-bold text-neutral-500 uppercase tracking-widest", children: isViewingAllServers ? "No servers found in the system." : "You do not have any active servers." })
-          ] })
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "space-y-3", children: notifications.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "py-24 flex flex-col items-center justify-center bg-neutral-800/20 border border-neutral-800/50 border-dashed rounded-[2.5rem]", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-20 h-20 bg-neutral-800 rounded-3xl flex items-center justify-center mb-6 shadow-2xl", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-bell-slash text-3xl text-neutral-600" }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h3", { className: "text-lg font-bold text-neutral-400 uppercase tracking-widest", children: "Peace and Quiet" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-xs text-neutral-600 font-bold uppercase tracking-[0.15em] mt-2 text-center max-w-xs", children: "No new notifications at the moment. We'll alert you if anything requires your attention." })
+          ] }) : notifications.map((notif, idx) => {
+            const theme = getSeverityTheme(notif.severity);
+            return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+              "div",
+              {
+                className: `group relative overflow-hidden bg-neutral-800/40 border transition-all duration-300 rounded-2xl p-5 sm:p-6 ${notif.isRead ? "border-neutral-800/50 opacity-60" : `${theme.border} hover:border-neutral-600 shadow-xl`}`,
+                children: [
+                  !notif.isRead && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `absolute top-0 left-0 w-1 h-full ${theme.color.replace("text", "bg")}` }),
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex gap-5 items-start", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-xl ${theme.bg} ${theme.color} border ${theme.border} transition-transform group-hover:scale-110`, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: `bi ${theme.icon}` }) }),
+                    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1 min-w-0", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-wrap items-center gap-3 mb-2", children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h4", { className: `text-sm font-black uppercase tracking-widest truncate ${notif.isRead ? "text-neutral-400" : "text-white"}`, children: notif.title }),
+                        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-[10px] font-bold text-neutral-600 uppercase tracking-widest", children: new Date(notif.createdAt).toLocaleString() })
+                      ] }),
+                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `text-xs leading-relaxed font-medium mb-4 whitespace-pre-wrap ${notif.isRead ? "text-neutral-500" : "text-neutral-300"}`, children: notif.message }),
+                      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-wrap items-center gap-4", children: [
+                        notif.linkUrl && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                          "a",
+                          {
+                            href: notif.linkUrl,
+                            className: "px-4 py-1.5 bg-primary-600/10 hover:bg-primary-600/20 text-primary-400 text-[10px] font-black uppercase tracking-widest rounded-lg transition-colors border border-primary-500/20",
+                            children: "View Details"
+                          }
+                        ),
+                        !notif.isRead && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                          "button",
+                          {
+                            onClick: () => markRead(notif.id),
+                            className: "text-[10px] font-black text-neutral-500 hover:text-white uppercase tracking-[0.2em] transition-colors",
+                            children: "Mark as Read"
+                          }
+                        )
+                      ] })
+                    ] })
+                  ] })
+                ]
+              },
+              notif.id || idx
+            );
+          }) })
         ]
       }
     ) });
   }
-  var dashboard_default = DashboardPage;
+  var notifications_default = NotificationsPage;
   if (root) {
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime8.jsx)(DashboardPage, { pageData: data }));
-    if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
-      window.__CPANEL_REACT_BOOTED__();
-    }
+    root.render(/* @__PURE__ */ (0, import_jsx_runtime6.jsx)(NotificationsPage, { pageData: data }));
   }
 })();
 /*! Bundled license information:

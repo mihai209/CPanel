@@ -90,6 +90,9 @@ export default function ReactAppShell({
                     </button>
                     
                     <div className="hidden md:flex items-center gap-2">
+                        {pageData.user?.isAdmin && (
+                            <InternalTopAction to={ReactRoutes.connectorsCheck} icon="bi-cpu" title="Connectors Check" />
+                        )}
                         <NotificationBell />
                         <div className="h-6 w-px bg-neutral-700 mx-2"></div>
                         <InternalTopAction to={ReactRoutes.experimentalFeatures} icon="bi-sliders" title="Experimental Features" />

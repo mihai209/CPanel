@@ -23,7 +23,9 @@ export const ReactRoutes = {
     deviceLogin: '/account/device-login',
     themes: '/themes',
     experimentalFeatures: '/experimental-features',
-    changeView: '/experimental/change-view'
+    changeView: '/experimental/change-view',
+    connectorsCheck: '/connectors-check',
+    notifications: '/notifications'
 };
 
 const RESERVED_SERVER_SEGMENTS = new Set(['notfound', 'no-permissions', 'suspended']);
