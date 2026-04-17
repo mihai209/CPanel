@@ -113,6 +113,6 @@
         };
     })();
     </script>
-    <script src="/react-build/<%= reactEntry %>.js" onerror="window.__CPANEL_REACT_BUNDLE_ERROR__ && window.__CPANEL_REACT_BUNDLE_ERROR__()"></script>
+    <script src="/react-build/<%= reactEntry %>.js?v=<%= Date.now() %>" onerror="window.__CPANEL_REACT_BUNDLE_ERROR__ && window.__CPANEL_REACT_BUNDLE_ERROR__()"></script>
 </body>
 </html>

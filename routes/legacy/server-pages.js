@@ -133,11 +133,20 @@ function registerServerPagesRoutes(ctx) {
             hasServerPermission(access, 'server.backups.view')
                 ? { key: 'backups', label: 'Backups', href: `/server/${containerId}/backups`, active: activeKey === 'backups' }
                 : null,
+            hasServerPermission(access, 'server.databases.view') || hasServerPermission(access, 'server.view')
+                ? { key: 'dbs', label: 'Databases', href: `/server/${containerId}/databases`, active: activeKey === 'dbs' }
+                : null,
             hasServerPermission(access, 'server.network.view')
                 ? { key: 'network', label: 'Network', href: `/server/${containerId}/network`, active: activeKey === 'network' }
                 : null,
             hasServerPermission(access, 'server.users.view')
+                ? { key: 'users', label: 'Users', href: `/server/${containerId}/users`, active: activeKey === 'users' }
+                : null,
+            hasServerPermission(access, 'server.users.view')
                 ? { key: 'api', label: 'API Keys', href: `/server/${containerId}/api`, active: activeKey === 'api' }
+                : null,
+            hasServerPermission(access, 'server.schedules.view')
+                ? { key: 'schedules', label: 'Schedules', href: `/server/${containerId}/schedules`, active: activeKey === 'schedules' }
                 : null,
             hasServerPermission(access, 'server.startup')
                 ? { key: 'startup', label: 'Startup', href: `/server/${containerId}/startup`, active: activeKey === 'startup' }
