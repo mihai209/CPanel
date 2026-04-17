@@ -9291,6 +9291,9 @@
       () => `cpanel.react.console.history.${server.containerId || "server"}`,
       [server.containerId]
     );
+    const isMinecraft = Boolean(pageData.isMinecraftServer);
+    const macros = Array.isArray(pageData.commandMacros) ? pageData.commandMacros : [];
+    const mcPerms = pageData.minecraftActionPermissions || {};
     const terminalHostRef = import_react6.default.useRef(null);
     const terminalInstanceRef = import_react6.default.useRef(null);
     const fitAddonRef = import_react6.default.useRef(null);
@@ -9338,6 +9341,72 @@
     const [followOutput, setFollowOutput] = import_react6.default.useState(true);
     const [terminalError, setTerminalError] = import_react6.default.useState("");
     const [terminalBooted, setTerminalBooted] = import_react6.default.useState(false);
+    const [players, setPlayers] = import_react6.default.useState([]);
+    const [playersLoading, setPlayersLoading] = import_react6.default.useState(isMinecraft);
+    const [playersError, setPlayersError] = import_react6.default.useState("");
+    import_react6.default.useEffect(() => {
+      if (!isMinecraft) return;
+      let active = true;
+      async function fetchPlayers() {
+        if (!active) return;
+        try {
+          const bedrockMode = pageData.minecraftBedrockMode ? "1" : "0";
+          const response = await fetch(`/server/${server.containerId}/minecraft/configs/status?bedrock=${bedrockMode}`);
+          const payload = await response.json();
+          if (!response.ok || !payload.success) throw new Error(payload.error || "Failed to sync players");
+          if (active) {
+            setPlayers(payload.status?.playersList || []);
+            setPlayersError("");
+            setPlayersLoading(false);
+          }
+        } catch (err) {
+          if (active) setPlayersError(err.message || "Player sync failed");
+        }
+      }
+      fetchPlayers();
+      const interval = setInterval(fetchPlayers, 3e4);
+      return () => {
+        active = false;
+        clearInterval(interval);
+      };
+    }, [isMinecraft, server.containerId]);
+    const handleMcAction = async (action, player) => {
+      const requiresReason = ["kick", "ban", "tempban"].includes(action);
+      const requiresDuration = action === "tempban";
+      const requiresDestination = action === "teleport";
+      const extra = {};
+      if (requiresDestination) {
+        const destination = window.prompt(`Teleport destination for ${player}:`, "");
+        if (!destination) return;
+        extra.destination = String(destination).trim().slice(0, 64);
+      }
+      if (requiresDuration) {
+        const duration = window.prompt(`Tempban duration for ${player} (e.g. 1h):`, "");
+        if (!duration) return;
+        extra.duration = String(duration).trim().slice(0, 16);
+      }
+      if (requiresReason) {
+        const reason = window.prompt(`Reason for ${action.toUpperCase()} ${player}:`, "");
+        if (!reason) return;
+        extra.reason = String(reason).trim().slice(0, 96);
+      }
+      const formData = new URLSearchParams();
+      formData.append("action", action);
+      formData.append("player", player);
+      formData.append("bedrock", pageData.minecraftBedrockMode ? "1" : "0");
+      if (extra.reason) formData.append("reason", extra.reason);
+      if (extra.duration) formData.append("duration", extra.duration);
+      if (extra.destination) formData.append("destination", extra.destination);
+      try {
+        await fetch(`/server/${server.containerId}/minecraft/configs`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: formData.toString()
+        });
+      } catch (e) {
+        console.error("Failed to dispatch action", e);
+      }
+    };
     import_react6.default.useEffect(() => {
       followOutputRef.current = followOutput;
     }, [followOutput]);
@@ -9591,6 +9660,11 @@
       recordHistory(command);
       setCommandValue("");
     }, [commandValue, recordHistory, sendPayload]);
+    const runMacro = import_react6.default.useCallback((macroId) => {
+      if (!sendPayload({ type: "run_macro", macroId })) return;
+      const term = terminalInstanceRef.current;
+      if (term) term.writeln(`\x1B[1;36m[*] Fired macro trigger...\x1B[0m`);
+    }, [sendPayload]);
     const sendPowerAction = import_react6.default.useCallback((action) => {
       if (!sendPayload({ type: "power_action", action })) return;
       const term = terminalInstanceRef.current;
@@ -9598,7 +9672,8 @@
         term.writeln(`\x1B[1;33m[*] Sending ${action} command...\x1B[0m`);
       }
     }, [sendPayload]);
-    const startDisabled = !connectorOnline || ["running", "starting", "stopping", "installing", "reinstalling", "error"].includes(status);
+    const isProvisioning = ["installing", "reinstalling", "starting"].includes(status);
+    const startDisabled = !connectorOnline || isProvisioning || ["running", "error"].includes(status);
     const restartDisabled = !connectorOnline || status !== "running";
     const stopDisabled = !connectorOnline || status !== "running";
     const memoryPercent = usagePercent(stats.memory, limits.memory);
@@ -9614,7 +9689,7 @@
       pageData.error && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm mx-4 lg:mx-8 mt-6", children: pageData.error }),
       terminalError && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm mx-4 lg:mx-8 mt-6", children: terminalError }),
       /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "p-4 lg:p-8 grid grid-cols-1 xl:grid-cols-4 gap-6", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "xl:col-span-3 flex flex-col gap-6", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "xl:col-span-3 flex flex-col gap-6 relative", children: [
           /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-col md:flex-row md:items-center justify-between gap-4", children: [
             /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-4", children: [
               /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `w-3 h-3 rounded-full shrink-0 ${getToneColorClass(statusTone(status))}` }),
@@ -9653,10 +9728,28 @@
                   disabled: stopDisabled,
                   children: "Stop"
                 }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: `px-6 py-2.5 text-sm font-semibold hover:bg-neutral-700 text-red-600 hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${status === "stopping" ? "" : "hidden"}`,
+                  onClick: () => sendPowerAction("kill"),
+                  children: "Kill"
+                }
               )
             ] })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 rounded-lg flex flex-col relative overflow-hidden shadow-lg h-[600px]", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 rounded-lg flex flex-col overflow-hidden shadow-lg h-[600px] relative", children: [
+            isProvisioning && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "absolute inset-0 bg-neutral-900/90 backdrop-blur-sm z-50 flex items-center justify-center p-6", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 p-8 rounded-xl max-w-md w-full shadow-2xl flex flex-col items-center text-center", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-16 h-16 rounded-full border-4 border-neutral-700 border-t-primary-500 animate-spin mb-6" }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h2", { className: "text-xl font-bold text-white mb-2", children: status === "starting" ? "Starting Server" : "Running Installer" }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-sm text-neutral-400 mb-6", children: status === "starting" ? "Your server is booting up. Most actions stay locked until the runtime is ready." : "Your server is being created and configured. This usually finishes in under a minute." }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-2 bg-neutral-900 px-4 py-2 rounded border border-neutral-700", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-hourglass-split text-primary-400" }),
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-sm font-bold tracking-widest uppercase text-neutral-300", children: status })
+              ] })
+            ] }) }),
             /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800 border-b border-neutral-700 px-4 py-3 flex justify-between items-center z-10 shrink-0", children: [
               /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
                 /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("strong", { className: "text-neutral-100 font-bold block", children: "Console" }),
@@ -9685,52 +9778,73 @@
               ] })
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `flex-1 relative ${terminalBooted ? "" : "opacity-0"} p-2`, style: { minHeight: 0 }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-full h-full", ref: terminalHostRef }) }),
-            !terminalBooted && !terminalError && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "absolute inset-x-0 bottom-16 top-16 flex items-center justify-center flex-col gap-4 text-neutral-500", children: [
+            !terminalBooted && !terminalError && !isProvisioning && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "absolute inset-x-0 bottom-16 top-16 flex items-center justify-center flex-col gap-4 text-neutral-500", children: [
               /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-8 h-8 border-4 border-neutral-600 border-t-primary-500 rounded-full animate-spin" }),
               /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { children: "Booting xterm runtime..." })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800 border-t border-neutral-700 flex items-center shrink-0", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-neutral-500 pl-4 font-mono font-bold", children: "$" }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                "input",
-                {
-                  type: "text",
-                  className: "flex-1 bg-transparent border-none text-neutral-200 text-sm font-mono px-3 py-3.5 focus:ring-0 shadow-none outline-none",
-                  value: commandValue,
-                  onChange: (event) => setCommandValue(event.target.value),
-                  onKeyDown: (event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      sendCommand();
-                      return;
-                    }
-                    if (event.key === "ArrowUp") {
-                      event.preventDefault();
-                      if (!history.length) return;
-                      historyIndexRef.current = Math.min(historyIndexRef.current + 1, history.length - 1);
-                      setCommandValue(history[historyIndexRef.current] || "");
-                      return;
-                    }
-                    if (event.key === "ArrowDown") {
-                      event.preventDefault();
-                      if (!history.length) return;
-                      historyIndexRef.current = Math.max(historyIndexRef.current - 1, -1);
-                      setCommandValue(historyIndexRef.current >= 0 ? history[historyIndexRef.current] || "" : "");
-                    }
-                  },
-                  placeholder: connectorOnline ? "Type a command and press Enter..." : "Connector offline",
-                  disabled: !connectorOnline
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                "button",
-                {
-                  className: "px-5 py-3.5 bg-primary-600 hover:bg-primary-500 font-bold text-white text-sm transition-colors border-l border-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed",
-                  onClick: sendCommand,
-                  disabled: !connectorOnline || !String(commandValue || "").trim(),
-                  children: "Send"
-                }
-              )
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800 border-t border-neutral-700 flex flex-col md:flex-row items-center shrink-0", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1 flex items-center w-full min-w-0", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-neutral-500 pl-4 font-mono font-bold", children: "$" }),
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                  "input",
+                  {
+                    type: "text",
+                    className: "w-full bg-transparent border-none text-neutral-200 text-sm font-mono px-3 py-3.5 focus:ring-0 shadow-none outline-none",
+                    value: commandValue,
+                    onChange: (event) => setCommandValue(event.target.value),
+                    onKeyDown: (event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        sendCommand();
+                        return;
+                      }
+                      if (event.key === "ArrowUp") {
+                        event.preventDefault();
+                        if (!history.length) return;
+                        historyIndexRef.current = Math.min(historyIndexRef.current + 1, history.length - 1);
+                        setCommandValue(history[historyIndexRef.current] || "");
+                        return;
+                      }
+                      if (event.key === "ArrowDown") {
+                        event.preventDefault();
+                        if (!history.length) return;
+                        historyIndexRef.current = Math.max(historyIndexRef.current - 1, -1);
+                        setCommandValue(historyIndexRef.current >= 0 ? history[historyIndexRef.current] || "" : "");
+                      }
+                    },
+                    placeholder: connectorOnline ? "Type a command and press Enter..." : "Connector offline",
+                    disabled: !connectorOnline
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center w-full md:w-auto border-t md:border-t-0 md:border-l border-neutral-700", children: [
+                macros.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "px-3 py-2 md:py-0 border-r border-neutral-700", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+                  "select",
+                  {
+                    className: "bg-neutral-900 border border-neutral-700 rounded text-xs text-neutral-300 px-2 py-1.5 focus:ring-primary-500 focus:border-primary-500 cursor-pointer outline-none",
+                    onChange: (e) => {
+                      if (e.target.value) {
+                        runMacro(e.target.value);
+                        e.target.value = "";
+                      }
+                    },
+                    defaultValue: "",
+                    children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("option", { value: "", disabled: true, children: "Run a Macro..." }),
+                      macros.map((m) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("option", { value: m.id, children: m.name }, m.id))
+                    ]
+                  }
+                ) }),
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                  "button",
+                  {
+                    className: "flex-1 md:flex-none px-5 py-3.5 bg-primary-600 hover:bg-primary-500 font-bold text-white text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+                    onClick: sendCommand,
+                    disabled: !connectorOnline || !String(commandValue || "").trim(),
+                    children: "Send"
+                  }
+                )
+              ] })
             ] })
           ] })
         ] }),
@@ -9756,6 +9870,60 @@
               /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Link, { to: ReactRoutes.changeView, className: "flex-1 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-bold py-2 rounded text-center transition-colors", children: "View Mode" }),
               /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("a", { href: `/server/${server.containerId}?popout=true`, className: "flex-1 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-bold py-2 rounded text-center transition-colors", children: "Popout" })
             ] })
+          ] }),
+          isMinecraft && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-5 flex flex-col h-full max-h-[400px]", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between items-center mb-4", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest", children: "Online Players" }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "text-xs font-bold bg-neutral-900 border border-neutral-700 px-2 py-0.5 rounded text-neutral-400", children: [
+                players.length,
+                " Online"
+              ] })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex-1 overflow-y-auto pr-1", children: playersLoading ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-sm text-neutral-500 animate-pulse text-center mt-4", children: "Loading players..." }) : playersError ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-sm text-red-400 text-center mt-4", children: playersError }) : players.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-sm text-neutral-500 text-center mt-4", children: "No players online." }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex flex-col gap-3", children: players.map((p) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700/50 p-3 rounded-lg flex flex-col gap-3 group", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-3", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                  "img",
+                  {
+                    src: p.headUrl,
+                    className: "w-8 h-8 rounded shrink-0 shadow-sm",
+                    alt: p.name,
+                    onError: (e) => {
+                      e.target.src = "https://minotar.net/avatar/Steve/40";
+                    }
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("strong", { className: "text-sm text-white truncate flex-1", children: p.name })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "grid grid-cols-3 gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                  "button",
+                  {
+                    onClick: () => handleMcAction("kick", p.name),
+                    disabled: !mcPerms.canKick,
+                    className: "bg-neutral-800 hover:bg-neutral-700 text-[10px] uppercase font-bold text-neutral-300 py-1 rounded disabled:opacity-50",
+                    children: "Kick"
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                  "button",
+                  {
+                    onClick: () => handleMcAction("ban", p.name),
+                    disabled: !mcPerms.canBan,
+                    className: "bg-red-900/50 hover:bg-red-900 text-[10px] uppercase font-bold text-red-400 py-1 rounded disabled:opacity-50",
+                    children: "Ban"
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                  "button",
+                  {
+                    onClick: () => handleMcAction("op", p.name),
+                    disabled: !mcPerms.canOp,
+                    className: "bg-green-900/50 hover:bg-green-900 text-[10px] uppercase font-bold text-green-400 py-1 rounded disabled:opacity-50",
+                    children: "OP"
+                  }
+                )
+              ] })
+            ] }, p.name)) }) })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-5", children: [
             /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4", children: "Runtime Snapshot" }),
