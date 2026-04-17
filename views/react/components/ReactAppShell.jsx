@@ -18,13 +18,16 @@ function InternalTopAction({ to, icon, title }) {
 }
 
 function PrimaryNavLink({ to, label }) {
+    const currentPath = window.location.pathname;
+    const isActive = currentPath === to || (to !== '/' && currentPath.startsWith(to));
+    
     return (
-        <NavLink 
-            to={to} 
-            className={({ isActive }) => `px-4 py-3 text-sm font-semibold transition-colors ${isActive ? 'text-white border-b-2 border-primary-500' : 'text-neutral-400 hover:text-white'}`}
+        <a 
+            href={to} 
+            className={`px-4 py-3 text-sm font-semibold transition-colors ${isActive ? 'text-white border-b-2 border-primary-500' : 'text-neutral-400 hover:text-white'}`}
         >
             {label}
-        </NavLink>
+        </a>
     );
 }
 

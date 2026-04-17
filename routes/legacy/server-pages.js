@@ -17215,8 +17215,8 @@ return res.render('server/users', {
 
             if (Number(req.session.user.experimentalViewMode) === 1) {
                 return res.render('react/loader', {
-                    pageData: reactPageData,
-                    pageMeta: { entry: 'server-minecraft-center' },
+                    reactPageData,
+                    reactEntry: 'server-minecraft-center',
                     title: reactPageData.title
                 });
             }
@@ -17270,8 +17270,8 @@ return res.render('server/users', {
 
             if (Number(req.session.user.experimentalViewMode) === 1) {
                 return res.render('react/loader', {
-                    pageData: reactPageData,
-                    pageMeta: { entry: 'server-minecraft-world-center' },
+                    reactPageData,
+                    reactEntry: 'server-minecraft-world-center',
                     title: reactPageData.title
                 });
             }
@@ -17912,8 +17912,8 @@ return res.render('server/users', {
 
             if (Number(req.session.user.experimentalViewMode) === 1) {
                 return res.render('react/loader', {
-                    pageData: reactPageData,
-                    pageMeta: { entry: 'server-minecraft-addons' },
+                    reactPageData,
+                    reactEntry: 'server-minecraft-addons',
                     title: reactPageData.title
                 });
             }
