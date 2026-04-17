@@ -7279,9 +7279,12 @@
     }
   });
 
-  // views/react/server-console.jsx
+  // views/react/server-timeline.jsx
   var import_react3 = __toESM(require_react());
   var import_client = __toESM(require_client());
+
+  // views/react/components/ReactAppShell.jsx
+  var import_react = __toESM(require_react());
 
   // node_modules/react-router-dom/dist/index.js
   var React2 = __toESM(require_react());
@@ -8074,7 +8077,6 @@
   }
 
   // views/react/components/ReactAppShell.jsx
-  var import_react = __toESM(require_react());
   var import_jsx_runtime = __toESM(require_jsx_runtime());
   function InternalTopAction({ to, icon, title }) {
     return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
@@ -8193,827 +8195,209 @@
   // views/react/components/PageContentBlock.jsx
   var import_react2 = __toESM(require_react());
   var import_jsx_runtime2 = __toESM(require_jsx_runtime());
+  function PageContentBlock({ title, children, className = "" }) {
+    import_react2.default.useEffect(() => {
+      if (title) {
+        document.title = `${title} - CPanel`;
+      }
+    }, [title]);
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: `w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 ${className}`, children: [
+      title && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "mb-6 flex justify-between items-center", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h1", { className: "text-2xl font-bold text-neutral-100", children: title }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "w-full", children })
+    ] });
+  }
 
-  // views/react/server-console.jsx
+  // views/react/server-timeline.jsx
   var import_jsx_runtime3 = __toESM(require_jsx_runtime());
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
-  var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-console";
+  var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-timeline";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
-  var XTERM_CSS_URL = "https://cdn.jsdelivr.net/npm/xterm@5.2.1/css/xterm.css";
-  var XTERM_SCRIPT_URLS = [
-    "https://cdn.jsdelivr.net/npm/xterm@5.2.1/lib/xterm.js",
-    "https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.7.0/lib/xterm-addon-fit.js",
-    "https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.8.0/lib/xterm-addon-web-links.js",
-    "https://cdn.jsdelivr.net/npm/xterm-addon-unicode11@0.6.0/lib/xterm-addon-unicode11.js"
-  ];
-  var xtermAssetsPromise = null;
-  function ensureStyle(href) {
-    if (typeof document === "undefined") return;
-    if (document.querySelector(`link[data-react-asset="${href}"]`)) return;
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = href;
-    link.setAttribute("data-react-asset", href);
-    document.head.appendChild(link);
-  }
-  function loadScript(src) {
-    return new Promise((resolve, reject) => {
-      const existing = document.querySelector(`script[data-react-asset="${src}"]`);
-      if (existing) {
-        if (existing.getAttribute("data-loaded") === "1") {
-          resolve();
-          return;
-        }
-        existing.addEventListener("load", () => resolve(), { once: true });
-        existing.addEventListener("error", () => reject(new Error(`Failed to load ${src}`)), { once: true });
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = src;
-      script.async = true;
-      script.setAttribute("data-react-asset", src);
-      script.addEventListener("load", () => {
-        script.setAttribute("data-loaded", "1");
-        resolve();
-      }, { once: true });
-      script.addEventListener("error", () => reject(new Error(`Failed to load ${src}`)), { once: true });
-      document.body.appendChild(script);
-    });
-  }
-  function ensureXtermAssets() {
-    if (typeof window !== "undefined" && window.Terminal && window.FitAddon && window.WebLinksAddon && window.Unicode11Addon) {
-      return Promise.resolve();
-    }
-    if (xtermAssetsPromise) return xtermAssetsPromise;
-    ensureStyle(XTERM_CSS_URL);
-    xtermAssetsPromise = XTERM_SCRIPT_URLS.reduce(
-      (chain, src) => chain.then(() => loadScript(src)),
-      Promise.resolve()
-    );
-    return xtermAssetsPromise;
-  }
-  function normalizeStatus(status) {
-    return String(status || "unknown").trim().toLowerCase() || "unknown";
-  }
-  function formatStatus(status) {
-    const value = normalizeStatus(status).replace(/_/g, " ");
-    return value.charAt(0).toUpperCase() + value.slice(1);
-  }
-  function statusTone(status) {
-    const value = normalizeStatus(status);
-    if (value === "running") return "success";
-    if (["installing", "reinstalling", "starting", "stopping"].includes(value)) return "warning";
-    if (["stopped", "offline", "error"].includes(value)) return "danger";
-    return "muted";
-  }
-  function getToneColorClass(tone) {
-    switch (tone) {
-      case "success":
-        return "bg-green-500";
-      case "warning":
-        return "bg-yellow-500";
-      case "danger":
-        return "bg-red-500";
-      default:
-        return "bg-neutral-500";
-    }
-  }
-  function parseMetric(value) {
-    const numeric = Number.parseFloat(String(value || "0").replace(/[^0-9.-]/g, ""));
-    if (!Number.isFinite(numeric)) return 0;
-    return Math.max(0, numeric);
-  }
-  function formatBytes(value) {
-    const bytes = Math.max(0, Number.parseFloat(String(value || "0")) || 0);
-    if (!bytes) return "0 B";
-    const units = ["B", "KB", "MB", "GB", "TB"];
-    let current = bytes;
-    let index = 0;
-    while (current >= 1024 && index < units.length - 1) {
-      current /= 1024;
-      index += 1;
-    }
-    return `${current >= 100 || index === 0 ? current.toFixed(0) : current.toFixed(2)} ${units[index]}`;
-  }
-  function formatDuration(value) {
-    const seconds = Math.max(0, Number.parseInt(String(value || "0"), 10) || 0);
-    if (!seconds) return "0s";
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor(seconds % 86400 / 3600);
-    const minutes = Math.floor(seconds % 3600 / 60);
-    const secs = seconds % 60;
-    const parts = [];
-    if (days) parts.push(`${days}d`);
-    if (hours) parts.push(`${hours}h`);
-    if (minutes) parts.push(`${minutes}m`);
-    if (secs || parts.length === 0) parts.push(`${secs}s`);
-    return parts.slice(0, 3).join(" ");
-  }
-  function formatRuntimeSource(source) {
-    const value = String(source || "system").trim().toLowerCase().replace(/_/g, " ");
-    return value ? value.charAt(0).toUpperCase() + value.slice(1) : "System";
-  }
-  function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-  }
-  function usagePercent(value, limit) {
-    const safeValue = parseMetric(value);
-    const safeLimit = parseMetric(limit);
-    if (!safeLimit) return 0;
-    return clamp(safeValue / safeLimit * 100, 0, 100);
-  }
-  function ResourceBadge({ icon, label, value }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-3", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: `bi ${icon} text-lg text-neutral-400` }),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "block text-sm font-bold text-neutral-200", children: value }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "block text-xs text-neutral-500", children: label })
-      ] })
-    ] });
-  }
-  function InlineMetric({ title, value, note, tone = "" }) {
-    const toneTextClass = tone === "success" ? "text-green-400" : tone === "warning" ? "text-yellow-400" : tone === "danger" ? "text-red-400" : "text-primary-400";
-    return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col mb-1 pb-2 border-b border-neutral-700/50 last:border-0 last:pb-0", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-between items-center", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-xs font-bold text-neutral-400 uppercase tracking-wide", children: title }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: `font-mono text-sm ${toneTextClass}`, children: value })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("small", { className: "text-xs text-neutral-500 mt-1", children: note })
-    ] });
-  }
-  function scrubAnsi(text) {
-    return String(text || "").replace(/\\x1b/g, "\x1B");
-  }
-  function buildWsUrl(wsToken, containerId) {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    return `${protocol}//${window.location.host}/ws/server/${encodeURIComponent(String(containerId || ""))}?token=${encodeURIComponent(String(wsToken || ""))}`;
-  }
-  function ServerConsolePage({ pageData = data }) {
+  var MAX_POINTS = 180;
+  function ServerTimelinePage({ pageData = data }) {
     const server = pageData.server || {};
-    const limits = server.limits || {};
-    const historyStorageKey = import_react3.default.useMemo(
-      () => `cpanel.react.console.history.${server.containerId || "server"}`,
-      [server.containerId]
-    );
-    const isMinecraft = Boolean(pageData.isMinecraftServer);
-    const macros = Array.isArray(pageData.commandMacros) ? pageData.commandMacros : [];
-    const mcPerms = pageData.minecraftActionPermissions || {};
-    const terminalHostRef = import_react3.default.useRef(null);
-    const terminalInstanceRef = import_react3.default.useRef(null);
-    const fitAddonRef = import_react3.default.useRef(null);
-    const wsRef = import_react3.default.useRef(null);
-    const reconnectTimerRef = import_react3.default.useRef(null);
-    const heartbeatTimerRef = import_react3.default.useRef(null);
-    const disposedRef = import_react3.default.useRef(false);
-    const followOutputRef = import_react3.default.useRef(true);
-    const historyIndexRef = import_react3.default.useRef(-1);
-    const [status, setStatus] = import_react3.default.useState(normalizeStatus(server.status));
-    const [connectorOnline, setConnectorOnline] = import_react3.default.useState(Boolean(pageData.connectorOnline));
-    const [commandValue, setCommandValue] = import_react3.default.useState("");
-    const [history, setHistory] = import_react3.default.useState(() => {
-      try {
-        const raw = localStorage.getItem(historyStorageKey) || "[]";
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter((entry) => typeof entry === "string" && entry.trim()).slice(0, 32) : [];
-      } catch {
-        return [];
-      }
-    });
-    const [stats, setStats] = import_react3.default.useState({
-      cpu: parseMetric(pageData.initialStats && pageData.initialStats.cpu),
-      memory: parseMetric(pageData.initialStats && pageData.initialStats.memory),
-      disk: parseMetric(pageData.initialStats && pageData.initialStats.disk),
-      networkRx: parseMetric(pageData.initialStats && pageData.initialStats.network_rx),
-      networkTx: parseMetric(pageData.initialStats && pageData.initialStats.network_tx),
-      uptimeSeconds: parseMetric(pageData.initialStats && pageData.initialStats.uptime_seconds)
-    });
-    const [exitInfo, setExitInfo] = import_react3.default.useState({
-      exitCode: null,
-      oomKilled: false
-    });
-    const [runtimeMeta, setRuntimeMeta] = import_react3.default.useState(() => {
-      const incoming = pageData.runtimeMeta || {};
-      return {
-        lastSource: incoming.lastSource || "system",
-        lastReason: incoming.lastReason || "",
-        cooldownUntil: incoming.cooldownUntil || null,
-        crashLoopCount: incoming.crashLoopCount || 0,
-        history: Array.isArray(incoming.history) ? incoming.history.slice(0, 6) : []
-      };
-    });
-    const [connectionState, setConnectionState] = import_react3.default.useState("Connecting...");
-    const [followOutput, setFollowOutput] = import_react3.default.useState(true);
-    const [terminalError, setTerminalError] = import_react3.default.useState("");
-    const [terminalBooted, setTerminalBooted] = import_react3.default.useState(false);
-    const [players, setPlayers] = import_react3.default.useState([]);
-    const [playersLoading, setPlayersLoading] = import_react3.default.useState(isMinecraft);
-    const [playersError, setPlayersError] = import_react3.default.useState("");
-    import_react3.default.useEffect(() => {
-      if (!isMinecraft) return;
-      let active = true;
-      async function fetchPlayers() {
-        if (!active) return;
-        try {
-          const bedrockMode = pageData.minecraftBedrockMode ? "1" : "0";
-          const response = await fetch(`/server/${server.containerId}/minecraft/configs/status?bedrock=${bedrockMode}`);
-          const payload = await response.json();
-          if (!response.ok || !payload.success) throw new Error(payload.error || "Failed to sync players");
-          if (active) {
-            setPlayers(payload.status?.playersList || []);
-            setPlayersError("");
-            setPlayersLoading(false);
-          }
-        } catch (err) {
-          if (active) setPlayersError(err.message || "Player sync failed");
+    const canvasRef = (0, import_react3.useRef)(null);
+    const [history, setHistory] = (0, import_react3.useState)([]);
+    const [stats, setStats] = (0, import_react3.useState)({ cpu: 0, memory: 0, disk: 0, lastUpdate: null });
+    const memoryLimit = Math.max(1, Number(server.memory) || 1);
+    const diskLimit = Math.max(1, Number(server.disk) || 1);
+    (0, import_react3.useEffect)(() => {
+      if (pageData.samples && Array.isArray(pageData.samples)) {
+        const initial = pageData.samples.map((row) => ({
+          ts: row.collectedAt ? new Date(row.collectedAt).getTime() : Date.now(),
+          cpu: Math.max(0, parseFloat(row.cpuPercent) || 0),
+          mem: Math.max(0, parseFloat(row.memoryMb) || 0),
+          disk: Math.max(0, parseFloat(row.diskMb) || 0)
+        })).slice(-MAX_POINTS);
+        setHistory(initial);
+        if (initial.length > 0) {
+          const last = initial[initial.length - 1];
+          setStats({ cpu: last.cpu, memory: last.mem, disk: last.disk, lastUpdate: new Date(last.ts) });
         }
       }
-      fetchPlayers();
-      const interval = setInterval(fetchPlayers, 3e4);
-      return () => {
-        active = false;
-        clearInterval(interval);
-      };
-    }, [isMinecraft, server.containerId]);
-    const handleMcAction = async (action, player) => {
-      const requiresReason = ["kick", "ban", "tempban"].includes(action);
-      const requiresDuration = action === "tempban";
-      const requiresDestination = action === "teleport";
-      const extra = {};
-      if (requiresDestination) {
-        const destination = window.prompt(`Teleport destination for ${player}:`, "");
-        if (!destination) return;
-        extra.destination = String(destination).trim().slice(0, 64);
-      }
-      if (requiresDuration) {
-        const duration = window.prompt(`Tempban duration for ${player} (e.g. 1h):`, "");
-        if (!duration) return;
-        extra.duration = String(duration).trim().slice(0, 16);
-      }
-      if (requiresReason) {
-        const reason = window.prompt(`Reason for ${action.toUpperCase()} ${player}:`, "");
-        if (!reason) return;
-        extra.reason = String(reason).trim().slice(0, 96);
-      }
-      const formData = new URLSearchParams();
-      formData.append("action", action);
-      formData.append("player", player);
-      formData.append("bedrock", pageData.minecraftBedrockMode ? "1" : "0");
-      if (extra.reason) formData.append("reason", extra.reason);
-      if (extra.duration) formData.append("duration", extra.duration);
-      if (extra.destination) formData.append("destination", extra.destination);
-      try {
-        await fetch(`/server/${server.containerId}/minecraft/configs`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: formData.toString()
-        });
-      } catch (e) {
-        console.error("Failed to dispatch action", e);
-      }
-    };
-    import_react3.default.useEffect(() => {
-      followOutputRef.current = followOutput;
-    }, [followOutput]);
-    import_react3.default.useEffect(() => {
-      try {
-        localStorage.setItem(historyStorageKey, JSON.stringify(history.slice(0, 32)));
-      } catch {
-      }
-    }, [history, historyStorageKey]);
-    import_react3.default.useEffect(() => {
-      disposedRef.current = false;
-      setTerminalError("");
-      setTerminalBooted(false);
-      const stopHeartbeat = () => {
-        if (heartbeatTimerRef.current) {
-          clearInterval(heartbeatTimerRef.current);
-          heartbeatTimerRef.current = null;
-        }
-      };
-      const clearReconnect = () => {
-        if (reconnectTimerRef.current) {
-          clearTimeout(reconnectTimerRef.current);
-          reconnectTimerRef.current = null;
-        }
-      };
-      const teardownSocket = () => {
-        stopHeartbeat();
-        clearReconnect();
-        if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
-          wsRef.current.close(1e3, "Leaving React console");
-        }
-        wsRef.current = null;
-      };
-      const handleResize = () => {
-        try {
-          fitAddonRef.current && fitAddonRef.current.fit();
-        } catch {
-        }
-      };
-      const boot = async () => {
-        await ensureXtermAssets();
-        if (disposedRef.current || !terminalHostRef.current) return;
-        terminalHostRef.current.innerHTML = "";
-        const term = new window.Terminal({
-          theme: {
-            background: "#18181b",
-            // neutral-900 equivalent for console
-            foreground: "#eef4fb",
-            cursor: "#eef4fb",
-            black: "#16161a",
-            red: "#ef4444",
-            green: "#10b981",
-            yellow: "#f59e0b",
-            blue: "#3b82f6",
-            magenta: "#8b5cf6",
-            cyan: "#06b6d4",
-            white: "#eef4fb"
-          },
-          allowProposedApi: true,
-          fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-          fontSize: 13,
-          cursorBlink: true,
-          scrollback: 5e3,
-          convertEol: true,
-          padding: "16px"
-        });
-        const fitAddon = new window.FitAddon.FitAddon();
-        const webLinksAddon = new window.WebLinksAddon.WebLinksAddon();
-        const unicode11Addon = new window.Unicode11Addon.Unicode11Addon();
-        term.loadAddon(fitAddon);
-        term.loadAddon(webLinksAddon);
-        term.loadAddon(unicode11Addon);
-        term.open(terminalHostRef.current);
-        try {
-          term.unicode.activeVersion = "11";
-        } catch {
-        }
-        fitAddon.fit();
-        terminalInstanceRef.current = term;
-        fitAddonRef.current = fitAddon;
-        setTerminalBooted(true);
-        if (pageData.initialConsoleBuffer) {
-          term.write(scrubAnsi(pageData.initialConsoleBuffer));
-          if (followOutputRef.current) {
-            term.scrollToBottom();
-          }
-        } else {
-          term.writeln("\x1B[1;34m[*] React console ready.\x1B[0m");
-        }
-        let reconnectDelay = 1e3;
-        const connect = () => {
-          if (disposedRef.current) return;
-          setConnectionState("Connecting...");
-          const ws = new WebSocket(buildWsUrl(pageData.wsToken, server.containerId));
-          wsRef.current = ws;
-          ws.onopen = () => {
-            reconnectDelay = 1e3;
-            setConnectionState("Connected");
-            setConnectorOnline(true);
-            term.writeln("\x1B[1;32m[\u2713] Console stream connected.\x1B[0m");
-            stopHeartbeat();
-            heartbeatTimerRef.current = window.setInterval(() => {
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: "ping" }));
-              }
-            }, 3e4);
-          };
-          ws.onmessage = (event) => {
-            try {
-              const payload = JSON.parse(event.data);
-              switch (payload.type) {
-                case "console_output": {
-                  const output = scrubAnsi(payload.output || "");
-                  term.write(output);
-                  if (followOutputRef.current) {
-                    term.scrollToBottom();
-                  }
-                  break;
-                }
-                case "server_status_update":
-                  setStatus(normalizeStatus(payload.status));
-                  setExitInfo({
-                    exitCode: payload.exitCode !== void 0 && payload.exitCode !== null && String(payload.exitCode).trim() !== "" ? String(payload.exitCode) : null,
-                    oomKilled: payload.oomKilled === true || String(payload.oomKilled || "").toLowerCase() === "true"
-                  });
-                  break;
-                case "connector_status":
-                  setConnectorOnline(Boolean(payload.online));
-                  break;
-                case "server_stats": {
-                  const nextCpu = parseMetric(payload.cpu);
-                  const nextMemory = parseMetric(payload.memory);
-                  const nextDisk = parseMetric(payload.disk);
-                  const nextNetworkRx = parseMetric(payload.network_rx);
-                  const nextNetworkTx = parseMetric(payload.network_tx);
-                  const nextUptime = parseMetric(payload.uptime_seconds);
-                  setStats({
-                    cpu: nextCpu,
-                    memory: nextMemory,
-                    disk: nextDisk,
-                    networkRx: nextNetworkRx,
-                    networkTx: nextNetworkTx,
-                    uptimeSeconds: nextUptime
-                  });
-                  break;
-                }
-                case "server_runtime_meta":
-                  setRuntimeMeta({
-                    lastSource: payload.lastSource || "system",
-                    lastReason: payload.lastReason || "",
-                    cooldownUntil: payload.cooldownUntil || null,
-                    crashLoopCount: payload.crashLoopCount || 0,
-                    history: Array.isArray(payload.history) ? payload.history.slice(0, 6) : []
-                  });
-                  break;
-                case "server_action_ack": {
-                  const phase = String(payload.phase || "").toLowerCase();
-                  const actionType = String(payload.actionType || "action");
-                  const text = String(payload.message || "").trim() || `${actionType} ${phase}`;
-                  if (phase === "failed") {
-                    term.writeln(`\x1B[1;31m[ACK] ${actionType}: ${text}\x1B[0m`);
-                  } else if (phase === "executed") {
-                    term.writeln(`\x1B[1;32m[ACK] ${actionType}: ${text}\x1B[0m`);
-                  } else {
-                    term.writeln(`\x1B[1;34m[ACK] ${actionType}: ${text}\x1B[0m`);
-                  }
-                  break;
-                }
-                case "error":
-                  term.writeln(`\x1B[1;31m[!] ${String(payload.message || "Unknown error")}\x1B[0m`);
-                  break;
-                default:
-                  break;
-              }
-            } catch (error) {
-              console.error("React console failed to parse websocket payload.", error);
-            }
-          };
-          ws.onclose = () => {
-            stopHeartbeat();
-            if (disposedRef.current) return;
-            setConnectionState("Disconnected");
-            setConnectorOnline(false);
-            term.writeln(`\x1B[1;33m[!] Connection lost. Reconnecting in ${Math.round(reconnectDelay / 1e3)}s...\x1B[0m`);
-            clearReconnect();
-            reconnectTimerRef.current = window.setTimeout(() => {
-              reconnectDelay = Math.min(Math.round(reconnectDelay * 1.5), 5e3);
-              connect();
-            }, reconnectDelay);
-          };
-          ws.onerror = (error) => {
-            console.error("React console websocket error:", error);
-            try {
-              ws.close();
-            } catch {
-            }
-          };
-        };
-        connect();
-        window.addEventListener("resize", handleResize);
-        return () => {
-          window.removeEventListener("resize", handleResize);
-          teardownSocket();
+    }, [pageData.samples]);
+    (0, import_react3.useEffect)(() => {
+      const wsToken = pageData.wsToken;
+      if (!wsToken) return;
+      const protocol = window.location.protocol.replace("http", "ws");
+      const url = `${protocol}//${window.location.host}/ws/server/${server.containerId}?token=${encodeURIComponent(wsToken)}`;
+      let ws = null;
+      const connect = () => {
+        ws = new WebSocket(url);
+        ws.onmessage = (event) => {
           try {
-            term.dispose();
-          } catch {
+            const data2 = JSON.parse(event.data);
+            if (data2 && data2.type === "server_stats") {
+              const newPoint = {
+                ts: Date.now(),
+                cpu: Math.max(0, parseFloat(data2.cpu) || 0),
+                mem: Math.max(0, parseFloat(data2.memory) || 0),
+                disk: Math.max(0, parseFloat(data2.disk) || 0)
+              };
+              setHistory((prev) => {
+                const updated = [...prev, newPoint];
+                return updated.slice(-MAX_POINTS);
+              });
+              setStats({ cpu: newPoint.cpu, memory: newPoint.mem, disk: newPoint.disk, lastUpdate: /* @__PURE__ */ new Date() });
+            }
+          } catch (e) {
           }
-          terminalInstanceRef.current = null;
-          fitAddonRef.current = null;
         };
+        ws.onclose = () => setTimeout(connect, 2e3);
       };
-      let cleanup = null;
-      boot().then((nextCleanup) => {
-        cleanup = nextCleanup;
-      }).catch((error) => {
-        console.error("React console bootstrap failed:", error);
-        setTerminalError(error && error.message ? error.message : "Failed to initialize terminal.");
-      });
-      return () => {
-        disposedRef.current = true;
-        if (typeof cleanup === "function") cleanup();
-        stopHeartbeat();
-        clearReconnect();
-        if (terminalInstanceRef.current) {
-          try {
-            terminalInstanceRef.current.dispose();
-          } catch {
-          }
-          terminalInstanceRef.current = null;
+      connect();
+      return () => ws && ws.close();
+    }, [server.containerId, pageData.wsToken]);
+    (0, import_react3.useEffect)(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const draw = () => {
+        const ctx = canvas.getContext("2d");
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = "#0a0a0c";
+        ctx.fillRect(0, 0, width, height);
+        ctx.strokeStyle = "rgba(255,255,255,0.05)";
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+          const y = 10 + (height - 20) * (i / 4);
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(width, y);
+          ctx.stroke();
         }
-        fitAddonRef.current = null;
-        wsRef.current = null;
+        if (history.length < 2) return;
+        const clamp = (v) => Math.max(0, Math.min(100, v));
+        const getX = (i) => width / (MAX_POINTS - 1) * (i + (MAX_POINTS - history.length));
+        const getY = (percent) => 10 + (height - 20) * (1 - clamp(percent) / 100);
+        const drawLine = (getData, color, fillGradient) => {
+          ctx.beginPath();
+          history.forEach((pt, i) => {
+            const x = getX(i);
+            const y = getY(getData(pt));
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 2;
+          ctx.lineJoin = "round";
+          ctx.stroke();
+          if (fillGradient) {
+            ctx.lineTo(getX(history.length - 1), height);
+            ctx.lineTo(getX(0), height);
+            ctx.closePath();
+            const grad = ctx.createLinearGradient(0, 0, 0, height);
+            grad.addColorStop(0, fillGradient);
+            grad.addColorStop(1, "transparent");
+            ctx.fillStyle = grad;
+            ctx.fill();
+          }
+        };
+        drawLine((p) => p.disk / diskLimit * 100, "#f59e0b", "rgba(245, 158, 11, 0.05)");
+        drawLine((p) => p.mem / memoryLimit * 100, "#3b82f6", "rgba(59, 130, 246, 0.05)");
+        drawLine((p) => p.cpu, "#22c55e", "rgba(34, 197, 94, 0.1)");
       };
-    }, [pageData.initialConsoleBuffer, pageData.wsToken, server.containerId]);
-    const sendPayload = import_react3.default.useCallback((payload) => {
-      const socket = wsRef.current;
-      if (!socket || socket.readyState !== WebSocket.OPEN) return false;
-      socket.send(JSON.stringify(payload));
-      return true;
-    }, []);
-    const recordHistory = import_react3.default.useCallback((value) => {
-      const trimmed = String(value || "").trim();
-      if (!trimmed) return;
-      setHistory((current) => [trimmed, ...current.filter((entry) => entry !== trimmed)].slice(0, 32));
-      historyIndexRef.current = -1;
-    }, []);
-    const sendCommand = import_react3.default.useCallback(() => {
-      const command = String(commandValue || "").trim();
-      if (!command) return;
-      if (!sendPayload({ type: "console_input", command })) return;
-      recordHistory(command);
-      setCommandValue("");
-    }, [commandValue, recordHistory, sendPayload]);
-    const runMacro = import_react3.default.useCallback((macroId) => {
-      if (!sendPayload({ type: "run_macro", macroId })) return;
-      const term = terminalInstanceRef.current;
-      if (term) term.writeln(`\x1B[1;36m[*] Fired macro trigger...\x1B[0m`);
-    }, [sendPayload]);
-    const sendPowerAction = import_react3.default.useCallback((action) => {
-      if (!sendPayload({ type: "power_action", action })) return;
-      const term = terminalInstanceRef.current;
-      if (term) {
-        term.writeln(`\x1B[1;33m[*] Sending ${action} command...\x1B[0m`);
-      }
-    }, [sendPayload]);
-    const isProvisioning = ["installing", "reinstalling", "starting"].includes(status);
-    const startDisabled = !connectorOnline || isProvisioning || ["running", "error"].includes(status);
-    const restartDisabled = !connectorOnline || status !== "running";
-    const stopDisabled = !connectorOnline || status !== "running";
-    const memoryPercent = usagePercent(stats.memory, limits.memory);
-    const diskPercent = usagePercent(stats.disk, limits.disk);
-    const lastExitValue = exitInfo.exitCode ? `Exit code ${exitInfo.exitCode}` : "No exit data";
-    const lastExitNote = exitInfo.exitCode ? exitInfo.oomKilled ? "OOM kill detected for the last exit." : "Last stop did not carry an OOM kill flag." : "The runtime has not reported an exit event in this session.";
-    const cooldownUntil = Number.parseInt(String(runtimeMeta.cooldownUntil || 0), 10) || 0;
-    const cooldownActive = cooldownUntil > Date.now();
-    const cooldownValue = cooldownActive ? "Active" : "Idle";
-    const cooldownNote = cooldownActive ? `Cooldown until ${new Date(cooldownUntil).toLocaleString()}${runtimeMeta.crashLoopCount ? ` \xB7 loop count ${runtimeMeta.crashLoopCount}` : ""}` : runtimeMeta.crashLoopCount ? `Crash loop count tracked: ${runtimeMeta.crashLoopCount}` : "No crash cooldown is active.";
-    return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(ReactAppShell, { pageData, subtitle: "React server console", children: [
-      pageData.success && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm mx-4 lg:mx-8 mt-6", children: pageData.success }),
-      pageData.error && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm mx-4 lg:mx-8 mt-6", children: pageData.error }),
-      terminalError && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm mx-4 lg:mx-8 mt-6", children: terminalError }),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "p-4 lg:p-8 grid grid-cols-1 xl:grid-cols-4 gap-6", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "xl:col-span-3 flex flex-col gap-6 relative", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col md:flex-row md:items-center justify-between gap-4", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-4", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: `w-3 h-3 rounded-full shrink-0 ${getToneColorClass(statusTone(status))}` }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h1", { className: "text-xl font-bold text-white tracking-wide", children: server.name || "Server Console" }),
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-sm text-neutral-400 mt-1", children: server.description || "Live runtime output and power controls." })
-              ] })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex bg-neutral-800 rounded-lg border border-neutral-700/50 overflow-hidden shadow-sm shrink-0", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-                "button",
-                {
-                  type: "button",
-                  className: "px-6 py-2.5 text-sm font-semibold hover:bg-neutral-700 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-r border-neutral-700/50 text-green-500",
-                  onClick: () => sendPowerAction("start"),
-                  disabled: startDisabled,
-                  children: "Start"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-                "button",
-                {
-                  type: "button",
-                  className: "px-6 py-2.5 text-sm font-semibold hover:bg-neutral-700 text-blue-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-r border-neutral-700/50",
-                  onClick: () => sendPowerAction("restart"),
-                  disabled: restartDisabled,
-                  children: "Restart"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-                "button",
-                {
-                  type: "button",
-                  className: "px-6 py-2.5 text-sm font-semibold hover:bg-neutral-700 text-red-500 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
-                  onClick: () => sendPowerAction("stop"),
-                  disabled: stopDisabled,
-                  children: "Stop"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-                "button",
-                {
-                  type: "button",
-                  className: `px-6 py-2.5 text-sm font-semibold hover:bg-neutral-700 text-red-600 hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${status === "stopping" ? "" : "hidden"}`,
-                  onClick: () => sendPowerAction("kill"),
-                  children: "Kill"
-                }
-              )
-            ] })
+      draw();
+      window.addEventListener("resize", draw);
+      return () => window.removeEventListener("resize", draw);
+    }, [history, memoryLimit, diskLimit]);
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ReactAppShell, { pageData, subtitle: "Resource Timeline", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(PageContentBlock, { title: "Resource Timeline", description: "Real-time performance monitoring across CPU, Memory and Disk.", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-xl overflow-hidden", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-wrap items-center justify-between gap-4 mb-6", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex gap-6", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-2", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "w-3 h-3 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-xs font-bold text-neutral-300 uppercase tracking-widest", children: "CPU Used" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 rounded-lg flex flex-col overflow-hidden shadow-lg h-[600px] relative", children: [
-            isProvisioning && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "absolute inset-0 bg-neutral-900/90 backdrop-blur-sm z-50 flex items-center justify-center p-6", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 p-8 rounded-xl max-w-md w-full shadow-2xl flex flex-col items-center text-center", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "w-16 h-16 rounded-full border-4 border-neutral-700 border-t-primary-500 animate-spin mb-6" }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-xl font-bold text-white mb-2", children: status === "starting" ? "Starting Server" : "Running Installer" }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-sm text-neutral-400 mb-6", children: status === "starting" ? "Your server is booting up. Most actions stay locked until the runtime is ready." : "Your server is being created and configured. This usually finishes in under a minute." }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-2 bg-neutral-900 px-4 py-2 rounded border border-neutral-700", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-hourglass-split text-primary-400" }),
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-sm font-bold tracking-widest uppercase text-neutral-300", children: status })
-              ] })
-            ] }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border-b border-neutral-700 px-4 py-3 flex justify-between items-center z-10 shrink-0", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "text-neutral-100 font-bold block", children: "Console" }),
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-xs text-neutral-500", children: "Interactive server stream" })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex bg-neutral-900 rounded overflow-hidden border border-neutral-700", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-                  "button",
-                  {
-                    className: `px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors border-r border-neutral-700 ${followOutput ? "bg-primary-600 text-white" : "text-neutral-400 hover:text-white hover:bg-neutral-700"}`,
-                    onClick: () => setFollowOutput((current) => !current),
-                    children: "Follow"
-                  }
-                ),
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-                  "button",
-                  {
-                    className: "px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-neutral-400 hover:text-white hover:bg-neutral-700 transition-colors",
-                    onClick: () => {
-                      const term = terminalInstanceRef.current;
-                      if (term) term.clear();
-                    },
-                    children: "Clear"
-                  }
-                )
-              ] })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: `flex-1 relative ${terminalBooted ? "" : "opacity-0"} p-2`, style: { minHeight: 0 }, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "w-full h-full", ref: terminalHostRef }) }),
-            !terminalBooted && !terminalError && !isProvisioning && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "absolute inset-x-0 bottom-16 top-16 flex items-center justify-center flex-col gap-4 text-neutral-500", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "w-8 h-8 border-4 border-neutral-600 border-t-primary-500 rounded-full animate-spin" }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { children: "Booting xterm runtime..." })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border-t border-neutral-700 flex flex-col md:flex-row items-center shrink-0", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex-1 flex items-center w-full min-w-0", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-neutral-500 pl-4 font-mono font-bold", children: "$" }),
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-                  "input",
-                  {
-                    type: "text",
-                    className: "w-full bg-transparent border-none text-neutral-200 text-sm font-mono px-3 py-3.5 focus:ring-0 shadow-none outline-none",
-                    value: commandValue,
-                    onChange: (event) => setCommandValue(event.target.value),
-                    onKeyDown: (event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        sendCommand();
-                        return;
-                      }
-                      if (event.key === "ArrowUp") {
-                        event.preventDefault();
-                        if (!history.length) return;
-                        historyIndexRef.current = Math.min(historyIndexRef.current + 1, history.length - 1);
-                        setCommandValue(history[historyIndexRef.current] || "");
-                        return;
-                      }
-                      if (event.key === "ArrowDown") {
-                        event.preventDefault();
-                        if (!history.length) return;
-                        historyIndexRef.current = Math.max(historyIndexRef.current - 1, -1);
-                        setCommandValue(historyIndexRef.current >= 0 ? history[historyIndexRef.current] || "" : "");
-                      }
-                    },
-                    placeholder: connectorOnline ? "Type a command and press Enter..." : "Connector offline",
-                    disabled: !connectorOnline
-                  }
-                )
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center w-full md:w-auto border-t md:border-t-0 md:border-l border-neutral-700", children: [
-                macros.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "px-3 py-2 md:py-0 border-r border-neutral-700", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
-                  "select",
-                  {
-                    className: "bg-neutral-900 border border-neutral-700 rounded text-xs text-neutral-300 px-2 py-1.5 focus:ring-primary-500 focus:border-primary-500 cursor-pointer outline-none",
-                    onChange: (e) => {
-                      if (e.target.value) {
-                        runMacro(e.target.value);
-                        e.target.value = "";
-                      }
-                    },
-                    defaultValue: "",
-                    children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("option", { value: "", disabled: true, children: "Run a Macro..." }),
-                      macros.map((m) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("option", { value: m.id, children: m.name }, m.id))
-                    ]
-                  }
-                ) }),
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-                  "button",
-                  {
-                    className: "flex-1 md:flex-none px-5 py-3.5 bg-primary-600 hover:bg-primary-500 font-bold text-white text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
-                    onClick: sendCommand,
-                    disabled: !connectorOnline || !String(commandValue || "").trim(),
-                    children: "Send"
-                  }
-                )
-              ] })
-            ] })
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-2", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "w-3 h-3 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-xs font-bold text-neutral-300 uppercase tracking-widest", children: "Memory Used" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-2", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-xs font-bold text-neutral-300 uppercase tracking-widest", children: "Disk Used" })
           ] })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("aside", { className: "xl:col-span-1 flex flex-col gap-6", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-5", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4", children: "Server Details" }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-4", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ResourceBadge, { icon: "bi-hdd-network", label: "Allocation", value: server.address || "No allocation address" }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ResourceBadge, { icon: "bi-hdd-stack", label: "Status", value: formatStatus(status) }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "border-t border-neutral-700/50 my-1" }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ResourceBadge, { icon: "bi-cpu", label: "CPU Cap", value: limits.cpu ? `${limits.cpu}%` : "Unlimited" }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ResourceBadge, { icon: "bi-memory", label: "RAM Cap", value: limits.memory ? `${limits.memory} MB` : "Unlimited" }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ResourceBadge, { icon: "bi-device-hdd", label: "Disk Cap", value: limits.disk ? `${limits.disk} MB` : "Unlimited" })
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-[10px] font-mono text-neutral-500", children: [
+          "Last Update: ",
+          stats.lastUpdate ? stats.lastUpdate.toLocaleTimeString() : "Waiting..."
+        ] })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "relative group", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+          "canvas",
+          {
+            ref: canvasRef,
+            className: "w-full h-[360px] cursor-crosshair rounded-lg",
+            style: { imageRendering: "auto" }
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "absolute top-4 right-4 pointer-events-none space-y-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-950/80 backdrop-blur-md border border-neutral-700/50 rounded-lg px-3 py-2 text-right", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-[10px] text-neutral-500 font-bold uppercase tracking-tighter", children: "Current CPU" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-lg font-black text-white", children: [
+              stats.cpu.toFixed(1),
+              "%"
             ] })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-5", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4", children: "Connector Link" }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: `flex items-center gap-3 p-3 rounded mb-4 border ${connectorOnline ? "bg-green-600/10 border-green-600/30 text-green-400" : "bg-red-600/10 border-red-600/30 text-red-400"}`, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: `bi ${connectorOnline ? "bi-broadcast-pin" : "bi-wifi-off"}` }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "font-semibold", children: connectionState })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex gap-2", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Link, { to: ReactRoutes.changeView, className: "flex-1 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-bold py-2 rounded text-center transition-colors", children: "View Mode" }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("a", { href: `/server/${server.containerId}?popout=true`, className: "flex-1 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-bold py-2 rounded text-center transition-colors", children: "Popout" })
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-950/80 backdrop-blur-md border border-neutral-700/50 rounded-lg px-3 py-2 text-right", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-[10px] text-neutral-500 font-bold uppercase tracking-tighter", children: "Current Memory" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-lg font-black text-white", children: [
+              Math.round(stats.memory),
+              " MB"
             ] })
-          ] }),
-          isMinecraft && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-5 flex flex-col h-full max-h-[400px]", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-between items-center mb-4", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest", children: "Online Players" }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { className: "text-xs font-bold bg-neutral-900 border border-neutral-700 px-2 py-0.5 rounded text-neutral-400", children: [
-                players.length,
-                " Online"
-              ] })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "flex-1 overflow-y-auto pr-1", children: playersLoading ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-sm text-neutral-500 animate-pulse text-center mt-4", children: "Loading players..." }) : playersError ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-sm text-red-400 text-center mt-4", children: playersError }) : players.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-sm text-neutral-500 text-center mt-4", children: "No players online." }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "flex flex-col gap-3", children: players.map((p) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700/50 p-3 rounded-lg flex flex-col gap-3 group", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-3", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-                  "img",
-                  {
-                    src: p.headUrl,
-                    className: "w-8 h-8 rounded shrink-0 shadow-sm",
-                    alt: p.name,
-                    onError: (e) => {
-                      e.target.src = "https://minotar.net/avatar/Steve/40";
-                    }
-                  }
-                ),
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "text-sm text-white truncate flex-1", children: p.name })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "grid grid-cols-3 gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-                  "button",
-                  {
-                    onClick: () => handleMcAction("kick", p.name),
-                    disabled: !mcPerms.canKick,
-                    className: "bg-neutral-800 hover:bg-neutral-700 text-[10px] uppercase font-bold text-neutral-300 py-1 rounded disabled:opacity-50",
-                    children: "Kick"
-                  }
-                ),
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-                  "button",
-                  {
-                    onClick: () => handleMcAction("ban", p.name),
-                    disabled: !mcPerms.canBan,
-                    className: "bg-red-900/50 hover:bg-red-900 text-[10px] uppercase font-bold text-red-400 py-1 rounded disabled:opacity-50",
-                    children: "Ban"
-                  }
-                ),
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-                  "button",
-                  {
-                    onClick: () => handleMcAction("op", p.name),
-                    disabled: !mcPerms.canOp,
-                    className: "bg-green-900/50 hover:bg-green-900 text-[10px] uppercase font-bold text-green-400 py-1 rounded disabled:opacity-50",
-                    children: "OP"
-                  }
-                )
-              ] })
-            ] }, p.name)) }) })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-5", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4", children: "Runtime Snapshot" }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "CPU", value: `${stats.cpu.toFixed(1)}%`, note: limits.cpu ? `${limits.cpu}% cap` : "No cap", tone: "primary" }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "Memory", value: `${Math.round(stats.memory)} MB`, note: `${memoryPercent.toFixed(0)}% used`, tone: "success" }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "Disk", value: `${Math.round(stats.disk)} MB`, note: `${diskPercent.toFixed(0)}% used`, tone: "warning" }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "Uptime", value: formatDuration(stats.uptimeSeconds), note: "Current runtime session" }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "Net RX", value: formatBytes(stats.networkRx), note: "Inbound since start", tone: "success" }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "Net TX", value: formatBytes(stats.networkTx), note: "Outbound since start", tone: "warning" })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-5", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4", children: "Guards" }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "Restart Trigger", value: formatRuntimeSource(runtimeMeta.lastSource), note: runtimeMeta.lastReason || "No restart source captured yet." }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "Cooldown State", value: cooldownValue, note: cooldownNote, tone: cooldownActive ? "warning" : "primary" }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "Exit Summary", value: lastExitValue, note: lastExitNote, tone: exitInfo.oomKilled ? "danger" : "primary" })
+          ] })
+        ] })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 pt-8 border-t border-neutral-800", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "space-y-1", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-[10px] font-bold text-neutral-500 uppercase tracking-widest", children: "CPU Limit" }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-neutral-200 font-mono", children: "Unrestricted" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "space-y-1", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-[10px] font-bold text-neutral-500 uppercase tracking-widest", children: "Memory Limit" }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-neutral-200 font-mono", children: [
+            memoryLimit,
+            " MB"
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "space-y-1", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-[10px] font-bold text-neutral-500 uppercase tracking-widest", children: "Disk Quota" }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-neutral-200 font-mono", children: [
+            diskLimit,
+            " MB"
           ] })
         ] })
       ] })
-    ] });
+    ] }) }) });
   }
-  var server_console_default = ServerConsolePage;
+  var server_timeline_default = ServerTimelinePage;
   if (root) {
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ServerConsolePage, { pageData: data }));
-    if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
-      window.__CPANEL_REACT_BOOTED__();
-    }
+    root.render(/* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ServerTimelinePage, { pageData: data }));
   }
 })();
 /*! Bundled license information:

@@ -28,7 +28,28 @@ export function DashboardPage({ pageData = data }) {
 
     return (
         <ReactAppShell pageData={pageData} subtitle="React view beta">
-            <PageContentBlock title="Dashboard">
+            <PageContentBlock 
+                title={isAdminDashboard ? "System Overview" : "Dashboard"} 
+                description={isAdminDashboard ? "Viewing all active servers across the system." : "Individual overview of your servers and instances."}
+            >
+                {pageData.user?.isAdmin && (
+                    <div className="flex justify-between items-center mb-6 bg-neutral-800/50 border border-neutral-700/50 p-4 rounded-xl">
+                        <div className="flex items-center gap-3">
+                            <div className={`w-3 h-3 rounded-full ${isAdminDashboard ? 'bg-primary-500 animate-pulse' : 'bg-neutral-600'}`}></div>
+                            <span className="text-sm font-bold text-neutral-300 uppercase tracking-widest">
+                                {isAdminDashboard ? 'Admin View: All Servers' : 'Private View: My Servers'}
+                            </span>
+                        </div>
+                        <a 
+                            href={isAdminDashboard ? '/' : '/?others=true'}
+                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${isAdminDashboard ? 'bg-primary-600 hover:bg-primary-500 text-white shadow-lg shadow-primary-900/20' : 'bg-neutral-700 hover:bg-neutral-600 text-neutral-300'}`}
+                        >
+                            <i className={`bi ${isAdminDashboard ? 'bi-shield-check' : 'bi-shield-lock'} me-2`}></i>
+                            {isAdminDashboard ? 'Exit Admin Mode' : 'Enter Admin Mode'}
+                        </a>
+                    </div>
+                )}
+                
                 {!servers ? (
                     <Spinner centered size="large" />
                 ) : servers.length > 0 ? (

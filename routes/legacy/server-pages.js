@@ -10758,6 +10758,38 @@ function registerServerPagesRoutes(ctx) {
 
     // Server Error Pages
     app.get('/server/notfound', (req, res) => {
+        const reactPageData = {
+
+            routePath: '/server/notfound',
+
+            brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+
+            faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+
+            user: buildReactUserSummary(req.session.user)
+
+        };
+
+        if (wantsReactPageData(req)) {
+
+            return res.json(reactPageData);
+
+        }
+
+        if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
+
+            return res.render('react/loader', {
+
+                title: 'Server Not Found',
+
+                reactEntry: 'app',
+
+                reactPageData
+
+            });
+
+        }
+
         res.render('server/notfound', {
             user: req.session.user,
             title: 'Server Not Found',
@@ -10766,6 +10798,38 @@ function registerServerPagesRoutes(ctx) {
     });
 
     app.get('/server/no-permissions', (req, res) => {
+        const reactPageData = {
+
+            routePath: '/server/no-permissions',
+
+            brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+
+            faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+
+            user: buildReactUserSummary(req.session.user)
+
+        };
+
+        if (wantsReactPageData(req)) {
+
+            return res.json(reactPageData);
+
+        }
+
+        if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
+
+            return res.render('react/loader', {
+
+                title: 'Access Denied',
+
+                reactEntry: 'app',
+
+                reactPageData
+
+            });
+
+        }
+
         res.render('server/no-permissions', {
             user: req.session.user,
             title: 'No Permissions',
@@ -11409,6 +11473,40 @@ function registerServerPagesRoutes(ctx) {
             if (!server.isSuspended) {
                 return res.redirect(`/server/${server.containerId}`);
             }
+            const reactPageData = {
+
+                routePath: `/server/${server.containerId}/suspended`,
+
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+
+                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+
+                user: buildReactUserSummary(req.session.user),
+
+                server: server.toJSON()
+
+            };
+
+            if (wantsReactPageData(req)) {
+
+                return res.json(reactPageData);
+
+            }
+
+            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
+
+                return res.render('react/loader', {
+
+                    title: 'Server Suspended',
+
+                    reactEntry: 'app',
+
+                    reactPageData
+
+                });
+
+            }
+
             res.render('server/suspended', {
                 server,
                 user: req.session.user,
@@ -11510,6 +11608,55 @@ function registerServerPagesRoutes(ctx) {
                     status: statusPreview
                 };
             }
+
+            const reactPageData = {
+        routePath: `/server/${server.containerId}/overview`,
+        brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+        faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+        success: req.query.success || null,
+        error: req.query.error || null,
+        user: buildReactUserSummary(req.session.user),
+        server: { ...server.toJSON(), folder: normalizeServerFolderName(server.folder), tags: normalizeServerTags(server.tags) },
+        serverNavItems: buildReactServerNavItems(server, access, 'overview'),
+        wsToken,
+        resolvedStartup,
+        healthScore,
+        serverCost,
+        configDrift,
+        minecraftProfileCard
+    };
+
+
+            if (wantsReactPageData(req)) {
+
+
+                return res.json(reactPageData);
+
+
+            }
+
+
+            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
+
+
+                return res.render('react/loader', {
+
+
+                    title: `Overview ${server.name}`,
+
+
+                    reactEntry: 'app',
+
+
+                    reactPageData
+
+
+                });
+
+
+            
+}
+
 
             res.render('server/overview', {
                 server,
@@ -12252,6 +12399,51 @@ return res.render('server/users', {
                 })
                 : [];
 
+            const reactPageData = {
+        routePath: `/server/${server.containerId}/activity`,
+        brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+        faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+        success: req.query.success || null,
+        error: req.query.error || null,
+        user: buildReactUserSummary(req.session.user),
+        server: server.toJSON(),
+        serverNavItems: buildReactServerNavItems(server, access, 'activity'),
+        logs,
+        changeLogs
+    };
+
+
+            if (wantsReactPageData(req)) {
+
+
+                return res.json(reactPageData);
+
+
+            }
+
+
+            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
+
+
+                return res.render('react/loader', {
+
+
+                    title: `Activity ${server.name}`,
+
+
+                    reactEntry: 'app',
+
+
+                    reactPageData
+
+
+                });
+
+
+            
+}
+
+
             return res.render('server/activity', {
                 server,
                 user: req.session.user,
@@ -12385,6 +12577,51 @@ return res.render('server/users', {
                     limit: 240
                 })
                 : [];
+
+            const reactPageData = {
+        routePath: `/server/${server.containerId}/timeline`,
+        brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+        faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+        success: req.query.success || null,
+        error: req.query.error || null,
+        user: buildReactUserSummary(req.session.user),
+        server: server.toJSON(),
+        serverNavItems: buildReactServerNavItems(server, access, 'timeline'),
+        wsToken,
+        samples
+    };
+
+
+            if (wantsReactPageData(req)) {
+
+
+                return res.json(reactPageData);
+
+
+            }
+
+
+            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
+
+
+                return res.render('react/loader', {
+
+
+                    title: `Resource Timeline ${server.name}`,
+
+
+                    reactEntry: 'app',
+
+
+                    reactPageData
+
+
+                });
+
+
+            
+}
+
 
             return res.render('server/timeline', {
                 server,
@@ -16892,6 +17129,26 @@ return res.render('server/users', {
                 return res.redirect(`/server/${server.containerId}/suspended`);
             }
 
+            const reactPageData = {
+                server,
+                user: req.session.user,
+                title: `Minecraft Center ${server.name}`,
+                serverNavItems: buildReactServerNavItems(server, access, 'mccenter'),
+                brandName: SETTINGS?.[0]?.brandName || 'CPanel'
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
+            if (Number(req.session.user.experimentalViewMode) === 1) {
+                return res.render('react/loader', {
+                    pageData: reactPageData,
+                    pageMeta: { entry: 'server-minecraft-center' },
+                    title: reactPageData.title
+                });
+            }
+
             return res.render('server/minecraft-center', {
                 server,
                 user: req.session.user,
@@ -16918,6 +17175,33 @@ return res.render('server/users', {
             const inventory = await buildMinecraftWorldInventory(context.server, context.connectorWs);
             if (!inventory.success) {
                 return res.redirect(`/server/${req.params.containerId}/minecraft-center?error=${encodeURIComponent(inventory.error || 'Failed to inspect Minecraft worlds.')}`);
+            }
+
+            const reactPageData = {
+                server: context.server,
+                user: req.session.user,
+                title: `World Center ${context.server.name}`,
+                serverNavItems: buildReactServerNavItems(context.server, context.access, 'mccenter'),
+                worldData: inventory,
+                feedback: {
+                    success: String(req.query.success || '').trim(),
+                    error: String(req.query.error || '').trim(),
+                    warning: String(req.query.warning || '').trim(),
+                    exportFile: String(req.query.exportFile || '').trim()
+                },
+                brandName: SETTINGS?.[0]?.brandName || 'CPanel'
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
+            if (Number(req.session.user.experimentalViewMode) === 1) {
+                return res.render('react/loader', {
+                    pageData: reactPageData,
+                    pageMeta: { entry: 'server-minecraft-world-center' },
+                    title: reactPageData.title
+                });
             }
 
             return res.render('server/minecraft-world-center', {
@@ -17507,6 +17791,44 @@ return res.render('server/users', {
             const runtimeLabel = defaultKind === 'mod'
                 ? `${defaultLoader ? defaultLoader.toUpperCase() : 'MODDED'}`
                 : `${defaultLoader ? defaultLoader.toUpperCase() : 'PLUGIN'}`;
+
+            const reactPageData = {
+                server,
+                user: req.session.user,
+                title: `Minecraft Addons ${server.name}`,
+                serverNavItems: buildReactServerNavItems(server, access, 'mccenter'),
+                minecraftDefaults: {
+                    kind: defaultKind,
+                    loader: defaultLoader,
+                    version: defaultVersion,
+                    targetDirectory: resolveMinecraftTargetDirectory(defaultKind, req.query.targetDirectory)
+                },
+                minecraftCatalog: {
+                    plugins: MODRINTH_PLUGIN_LOADERS,
+                    mods: MODRINTH_MOD_LOADERS,
+                    datapacks: [],
+                    resourcepacks: [],
+                    worlds: []
+                },
+                minecraftRuntime: {
+                    kind: defaultKind,
+                    loader: defaultLoader,
+                    label: runtimeLabel
+                },
+                brandName: SETTINGS?.[0]?.brandName || 'CPanel'
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
+            if (Number(req.session.user.experimentalViewMode) === 1) {
+                return res.render('react/loader', {
+                    pageData: reactPageData,
+                    pageMeta: { entry: 'server-minecraft-addons' },
+                    title: reactPageData.title
+                });
+            }
 
             res.render('server/minecraft', {
                 server,
@@ -21946,6 +22268,71 @@ res.render('server/startup', {
                 isAdmin: Boolean(req.session.user.isAdmin),
                 serverPerms: Array.from(access.permissions || [])
             }, SECRET_KEY, { expiresIn: '1h' });
+
+            const filePath = String(req.query.path || '/').trim();
+            const parentPath = filePath.split('/').slice(0, -1).join('/') || '/';
+            
+            let dirFiles = [];
+            const connectorWs = connectorConnections.get(server.allocation.connectorId);
+            if (connectorWs && connectorWs.readyState === WebSocket.OPEN) {
+                try {
+                    connectorWs.send(JSON.stringify({
+                        type: 'list_files',
+                        serverId: server.id,
+                        directory: parentPath
+                    }));
+
+                    const response = await new Promise((resolve) => {
+                        const timer = setTimeout(() => {
+                            connectorWs.removeListener('message', handleEditorDirList);
+                            resolve({ error: 'timeout' });
+                        }, 1000); // Short timeout for pre-fetch
+
+                        function handleEditorDirList(messageData) {
+                            try {
+                                const data = JSON.parse(messageData);
+                                if (data.type === 'file_list' && data.serverId === server.id && data.directory === parentPath) {
+                                    clearTimeout(timer);
+                                    connectorWs.removeListener('message', handleEditorDirList);
+                                    resolve(data);
+                                }
+                            } catch (e) { }
+                        }
+                        connectorWs.on('message', handleEditorDirList);
+                    });
+
+                    if (response && response.files) {
+                        dirFiles = response.files.filter(f => !f.isDirectory);
+                    }
+                } catch (err) {
+                    // Fail silently, frontend will fetch if missing
+                }
+            }
+
+            const reactPageData = {
+                server,
+                user: req.session.user,
+                wsToken,
+                filePath,
+                parentPath,
+                dirFiles,
+                editWriteLocked: isServerEditLockedForAccess(policyConfig, access),
+                policyReadOnlyPatterns: policyConfig && policyConfig.readOnlyFiles ? policyConfig.readOnlyFiles.patterns || [] : [],
+                serverNavItems: buildReactServerNavItems(server, access, 'files'),
+                brandName: SETTINGS?.[0]?.brandName || 'CPanel'
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
+            if (Number(req.session.user.experimentalViewMode) === 1) {
+                return res.render('react/loader', {
+                    pageData: reactPageData,
+                    pageMeta: { entry: 'server-file-editor' },
+                    title: `File Editor - ${server.name}`
+                });
+            }
 
             res.render('server/edit', {
                 server,

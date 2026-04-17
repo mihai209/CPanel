@@ -117,16 +117,33 @@ export default function ReactAppShell({
 
             {/* Server Deep Navigation (if in server view) */}
             {serverNavItems.length > 0 && (
-                <nav className="bg-neutral-800/50 border-b border-neutral-700 flex overflow-x-auto px-4 lg:px-8">
-                    {serverNavItems.map((item) => (
-                        <a 
-                            key={item.href} 
-                            href={item.href} 
-                            className={`px-4 py-3 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 ${item.active ? 'text-white border-primary-500' : 'text-neutral-400 border-transparent hover:text-white hover:border-neutral-500'}`}
-                        >
-                            {item.label}
-                        </a>
-                    ))}
+                <nav className="bg-neutral-800/55 border-b border-neutral-700/50 flex flex-col md:flex-row overflow-x-auto px-4 lg:px-8 py-1 md:py-0">
+                    {[
+                        { name: 'Home', keys: ['overview', 'console', 'activity'] },
+                        { name: 'Data', keys: ['files', 'backups', 'dbs'] },
+                        { name: 'Access', keys: ['network', 'users', 'api', 'schedules'] },
+                        { name: 'Config', keys: ['startup', 'timeline'] }
+                    ].map((group) => {
+                        const groupItems = serverNavItems.filter(item => group.keys.includes(item.key));
+                        if (groupItems.length === 0) return null;
+
+                        return (
+                            <div key={group.name} className="flex items-center group/navgroup">
+                                <div className="hidden lg:block h-3 w-px bg-neutral-700 mx-1 first:hidden"></div>
+                                <div className="flex items-center overflow-x-auto no-scrollbar">
+                                    {groupItems.map((item) => (
+                                        <a 
+                                            key={item.href} 
+                                            href={item.href} 
+                                            className={`px-3 py-3 text-[11px] font-black uppercase tracking-widest whitespace-nowrap transition-all border-b-2 hover:translate-y-[-1px] ${item.active ? 'text-primary-400 border-primary-500 bg-primary-500/5' : 'text-neutral-500 border-transparent hover:text-neutral-300'}`}
+                                        >
+                                            {item.label}
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </nav>
             )}
 

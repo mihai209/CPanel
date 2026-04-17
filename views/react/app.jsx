@@ -12,6 +12,16 @@ import { ServerDatabasesPage } from './server-databases.jsx';
 import { ServerUsersPage } from './server-users.jsx';
 import { ServerSchedulesPage } from './server-schedules.jsx';
 import { ServerStartupPage } from './server-startup.jsx';
+import { ServerFileEditorPage } from './server-file-editor.jsx';
+import { ServerMinecraftCenterPage } from './server-minecraft-center.jsx';
+import { ServerMinecraftWorldCenterPage } from './server-minecraft-world-center.jsx';
+import { ServerMinecraftAddonsPage } from './server-minecraft-addons.jsx';
+import { ServerOverviewPage } from './server-overview.jsx';
+import { ServerActivityPage } from './server-activity.jsx';
+import { ServerTimelinePage } from './server-timeline.jsx';
+import { ServerNotFoundPage } from './server-not-found.jsx';
+import { ServerNoPermissionsPage } from './server-no-permissions.jsx';
+import { ServerSuspendedPage } from './server-suspended.jsx';
 import { AccountPage } from './account.jsx';
 import { DeviceLoginPage } from './device-login.jsx';
 import { ExperimentalFeaturesPage } from './experimental-features.jsx';
@@ -42,6 +52,16 @@ function resolveComponentForPath(pathname) {
         if (serverRoute.page === 'users') return ServerUsersPage;
         if (serverRoute.page === 'schedules') return ServerSchedulesPage;
         if (serverRoute.page === 'startup') return ServerStartupPage;
+        if (serverRoute.page === 'files/edit') return ServerFileEditorPage;
+        if (serverRoute.page === 'minecraft-center') return ServerMinecraftCenterPage;
+        if (serverRoute.page === 'minecraft/world-center') return ServerMinecraftWorldCenterPage;
+        if (serverRoute.page === 'minecraft/addons') return ServerMinecraftAddonsPage;
+        if (serverRoute.page === 'overview') return ServerOverviewPage;
+        if (serverRoute.page === 'activity') return ServerActivityPage;
+        if (serverRoute.page === 'timeline') return ServerTimelinePage;
+        if (serverRoute.page === 'notfound') return ServerNotFoundPage;
+        if (serverRoute.page === 'no-permissions') return ServerNoPermissionsPage;
+        if (serverRoute.page === 'suspended') return ServerSuspendedPage;
     }
     if (current === ReactRoutes.account) return AccountPage;
     if (current === ReactRoutes.deviceLogin) return DeviceLoginPage;
@@ -243,6 +263,16 @@ function AppRouter() {
                 <Route path={ReactRoutes.serverUsersPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverSchedulesPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverStartupPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverFilesEditPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverMinecraftCenterPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverMinecraftWorldCenterPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverMinecraftAddonsPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverOverviewPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverActivityPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverTimelinePattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverNotFoundPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverNoPermissionsPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverSuspendedPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.account} element={<RoutedPage />} />
                 <Route path={ReactRoutes.deviceLogin} element={<RoutedPage />} />
                 <Route path={ReactRoutes.experimentalFeatures} element={<RoutedPage />} />

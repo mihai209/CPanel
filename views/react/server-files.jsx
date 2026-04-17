@@ -54,6 +54,81 @@ export function ServerFilesPage({ pageData = data }) {
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(pageData.error || '');
     const [menuPath, setMenuPath] = React.useState('');
+    const [isDragging, setIsDragging] = React.useState(false);
+    const [uploadProgress, setUploadProgress] = React.useState({ active: false, current: '', progress: 0 });
+
+    const reloadFiles = React.useCallback(() => {
+        setLoading(true);
+        setError('');
+        fetch(`${manager.fetchUrlBase}?path=${encodeURIComponent(currentPath)}`, {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' }
+        })
+            .then(async (response) => {
+                const payload = await response.json().catch(() => ({}));
+                const nextEntries = Array.isArray(payload.files) ? payload.files : [];
+                nextEntries.sort((left, right) => {
+                    if (left.isDirectory && !right.isDirectory) return -1;
+                    if (!left.isDirectory && right.isDirectory) return 1;
+                    return String(left.name || '').localeCompare(String(right.name || ''), undefined, { numeric: true, sensitivity: 'base' });
+                });
+                setEntries(nextEntries);
+                setLoading(false);
+            })
+            .catch(() => {
+                setLoading(false);
+                setError('Failed to refresh files.');
+            });
+    }, [currentPath, manager.fetchUrlBase]);
+
+    const uploadFile = async (file) => {
+        setUploadProgress({ active: true, current: file.name, progress: 0 });
+        try {
+            const response = await fetch(`${manager.uploadUrlBase || `/server/${pageData.server?.containerId}/files/upload`}?path=${encodeURIComponent(currentPath)}&name=${encodeURIComponent(file.name)}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/octet-stream',
+                    'x-file-name': file.name
+                },
+                body: file,
+                credentials: 'same-origin'
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.error) throw new Error(payload.error || 'Upload failed');
+        } catch (err) {
+            console.error('Upload error:', err);
+            setError(`Failed to upload ${file.name}: ${err.message}`);
+        }
+    };
+
+    const handleDrop = async (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        if (permissions.filesWriteLocked) return;
+
+        const droppedFiles = Array.from(e.dataTransfer.files);
+        if (droppedFiles.length === 0) return;
+
+        setLoading(true);
+        for (const file of droppedFiles) {
+            await uploadFile(file);
+        }
+        setUploadProgress({ active: false, current: '', progress: 0 });
+        reloadFiles();
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        if (!permissions.filesWriteLocked) setIsDragging(true);
+    };
+
+    const handleDragLeave = (e) => {
+        e.preventDefault();
+        // Only disable if we actually left the container
+        if (!e.currentTarget.contains(e.relatedTarget)) {
+            setIsDragging(false);
+        }
+    };
 
     React.useEffect(() => {
         let cancelled = false;
@@ -144,7 +219,32 @@ export function ServerFilesPage({ pageData = data }) {
                     </div>
 
                     {/* File Manager UI */}
-                    <div className="lg:col-span-3">
+                    <div 
+                        className="lg:col-span-3 relative"
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                    >
+                        {isDragging && (
+                            <div className="absolute inset-0 z-50 bg-primary-600/20 backdrop-blur-[2px] border-2 border-dashed border-primary-500 rounded-lg flex items-center justify-center pointer-events-none transition-all duration-300">
+                                <div className="bg-neutral-900 px-8 py-10 rounded-2xl shadow-2xl border border-neutral-700 flex flex-col items-center animate-bounce">
+                                    <i className="bi bi-cloud-arrow-up text-5xl text-primary-500 mb-4"></i>
+                                    <span className="text-xl font-black text-white uppercase tracking-widest">Drop to Upload</span>
+                                    <span className="text-sm text-neutral-400 mt-2">File(s) will be uploaded to {currentPath}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {uploadProgress.active && (
+                            <div className="absolute top-4 right-4 z-50 bg-neutral-900 border border-neutral-700 p-4 rounded-xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-4">
+                                <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+                                <div>
+                                    <div className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Uploading...</div>
+                                    <div className="text-xs font-bold text-white max-w-[150px] truncate">{uploadProgress.current}</div>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden flex flex-col">
                             
                             {/* Breadcrumbs Row */}

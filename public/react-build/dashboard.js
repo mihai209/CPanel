@@ -8044,6 +8044,16 @@
     serverUsersPattern: "/server/:containerId/users",
     serverSchedulesPattern: "/server/:containerId/schedules",
     serverStartupPattern: "/server/:containerId/startup",
+    serverFilesEditPattern: "/server/:containerId/files/edit",
+    serverMinecraftCenterPattern: "/server/:containerId/minecraft-center",
+    serverMinecraftWorldCenterPattern: "/server/:containerId/minecraft/world-center",
+    serverMinecraftAddonsPattern: "/server/:containerId/minecraft/addons",
+    serverOverviewPattern: "/server/:containerId/overview",
+    serverActivityPattern: "/server/:containerId/activity",
+    serverTimelinePattern: "/server/:containerId/timeline",
+    serverNotFoundPattern: "/server/:containerId/notfound",
+    serverNoPermissionsPattern: "/server/:containerId/no-permissions",
+    serverSuspendedPattern: "/server/:containerId/suspended",
     account: "/account",
     deviceLogin: "/account/device-login",
     themes: "/themes",
@@ -8155,15 +8165,27 @@
         )),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(NavLink, { to: ReactRoutes.changeView, className: "px-4 py-3 text-sm font-semibold border-l-4 border-transparent text-neutral-400 hover:text-white", children: "Exit Beta Mode" })
       ] }),
-      serverNavItems.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("nav", { className: "bg-neutral-800/50 border-b border-neutral-700 flex overflow-x-auto px-4 lg:px-8", children: serverNavItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-        "a",
-        {
-          href: item.href,
-          className: `px-4 py-3 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 ${item.active ? "text-white border-primary-500" : "text-neutral-400 border-transparent hover:text-white hover:border-neutral-500"}`,
-          children: item.label
-        },
-        item.href
-      )) }),
+      serverNavItems.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("nav", { className: "bg-neutral-800/55 border-b border-neutral-700/50 flex flex-col md:flex-row overflow-x-auto px-4 lg:px-8 py-1 md:py-0", children: [
+        { name: "Home", keys: ["overview", "console", "activity"] },
+        { name: "Data", keys: ["files", "backups", "dbs"] },
+        { name: "Access", keys: ["network", "users", "api", "schedules"] },
+        { name: "Config", keys: ["startup", "timeline"] }
+      ].map((group) => {
+        const groupItems = serverNavItems.filter((item) => group.keys.includes(item.key));
+        if (groupItems.length === 0) return null;
+        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center group/navgroup", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "hidden lg:block h-3 w-px bg-neutral-700 mx-1 first:hidden" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex items-center overflow-x-auto no-scrollbar", children: groupItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "a",
+            {
+              href: item.href,
+              className: `px-3 py-3 text-[11px] font-black uppercase tracking-widest whitespace-nowrap transition-all border-b-2 hover:translate-y-[-1px] ${item.active ? "text-primary-400 border-primary-500 bg-primary-500/5" : "text-neutral-500 border-transparent hover:text-neutral-300"}`,
+              children: item.label
+            },
+            item.href
+          )) })
+        ] }, group.name);
+      }) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("main", { className: "flex-1 w-full bg-neutral-900", children })
     ] });
   }
@@ -8191,7 +8213,7 @@
     if (mb >= 1024) return `${(mb / 1024).toFixed(mb % 1024 === 0 ? 0 : 1)} GB`;
     return `${mb} MB`;
   }
-  function ServerRow({ server }) {
+  function ServerRow({ server, isAdminDashboard }) {
     const rawStatus = String(server.status || "unknown").toLowerCase();
     let statusColor = "bg-neutral-600 text-neutral-200";
     let statusLabel = rawStatus;
@@ -8211,7 +8233,13 @@
           /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h3", { className: "text-lg font-bold text-neutral-100 truncate group-hover:text-primary-400 transition-colors", children: server.name }),
           /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `text-xs px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide ${statusColor}`, children: statusLabel })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-sm text-neutral-400 font-mono truncate", children: server.containerId?.substring(0, 12) })
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-2 mt-1", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-xs text-neutral-500 font-mono truncate", children: server.containerId?.substring(0, 12) }),
+          isAdminDashboard && server.owner && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-1.5 ml-2 pl-2 border-l border-neutral-700", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-person text-[10px] text-neutral-500" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-[10px] font-bold text-neutral-400 uppercase tracking-tighter", children: server.owner.username })
+          ] })
+        ] })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "mt-4 md:mt-0 flex gap-4 md:ml-6 shrink-0", children: [
         /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-center", children: [
@@ -8258,14 +8286,40 @@
       }
     }, [pageData]);
     const isAdminDashboard = Boolean(pageData.isAdminDashboard);
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ReactAppShell, { pageData, subtitle: "React view beta", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(PageContentBlock, { title: "Dashboard", children: !servers ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Spinner, { centered: true, size: "large" }) : servers.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex flex-col gap-2", children: servers.map((server) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
-      ServerRow,
+    return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ReactAppShell, { pageData, subtitle: "React view beta", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+      PageContentBlock,
       {
-        server,
-        isAdminDashboard
-      },
-      server.id || server.containerId
-    )) }) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "text-center text-sm text-neutral-400 mt-10", children: "There are no servers associated with your account." }) }) });
+        title: isAdminDashboard ? "System Overview" : "Dashboard",
+        description: isAdminDashboard ? "Viewing all active servers across the system." : "Individual overview of your servers and instances.",
+        children: [
+          pageData.user?.isAdmin && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex justify-between items-center mb-6 bg-neutral-800/50 border border-neutral-700/50 p-4 rounded-xl", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center gap-3", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: `w-3 h-3 rounded-full ${isAdminDashboard ? "bg-primary-500 animate-pulse" : "bg-neutral-600"}` }),
+              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-sm font-bold text-neutral-300 uppercase tracking-widest", children: isAdminDashboard ? "Admin View: All Servers" : "Private View: My Servers" })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+              "a",
+              {
+                href: isAdminDashboard ? "/" : "/?others=true",
+                className: `px-4 py-2 rounded-lg text-xs font-bold transition-all ${isAdminDashboard ? "bg-primary-600 hover:bg-primary-500 text-white shadow-lg shadow-primary-900/20" : "bg-neutral-700 hover:bg-neutral-600 text-neutral-300"}`,
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: `bi ${isAdminDashboard ? "bi-shield-check" : "bi-shield-lock"} me-2` }),
+                  isAdminDashboard ? "Exit Admin Mode" : "Enter Admin Mode"
+                ]
+              }
+            )
+          ] }),
+          !servers ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Spinner, { centered: true, size: "large" }) : servers.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex flex-col gap-2", children: servers.map((server) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+            ServerRow,
+            {
+              server,
+              isAdminDashboard
+            },
+            server.id || server.containerId
+          )) }) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "text-center text-sm text-neutral-400 mt-10", children: "There are no servers associated with your account." })
+        ]
+      }
+    ) });
   }
   var dashboard_default = DashboardPage;
   if (root) {

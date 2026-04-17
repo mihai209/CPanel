@@ -7,7 +7,7 @@ function formatLimit(mb) {
     return `${mb} MB`;
 }
 
-export default function ServerRow({ server }) {
+export default function ServerRow({ server, isAdminDashboard }) {
     const rawStatus = String(server.status || 'unknown').toLowerCase();
     
     let statusColor = 'bg-neutral-600 text-neutral-200';
@@ -35,8 +35,18 @@ export default function ServerRow({ server }) {
                         {statusLabel}
                     </span>
                 </div>
-                <div className="text-sm text-neutral-400 font-mono truncate">
-                    {server.containerId?.substring(0, 12)}
+                <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-neutral-500 font-mono truncate">
+                        {server.containerId?.substring(0, 12)}
+                    </span>
+                    {isAdminDashboard && server.owner && (
+                         <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-neutral-700">
+                            <i className="bi bi-person text-[10px] text-neutral-500"></i>
+                            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-tighter">
+                                {server.owner.username}
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
 
