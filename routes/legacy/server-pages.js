@@ -1230,6 +1230,7 @@ function registerServerPagesRoutes(ctx) {
 
             return res.render('react/loader', {
                 title: 'Connectors Check',
+                reactEntry: 'connectors-check',
                 reactPageData: {
                     routePath: '/connectors-check',
                     brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
