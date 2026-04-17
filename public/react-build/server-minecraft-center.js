@@ -7283,9 +7283,6 @@
   var import_react6 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
-  // views/react/components/ReactAppShell.jsx
-  var import_react4 = __toESM(require_react());
-
   // node_modules/react-router-dom/dist/index.js
   var React2 = __toESM(require_react());
   var ReactDOM = __toESM(require_react_dom());
@@ -7314,6 +7311,34 @@
     Action2["Push"] = "PUSH";
     Action2["Replace"] = "REPLACE";
   })(Action || (Action = {}));
+  var PopStateEventType = "popstate";
+  function createBrowserHistory(options) {
+    if (options === void 0) {
+      options = {};
+    }
+    function createBrowserLocation(window2, globalHistory) {
+      let {
+        pathname,
+        search,
+        hash
+      } = window2.location;
+      return createLocation(
+        "",
+        {
+          pathname,
+          search,
+          hash
+        },
+        // state defaults to `null` because `window.history.state` does
+        globalHistory.state && globalHistory.state.usr || null,
+        globalHistory.state && globalHistory.state.key || "default"
+      );
+    }
+    function createBrowserHref(window2, to) {
+      return typeof to === "string" ? to : createPath(to);
+    }
+    return getUrlBasedHistory(createBrowserLocation, createBrowserHref, null, options);
+  }
   function invariant(value, message) {
     if (value === false || value === null || typeof value === "undefined") {
       throw new Error(message);
@@ -7327,6 +7352,34 @@
       } catch (e) {
       }
     }
+  }
+  function createKey() {
+    return Math.random().toString(36).substr(2, 8);
+  }
+  function getHistoryState(location, index) {
+    return {
+      usr: location.state,
+      key: location.key,
+      idx: index
+    };
+  }
+  function createLocation(current, to, state, key) {
+    if (state === void 0) {
+      state = null;
+    }
+    let location = _extends({
+      pathname: typeof current === "string" ? current : current.pathname,
+      search: "",
+      hash: ""
+    }, typeof to === "string" ? parsePath(to) : to, {
+      state,
+      // TODO: This could be cleaned up.  push/replace should probably just take
+      // full Locations now and avoid the need to run through this flow at all
+      // But that's a pretty big refactor to the current test suite so going to
+      // keep as is for the time being and just let any incoming keys take precedence
+      key: to && to.key || key || createKey()
+    });
+    return location;
   }
   function createPath(_ref) {
     let {
@@ -7356,6 +7409,127 @@
       }
     }
     return parsedPath;
+  }
+  function getUrlBasedHistory(getLocation, createHref, validateLocation, options) {
+    if (options === void 0) {
+      options = {};
+    }
+    let {
+      window: window2 = document.defaultView,
+      v5Compat = false
+    } = options;
+    let globalHistory = window2.history;
+    let action = Action.Pop;
+    let listener = null;
+    let index = getIndex();
+    if (index == null) {
+      index = 0;
+      globalHistory.replaceState(_extends({}, globalHistory.state, {
+        idx: index
+      }), "");
+    }
+    function getIndex() {
+      let state = globalHistory.state || {
+        idx: null
+      };
+      return state.idx;
+    }
+    function handlePop() {
+      action = Action.Pop;
+      let nextIndex = getIndex();
+      let delta = nextIndex == null ? null : nextIndex - index;
+      index = nextIndex;
+      if (listener) {
+        listener({
+          action,
+          location: history.location,
+          delta
+        });
+      }
+    }
+    function push(to, state) {
+      action = Action.Push;
+      let location = createLocation(history.location, to, state);
+      if (validateLocation) validateLocation(location, to);
+      index = getIndex() + 1;
+      let historyState = getHistoryState(location, index);
+      let url = history.createHref(location);
+      try {
+        globalHistory.pushState(historyState, "", url);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "DataCloneError") {
+          throw error;
+        }
+        window2.location.assign(url);
+      }
+      if (v5Compat && listener) {
+        listener({
+          action,
+          location: history.location,
+          delta: 1
+        });
+      }
+    }
+    function replace2(to, state) {
+      action = Action.Replace;
+      let location = createLocation(history.location, to, state);
+      if (validateLocation) validateLocation(location, to);
+      index = getIndex();
+      let historyState = getHistoryState(location, index);
+      let url = history.createHref(location);
+      globalHistory.replaceState(historyState, "", url);
+      if (v5Compat && listener) {
+        listener({
+          action,
+          location: history.location,
+          delta: 0
+        });
+      }
+    }
+    function createURL(to) {
+      let base = window2.location.origin !== "null" ? window2.location.origin : window2.location.href;
+      let href = typeof to === "string" ? to : createPath(to);
+      href = href.replace(/ $/, "%20");
+      invariant(base, "No window.location.(origin|href) available to create URL for href: " + href);
+      return new URL(href, base);
+    }
+    let history = {
+      get action() {
+        return action;
+      },
+      get location() {
+        return getLocation(window2, globalHistory);
+      },
+      listen(fn) {
+        if (listener) {
+          throw new Error("A history only accepts one active listener");
+        }
+        window2.addEventListener(PopStateEventType, handlePop);
+        listener = fn;
+        return () => {
+          window2.removeEventListener(PopStateEventType, handlePop);
+          listener = null;
+        };
+      },
+      createHref(to) {
+        return createHref(window2, to);
+      },
+      createURL,
+      encodeLocation(to) {
+        let url = createURL(to);
+        return {
+          pathname: url.pathname,
+          search: url.search,
+          hash: url.hash
+        };
+      },
+      push,
+      replace: replace2,
+      go(n) {
+        return globalHistory.go(n);
+      }
+    };
+    return history;
   }
   var ResultType;
   (function(ResultType2) {
@@ -7769,8 +7943,94 @@
     }, [router, id]);
     return navigate;
   }
+  function warnOnce(key, message) {
+    if (false) {
+      alreadyWarned[message] = true;
+      console.warn(message);
+    }
+  }
+  var logDeprecation = (flag, msg, link) => warnOnce(flag, "\u26A0\uFE0F React Router Future Flag Warning: " + msg + ". " + ("You can use the `" + flag + "` future flag to opt-in early. ") + ("For more information, see " + link + "."));
+  function logV6DeprecationWarnings(renderFuture, routerFuture) {
+    if ((renderFuture == null ? void 0 : renderFuture.v7_startTransition) === void 0) {
+      logDeprecation("v7_startTransition", "React Router will begin wrapping state updates in `React.startTransition` in v7", "https://reactrouter.com/v6/upgrading/future#v7_starttransition");
+    }
+    if ((renderFuture == null ? void 0 : renderFuture.v7_relativeSplatPath) === void 0 && (!routerFuture || routerFuture.v7_relativeSplatPath === void 0)) {
+      logDeprecation("v7_relativeSplatPath", "Relative route resolution within Splat routes is changing in v7", "https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath");
+    }
+    if (routerFuture) {
+      if (routerFuture.v7_fetcherPersist === void 0) {
+        logDeprecation("v7_fetcherPersist", "The persistence behavior of fetchers is changing in v7", "https://reactrouter.com/v6/upgrading/future#v7_fetcherpersist");
+      }
+      if (routerFuture.v7_normalizeFormMethod === void 0) {
+        logDeprecation("v7_normalizeFormMethod", "Casing of `formMethod` fields is being normalized to uppercase in v7", "https://reactrouter.com/v6/upgrading/future#v7_normalizeformmethod");
+      }
+      if (routerFuture.v7_partialHydration === void 0) {
+        logDeprecation("v7_partialHydration", "`RouterProvider` hydration behavior is changing in v7", "https://reactrouter.com/v6/upgrading/future#v7_partialhydration");
+      }
+      if (routerFuture.v7_skipActionErrorRevalidation === void 0) {
+        logDeprecation("v7_skipActionErrorRevalidation", "The revalidation behavior after 4xx/5xx `action` responses is changing in v7", "https://reactrouter.com/v6/upgrading/future#v7_skipactionerrorrevalidation");
+      }
+    }
+  }
   var START_TRANSITION = "startTransition";
   var startTransitionImpl = React[START_TRANSITION];
+  function Router(_ref5) {
+    let {
+      basename: basenameProp = "/",
+      children = null,
+      location: locationProp,
+      navigationType = Action.Pop,
+      navigator: navigator2,
+      static: staticProp = false,
+      future
+    } = _ref5;
+    !!useInRouterContext() ? false ? invariant(false, "You cannot render a <Router> inside another <Router>. You should never have more than one in your app.") : invariant(false) : void 0;
+    let basename = basenameProp.replace(/^\/*/, "/");
+    let navigationContext = React.useMemo(() => ({
+      basename,
+      navigator: navigator2,
+      static: staticProp,
+      future: _extends2({
+        v7_relativeSplatPath: false
+      }, future)
+    }), [basename, future, navigator2, staticProp]);
+    if (typeof locationProp === "string") {
+      locationProp = parsePath(locationProp);
+    }
+    let {
+      pathname = "/",
+      search = "",
+      hash = "",
+      state = null,
+      key = "default"
+    } = locationProp;
+    let locationContext = React.useMemo(() => {
+      let trailingPathname = stripBasename(pathname, basename);
+      if (trailingPathname == null) {
+        return null;
+      }
+      return {
+        location: {
+          pathname: trailingPathname,
+          search,
+          hash,
+          state,
+          key
+        },
+        navigationType
+      };
+    }, [basename, pathname, search, hash, state, key, navigationType]);
+    false ? warning(locationContext != null, '<Router basename="' + basename + '"> is not able to match the URL ' + ('"' + pathname + search + hash + '" because it does not start with the ') + "basename, so the <Router> won't render anything.") : void 0;
+    if (locationContext == null) {
+      return null;
+    }
+    return /* @__PURE__ */ React.createElement(NavigationContext.Provider, {
+      value: navigationContext
+    }, /* @__PURE__ */ React.createElement(LocationContext.Provider, {
+      children,
+      value: locationContext
+    }));
+  }
   var neverSettledPromise = new Promise(() => {
   });
 
@@ -7831,6 +8091,42 @@
   var flushSyncImpl = ReactDOM[FLUSH_SYNC];
   var USE_ID = "useId";
   var useIdImpl = React2[USE_ID];
+  function BrowserRouter(_ref4) {
+    let {
+      basename,
+      children,
+      future,
+      window: window2
+    } = _ref4;
+    let historyRef = React2.useRef();
+    if (historyRef.current == null) {
+      historyRef.current = createBrowserHistory({
+        window: window2,
+        v5Compat: true
+      });
+    }
+    let history = historyRef.current;
+    let [state, setStateImpl] = React2.useState({
+      action: history.action,
+      location: history.location
+    });
+    let {
+      v7_startTransition
+    } = future || {};
+    let setState = React2.useCallback((newState) => {
+      v7_startTransition && startTransitionImpl2 ? startTransitionImpl2(() => setStateImpl(newState)) : setStateImpl(newState);
+    }, [setStateImpl, v7_startTransition]);
+    React2.useLayoutEffect(() => history.listen(setState), [history, setState]);
+    React2.useEffect(() => logV6DeprecationWarnings(future), [future]);
+    return /* @__PURE__ */ React2.createElement(Router, {
+      basename,
+      children,
+      location: state.location,
+      navigationType: state.action,
+      navigator: history,
+      future
+    });
+  }
   if (false) {
     HistoryRouter.displayName = "unstable_HistoryRouter";
   }
@@ -8035,6 +8331,9 @@
     return matchPath(path.pathname, nextPath) != null || matchPath(path.pathname, currentPath) != null;
   }
 
+  // views/react/components/ReactAppShell.jsx
+  var import_react4 = __toESM(require_react());
+
   // views/react/ReactRoutes.js
   var ReactRoutes = {
     dashboard: "/",
@@ -8051,6 +8350,7 @@
     serverMinecraftCenterPattern: "/server/:containerId/minecraft-center",
     serverMinecraftWorldCenterPattern: "/server/:containerId/minecraft/world-center",
     serverMinecraftAddonsPattern: "/server/:containerId/minecraft/addons",
+    serverMinecraftInstallerPattern: "/server/:containerId/minecraft/installer",
     serverOverviewPattern: "/server/:containerId/overview",
     serverActivityPattern: "/server/:containerId/activity",
     serverTimelinePattern: "/server/:containerId/timeline",
@@ -8685,7 +8985,12 @@
   }
   var server_minecraft_center_default = ServerMinecraftCenterPage;
   if (root) {
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ServerMinecraftCenterPage, { pageData: data }));
+    root.render(
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(BrowserRouter, { children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ServerMinecraftCenterPage, { pageData: data }) })
+    );
+    if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
+      window.__CPANEL_REACT_BOOTED__();
+    }
   }
 })();
 /*! Bundled license information:

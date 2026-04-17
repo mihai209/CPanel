@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
 import GlobalStatusModal from './components/GlobalStatusModal.jsx';
@@ -175,5 +176,12 @@ export function NotificationsPage({ pageData = data }) {
 export default NotificationsPage;
 
 if (root) {
-    root.render(<NotificationsPage pageData={data} />);
+    root.render(
+        <BrowserRouter>
+            <NotificationsPage pageData={data} />
+        </BrowserRouter>
+    );
+    if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
+        window.__CPANEL_REACT_BOOTED__();
+    }
 }

@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
 
@@ -215,5 +216,12 @@ export function ConnectorsCheckPage({ pageData = data }) {
 export default ConnectorsCheckPage;
 
 if (root) {
-    root.render(<ConnectorsCheckPage pageData={data} />);
+    root.render(
+        <BrowserRouter>
+            <ConnectorsCheckPage pageData={data} />
+        </BrowserRouter>
+    );
+    if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
+        window.__CPANEL_REACT_BOOTED__();
+    }
 }

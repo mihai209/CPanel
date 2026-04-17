@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
 
@@ -148,5 +149,12 @@ export function ServerMinecraftWorldCenterPage({ pageData = data }) {
 export default ServerMinecraftWorldCenterPage;
 
 if (root) {
-    root.render(<ServerMinecraftWorldCenterPage pageData={data} />);
+    root.render(
+        <BrowserRouter>
+            <ServerMinecraftWorldCenterPage pageData={data} />
+        </BrowserRouter>
+    );
+    if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
+        window.__CPANEL_REACT_BOOTED__();
+    }
 }

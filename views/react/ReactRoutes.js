@@ -13,6 +13,7 @@ export const ReactRoutes = {
     serverMinecraftCenterPattern: '/server/:containerId/minecraft-center',
     serverMinecraftWorldCenterPattern: '/server/:containerId/minecraft/world-center',
     serverMinecraftAddonsPattern: '/server/:containerId/minecraft/addons',
+    serverMinecraftInstallerPattern: '/server/:containerId/minecraft/installer',
     serverOverviewPattern: '/server/:containerId/overview',
     serverActivityPattern: '/server/:containerId/activity',
     serverTimelinePattern: '/server/:containerId/timeline',

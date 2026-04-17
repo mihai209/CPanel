@@ -8880,6 +8880,7 @@
     serverMinecraftCenterPattern: "/server/:containerId/minecraft-center",
     serverMinecraftWorldCenterPattern: "/server/:containerId/minecraft/world-center",
     serverMinecraftAddonsPattern: "/server/:containerId/minecraft/addons",
+    serverMinecraftInstallerPattern: "/server/:containerId/minecraft/installer",
     serverOverviewPattern: "/server/:containerId/overview",
     serverActivityPattern: "/server/:containerId/activity",
     serverTimelinePattern: "/server/:containerId/timeline",
@@ -9577,7 +9578,9 @@
     ) });
   }
   if (root) {
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime8.jsx)(DashboardPage, { pageData: data }));
+    root.render(
+      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(BrowserRouter, { children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(DashboardPage, { pageData: data }) })
+    );
     if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
       window.__CPANEL_REACT_BOOTED__();
     }
@@ -12595,7 +12598,12 @@
     ) });
   }
   if (root12) {
-    root12.render(/* @__PURE__ */ (0, import_jsx_runtime19.jsx)(ServerMinecraftCenterPage, { pageData: data12 }));
+    root12.render(
+      /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(BrowserRouter, { children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(ServerMinecraftCenterPage, { pageData: data12 }) })
+    );
+    if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
+      window.__CPANEL_REACT_BOOTED__();
+    }
   }
 
   // views/react/server-minecraft-world-center.jsx
@@ -12709,7 +12717,12 @@
     ) });
   }
   if (root13) {
-    root13.render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(ServerMinecraftWorldCenterPage, { pageData: data13 }));
+    root13.render(
+      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(BrowserRouter, { children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(ServerMinecraftWorldCenterPage, { pageData: data13 }) })
+    );
+    if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
+      window.__CPANEL_REACT_BOOTED__();
+    }
   }
 
   // views/react/server-minecraft-addons.jsx
@@ -12845,7 +12858,12 @@
     ) });
   }
   if (root14) {
-    root14.render(/* @__PURE__ */ (0, import_jsx_runtime21.jsx)(ServerMinecraftAddonsPage, { pageData: data14 }));
+    root14.render(
+      /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(BrowserRouter, { children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)(ServerMinecraftAddonsPage, { pageData: data14 }) })
+    );
+    if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
+      window.__CPANEL_REACT_BOOTED__();
+    }
   }
 
   // views/react/server-overview.jsx

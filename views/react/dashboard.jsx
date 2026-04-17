@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { Link } from 'react-router-dom';
+import { BrowserRouter, Link } from 'react-router-dom';
 import { ReactRoutes } from './ReactRoutes.js';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
@@ -91,7 +91,11 @@ export function DashboardPage({ pageData = data }) {
 export default DashboardPage;
 
 if (root) {
-    root.render(<DashboardPage pageData={data} />);
+    root.render(
+        <BrowserRouter>
+            <DashboardPage pageData={data} />
+        </BrowserRouter>
+    );
     if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
         window.__CPANEL_REACT_BOOTED__();
     }

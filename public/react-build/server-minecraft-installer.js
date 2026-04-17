@@ -7279,7 +7279,7 @@
     }
   });
 
-  // views/react/server-minecraft-addons.jsx
+  // views/react/server-minecraft-installer.jsx
   var import_react6 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
@@ -8886,140 +8886,176 @@
     ] });
   }
 
-  // views/react/server-minecraft-addons.jsx
+  // views/react/server-minecraft-installer.jsx
   var import_jsx_runtime6 = __toESM(require_jsx_runtime());
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
-  var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-minecraft-addons";
+  var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-minecraft-installer";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
-  function AddonCard({ project, onInstall }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden group hover:border-primary-500/50 transition-all duration-300 flex flex-col hover:shadow-2xl hover:shadow-primary-900/10 hover:translate-y-[-2px]", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "relative aspect-video overflow-hidden bg-neutral-950", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-          "img",
-          {
-            src: project.gallery && project.gallery[0] ? project.gallery[0].url : project.icon_url || "https://cdn.modrinth.com/assets/images/default_project_icon.svg",
-            alt: project.title,
-            className: "w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity duration-500"
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "absolute top-4 right-4 bg-neutral-900/80 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black text-primary-400 uppercase tracking-widest border border-primary-900/30", children: project.project_type })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "p-6 flex-1 flex flex-col", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h3", { className: "text-lg font-black text-white mb-2 line-clamp-1", children: project.title }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-xs text-neutral-500 leading-relaxed line-clamp-3 mb-6 flex-1", children: project.description }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center justify-between mt-auto", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-2", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-download text-neutral-600" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "text-[10px] font-bold text-neutral-500 uppercase tracking-widest", children: [
-              Math.round(project.downloads / 1e3),
-              "K DLs"
-            ] })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-            "button",
-            {
-              onClick: () => onInstall(project),
-              className: "px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl border border-neutral-700 transition",
-              children: "View Details"
-            }
-          )
-        ] })
-      ] })
-    ] });
-  }
-  function ServerMinecraftAddonsPage({ pageData = data }) {
+  var PLATFORMS = [
+    { id: "vanilla", name: "Vanilla", icon: "bi-box-seam", description: "The official Minecraft server jar from Mojang.", color: "bg-green-600/10 text-green-500" },
+    { id: "fabric", name: "Fabric", icon: "bi-cpu", description: "Lightweight, modular modding toolset for modern versions.", color: "bg-orange-600/10 text-orange-500" },
+    { id: "forge", name: "Forge", icon: "bi-hammer", description: "The original modding API for extensive content mods.", color: "bg-blue-600/10 text-blue-500" },
+    { id: "quilt", name: "Quilt", icon: "bi-patch-check", description: "Community-driven mod loader built for modularity.", color: "bg-purple-600/10 text-purple-500" },
+    { id: "waterfall", name: "Waterfall", icon: "bi-water", description: "High-performance BungeeCord fork for proxy networks.", color: "bg-sky-600/10 text-sky-500" },
+    { id: "bungeecord", name: "BungeeCord", icon: "bi-intersect", description: "The standard proxy for connecting multiple servers.", color: "bg-yellow-600/10 text-yellow-500" }
+  ];
+  function ServerMinecraftInstallerPage({ pageData = data }) {
     const server = pageData.server || {};
-    const defaults = pageData.minecraftDefaults || {};
-    const [search, setSearch] = (0, import_react6.useState)("");
-    const [kind, setKind] = (0, import_react6.useState)(defaults.kind || "mod");
-    const [results, setResults] = (0, import_react6.useState)([]);
-    const [loading, setLoading] = (0, import_react6.useState)(false);
-    const [error, setError] = (0, import_react6.useState)("");
-    (0, import_react6.useEffect)(() => {
-      let cancelled = false;
-      const timer = setTimeout(() => {
-        setLoading(true);
-        setError("");
-        fetch(`/server/${server.containerId}/minecraft/addons/search?q=${encodeURIComponent(search)}&kind=${kind}&limit=12`).then((res) => res.json()).then((payload) => {
-          if (cancelled) return;
-          if (payload.success) {
-            setResults(payload.projects || []);
-          } else {
-            throw new Error(payload.error || "Failed to search modrinth");
-          }
-          setLoading(false);
-        }).catch((err) => {
-          if (cancelled) return;
-          console.error(err);
-          setError(err.message || "Search failed");
-          setLoading(false);
-        });
-      }, 500);
-      return () => {
-        cancelled = true;
-        clearTimeout(timer);
-      };
-    }, [search, kind, server.containerId]);
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ReactAppShell, { pageData, subtitle: "Addons", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+    const catalog = pageData.installerCatalog || {};
+    const [selectedPlatform, setSelectedPlatform] = import_react6.default.useState(null);
+    const [selectedVersion, setSelectedVersion] = import_react6.default.useState("");
+    const [selectedBuild, setSelectedBuild] = import_react6.default.useState("");
+    const [installing, setInstalling] = import_react6.default.useState(false);
+    const [error, setError] = import_react6.default.useState(pageData.error || null);
+    const [success, setSuccess] = import_react6.default.useState(pageData.success || null);
+    const availableVersions = import_react6.default.useMemo(() => {
+      if (!selectedPlatform) return [];
+      const platformKey = selectedPlatform.toLowerCase();
+      if (platformKey === "waterfall" && catalog.waterfall) {
+        return Object.keys(catalog.waterfall).sort((a, b) => b.localeCompare(a, void 0, { numeric: true }));
+      }
+      return [];
+    }, [selectedPlatform, catalog]);
+    const handlePlatformSelect = (platform) => {
+      setSelectedPlatform(platform.id);
+      setSelectedVersion("");
+      setSelectedBuild("");
+      setError(null);
+    };
+    const handleInstall = () => {
+      if (!selectedPlatform || !selectedVersion) return;
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = `/server/${server.containerId}/minecraft/installer`;
+      const platInput = document.createElement("input");
+      platInput.name = "platform";
+      platInput.value = selectedPlatform;
+      form.appendChild(platInput);
+      const verInput = document.createElement("input");
+      verInput.name = "version";
+      verInput.value = selectedVersion;
+      form.appendChild(verInput);
+      if (selectedBuild) {
+        const buildInput = document.createElement("input");
+        buildInput.name = "build";
+        buildInput.value = selectedBuild;
+        form.appendChild(buildInput);
+      }
+      const csrfInput = document.createElement("input");
+      csrfInput.type = "hidden";
+      csrfInput.name = "_csrf";
+      csrfInput.value = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "";
+      form.appendChild(csrfInput);
+      document.body.appendChild(form);
+      setInstalling(true);
+      form.submit();
+    };
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ReactAppShell, { pageData, subtitle: "Version Installer", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
       PageContentBlock,
       {
-        title: "Addons Hub",
-        description: `Browse and install thousands of mods and plugins for your ${server.name} instance.`,
-        eyebrow: "Resource Catalog",
+        title: "Version Installer",
+        description: "Easily switch between different Minecraft platforms and versions.",
+        eyebrow: "Provisioning",
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-col md:flex-row gap-6 mb-12", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1 relative", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-search absolute left-5 top-1/2 -translate-y-1/2 text-neutral-600 text-lg" }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                "input",
-                {
-                  type: "text",
-                  value: search,
-                  onChange: (e) => setSearch(e.target.value),
-                  placeholder: "Search Modrinth (e.g. WorldEdit, Essentials, Sodium)...",
-                  className: "w-full bg-neutral-900 border border-neutral-800 rounded-3xl py-5 pl-14 pr-6 text-white text-sm focus:outline-none focus:border-primary-500/50 shadow-2xl shadow-black/20"
-                }
-              )
+          error && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "mb-8 bg-rose-600/10 border border-rose-600/20 text-rose-500 p-6 rounded-3xl flex items-center gap-4 animate-in slide-in-from-top-4", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-exclamation-octagon text-2xl" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "font-bold uppercase tracking-widest text-sm", children: error })
+          ] }),
+          success && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "mb-8 bg-emerald-600/10 border border-emerald-600/20 text-emerald-500 p-6 rounded-3xl flex items-center gap-4 animate-in slide-in-from-top-4", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-check-circle text-2xl" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "font-bold uppercase tracking-widest text-sm", children: success })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "mb-10", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("h3", { className: "text-sm font-black text-white uppercase tracking-[0.2em] mb-6 flex items-center gap-3", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "w-6 h-6 rounded-lg bg-neutral-800 flex items-center justify-center text-[10px]", children: "1" }),
+              "Select Platform"
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex bg-neutral-900 border border-neutral-800 rounded-3xl p-1 gap-1", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4", children: PLATFORMS.map((platform) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+              "button",
+              {
+                onClick: () => handlePlatformSelect(platform),
+                className: `group flex items-start gap-4 p-5 rounded-2xl border transition-all text-left ${selectedPlatform === platform.id ? "bg-primary-600/10 border-primary-500 shadow-xl shadow-primary-900/10" : "bg-neutral-800/40 border-neutral-800 hover:border-neutral-700"}`,
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `shrink-0 w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-lg ${selectedPlatform === platform.id ? "bg-primary-600 text-white" : platform.color}`, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: `bi ${platform.icon}` }) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h4", { className: "font-black text-white uppercase tracking-widest text-xs mb-1 group-hover:text-primary-400 transition-colors", children: platform.name }),
+                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-[10px] text-neutral-500 font-bold uppercase tracking-widest leading-relaxed", children: platform.description })
+                  ] })
+                ]
+              },
+              platform.id
+            )) })
+          ] }),
+          selectedPlatform && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "animate-in fade-in slide-in-from-top-4 duration-500", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("h3", { className: "text-sm font-black text-white uppercase tracking-[0.2em] mb-6 flex items-center gap-3", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "w-6 h-6 rounded-lg bg-neutral-800 flex items-center justify-center text-[10px]", children: "2" }),
+              "Configure Installation"
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800/40 border border-neutral-800 rounded-3xl p-8 max-w-2xl", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("label", { className: "block text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-3", children: "Target Version" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                    "input",
+                    {
+                      type: "text",
+                      placeholder: "e.g. 1.20.1",
+                      value: selectedVersion,
+                      onChange: (e) => setSelectedVersion(e.target.value),
+                      className: "w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-3 text-sm text-white focus:border-primary-500 transition-colors outline-none font-mono"
+                    }
+                  ),
+                  selectedPlatform === "waterfall" && availableVersions.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "mt-2 flex flex-wrap gap-2", children: availableVersions.slice(0, 5).map((v) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { onClick: () => setSelectedVersion(v), className: "text-[9px] font-bold text-neutral-600 hover:text-white transition-colors", children: v }, v)) })
+                ] }),
+                ["forge", "fabric", "quilt", "waterfall"].includes(selectedPlatform) && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("label", { className: "block text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-3", children: "Build / Loader" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                    "input",
+                    {
+                      type: "text",
+                      placeholder: "Leave blank for latest",
+                      value: selectedBuild,
+                      onChange: (e) => setSelectedBuild(e.target.value),
+                      className: "w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-3 text-sm text-white focus:border-primary-500 transition-colors outline-none font-mono"
+                    }
+                  )
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "bg-rose-600/5 border border-rose-600/20 p-5 rounded-2xl mb-8", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-start gap-4", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-shield-exclamation text-rose-500 text-xl" }),
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h5", { className: "text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] mb-1", children: "Destructive Action" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-[10px] text-neutral-500 font-bold uppercase tracking-widest leading-relaxed", children: "This will stop your server and overwrite the primary executable. Current world files will be preserved." })
+                ] })
+              ] }) }),
               /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
                 "button",
                 {
-                  onClick: () => setKind("mod"),
-                  className: `px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${kind === "mod" ? "bg-primary-600 text-white shadow-lg shadow-primary-900/20" : "text-neutral-500 hover:text-neutral-300"}`,
-                  children: "Mods"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                "button",
-                {
-                  onClick: () => setKind("plugin"),
-                  className: `px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${kind === "plugin" ? "bg-primary-600 text-white shadow-lg shadow-primary-900/20" : "text-neutral-500 hover:text-neutral-300"}`,
-                  children: "Plugins"
+                  onClick: handleInstall,
+                  disabled: !selectedVersion || installing,
+                  className: `w-full py-4 rounded-xl text-xs font-black uppercase tracking-[0.3em] transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3 ${!selectedVersion || installing ? "bg-neutral-800 text-neutral-600 cursor-not-allowed" : "bg-primary-600 hover:bg-primary-500 text-white shadow-primary-900/20"}`,
+                  children: installing ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" }),
+                    "Processing..."
+                  ] }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-download" }),
+                    "Install ",
+                    PLATFORMS.find((p) => p.id === selectedPlatform)?.name,
+                    " ",
+                    selectedVersion
+                  ] })
                 }
               )
             ] })
-          ] }),
-          error && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-rose-600/10 border border-rose-600/30 text-rose-400 p-6 rounded-3xl mb-8 flex items-center gap-4", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-exclamation-triangle text-2xl" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "font-bold uppercase tracking-widest text-sm", children: error })
-          ] }),
-          loading ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-col items-center justify-center py-24 gap-6", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-16 h-16 border-4 border-neutral-800 border-t-primary-500 rounded-full animate-spin" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-xs font-black text-neutral-500 uppercase tracking-[0.3em] pulse", children: "Indexing Modrinth..." })
-          ] }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6", children: results.length > 0 ? results.map((project) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(AddonCard, { project, onInstall: (p) => window.location.href = `/server/${server.containerId}/minecraft/addons/project/${p.project_id}` }, project.project_id)) : /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "col-span-full py-24 text-center", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-search text-6xl text-neutral-800 mb-6 block" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-lg font-bold text-neutral-600 uppercase tracking-widest", children: "No addons found" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-sm text-neutral-700 mt-2", children: "Try adjusting your search terms or filters." })
-          ] }) })
+          ] })
         ]
       }
     ) });
   }
-  var server_minecraft_addons_default = ServerMinecraftAddonsPage;
+  var server_minecraft_installer_default = ServerMinecraftInstallerPage;
   if (root) {
     root.render(
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(BrowserRouter, { children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ServerMinecraftAddonsPage, { pageData: data }) })
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(BrowserRouter, { children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ServerMinecraftInstallerPage, { pageData: data }) })
     );
     if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
       window.__CPANEL_REACT_BOOTED__();

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
 
@@ -149,5 +150,12 @@ export function ServerMinecraftAddonsPage({ pageData = data }) {
 export default ServerMinecraftAddonsPage;
 
 if (root) {
-    root.render(<ServerMinecraftAddonsPage pageData={data} />);
+    root.render(
+        <BrowserRouter>
+            <ServerMinecraftAddonsPage pageData={data} />
+        </BrowserRouter>
+    );
+    if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
+        window.__CPANEL_REACT_BOOTED__();
+    }
 }

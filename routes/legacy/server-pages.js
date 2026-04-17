@@ -17648,14 +17648,30 @@ return res.render('server/users', {
                 archlight: loadArchlightCatalog(),
                 waterfall: loadWaterfallCatalog()
             };
-            return res.render('server/minecraft-installer', {
-                server,
-                user: req.session.user,
-                title: `Minecraft Installer · ${server.name}`,
-                path: '/servers',
-                active: 'mcinstaller',
+            const reactPageData = {
+                routePath: `/server/${server.containerId}/minecraft/installer`,
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                user: {
+                    username: req.session.user.username,
+                    isAdmin: Boolean(req.session.user.isAdmin),
+                    gravatarHash: md5(String(req.session.user.email || '').trim().toLowerCase())
+                },
+                server: {
+                    containerId: server.containerId,
+                    name: server.name,
+                    status: server.status
+                },
+                serverNavItems: buildReactServerNavItems(server, 'mcinstaller'),
                 installerCatalog: catalog,
-                installerMessage: req.query.success ? { type: 'success', text: String(req.query.success) } : req.query.error ? { type: 'error', text: String(req.query.error) } : null
+                success: req.query.success || null,
+                error: req.query.error || null
+            };
+
+            return res.render('react/loader', {
+                title: 'Minecraft Installer',
+                reactEntry: 'server-minecraft-installer',
+                reactPageData
             });
         } catch (err) {
             console.error('Error loading minecraft installer:', err);
