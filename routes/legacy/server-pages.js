@@ -11700,229 +11700,69 @@ function registerServerPagesRoutes(ctx) {
 
             const reactPageData = {
 
+routePath: `/server/${server.containerId}/users`,
 
-                routePath: `/server/${server.containerId}/users`,
+brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
 
+faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
 
-                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+success: req.query.success || null,
 
+error: req.query.error || null,
 
-                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+user: buildReactUserSummary(req.session.user),
 
+server: {
 
-                success: req.query.success || null,
+id: server.id,
 
+containerId: server.containerId,
 
-                error: req.query.error || null,
+name: server.name,
 
+description: server.description || '',
 
-                user: buildReactUserSummary(req.session.user),
+status: server.status || 'unknown'
 
+},
 
-                server: {
+serverNavItems: buildReactServerNavItems(server, access, 'users'),
 
+owner,
 
-                    id: server.id,
+memberships,
 
+candidateUsers,
 
-                    containerId: server.containerId,
+permissionCatalog: SERVER_PERMISSIONS,
 
+permissionPresets: SUBUSER_PERMISSION_PRESETS,
 
-                    name: server.name,
+canManageUsers: hasServerPermission(access, 'server.users.manage')
 
+};
 
-                    description: server.description || '',
+if (wantsReactPageData(req)) {
 
+return res.json(reactPageData);
 
-                    status: server.status || 'unknown'
+}
 
+if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
 
-                },
+return res.render('react/loader', {
 
+title: `Users ${server.name}`,
 
-                serverNavItems: buildReactServerNavItems(server, access, 'users'),
+reactEntry: 'app',
 
+reactPageData
 
-                owner,
+});
 
+}
 
-                memberships,
-
-
-                candidateUsers,
-
-
-                permissionCatalog: SERVER_PERMISSIONS,
-
-
-                permissionPresets: SUBUSER_PERMISSION_PRESETS,
-
-
-                canManageUsers: hasServerPermission(access, 'server.users.manage')
-
-
-            };
-
-
-            if (wantsReactPageData(req)) {
-
-
-                return res.json(reactPageData);
-
-
-            }
-
-
-            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
-
-
-                return res.render('react/loader', {
-
-
-                    title: `Users ${server.name}`,
-
-
-                    reactEntry: 'app',
-
-
-                    reactPageData
-
-
-                });
-
-
-            }
-
-
-            const reactPageData = {
-
-
-
-                routePath: `/server/${server.containerId}/users`,
-
-
-
-                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
-
-
-
-                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
-
-
-
-                success: req.query.success || null,
-
-
-
-                error: req.query.error || null,
-
-
-
-                user: buildReactUserSummary(req.session.user),
-
-
-
-                server: {
-
-
-
-                    id: server.id,
-
-
-
-                    containerId: server.containerId,
-
-
-
-                    name: server.name,
-
-
-
-                    description: server.description || '',
-
-
-
-                    status: server.status || 'unknown'
-
-
-
-                },
-
-
-
-                serverNavItems: buildReactServerNavItems(server, access, 'users'),
-
-
-
-                owner,
-
-
-
-                memberships,
-
-
-
-                candidateUsers,
-
-
-
-                permissionCatalog: SERVER_PERMISSIONS,
-
-
-
-                permissionPresets: SUBUSER_PERMISSION_PRESETS,
-
-
-
-                canManageUsers: hasServerPermission(access, 'server.users.manage')
-
-
-
-            };
-
-
-
-            if (wantsReactPageData(req)) {
-
-
-
-                return res.json(reactPageData);
-
-
-
-            }
-
-
-
-            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
-
-
-
-                return res.render('react/loader', {
-
-
-
-                    title: `Users ${server.name}`,
-
-
-
-                    reactEntry: 'app',
-
-
-
-                    reactPageData
-
-
-
-                });
-
-
-
-            }
-
-
-
-            return res.render('server/users', {
+return res.render('server/users', {
                 server,
                 user: req.session.user,
                 title: `Users ${server.name}`,
@@ -15464,102 +15304,6 @@ function registerServerPagesRoutes(ctx) {
 
             }
 
-            const reactPageData = {
-
-
-                routePath: `/server/${state.server.containerId}/databases`,
-
-
-                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
-
-
-                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
-
-
-                success: req.query.success || null,
-
-
-                error: req.query.error || null,
-
-
-                user: buildReactUserSummary(req.session.user),
-
-
-                server: {
-
-
-                    id: state.server.id,
-
-
-                    containerId: state.server.containerId,
-
-
-                    name: state.server.name,
-
-
-                    description: state.server.description || '',
-
-
-                    status: state.server.status || 'unknown',
-
-
-                    databaseLimit
-
-
-                },
-
-
-                serverNavItems: buildReactServerNavItems(state.server, access, 'dbs'),
-
-
-                hosts: state.hosts,
-
-
-                databases: state.databases,
-
-
-                locationId: state.locationId,
-
-
-                databaseLimit,
-
-
-                canManageDatabases: hasServerPermission(access, 'server.databases.manage')
-
-
-            };
-
-
-            if (wantsReactPageData(req)) {
-
-
-                return res.json(reactPageData);
-
-
-            }
-
-
-            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
-
-
-                return res.render('react/loader', {
-
-
-                    title: `Databases ${state.server.name}`,
-
-
-                    reactEntry: 'app',
-
-
-                    reactPageData
-
-
-                });
-
-
-            }
-
-
             return res.render('server/databases', {
                 server: state.server,
                 user: req.session.user,
@@ -16470,90 +16214,6 @@ function registerServerPagesRoutes(ctx) {
                 });
 
             }
-
-            const reactPageData = {
-
-
-                routePath: `/server/${server.containerId}/schedules`,
-
-
-                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
-
-
-                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
-
-
-                success: req.query.success || null,
-
-
-                error: req.query.error || null,
-
-
-                user: buildReactUserSummary(req.session.user),
-
-
-                server: {
-
-
-                    id: server.id,
-
-
-                    containerId: server.containerId,
-
-
-                    name: server.name,
-
-
-                    description: server.description || '',
-
-
-                    status: server.status || 'unknown'
-
-
-                },
-
-
-                serverNavItems: buildReactServerNavItems(server, access, 'schedules'),
-
-
-                schedules,
-
-
-                canManageSchedules: hasServerPermission(access, 'server.schedules.manage')
-
-
-            };
-
-
-            if (wantsReactPageData(req)) {
-
-
-                return res.json(reactPageData);
-
-
-            }
-
-
-            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
-
-
-                return res.render('react/loader', {
-
-
-                    title: `Schedules ${server.name}`,
-
-
-                    reactEntry: 'app',
-
-
-                    reactPageData
-
-
-                });
-
-
-            }
-
 
             return res.render('server/schedules', {
                 server,
@@ -21540,271 +21200,81 @@ function registerServerPagesRoutes(ctx) {
 
             const reactPageData = {
 
+routePath: `/server/${server.containerId}/startup`,
 
-                routePath: `/server/${server.containerId}/startup`,
+brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
 
+faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
 
-                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+success: req.query.success || null,
 
+error: req.query.error || null,
 
-                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+user: buildReactUserSummary(req.session.user),
 
+server: {
 
-                success: req.query.success || null,
+id: server.id,
 
+containerId: server.containerId,
 
-                error: req.query.error || null,
+name: server.name,
 
+description: server.description || '',
 
-                user: buildReactUserSummary(req.session.user),
+status: server.status || 'unknown',
 
+startup: server.startup,
 
-                server: {
+dockerImage: server.dockerImage,
 
+variables: server.variables
 
-                    id: server.id,
+},
 
+serverNavItems: buildReactServerNavItems(server, access, 'startup'),
 
-                    containerId: server.containerId,
+image: image,
 
+dockerChoices,
 
-                    name: server.name,
+variableDefinitions,
 
+resolvedVariables,
 
-                    description: server.description || '',
+selectedDockerImage,
 
+resolvedStartup,
 
-                    status: server.status || 'unknown',
+startupPresets,
 
+selectedStartupPresetId,
 
-                    startup: server.startup,
+startupWriteLocked
 
+};
 
-                    dockerImage: server.dockerImage,
+if (wantsReactPageData(req)) {
 
+return res.json(reactPageData);
 
-                    variables: server.variables
+}
 
+if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
 
-                },
+return res.render('react/loader', {
 
+title: `Startup ${server.name}`,
 
-                serverNavItems: buildReactServerNavItems(server, access, 'startup'),
+reactEntry: 'app',
 
+reactPageData
 
-                image: image,
+});
 
+}
 
-                dockerChoices,
-
-
-                variableDefinitions,
-
-
-                resolvedVariables,
-
-
-                selectedDockerImage,
-
-
-                resolvedStartup,
-
-
-                startupPresets,
-
-
-                selectedStartupPresetId,
-
-
-                startupWriteLocked
-
-
-            };
-
-
-            if (wantsReactPageData(req)) {
-
-
-                return res.json(reactPageData);
-
-
-            }
-
-
-            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
-
-
-                return res.render('react/loader', {
-
-
-                    title: `Startup ${server.name}`,
-
-
-                    reactEntry: 'app',
-
-
-                    reactPageData
-
-
-                });
-
-
-            }
-
-
-            const reactPageData = {
-
-
-
-                routePath: `/server/${server.containerId}/startup`,
-
-
-
-                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
-
-
-
-                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
-
-
-
-                success: req.query.success || null,
-
-
-
-                error: req.query.error || null,
-
-
-
-                user: buildReactUserSummary(req.session.user),
-
-
-
-                server: {
-
-
-
-                    id: server.id,
-
-
-
-                    containerId: server.containerId,
-
-
-
-                    name: server.name,
-
-
-
-                    description: server.description || '',
-
-
-
-                    status: server.status || 'unknown',
-
-
-
-                    startup: server.startup,
-
-
-
-                    dockerImage: server.dockerImage,
-
-
-
-                    variables: server.variables
-
-
-
-                },
-
-
-
-                serverNavItems: buildReactServerNavItems(server, access, 'startup'),
-
-
-
-                image: image,
-
-
-
-                dockerChoices,
-
-
-
-                variableDefinitions,
-
-
-
-                resolvedVariables,
-
-
-
-                selectedDockerImage,
-
-
-
-                resolvedStartup,
-
-
-
-                startupPresets,
-
-
-
-                selectedStartupPresetId,
-
-
-
-                startupWriteLocked
-
-
-
-            };
-
-
-
-            if (wantsReactPageData(req)) {
-
-
-
-                return res.json(reactPageData);
-
-
-
-            }
-
-
-
-            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
-
-
-
-                return res.render('react/loader', {
-
-
-
-                    title: `Startup ${server.name}`,
-
-
-
-                    reactEntry: 'app',
-
-
-
-                    reactPageData
-
-
-
-                });
-
-
-
-            }
-
-
-
-            res.render('server/startup', {
+res.render('server/startup', {
                 server,
                 user: req.session.user,
                 title: `Startup ${server.name}`,
@@ -22483,8 +21953,7 @@ function registerServerPagesRoutes(ctx) {
         }
     });
 
-
-    app.get('/api/client/servers/:containerId', async (req, res) => {
+app.get('/api/client/servers/:containerId', async (req, res) => {
         try {
             const auth = await authenticateServerApiClientRequest(req, 'server.view');
             if (!auth.ok) {
@@ -23468,8 +22937,7 @@ function registerServerPagesRoutes(ctx) {
         }
     });
 
-
-    // API: Fetch file list (JSON) for auto-refresh
+// API: Fetch file list (JSON) for auto-refresh
     app.get('/server/:containerId/files-search', requireAuth, async (req, res) => {
         try {
             const server = await Server.findOne({
