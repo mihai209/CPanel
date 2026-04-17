@@ -17206,7 +17206,7 @@ return res.render('server/users', {
                 user: req.session.user,
                 title: `Minecraft Center ${server.name}`,
                 serverNavItems: buildReactServerNavItems(server, access, 'mccenter'),
-                brandName: SETTINGS?.[0]?.brandName || 'CPanel'
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel'
             };
 
             if (wantsReactPageData(req)) {
@@ -17261,7 +17261,7 @@ return res.render('server/users', {
                     warning: String(req.query.warning || '').trim(),
                     exportFile: String(req.query.exportFile || '').trim()
                 },
-                brandName: SETTINGS?.[0]?.brandName || 'CPanel'
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel'
             };
 
             if (wantsReactPageData(req)) {
@@ -17903,7 +17903,7 @@ return res.render('server/users', {
                     loader: defaultLoader,
                     label: runtimeLabel
                 },
-                brandName: SETTINGS?.[0]?.brandName || 'CPanel'
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel'
             };
 
             if (wantsReactPageData(req)) {
@@ -22410,7 +22410,7 @@ res.render('server/startup', {
                 editWriteLocked: isServerEditLockedForAccess(policyConfig, access),
                 policyReadOnlyPatterns: policyConfig && policyConfig.readOnlyFiles ? policyConfig.readOnlyFiles.patterns || [] : [],
                 serverNavItems: buildReactServerNavItems(server, access, 'files'),
-                brandName: SETTINGS?.[0]?.brandName || 'CPanel'
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel'
             };
 
             if (wantsReactPageData(req)) {
