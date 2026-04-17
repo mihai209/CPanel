@@ -7280,7 +7280,7 @@
   });
 
   // views/react/account.jsx
-  var import_react2 = __toESM(require_react());
+  var import_react3 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // node_modules/react-router-dom/dist/index.js
@@ -8164,29 +8164,44 @@
     ] });
   }
 
-  // views/react/account.jsx
+  // views/react/components/PageContentBlock.jsx
+  var import_react2 = __toESM(require_react());
   var import_jsx_runtime2 = __toESM(require_jsx_runtime());
+  function PageContentBlock({ title, children, className = "" }) {
+    import_react2.default.useEffect(() => {
+      if (title) {
+        document.title = `${title} - CPanel`;
+      }
+    }, [title]);
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: `w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 ${className}`, children: [
+      title && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "mb-6 flex justify-between items-center", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h1", { className: "text-2xl font-bold text-neutral-100", children: title }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "w-full", children })
+    ] });
+  }
+
+  // views/react/account.jsx
+  var import_jsx_runtime3 = __toESM(require_jsx_runtime());
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
   var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "account";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
   function LinkedProviderCard({ provider }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-provider", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-provider-main", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("i", { className: `bi ${provider.icon}`, style: { color: provider.color } }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: provider.name }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: provider.isLinked ? "Linked to this account" : "Available to connect" })
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700/50 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between mb-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: `bi ${provider.icon} text-2xl`, style: { color: provider.color } }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "block text-sm font-bold text-neutral-200", children: provider.name }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-xs text-neutral-400", children: provider.isLinked ? "Linked to this account" : "Available to connect" })
         ] })
       ] }),
-      provider.isLinked ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("form", { method: "POST", action: provider.unlinkAction, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "submit", className: "react-account-button is-danger", children: "Unlink" }) }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("a", { href: provider.linkAction, className: "react-account-button is-ghost", children: "Connect" })
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "mt-4 sm:mt-0 shrink-0", children: provider.isLinked ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("form", { method: "POST", action: provider.unlinkAction, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "submit", className: "bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 border border-red-600/30 text-xs font-semibold py-1.5 px-4 rounded transition-colors w-full sm:w-auto", children: "Unlink" }) }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("a", { href: provider.linkAction, className: "inline-block bg-neutral-700 hover:bg-neutral-600 text-neutral-200 text-xs font-semibold py-1.5 px-4 rounded transition-colors text-center w-full sm:w-auto", children: "Connect" }) })
     ] });
   }
   function AccountPage({ pageData = data }) {
     const user = pageData.user || {};
     const linkedProviders = Array.isArray(pageData.linkedProviders) ? pageData.linkedProviders : [];
     const avatar = resolveUserAvatar(user, resolveBrandImage(pageData));
-    const [setupState, setSetupState] = import_react2.default.useState({ loading: false, qrCodeUrl: "", secret: "", code: "", error: "" });
-    const [disableState, setDisableState] = import_react2.default.useState({ password: "", loading: false, error: "" });
+    const [setupState, setSetupState] = import_react3.default.useState({ loading: false, qrCodeUrl: "", secret: "", code: "", error: "" });
+    const [disableState, setDisableState] = import_react3.default.useState({ password: "", loading: false, error: "" });
     const start2FASetup = async () => {
       setSetupState((current) => ({ ...current, loading: true, error: "" }));
       try {
@@ -8260,145 +8275,194 @@
         }));
       }
     };
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ReactAppShell, { pageData, subtitle: "Account surface", pageClassName: "react-account-page", shellClassName: "react-account-shell", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("main", { className: "react-account-layout", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("section", { className: "react-account-main", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-scroll", children: [
-      pageData.success ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-flash is-success", children: pageData.success }) : null,
-      pageData.error ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-flash is-danger", children: pageData.error }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-grid", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-card react-account-profile-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-profile", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("img", { src: avatar, alt: user.username || "User", className: "react-account-avatar" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h1", { children: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username || "Account" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-username", children: [
+    const inputClass = "w-full bg-neutral-900 border border-neutral-700/50 rounded p-2.5 text-sm text-neutral-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-shadow";
+    const labelClass = "block text-xs font-bold text-neutral-400 uppercase tracking-wide mb-1.5";
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ReactAppShell, { pageData, subtitle: "Account surface", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(PageContentBlock, { title: "Your Account", children: [
+      pageData.success && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-check-circle-fill text-green-500" }),
+        pageData.success
+      ] }),
+      pageData.error && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-exclamation-triangle-fill text-red-500" }),
+        pageData.error
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-12 gap-6 items-start", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "lg:col-span-4 flex flex-col gap-6", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col items-center text-center", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("img", { src: avatar, alt: user.username || "User", className: "w-24 h-24 rounded-full border-4 border-neutral-700 shadow-md mb-4" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h1", { className: "text-xl font-bold text-white leading-tight", children: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username || "Account" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-sm text-neutral-400 mt-1 font-mono", children: [
                 "@",
                 user.username || "unknown"
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-email", children: user.email || "No email set" })
-            ] })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-badges", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: `react-account-badge ${user.twoFactorEnabled ? "is-success" : "is-muted"}`, children: user.twoFactorEnabled ? "2FA Active" : "2FA Inactive" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { className: "react-account-badge is-info", children: [
-              "Theme: ",
-              pageData.activeTheme || "default"
-            ] })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-inline-actions", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Link, { to: ReactRoutes.deviceLogin, className: "react-account-button is-ghost", children: "Device History" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("a", { href: ReactRoutes.themes, className: "react-account-button is-ghost", children: "Themes" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Link, { to: ReactRoutes.experimentalFeatures, className: "react-account-button is-ghost", children: "Experimental" })
-          ] })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-section-title", children: "Account Details" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("form", { method: "POST", action: "/account/update", className: "react-account-form", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-form-grid", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "First Name" }),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "text", name: "firstName", defaultValue: user.firstName || "", required: true })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Last Name" }),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "text", name: "lastName", defaultValue: user.lastName || "", required: true })
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-sm text-neutral-500 mt-0.5", children: user.email || "No email set" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-wrap items-center justify-center gap-2 mt-4", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wide ${user.twoFactorEnabled ? "bg-green-600/20 text-green-400 border border-green-600/30" : "bg-neutral-700 text-neutral-400"}`, children: user.twoFactorEnabled ? "2FA Active" : "2FA Inactive" }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("span", { className: "px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wide bg-primary-600/20 text-primary-400 border border-primary-600/30", children: [
+                  "Theme: ",
+                  pageData.activeTheme || "default"
+                ] })
               ] })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Email" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "email", name: "email", defaultValue: user.email || "", required: true })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-form-grid", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Avatar Provider" }),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("select", { name: "avatarProvider", defaultValue: user.avatarProvider || "gravatar", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "gravatar", children: "Gravatar" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: "url", children: "Custom URL" })
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "mt-8 flex flex-col gap-2", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Link, { to: ReactRoutes.deviceLogin, className: "w-full bg-neutral-700/50 hover:bg-neutral-700 text-neutral-300 text-sm font-semibold py-2 px-4 rounded transition-colors text-center border border-transparent hover:border-neutral-600 flex justify-center items-center gap-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-clock-history" }),
+                " Device History"
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("a", { href: ReactRoutes.themes, className: "w-full bg-neutral-700/50 hover:bg-neutral-700 text-neutral-300 text-sm font-semibold py-2 px-4 rounded transition-colors text-center border border-transparent hover:border-neutral-600 flex justify-center items-center gap-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-palette2" }),
+                " Themes"
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Link, { to: ReactRoutes.experimentalFeatures, className: "w-full bg-neutral-700/50 hover:bg-neutral-700 text-neutral-300 text-sm font-semibold py-2 px-4 rounded transition-colors text-center border border-transparent hover:border-neutral-600 flex justify-center items-center gap-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-stars" }),
+                " Experimental"
+              ] })
+            ] })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-4", children: "Linked Accounts" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { children: linkedProviders.length > 0 ? linkedProviders.map((provider) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(LinkedProviderCard, { provider }, provider.id)) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-sm text-neutral-400 text-center py-4", children: "No external providers are configured for this account yet." }) })
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "lg:col-span-8 flex flex-col gap-6", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-6", children: "Account Details" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("form", { method: "POST", action: "/account/update", className: "flex flex-col gap-5", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-5", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "First Name" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { type: "text", name: "firstName", defaultValue: user.firstName || "", required: true, className: inputClass })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "Last Name" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { type: "text", name: "lastName", defaultValue: user.lastName || "", required: true, className: inputClass })
                 ] })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Avatar URL" }),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "url", name: "avatarUrl", defaultValue: user.avatarUrl || "", placeholder: "https://example.com/avatar.png" })
-              ] })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Username" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "text", value: user.username || "", readOnly: true })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-form-actions", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "submit", className: "react-account-button is-primary", children: "Save Account" }) })
-          ] })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-section-title", children: "Update Password" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("form", { method: "POST", action: "/account/password", className: "react-account-form", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Current Password" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "password", name: "currentPassword", required: true })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "New Password" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "password", name: "newPassword", required: true })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Confirm New Password" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "password", name: "confirmPassword", required: true })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-form-actions", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "submit", className: "react-account-button is-primary", children: "Update Password" }) })
-          ] })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-section-title", children: "Linked Accounts" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-provider-list", children: linkedProviders.length > 0 ? linkedProviders.map((provider) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(LinkedProviderCard, { provider }, provider.id)) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-muted", children: "No external providers are configured for this account yet." }) })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-section-title", children: "Two-Factor Authentication" }),
-          user.twoFactorEnabled ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-twofa-block", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-muted", children: "Two-factor authentication is enabled. Enter your current password to disable it." }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Current Password" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-                "input",
-                {
-                  type: "password",
-                  value: disableState.password,
-                  onChange: (event) => setDisableState((current) => ({ ...current, password: event.target.value }))
-                }
-              )
-            ] }),
-            disableState.error ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-inline-error", children: disableState.error }) : null,
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "react-account-button is-danger", onClick: disable2FA, disabled: disableState.loading, children: disableState.loading ? "Disabling..." : "Disable 2FA" })
-          ] }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-twofa-block", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-muted", children: "Start setup to receive a QR code and manual secret for your authenticator app." }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "react-account-button is-primary", onClick: start2FASetup, disabled: setupState.loading, children: setupState.loading ? "Loading..." : "Start 2FA Setup" }),
-            setupState.qrCodeUrl ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-account-twofa-setup", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-twofa-qr-wrap", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("img", { src: setupState.qrCodeUrl, alt: "2FA QR code", className: "react-account-twofa-qr" }) }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Manual Secret" }),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "text", value: setupState.secret, readOnly: true })
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "Email" }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { type: "email", name: "email", defaultValue: user.email || "", required: true, className: inputClass })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Verification Code" }),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-                  "input",
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-5", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "Avatar Provider" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("select", { name: "avatarProvider", defaultValue: user.avatarProvider || "gravatar", className: `${inputClass} pr-8 appearance-none`, children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("option", { value: "gravatar", children: "Gravatar" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("option", { value: "url", children: "Custom URL" })
+                  ] })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "Avatar URL" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { type: "url", name: "avatarUrl", defaultValue: user.avatarUrl || "", placeholder: "https://example.com/avatar.png", className: inputClass })
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "Username" }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { type: "text", value: user.username || "", readOnly: true, className: `${inputClass} bg-neutral-800/50 cursor-not-allowed text-neutral-500 ring-0 focus:ring-0` }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "block text-xs text-neutral-500 mt-1", children: "Usernames cannot be changed." })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "mt-2 flex justify-end", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "submit", className: "bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm", children: "Save Account" }) })
+            ] })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-6", children: "Update Password" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("form", { method: "POST", action: "/account/password", className: "flex flex-col gap-5", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "Current Password" }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { type: "password", name: "currentPassword", required: true, className: inputClass })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-5", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "New Password" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { type: "password", name: "newPassword", required: true, className: inputClass })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "Confirm New Password" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { type: "password", name: "confirmPassword", required: true, className: inputClass })
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "mt-2 flex justify-end", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "submit", className: "bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm", children: "Update Password" }) })
+            ] })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-4", children: "Two-Factor Authentication" }),
+            user.twoFactorEnabled ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-sm text-neutral-400 mb-5", children: "Two-factor authentication is currently enabled on your account. If you would like to disable it, you must securely confirm your password below." }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col sm:flex-row gap-4 items-end", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { className: "flex-1 w-full", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "Current Password" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                    "input",
+                    {
+                      type: "password",
+                      value: disableState.password,
+                      onChange: (e) => setDisableState({ ...disableState, password: e.target.value }),
+                      className: inputClass
+                    }
+                  )
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                  "button",
                   {
-                    type: "text",
-                    value: setupState.code,
-                    maxLength: 6,
-                    onChange: (event) => setSetupState((current) => ({ ...current, code: event.target.value.replace(/[^0-9]/g, "") })),
-                    placeholder: "000000"
+                    type: "button",
+                    className: "w-full sm:w-auto bg-red-600 hover:bg-red-500 text-white font-semibold flex-shrink-0 h-10 px-6 rounded transition-colors text-sm shadow-sm disabled:opacity-50",
+                    onClick: disable2FA,
+                    disabled: disableState.loading,
+                    children: disableState.loading ? "Disabling..." : "Disable 2FA"
                   }
                 )
               ] }),
-              setupState.error ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-inline-error", children: setupState.error }) : null,
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "react-account-button is-primary", onClick: enable2FA, disabled: setupState.loading, children: setupState.loading ? "Verifying..." : "Verify and Enable" })
-            ] }) : null,
-            !setupState.qrCodeUrl && setupState.error ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-inline-error", children: setupState.error }) : null
+              disableState.error && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-red-400 text-sm mt-2 font-bold", children: disableState.error })
+            ] }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-sm text-neutral-400 mb-5", children: "Enable two-factor authentication to add an extra layer of security to your account. You will be required to input a code generated by your authenticator app each time you log in." }),
+              !setupState.qrCodeUrl ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm disabled:opacity-50",
+                  onClick: start2FASetup,
+                  disabled: setupState.loading,
+                  children: setupState.loading ? "Connecting..." : "Begin Setup"
+                }
+              ) : /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700/50 rounded-lg p-6 flex flex-col md:flex-row items-center md:items-start gap-8", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "bg-white p-2 rounded shrink-0 shadow-lg", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("img", { src: setupState.qrCodeUrl, alt: "2FA QR code", className: "w-32 h-32 md:w-40 md:h-40", style: { imageRendering: "pixelated" } }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex-1 w-full", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { className: "block mb-4", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "Manual Setup Key" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { type: "text", value: setupState.secret, readOnly: true, className: `${inputClass} font-mono`, onClick: (e) => e.target.select() }),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "block text-xs text-neutral-500 mt-1", children: "If you cannot scan the QR code, manually input this secret into your app." })
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { className: "block mb-5", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "Authentication Code" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                      "input",
+                      {
+                        type: "text",
+                        value: setupState.code,
+                        maxLength: 6,
+                        onChange: (event) => setSetupState({ ...setupState, code: event.target.value.replace(/[^0-9]/g, "") }),
+                        placeholder: "000000",
+                        className: `${inputClass} font-mono tracking-widest text-lg py-3`
+                      }
+                    )
+                  ] }),
+                  setupState.error && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-red-400 text-sm mb-4 font-bold", children: setupState.error }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex gap-3", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "button", className: "bg-neutral-700 hover:bg-neutral-600 text-white font-semibold py-2 px-6 rounded transition-colors text-sm", onClick: () => setSetupState({ loading: false, qrCodeUrl: "", secret: "", code: "", error: "" }), children: "Cancel" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "button", className: "bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm disabled:opacity-50", onClick: enable2FA, disabled: setupState.loading || setupState.code.length !== 6, children: setupState.loading ? "Verifying..." : "Verify & Enable" })
+                  ] })
+                ] })
+              ] }),
+              !setupState.qrCodeUrl && setupState.error && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-red-400 text-sm mt-4 font-bold", children: setupState.error })
+            ] })
           ] })
         ] })
       ] })
-    ] }) }) }) });
+    ] }) });
   }
   var account_default = AccountPage;
   if (root) {
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime2.jsx)(AccountPage, { pageData: data }));
+    root.render(/* @__PURE__ */ (0, import_jsx_runtime3.jsx)(AccountPage, { pageData: data }));
     if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
       window.__CPANEL_REACT_BOOTED__();
     }

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Link } from 'react-router-dom';
 import { ReactRoutes } from './ReactRoutes.js';
 import ReactAppShell from './components/ReactAppShell.jsx';
+import PageContentBlock from './components/PageContentBlock.jsx';
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'server-console';
@@ -84,6 +85,15 @@ function statusTone(status) {
     return 'muted';
 }
 
+function getToneColorClass(tone) {
+    switch (tone) {
+        case 'success': return 'bg-green-500';
+        case 'warning': return 'bg-yellow-500';
+        case 'danger': return 'bg-red-500';
+        default: return 'bg-neutral-500';
+    }
+}
+
 function parseMetric(value) {
     const numeric = Number.parseFloat(String(value || '0').replace(/[^0-9.-]/g, ''));
     if (!Number.isFinite(numeric)) return 0;
@@ -136,73 +146,28 @@ function usagePercent(value, limit) {
 
 function ResourceBadge({ icon, label, value }) {
     return (
-        <div className="react-console-resource">
-            <i className={`bi ${icon}`}></i>
+        <div className="flex items-center gap-3">
+            <i className={`bi ${icon} text-lg text-neutral-400`}></i>
             <div>
-                <strong>{value}</strong>
-                <span>{label}</span>
+                <strong className="block text-sm font-bold text-neutral-200">{value}</strong>
+                <span className="block text-xs text-neutral-500">{label}</span>
             </div>
         </div>
     );
 }
 
 function InlineMetric({ title, value, note, tone = '' }) {
+    const toneTextClass = tone === 'success' ? 'text-green-400' :
+                        tone === 'warning' ? 'text-yellow-400' :
+                        tone === 'danger' ? 'text-red-400' : 'text-primary-400';
     return (
-        <div className={`react-console-inline-metric${tone ? ` is-${tone}` : ''}`}>
-            <span>{title}</span>
-            <strong>{value}</strong>
-            <small>{note}</small>
+        <div className="flex flex-col mb-1 pb-2 border-b border-neutral-700/50 last:border-0 last:pb-0">
+            <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-neutral-400 uppercase tracking-wide">{title}</span>
+                <strong className={`font-mono text-sm ${toneTextClass}`}>{value}</strong>
+            </div>
+            <small className="text-xs text-neutral-500 mt-1">{note}</small>
         </div>
-    );
-}
-
-function buildTrendPoints(percent, seed) {
-    const safe = clamp(Number(percent) || 0, 0, 100);
-    const points = [];
-    for (let index = 0; index < 12; index += 1) {
-        const progress = index / 11;
-        const wobble = Math.sin((index + seed) * 0.82) * 6 + Math.cos((index + seed) * 0.47) * 3;
-        const value = clamp(safe * (0.38 + progress * 0.62) + wobble, 4, 100);
-        const x = (index / 11) * 100;
-        const y = 100 - value;
-        points.push(`${x},${y}`);
-    }
-    return points.join(' ');
-}
-
-function MetricGraphCard({ title, value, note, percent, tone = 'info', seed = 1 }) {
-    const safePercent = clamp(Number(percent) || 0, 0, 100);
-    return (
-        <article className={`react-console-graph-card is-${tone}`}>
-            <div className="react-console-graph-head">
-                <div>
-                    <span>{title}</span>
-                    <strong>{value}</strong>
-                </div>
-                <small>{note}</small>
-            </div>
-            <div className="react-console-graph-canvas">
-                <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-                    <defs>
-                        <linearGradient id={`consoleGraphFill-${title.replace(/\s+/g, '-')}`} x1="0%" x2="0%" y1="0%" y2="100%">
-                            <stop offset="0%" stopColor="currentColor" stopOpacity="0.34" />
-                            <stop offset="100%" stopColor="currentColor" stopOpacity="0.02" />
-                        </linearGradient>
-                    </defs>
-                    <polyline
-                        className="react-console-graph-line"
-                        points={buildTrendPoints(safePercent, seed)}
-                        fill="none"
-                        vectorEffect="non-scaling-stroke"
-                    />
-                    <polygon
-                        className="react-console-graph-fill"
-                        points={`0,100 ${buildTrendPoints(safePercent, seed)} 100,100`}
-                        fill={`url(#consoleGraphFill-${title.replace(/\s+/g, '-')})`}
-                    />
-                </svg>
-            </div>
-        </article>
     );
 }
 
@@ -327,7 +292,7 @@ export function ServerConsolePage({ pageData = data }) {
             terminalHostRef.current.innerHTML = '';
             const term = new window.Terminal({
                 theme: {
-                    background: '#10161d',
+                    background: '#18181b', // neutral-900 equivalent for console
                     foreground: '#eef4fb',
                     cursor: '#eef4fb',
                     black: '#16161a',
@@ -344,7 +309,8 @@ export function ServerConsolePage({ pageData = data }) {
                 fontSize: 13,
                 cursorBlink: true,
                 scrollback: 5000,
-                convertEol: true
+                convertEol: true,
+                padding: '16px'
             });
             const fitAddon = new window.FitAddon.FitAddon();
             const webLinksAddon = new window.WebLinksAddon.WebLinksAddon();
@@ -584,259 +550,196 @@ export function ServerConsolePage({ pageData = data }) {
         : (runtimeMeta.crashLoopCount ? `Crash loop count tracked: ${runtimeMeta.crashLoopCount}` : 'No crash cooldown is active.');
 
     return (
-        <ReactAppShell pageData={pageData} subtitle="React server console" pageClassName="react-console-page" shellClassName="react-console-shell">
-            <div className="react-console-frame">
-                <main className="react-console-board">
-                    {pageData.success ? <div className="react-account-flash is-success">{pageData.success}</div> : null}
-                    {pageData.error ? <div className="react-account-flash is-danger">{pageData.error}</div> : null}
-                    {terminalError ? <div className="react-account-flash is-danger">{terminalError}</div> : null}
+        <ReactAppShell pageData={pageData} subtitle="React server console">
+            {pageData.success && (
+                <div className="bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm mx-4 lg:mx-8 mt-6">
+                    {pageData.success}
+                </div>
+            )}
+            {pageData.error && (
+                <div className="bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm mx-4 lg:mx-8 mt-6">
+                    {pageData.error}
+                </div>
+            )}
+            {terminalError && (
+                <div className="bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm mx-4 lg:mx-8 mt-6">
+                    {terminalError}
+                </div>
+            )}
 
-                    <section className="react-console-topbar">
-                        <div className="react-console-titleblock">
-                            <div className="react-console-titleline">
-                                <div className={`react-console-status-dot is-${statusTone(status)}`}></div>
-                                <h1>{server.name || 'Server Console'}</h1>
+            {/* Note: In pterodactyl, the console spans full width without a white wrapper block usually */}
+            <div className="p-4 lg:p-8 grid grid-cols-1 xl:grid-cols-4 gap-6">
+                
+                {/* Main Console Surface */}
+                <div className="xl:col-span-3 flex flex-col gap-6">
+                    
+                    {/* Header + Power Row */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <div className={`w-3 h-3 rounded-full shrink-0 ${getToneColorClass(statusTone(status))}`}></div>
+                            <div>
+                                <h1 className="text-xl font-bold text-white tracking-wide">{server.name || 'Server Console'}</h1>
+                                <p className="text-sm text-neutral-400 mt-1">{server.description || 'Live runtime output and power controls.'}</p>
                             </div>
-                            <p>{server.description || 'Live runtime output and power controls for this server.'}</p>
                         </div>
-
-                        <div className="react-console-top-actions">
-                            <button type="button" className="react-console-action is-success" onClick={() => sendPowerAction('start')} disabled={startDisabled}>
+                        
+                        <div className="flex bg-neutral-800 rounded-lg border border-neutral-700/50 overflow-hidden shadow-sm shrink-0">
+                            <button 
+                                type="button" 
+                                className="px-6 py-2.5 text-sm font-semibold hover:bg-neutral-700 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-r border-neutral-700/50 text-green-500" 
+                                onClick={() => sendPowerAction('start')} 
+                                disabled={startDisabled}
+                            >
                                 Start
                             </button>
-                            <button type="button" className="react-console-action is-warning" onClick={() => sendPowerAction('restart')} disabled={restartDisabled}>
+                            <button 
+                                type="button" 
+                                className="px-6 py-2.5 text-sm font-semibold hover:bg-neutral-700 text-blue-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-r border-neutral-700/50" 
+                                onClick={() => sendPowerAction('restart')} 
+                                disabled={restartDisabled}
+                            >
                                 Restart
                             </button>
-                            <button type="button" className="react-console-action is-danger" onClick={() => sendPowerAction('stop')} disabled={stopDisabled}>
+                            <button 
+                                type="button" 
+                                className="px-6 py-2.5 text-sm font-semibold hover:bg-neutral-700 text-red-500 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+                                onClick={() => sendPowerAction('stop')} 
+                                disabled={stopDisabled}
+                            >
                                 Stop
                             </button>
                         </div>
-                    </section>
+                    </div>
 
-                    <section className="react-console-core">
-                        <section className="react-console-terminal-card">
-                            <div className="react-console-terminal-head">
-                                <div className="react-console-terminal-heading">
-                                    <h2>Console</h2>
-                                    <div className="react-console-chart-note">Interactive server stream with direct command input.</div>
-                                </div>
-                                <div className="react-console-terminal-tools">
-                                    <button
-                                        type="button"
-                                        className={`react-console-mini-toggle${followOutput ? ' is-active' : ''}`}
-                                        onClick={() => setFollowOutput((current) => !current)}
-                                    >
-                                        Follow
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="react-console-mini-toggle"
-                                        onClick={() => {
-                                            const term = terminalInstanceRef.current;
-                                            if (term) {
-                                                term.clear();
-                                            }
-                                        }}
-                                    >
-                                        Clear
-                                    </button>
-                                </div>
+                    {/* Terminal Block */}
+                    <div className="bg-neutral-900 border border-neutral-700 rounded-lg flex flex-col relative overflow-hidden shadow-lg h-[600px]">
+                        {/* Terminal Header */}
+                        <div className="bg-neutral-800 border-b border-neutral-700 px-4 py-3 flex justify-between items-center z-10 shrink-0">
+                            <div>
+                                <strong className="text-neutral-100 font-bold block">Console</strong>
+                                <span className="text-xs text-neutral-500">Interactive server stream</span>
                             </div>
-                            <div className={`react-console-terminal-body${terminalBooted ? '' : ' is-loading'}`}>
-                                <div className="react-console-terminal-host" ref={terminalHostRef}></div>
-                                {!terminalBooted && !terminalError ? (
-                                    <div className="react-console-terminal-placeholder">Booting xterm runtime…</div>
-                                ) : null}
-                            </div>
-                            <div className="react-console-command-row">
-                                <span className="react-console-command-prefix">$</span>
-                                <input
-                                    type="text"
-                                    value={commandValue}
-                                    onChange={(event) => setCommandValue(event.target.value)}
-                                    onKeyDown={(event) => {
-                                        if (event.key === 'Enter') {
-                                            event.preventDefault();
-                                            sendCommand();
-                                            return;
-                                        }
-                                        if (event.key === 'ArrowUp') {
-                                            event.preventDefault();
-                                            if (!history.length) return;
-                                            historyIndexRef.current = Math.min(historyIndexRef.current + 1, history.length - 1);
-                                            setCommandValue(history[historyIndexRef.current] || '');
-                                            return;
-                                        }
-                                        if (event.key === 'ArrowDown') {
-                                            event.preventDefault();
-                                            if (!history.length) return;
-                                            historyIndexRef.current = Math.max(historyIndexRef.current - 1, -1);
-                                            setCommandValue(historyIndexRef.current >= 0 ? (history[historyIndexRef.current] || '') : '');
-                                        }
+                            <div className="flex bg-neutral-900 rounded overflow-hidden border border-neutral-700">
+                                <button 
+                                    className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors border-r border-neutral-700 ${followOutput ? 'bg-primary-600 text-white' : 'text-neutral-400 hover:text-white hover:bg-neutral-700'}`}
+                                    onClick={() => setFollowOutput((current) => !current)}
+                                >
+                                    Follow
+                                </button>
+                                <button 
+                                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-neutral-400 hover:text-white hover:bg-neutral-700 transition-colors"
+                                    onClick={() => {
+                                        const term = terminalInstanceRef.current;
+                                        if (term) term.clear();
                                     }}
-                                    className="react-console-command-input"
-                                    placeholder={connectorOnline ? 'Type a command and press Enter…' : 'Connector offline'}
-                                    disabled={!connectorOnline}
-                                />
-                                <button type="button" className="react-console-send" onClick={sendCommand} disabled={!connectorOnline || !String(commandValue || '').trim()}>
-                                    Send
+                                >
+                                    Clear
                                 </button>
                             </div>
-                        </section>
+                        </div>
 
-                        <aside className="react-console-details">
-                            <section className="react-console-side-card">
-                                <div className="react-console-panel-title">Server Details</div>
-                                <div className="react-console-side-list">
-                                    <ResourceBadge icon="bi-hdd-network" label="Allocation" value={server.address || 'No allocation address'} />
-                                    <ResourceBadge icon="bi-hdd-stack" label="Status" value={formatStatus(status)} />
-                                    <ResourceBadge icon="bi-cpu" label="CPU Cap" value={limits.cpu ? `${limits.cpu}%` : 'Unlimited'} />
-                                    <ResourceBadge icon="bi-memory" label="RAM Cap" value={limits.memory ? `${limits.memory} MB` : 'Unlimited'} />
-                                    <ResourceBadge icon="bi-device-hdd" label="Disk Cap" value={limits.disk ? `${limits.disk} MB` : 'Unlimited'} />
-                                </div>
-                            </section>
+                        {/* Terminal Canvas */}
+                        <div className={`flex-1 relative ${terminalBooted ? '' : 'opacity-0'} p-2`} style={{ minHeight: 0 }}>
+                            <div className="w-full h-full" ref={terminalHostRef}></div>
+                        </div>
+                        {!terminalBooted && !terminalError && (
+                            <div className="absolute inset-x-0 bottom-16 top-16 flex items-center justify-center flex-col gap-4 text-neutral-500">
+                                <div className="w-8 h-8 border-4 border-neutral-600 border-t-primary-500 rounded-full animate-spin"></div>
+                                <span>Booting xterm runtime...</span>
+                            </div>
+                        )}
 
-                            <section className="react-console-side-card">
-                                <div className="react-console-panel-title">Connector Link</div>
-                                <div className={`react-console-connection is-${connectorOnline ? 'success' : 'danger'}`}>
-                                    <i className={`bi ${connectorOnline ? 'bi-broadcast-pin' : 'bi-wifi-off'}`}></i>
-                                    <span>{connectionState}</span>
-                                </div>
-                                <div className="react-console-side-links">
-                                    <Link to={ReactRoutes.changeView} className="react-account-button is-ghost">View Mode</Link>
-                                    <a href={`/server/${server.containerId}?popout=true`} className="react-account-button is-ghost">Popout</a>
-                                </div>
-                            </section>
+                        {/* Input Row */}
+                        <div className="bg-neutral-800 border-t border-neutral-700 flex items-center shrink-0">
+                            <span className="text-neutral-500 pl-4 font-mono font-bold">$</span>
+                            <input
+                                type="text"
+                                className="flex-1 bg-transparent border-none text-neutral-200 text-sm font-mono px-3 py-3.5 focus:ring-0 shadow-none outline-none"
+                                value={commandValue}
+                                onChange={(event) => setCommandValue(event.target.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                        event.preventDefault();
+                                        sendCommand();
+                                        return;
+                                    }
+                                    if (event.key === 'ArrowUp') {
+                                        event.preventDefault();
+                                        if (!history.length) return;
+                                        historyIndexRef.current = Math.min(historyIndexRef.current + 1, history.length - 1);
+                                        setCommandValue(history[historyIndexRef.current] || '');
+                                        return;
+                                    }
+                                    if (event.key === 'ArrowDown') {
+                                        event.preventDefault();
+                                        if (!history.length) return;
+                                        historyIndexRef.current = Math.max(historyIndexRef.current - 1, -1);
+                                        setCommandValue(historyIndexRef.current >= 0 ? (history[historyIndexRef.current] || '') : '');
+                                    }
+                                }}
+                                placeholder={connectorOnline ? 'Type a command and press Enter...' : 'Connector offline'}
+                                disabled={!connectorOnline}
+                            />
+                            <button 
+                                className="px-5 py-3.5 bg-primary-600 hover:bg-primary-500 font-bold text-white text-sm transition-colors border-l border-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={sendCommand} 
+                                disabled={!connectorOnline || !String(commandValue || '').trim()}
+                            >
+                                Send
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
-                            <section className="react-console-side-card">
-                                <div className="react-console-panel-title">Runtime Snapshot</div>
-                                <div className="react-console-side-list">
-                                    <InlineMetric
-                                        title="CPU"
-                                        value={`${stats.cpu.toFixed(1)}%`}
-                                        note={limits.cpu ? `${limits.cpu}% cap` : 'No cap'}
-                                        tone="info"
-                                    />
-                                    <InlineMetric
-                                        title="Memory"
-                                        value={`${Math.round(stats.memory)} MB`}
-                                        note={`${memoryPercent.toFixed(0)}% used`}
-                                        tone="success"
-                                    />
-                                    <InlineMetric
-                                        title="Disk"
-                                        value={`${Math.round(stats.disk)} MB`}
-                                        note={`${diskPercent.toFixed(0)}% used`}
-                                        tone="warning"
-                                    />
-                                    <InlineMetric
-                                        title="Uptime"
-                                        value={formatDuration(stats.uptimeSeconds)}
-                                        note="Current runtime session"
-                                        tone="info"
-                                    />
-                                    <InlineMetric
-                                        title="Net RX"
-                                        value={formatBytes(stats.networkRx)}
-                                        note="Inbound since start"
-                                        tone="success"
-                                    />
-                                    <InlineMetric
-                                        title="Net TX"
-                                        value={formatBytes(stats.networkTx)}
-                                        note="Outbound since start"
-                                        tone="warning"
-                                    />
-                                </div>
-                            </section>
+                {/* Sidebar details */}
+                <aside className="xl:col-span-1 flex flex-col gap-6">
+                    
+                    {/* Server details */}
+                    <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-5">
+                        <div className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4">Server Details</div>
+                        <div className="flex flex-col gap-4">
+                            <ResourceBadge icon="bi-hdd-network" label="Allocation" value={server.address || 'No allocation address'} />
+                            <ResourceBadge icon="bi-hdd-stack" label="Status" value={formatStatus(status)} />
+                            <div className="border-t border-neutral-700/50 my-1"></div>
+                            <ResourceBadge icon="bi-cpu" label="CPU Cap" value={limits.cpu ? `${limits.cpu}%` : 'Unlimited'} />
+                            <ResourceBadge icon="bi-memory" label="RAM Cap" value={limits.memory ? `${limits.memory} MB` : 'Unlimited'} />
+                            <ResourceBadge icon="bi-device-hdd" label="Disk Cap" value={limits.disk ? `${limits.disk} MB` : 'Unlimited'} />
+                        </div>
+                    </div>
 
-                            <section className="react-console-side-card">
-                                <div className="react-console-panel-title">Restart Source</div>
-                                <div className="react-console-side-list">
-                                    <InlineMetric
-                                        title="Last Trigger"
-                                        value={formatRuntimeSource(runtimeMeta.lastSource)}
-                                        note={runtimeMeta.lastReason || 'No restart source captured yet.'}
-                                        tone="info"
-                                    />
-                                </div>
-                            </section>
+                    {/* Connector Link */}
+                    <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-5">
+                        <div className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4">Connector Link</div>
+                        <div className={`flex items-center gap-3 p-3 rounded mb-4 border ${connectorOnline ? 'bg-green-600/10 border-green-600/30 text-green-400' : 'bg-red-600/10 border-red-600/30 text-red-400'}`}>
+                            <i className={`bi ${connectorOnline ? 'bi-broadcast-pin' : 'bi-wifi-off'}`}></i>
+                            <span className="font-semibold">{connectionState}</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <Link to={ReactRoutes.changeView} className="flex-1 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-bold py-2 rounded text-center transition-colors">View Mode</Link>
+                            <a href={`/server/${server.containerId}?popout=true`} className="flex-1 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-bold py-2 rounded text-center transition-colors">Popout</a>
+                        </div>
+                    </div>
 
-                            <section className="react-console-side-card">
-                                <div className="react-console-panel-title">Crash Cooldown</div>
-                                <div className="react-console-side-list">
-                                    <InlineMetric
-                                        title="Guard State"
-                                        value={cooldownValue}
-                                        note={cooldownNote}
-                                        tone={cooldownActive ? 'warning' : 'info'}
-                                    />
-                                </div>
-                            </section>
+                    {/* Runtime Snapshot */}
+                    <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-5">
+                        <div className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4">Runtime Snapshot</div>
+                        <InlineMetric title="CPU" value={`${stats.cpu.toFixed(1)}%`} note={limits.cpu ? `${limits.cpu}% cap` : 'No cap'} tone="primary" />
+                        <InlineMetric title="Memory" value={`${Math.round(stats.memory)} MB`} note={`${memoryPercent.toFixed(0)}% used`} tone="success" />
+                        <InlineMetric title="Disk" value={`${Math.round(stats.disk)} MB`} note={`${diskPercent.toFixed(0)}% used`} tone="warning" />
+                        <InlineMetric title="Uptime" value={formatDuration(stats.uptimeSeconds)} note="Current runtime session" />
+                        <InlineMetric title="Net RX" value={formatBytes(stats.networkRx)} note="Inbound since start" tone="success" />
+                        <InlineMetric title="Net TX" value={formatBytes(stats.networkTx)} note="Outbound since start" tone="warning" />
+                    </div>
 
-                            <section className="react-console-side-card">
-                                <div className="react-console-panel-title">Last Exit</div>
-                                <div className="react-console-side-list">
-                                    <InlineMetric
-                                        title="Exit Summary"
-                                        value={lastExitValue}
-                                        note={lastExitNote}
-                                        tone={exitInfo.oomKilled ? 'danger' : 'info'}
-                                    />
-                                </div>
-                            </section>
+                    {/* Guards / Exits */}
+                    <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-5">
+                        <div className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4">Guards</div>
+                        <InlineMetric title="Restart Trigger" value={formatRuntimeSource(runtimeMeta.lastSource)} note={runtimeMeta.lastReason || 'No restart source captured yet.'} />
+                        <InlineMetric title="Cooldown State" value={cooldownValue} note={cooldownNote} tone={cooldownActive ? 'warning' : 'primary'} />
+                        <InlineMetric title="Exit Summary" value={lastExitValue} note={lastExitNote} tone={exitInfo.oomKilled ? 'danger' : 'primary'} />
+                    </div>
 
-                            <section className="react-console-side-card">
-                                <div className="react-console-panel-title">Recent Runtime Events</div>
-                                <div className="react-console-side-list">
-                                    {Array.isArray(runtimeMeta.history) && runtimeMeta.history.length ? runtimeMeta.history.map((entry, index) => (
-                                        <InlineMetric
-                                            key={`${entry.kind || 'runtime'}-${entry.ts || index}-${index}`}
-                                            title={`${entry.kind || 'runtime'} · ${formatRuntimeSource(entry.source)}`}
-                                            value={entry.summary || 'Runtime event recorded.'}
-                                            note={entry.ts ? new Date(entry.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Live'}
-                                            tone={entry.tone || 'info'}
-                                        />
-                                    )) : (
-                                        <InlineMetric
-                                            title="Runtime"
-                                            value="No recent events"
-                                            note="Recent restart reasons and crash transitions will appear here."
-                                            tone="info"
-                                        />
-                                    )}
-                                </div>
-                            </section>
-                        </aside>
-                    </section>
-
-                    <section className="react-console-graphs">
-                        <MetricGraphCard
-                            title="CPU Usage"
-                            value={`${stats.cpu.toFixed(1)}%`}
-                            note={limits.cpu ? `${limits.cpu}% server limit` : 'No limit configured'}
-                            percent={limits.cpu ? usagePercent(stats.cpu, limits.cpu) : clamp(stats.cpu, 0, 100)}
-                            tone="info"
-                            seed={1}
-                        />
-                        <MetricGraphCard
-                            title="Memory Usage"
-                            value={`${Math.round(stats.memory)} MB`}
-                            note={limits.memory ? `${Math.round(limits.memory)} MB limit` : 'No memory limit'}
-                            percent={memoryPercent}
-                            tone="success"
-                            seed={5}
-                        />
-                        <MetricGraphCard
-                            title="Disk Usage"
-                            value={`${Math.round(stats.disk)} MB`}
-                            note={limits.disk ? `${Math.round(limits.disk)} MB limit` : 'No disk limit'}
-                            percent={diskPercent}
-                            tone="warning"
-                            seed={9}
-                        />
-                    </section>
-                </main>
+                </aside>
             </div>
         </ReactAppShell>
     );

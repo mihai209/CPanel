@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { Link } from 'react-router-dom';
 import { ReactRoutes, resolveBrandImage, resolveUserAvatar } from './ReactRoutes.js';
 import ReactAppShell from './components/ReactAppShell.jsx';
+import PageContentBlock from './components/PageContentBlock.jsx';
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'account';
@@ -10,21 +11,27 @@ const root = standaloneEntry ? createRoot(document.getElementById('reactRoot')) 
 
 function LinkedProviderCard({ provider }) {
     return (
-        <div className="react-account-provider">
-            <div className="react-account-provider-main">
-                <i className={`bi ${provider.icon}`} style={{ color: provider.color }}></i>
+        <div className="bg-neutral-900 border border-neutral-700/50 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+                <i className={`bi ${provider.icon} text-2xl`} style={{ color: provider.color }}></i>
                 <div>
-                    <strong>{provider.name}</strong>
-                    <span>{provider.isLinked ? 'Linked to this account' : 'Available to connect'}</span>
+                    <strong className="block text-sm font-bold text-neutral-200">{provider.name}</strong>
+                    <span className="text-xs text-neutral-400">{provider.isLinked ? 'Linked to this account' : 'Available to connect'}</span>
                 </div>
             </div>
-            {provider.isLinked ? (
-                <form method="POST" action={provider.unlinkAction}>
-                    <button type="submit" className="react-account-button is-danger">Unlink</button>
-                </form>
-            ) : (
-                <a href={provider.linkAction} className="react-account-button is-ghost">Connect</a>
-            )}
+            <div className="mt-4 sm:mt-0 shrink-0">
+                {provider.isLinked ? (
+                    <form method="POST" action={provider.unlinkAction}>
+                        <button type="submit" className="bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 border border-red-600/30 text-xs font-semibold py-1.5 px-4 rounded transition-colors w-full sm:w-auto">
+                            Unlink
+                        </button>
+                    </form>
+                ) : (
+                    <a href={provider.linkAction} className="inline-block bg-neutral-700 hover:bg-neutral-600 text-neutral-200 text-xs font-semibold py-1.5 px-4 rounded transition-colors text-center w-full sm:w-auto">
+                        Connect
+                    </a>
+                )}
+            </div>
         </div>
     );
 }
@@ -112,170 +119,231 @@ export function AccountPage({ pageData = data }) {
         }
     };
 
+    const inputClass = "w-full bg-neutral-900 border border-neutral-700/50 rounded p-2.5 text-sm text-neutral-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-shadow";
+    const labelClass = "block text-xs font-bold text-neutral-400 uppercase tracking-wide mb-1.5";
+
     return (
-        <ReactAppShell pageData={pageData} subtitle="Account surface" pageClassName="react-account-page" shellClassName="react-account-shell">
-            <main className="react-account-layout">
-                    <section className="react-account-main">
-                        <div className="react-account-scroll">
-                            {pageData.success ? (
-                                <div className="react-account-flash is-success">{pageData.success}</div>
-                            ) : null}
-                            {pageData.error ? (
-                                <div className="react-account-flash is-danger">{pageData.error}</div>
-                            ) : null}
+        <ReactAppShell pageData={pageData} subtitle="Account surface">
+            <PageContentBlock title="Your Account">
+                {pageData.success && (
+                    <div className="bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3">
+                        <i className="bi bi-check-circle-fill text-green-500"></i>
+                        {pageData.success}
+                    </div>
+                )}
+                {pageData.error && (
+                    <div className="bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3">
+                        <i className="bi bi-exclamation-triangle-fill text-red-500"></i>
+                        {pageData.error}
+                    </div>
+                )}
 
-                            <div className="react-account-grid">
-                                <div className="react-account-card react-account-profile-card">
-                                    <div className="react-account-profile">
-                                        <img src={avatar} alt={user.username || 'User'} className="react-account-avatar" />
-                                        <div>
-                                            <h1>{[user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'Account'}</h1>
-                                            <div className="react-account-username">@{user.username || 'unknown'}</div>
-                                            <div className="react-account-email">{user.email || 'No email set'}</div>
-                                        </div>
-                                    </div>
-                                    <div className="react-account-badges">
-                                        <span className={`react-account-badge ${user.twoFactorEnabled ? 'is-success' : 'is-muted'}`}>
-                                            {user.twoFactorEnabled ? '2FA Active' : '2FA Inactive'}
-                                        </span>
-                                        <span className="react-account-badge is-info">Theme: {pageData.activeTheme || 'default'}</span>
-                                    </div>
-                                    <div className="react-account-inline-actions">
-                                        <Link to={ReactRoutes.deviceLogin} className="react-account-button is-ghost">Device History</Link>
-                                        <a href={ReactRoutes.themes} className="react-account-button is-ghost">Themes</a>
-                                        <Link to={ReactRoutes.experimentalFeatures} className="react-account-button is-ghost">Experimental</Link>
-                                    </div>
-                                </div>
-
-                                <div className="react-account-card">
-                                    <div className="react-account-section-title">Account Details</div>
-                                    <form method="POST" action="/account/update" className="react-account-form">
-                                        <div className="react-account-form-grid">
-                                            <label>
-                                                <span>First Name</span>
-                                                <input type="text" name="firstName" defaultValue={user.firstName || ''} required />
-                                            </label>
-                                            <label>
-                                                <span>Last Name</span>
-                                                <input type="text" name="lastName" defaultValue={user.lastName || ''} required />
-                                            </label>
-                                        </div>
-                                        <label>
-                                            <span>Email</span>
-                                            <input type="email" name="email" defaultValue={user.email || ''} required />
-                                        </label>
-                                        <div className="react-account-form-grid">
-                                            <label>
-                                                <span>Avatar Provider</span>
-                                                <select name="avatarProvider" defaultValue={user.avatarProvider || 'gravatar'}>
-                                                    <option value="gravatar">Gravatar</option>
-                                                    <option value="url">Custom URL</option>
-                                                </select>
-                                            </label>
-                                            <label>
-                                                <span>Avatar URL</span>
-                                                <input type="url" name="avatarUrl" defaultValue={user.avatarUrl || ''} placeholder="https://example.com/avatar.png" />
-                                            </label>
-                                        </div>
-                                        <label>
-                                            <span>Username</span>
-                                            <input type="text" value={user.username || ''} readOnly />
-                                        </label>
-                                        <div className="react-account-form-actions">
-                                            <button type="submit" className="react-account-button is-primary">Save Account</button>
-                                        </div>
-                                    </form>
-                                </div>
-
-                                <div className="react-account-card">
-                                    <div className="react-account-section-title">Update Password</div>
-                                    <form method="POST" action="/account/password" className="react-account-form">
-                                        <label>
-                                            <span>Current Password</span>
-                                            <input type="password" name="currentPassword" required />
-                                        </label>
-                                        <label>
-                                            <span>New Password</span>
-                                            <input type="password" name="newPassword" required />
-                                        </label>
-                                        <label>
-                                            <span>Confirm New Password</span>
-                                            <input type="password" name="confirmPassword" required />
-                                        </label>
-                                        <div className="react-account-form-actions">
-                                            <button type="submit" className="react-account-button is-primary">Update Password</button>
-                                        </div>
-                                    </form>
-                                </div>
-
-                                <div className="react-account-card">
-                                    <div className="react-account-section-title">Linked Accounts</div>
-                                    <div className="react-account-provider-list">
-                                        {linkedProviders.length > 0 ? linkedProviders.map((provider) => (
-                                            <LinkedProviderCard key={provider.id} provider={provider} />
-                                        )) : (
-                                            <div className="react-account-muted">No external providers are configured for this account yet.</div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="react-account-card">
-                                    <div className="react-account-section-title">Two-Factor Authentication</div>
-                                    {user.twoFactorEnabled ? (
-                                        <div className="react-account-twofa-block">
-                                            <div className="react-account-muted">Two-factor authentication is enabled. Enter your current password to disable it.</div>
-                                            <label>
-                                                <span>Current Password</span>
-                                                <input
-                                                    type="password"
-                                                    value={disableState.password}
-                                                    onChange={(event) => setDisableState((current) => ({ ...current, password: event.target.value }))}
-                                                />
-                                            </label>
-                                            {disableState.error ? <div className="react-account-inline-error">{disableState.error}</div> : null}
-                                            <button type="button" className="react-account-button is-danger" onClick={disable2FA} disabled={disableState.loading}>
-                                                {disableState.loading ? 'Disabling...' : 'Disable 2FA'}
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="react-account-twofa-block">
-                                            <div className="react-account-muted">Start setup to receive a QR code and manual secret for your authenticator app.</div>
-                                            <button type="button" className="react-account-button is-primary" onClick={start2FASetup} disabled={setupState.loading}>
-                                                {setupState.loading ? 'Loading...' : 'Start 2FA Setup'}
-                                            </button>
-                                            {setupState.qrCodeUrl ? (
-                                                <div className="react-account-twofa-setup">
-                                                    <div className="react-account-twofa-qr-wrap">
-                                                        <img src={setupState.qrCodeUrl} alt="2FA QR code" className="react-account-twofa-qr" />
-                                                    </div>
-                                                    <label>
-                                                        <span>Manual Secret</span>
-                                                        <input type="text" value={setupState.secret} readOnly />
-                                                    </label>
-                                                    <label>
-                                                        <span>Verification Code</span>
-                                                        <input
-                                                            type="text"
-                                                            value={setupState.code}
-                                                            maxLength={6}
-                                                            onChange={(event) => setSetupState((current) => ({ ...current, code: event.target.value.replace(/[^0-9]/g, '') }))}
-                                                            placeholder="000000"
-                                                        />
-                                                    </label>
-                                                    {setupState.error ? <div className="react-account-inline-error">{setupState.error}</div> : null}
-                                                    <button type="button" className="react-account-button is-primary" onClick={enable2FA} disabled={setupState.loading}>
-                                                        {setupState.loading ? 'Verifying...' : 'Verify and Enable'}
-                                                    </button>
-                                                </div>
-                                            ) : null}
-                                            {!setupState.qrCodeUrl && setupState.error ? <div className="react-account-inline-error">{setupState.error}</div> : null}
-                                        </div>
-                                    )}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    
+                    {/* Left Column (Profile & Integrations) */}
+                    <div className="lg:col-span-4 flex flex-col gap-6">
+                        
+                        {/* Profile Card */}
+                        <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-6">
+                            <div className="flex flex-col items-center text-center">
+                                <img src={avatar} alt={user.username || 'User'} className="w-24 h-24 rounded-full border-4 border-neutral-700 shadow-md mb-4" />
+                                <h1 className="text-xl font-bold text-white leading-tight">
+                                    {[user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'Account'}
+                                </h1>
+                                <div className="text-sm text-neutral-400 mt-1 font-mono">@{user.username || 'unknown'}</div>
+                                <div className="text-sm text-neutral-500 mt-0.5">{user.email || 'No email set'}</div>
+                                
+                                <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
+                                    <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wide ${user.twoFactorEnabled ? 'bg-green-600/20 text-green-400 border border-green-600/30' : 'bg-neutral-700 text-neutral-400'}`}>
+                                        {user.twoFactorEnabled ? '2FA Active' : '2FA Inactive'}
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wide bg-primary-600/20 text-primary-400 border border-primary-600/30">
+                                        Theme: {pageData.activeTheme || 'default'}
+                                    </span>
                                 </div>
                             </div>
+                            
+                            <div className="mt-8 flex flex-col gap-2">
+                                <Link to={ReactRoutes.deviceLogin} className="w-full bg-neutral-700/50 hover:bg-neutral-700 text-neutral-300 text-sm font-semibold py-2 px-4 rounded transition-colors text-center border border-transparent hover:border-neutral-600 flex justify-center items-center gap-2">
+                                    <i className="bi bi-clock-history"></i> Device History
+                                </Link>
+                                <a href={ReactRoutes.themes} className="w-full bg-neutral-700/50 hover:bg-neutral-700 text-neutral-300 text-sm font-semibold py-2 px-4 rounded transition-colors text-center border border-transparent hover:border-neutral-600 flex justify-center items-center gap-2">
+                                    <i className="bi bi-palette2"></i> Themes
+                                </a>
+                                <Link to={ReactRoutes.experimentalFeatures} className="w-full bg-neutral-700/50 hover:bg-neutral-700 text-neutral-300 text-sm font-semibold py-2 px-4 rounded transition-colors text-center border border-transparent hover:border-neutral-600 flex justify-center items-center gap-2">
+                                    <i className="bi bi-stars"></i> Experimental
+                                </Link>
+                            </div>
                         </div>
-                    </section>
-                </main>
+
+                        {/* Linked Accounts */}
+                        <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-6">
+                            <h2 className="text-lg font-bold text-neutral-100 mb-4">Linked Accounts</h2>
+                            <div>
+                                {linkedProviders.length > 0 ? linkedProviders.map((provider) => (
+                                    <LinkedProviderCard key={provider.id} provider={provider} />
+                                )) : (
+                                    <div className="text-sm text-neutral-400 text-center py-4">No external providers are configured for this account yet.</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right Column (Forms) */}
+                    <div className="lg:col-span-8 flex flex-col gap-6">
+                        
+                        {/* Account Details */}
+                        <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-6">
+                            <h2 className="text-lg font-bold text-neutral-100 mb-6">Account Details</h2>
+                            <form method="POST" action="/account/update" className="flex flex-col gap-5">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    <label>
+                                        <span className={labelClass}>First Name</span>
+                                        <input type="text" name="firstName" defaultValue={user.firstName || ''} required className={inputClass} />
+                                    </label>
+                                    <label>
+                                        <span className={labelClass}>Last Name</span>
+                                        <input type="text" name="lastName" defaultValue={user.lastName || ''} required className={inputClass} />
+                                    </label>
+                                </div>
+                                
+                                <label>
+                                    <span className={labelClass}>Email</span>
+                                    <input type="email" name="email" defaultValue={user.email || ''} required className={inputClass} />
+                                </label>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    <label>
+                                        <span className={labelClass}>Avatar Provider</span>
+                                        <select name="avatarProvider" defaultValue={user.avatarProvider || 'gravatar'} className={`${inputClass} pr-8 appearance-none`}>
+                                            <option value="gravatar">Gravatar</option>
+                                            <option value="url">Custom URL</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        <span className={labelClass}>Avatar URL</span>
+                                        <input type="url" name="avatarUrl" defaultValue={user.avatarUrl || ''} placeholder="https://example.com/avatar.png" className={inputClass} />
+                                    </label>
+                                </div>
+                                
+                                <label>
+                                    <span className={labelClass}>Username</span>
+                                    <input type="text" value={user.username || ''} readOnly className={`${inputClass} bg-neutral-800/50 cursor-not-allowed text-neutral-500 ring-0 focus:ring-0`} />
+                                    <span className="block text-xs text-neutral-500 mt-1">Usernames cannot be changed.</span>
+                                </label>
+                                
+                                <div className="mt-2 flex justify-end">
+                                    <button type="submit" className="bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm">Save Account</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        {/* Password */}
+                        <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-6">
+                            <h2 className="text-lg font-bold text-neutral-100 mb-6">Update Password</h2>
+                            <form method="POST" action="/account/password" className="flex flex-col gap-5">
+                                <label>
+                                    <span className={labelClass}>Current Password</span>
+                                    <input type="password" name="currentPassword" required className={inputClass} />
+                                </label>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    <label>
+                                        <span className={labelClass}>New Password</span>
+                                        <input type="password" name="newPassword" required className={inputClass} />
+                                    </label>
+                                    <label>
+                                        <span className={labelClass}>Confirm New Password</span>
+                                        <input type="password" name="confirmPassword" required className={inputClass} />
+                                    </label>
+                                </div>
+                                <div className="mt-2 flex justify-end">
+                                    <button type="submit" className="bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm">Update Password</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        {/* Two-Factor Authentication */}
+                        <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-6">
+                            <h2 className="text-lg font-bold text-neutral-100 mb-4">Two-Factor Authentication</h2>
+                            {user.twoFactorEnabled ? (
+                                <div>
+                                    <p className="text-sm text-neutral-400 mb-5">Two-factor authentication is currently enabled on your account. If you would like to disable it, you must securely confirm your password below.</p>
+                                    <div className="flex flex-col sm:flex-row gap-4 items-end">
+                                        <label className="flex-1 w-full">
+                                            <span className={labelClass}>Current Password</span>
+                                            <input
+                                                type="password"
+                                                value={disableState.password}
+                                                onChange={(e) => setDisableState({ ...disableState, password: e.target.value })}
+                                                className={inputClass}
+                                            />
+                                        </label>
+                                        <button 
+                                            type="button" 
+                                            className="w-full sm:w-auto bg-red-600 hover:bg-red-500 text-white font-semibold flex-shrink-0 h-10 px-6 rounded transition-colors text-sm shadow-sm disabled:opacity-50" 
+                                            onClick={disable2FA} 
+                                            disabled={disableState.loading}
+                                        >
+                                            {disableState.loading ? 'Disabling...' : 'Disable 2FA'}
+                                        </button>
+                                    </div>
+                                    {disableState.error && <p className="text-red-400 text-sm mt-2 font-bold">{disableState.error}</p>}
+                                </div>
+                            ) : (
+                                <div>
+                                    <p className="text-sm text-neutral-400 mb-5">Enable two-factor authentication to add an extra layer of security to your account. You will be required to input a code generated by your authenticator app each time you log in.</p>
+                                    
+                                    {!setupState.qrCodeUrl ? (
+                                        <button 
+                                            type="button" 
+                                            className="bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm disabled:opacity-50" 
+                                            onClick={start2FASetup} 
+                                            disabled={setupState.loading}
+                                        >
+                                            {setupState.loading ? 'Connecting...' : 'Begin Setup'}
+                                        </button>
+                                    ) : (
+                                        <div className="bg-neutral-900 border border-neutral-700/50 rounded-lg p-6 flex flex-col md:flex-row items-center md:items-start gap-8">
+                                            <div className="bg-white p-2 rounded shrink-0 shadow-lg">
+                                                <img src={setupState.qrCodeUrl} alt="2FA QR code" className="w-32 h-32 md:w-40 md:h-40" style={{ imageRendering: 'pixelated' }} />
+                                            </div>
+                                            <div className="flex-1 w-full">
+                                                <label className="block mb-4">
+                                                    <span className={labelClass}>Manual Setup Key</span>
+                                                    <input type="text" value={setupState.secret} readOnly className={`${inputClass} font-mono`} onClick={(e) => e.target.select()} />
+                                                    <span className="block text-xs text-neutral-500 mt-1">If you cannot scan the QR code, manually input this secret into your app.</span>
+                                                </label>
+                                                <label className="block mb-5">
+                                                    <span className={labelClass}>Authentication Code</span>
+                                                    <input
+                                                        type="text"
+                                                        value={setupState.code}
+                                                        maxLength={6}
+                                                        onChange={(event) => setSetupState({ ...setupState, code: event.target.value.replace(/[^0-9]/g, '') })}
+                                                        placeholder="000000"
+                                                        className={`${inputClass} font-mono tracking-widest text-lg py-3`}
+                                                    />
+                                                </label>
+                                                {setupState.error && <p className="text-red-400 text-sm mb-4 font-bold">{setupState.error}</p>}
+                                                <div className="flex gap-3">
+                                                    <button type="button" className="bg-neutral-700 hover:bg-neutral-600 text-white font-semibold py-2 px-6 rounded transition-colors text-sm" onClick={() => setSetupState({ loading: false, qrCodeUrl: '', secret: '', code: '', error: '' })}>
+                                                        Cancel
+                                                    </button>
+                                                    <button type="button" className="bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm disabled:opacity-50" onClick={enable2FA} disabled={setupState.loading || setupState.code.length !== 6}>
+                                                        {setupState.loading ? 'Verifying...' : 'Verify & Enable'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {!setupState.qrCodeUrl && setupState.error && <p className="text-red-400 text-sm mt-4 font-bold">{setupState.error}</p>}
+                                </div>
+                            )}
+                        </div>
+
+                    </div>
+                </div>
+            </PageContentBlock>
         </ReactAppShell>
     );
 }

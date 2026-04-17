@@ -7280,7 +7280,7 @@
   });
 
   // views/react/server-console.jsx
-  var import_react2 = __toESM(require_react());
+  var import_react3 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // node_modules/react-router-dom/dist/index.js
@@ -8164,8 +8164,12 @@
     ] });
   }
 
-  // views/react/server-console.jsx
+  // views/react/components/PageContentBlock.jsx
+  var import_react2 = __toESM(require_react());
   var import_jsx_runtime2 = __toESM(require_jsx_runtime());
+
+  // views/react/server-console.jsx
+  var import_jsx_runtime3 = __toESM(require_jsx_runtime());
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
   var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-console";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
@@ -8236,6 +8240,18 @@
     if (["stopped", "offline", "error"].includes(value)) return "danger";
     return "muted";
   }
+  function getToneColorClass(tone) {
+    switch (tone) {
+      case "success":
+        return "bg-green-500";
+      case "warning":
+        return "bg-yellow-500";
+      case "danger":
+        return "bg-red-500";
+      default:
+        return "bg-neutral-500";
+    }
+  }
   function parseMetric(value) {
     const numeric = Number.parseFloat(String(value || "0").replace(/[^0-9.-]/g, ""));
     if (!Number.isFinite(numeric)) return 0;
@@ -8281,67 +8297,22 @@
     return clamp(safeValue / safeLimit * 100, 0, 100);
   }
   function ResourceBadge({ icon, label, value }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-console-resource", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("i", { className: `bi ${icon}` }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: value }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: label })
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-3", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: `bi ${icon} text-lg text-neutral-400` }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "block text-sm font-bold text-neutral-200", children: value }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "block text-xs text-neutral-500", children: label })
       ] })
     ] });
   }
   function InlineMetric({ title, value, note, tone = "" }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: `react-console-inline-metric${tone ? ` is-${tone}` : ""}`, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: title }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: value }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("small", { children: note })
-    ] });
-  }
-  function buildTrendPoints(percent, seed) {
-    const safe = clamp(Number(percent) || 0, 0, 100);
-    const points = [];
-    for (let index = 0; index < 12; index += 1) {
-      const progress = index / 11;
-      const wobble = Math.sin((index + seed) * 0.82) * 6 + Math.cos((index + seed) * 0.47) * 3;
-      const value = clamp(safe * (0.38 + progress * 0.62) + wobble, 4, 100);
-      const x = index / 11 * 100;
-      const y = 100 - value;
-      points.push(`${x},${y}`);
-    }
-    return points.join(" ");
-  }
-  function MetricGraphCard({ title, value, note, percent, tone = "info", seed = 1 }) {
-    const safePercent = clamp(Number(percent) || 0, 0, 100);
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("article", { className: `react-console-graph-card is-${tone}`, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-console-graph-head", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: title }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: value })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("small", { children: note })
+    const toneTextClass = tone === "success" ? "text-green-400" : tone === "warning" ? "text-yellow-400" : tone === "danger" ? "text-red-400" : "text-primary-400";
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col mb-1 pb-2 border-b border-neutral-700/50 last:border-0 last:pb-0", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-between items-center", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-xs font-bold text-neutral-400 uppercase tracking-wide", children: title }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: `font-mono text-sm ${toneTextClass}`, children: value })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-console-graph-canvas", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("svg", { viewBox: "0 0 100 100", preserveAspectRatio: "none", "aria-hidden": "true", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("defs", { children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("linearGradient", { id: `consoleGraphFill-${title.replace(/\s+/g, "-")}`, x1: "0%", x2: "0%", y1: "0%", y2: "100%", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("stop", { offset: "0%", stopColor: "currentColor", stopOpacity: "0.34" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("stop", { offset: "100%", stopColor: "currentColor", stopOpacity: "0.02" })
-        ] }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-          "polyline",
-          {
-            className: "react-console-graph-line",
-            points: buildTrendPoints(safePercent, seed),
-            fill: "none",
-            vectorEffect: "non-scaling-stroke"
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-          "polygon",
-          {
-            className: "react-console-graph-fill",
-            points: `0,100 ${buildTrendPoints(safePercent, seed)} 100,100`,
-            fill: `url(#consoleGraphFill-${title.replace(/\s+/g, "-")})`
-          }
-        )
-      ] }) })
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("small", { className: "text-xs text-neutral-500 mt-1", children: note })
     ] });
   }
   function scrubAnsi(text) {
@@ -8354,23 +8325,23 @@
   function ServerConsolePage({ pageData = data }) {
     const server = pageData.server || {};
     const limits = server.limits || {};
-    const historyStorageKey = import_react2.default.useMemo(
+    const historyStorageKey = import_react3.default.useMemo(
       () => `cpanel.react.console.history.${server.containerId || "server"}`,
       [server.containerId]
     );
-    const terminalHostRef = import_react2.default.useRef(null);
-    const terminalInstanceRef = import_react2.default.useRef(null);
-    const fitAddonRef = import_react2.default.useRef(null);
-    const wsRef = import_react2.default.useRef(null);
-    const reconnectTimerRef = import_react2.default.useRef(null);
-    const heartbeatTimerRef = import_react2.default.useRef(null);
-    const disposedRef = import_react2.default.useRef(false);
-    const followOutputRef = import_react2.default.useRef(true);
-    const historyIndexRef = import_react2.default.useRef(-1);
-    const [status, setStatus] = import_react2.default.useState(normalizeStatus(server.status));
-    const [connectorOnline, setConnectorOnline] = import_react2.default.useState(Boolean(pageData.connectorOnline));
-    const [commandValue, setCommandValue] = import_react2.default.useState("");
-    const [history, setHistory] = import_react2.default.useState(() => {
+    const terminalHostRef = import_react3.default.useRef(null);
+    const terminalInstanceRef = import_react3.default.useRef(null);
+    const fitAddonRef = import_react3.default.useRef(null);
+    const wsRef = import_react3.default.useRef(null);
+    const reconnectTimerRef = import_react3.default.useRef(null);
+    const heartbeatTimerRef = import_react3.default.useRef(null);
+    const disposedRef = import_react3.default.useRef(false);
+    const followOutputRef = import_react3.default.useRef(true);
+    const historyIndexRef = import_react3.default.useRef(-1);
+    const [status, setStatus] = import_react3.default.useState(normalizeStatus(server.status));
+    const [connectorOnline, setConnectorOnline] = import_react3.default.useState(Boolean(pageData.connectorOnline));
+    const [commandValue, setCommandValue] = import_react3.default.useState("");
+    const [history, setHistory] = import_react3.default.useState(() => {
       try {
         const raw = localStorage.getItem(historyStorageKey) || "[]";
         const parsed = JSON.parse(raw);
@@ -8379,7 +8350,7 @@
         return [];
       }
     });
-    const [stats, setStats] = import_react2.default.useState({
+    const [stats, setStats] = import_react3.default.useState({
       cpu: parseMetric(pageData.initialStats && pageData.initialStats.cpu),
       memory: parseMetric(pageData.initialStats && pageData.initialStats.memory),
       disk: parseMetric(pageData.initialStats && pageData.initialStats.disk),
@@ -8387,11 +8358,11 @@
       networkTx: parseMetric(pageData.initialStats && pageData.initialStats.network_tx),
       uptimeSeconds: parseMetric(pageData.initialStats && pageData.initialStats.uptime_seconds)
     });
-    const [exitInfo, setExitInfo] = import_react2.default.useState({
+    const [exitInfo, setExitInfo] = import_react3.default.useState({
       exitCode: null,
       oomKilled: false
     });
-    const [runtimeMeta, setRuntimeMeta] = import_react2.default.useState(() => {
+    const [runtimeMeta, setRuntimeMeta] = import_react3.default.useState(() => {
       const incoming = pageData.runtimeMeta || {};
       return {
         lastSource: incoming.lastSource || "system",
@@ -8401,20 +8372,20 @@
         history: Array.isArray(incoming.history) ? incoming.history.slice(0, 6) : []
       };
     });
-    const [connectionState, setConnectionState] = import_react2.default.useState("Connecting...");
-    const [followOutput, setFollowOutput] = import_react2.default.useState(true);
-    const [terminalError, setTerminalError] = import_react2.default.useState("");
-    const [terminalBooted, setTerminalBooted] = import_react2.default.useState(false);
-    import_react2.default.useEffect(() => {
+    const [connectionState, setConnectionState] = import_react3.default.useState("Connecting...");
+    const [followOutput, setFollowOutput] = import_react3.default.useState(true);
+    const [terminalError, setTerminalError] = import_react3.default.useState("");
+    const [terminalBooted, setTerminalBooted] = import_react3.default.useState(false);
+    import_react3.default.useEffect(() => {
       followOutputRef.current = followOutput;
     }, [followOutput]);
-    import_react2.default.useEffect(() => {
+    import_react3.default.useEffect(() => {
       try {
         localStorage.setItem(historyStorageKey, JSON.stringify(history.slice(0, 32)));
       } catch {
       }
     }, [history, historyStorageKey]);
-    import_react2.default.useEffect(() => {
+    import_react3.default.useEffect(() => {
       disposedRef.current = false;
       setTerminalError("");
       setTerminalBooted(false);
@@ -8450,7 +8421,8 @@
         terminalHostRef.current.innerHTML = "";
         const term = new window.Terminal({
           theme: {
-            background: "#10161d",
+            background: "#18181b",
+            // neutral-900 equivalent for console
             foreground: "#eef4fb",
             cursor: "#eef4fb",
             black: "#16161a",
@@ -8467,7 +8439,8 @@
           fontSize: 13,
           cursorBlink: true,
           scrollback: 5e3,
-          convertEol: true
+          convertEol: true,
+          padding: "16px"
         });
         const fitAddon = new window.FitAddon.FitAddon();
         const webLinksAddon = new window.WebLinksAddon.WebLinksAddon();
@@ -8637,26 +8610,26 @@
         wsRef.current = null;
       };
     }, [pageData.initialConsoleBuffer, pageData.wsToken, server.containerId]);
-    const sendPayload = import_react2.default.useCallback((payload) => {
+    const sendPayload = import_react3.default.useCallback((payload) => {
       const socket = wsRef.current;
       if (!socket || socket.readyState !== WebSocket.OPEN) return false;
       socket.send(JSON.stringify(payload));
       return true;
     }, []);
-    const recordHistory = import_react2.default.useCallback((value) => {
+    const recordHistory = import_react3.default.useCallback((value) => {
       const trimmed = String(value || "").trim();
       if (!trimmed) return;
       setHistory((current) => [trimmed, ...current.filter((entry) => entry !== trimmed)].slice(0, 32));
       historyIndexRef.current = -1;
     }, []);
-    const sendCommand = import_react2.default.useCallback(() => {
+    const sendCommand = import_react3.default.useCallback(() => {
       const command = String(commandValue || "").trim();
       if (!command) return;
       if (!sendPayload({ type: "console_input", command })) return;
       recordHistory(command);
       setCommandValue("");
     }, [commandValue, recordHistory, sendPayload]);
-    const sendPowerAction = import_react2.default.useCallback((action) => {
+    const sendPowerAction = import_react3.default.useCallback((action) => {
       if (!sendPayload({ type: "power_action", action })) return;
       const term = terminalInstanceRef.current;
       if (term) {
@@ -8674,277 +8647,176 @@
     const cooldownActive = cooldownUntil > Date.now();
     const cooldownValue = cooldownActive ? "Active" : "Idle";
     const cooldownNote = cooldownActive ? `Cooldown until ${new Date(cooldownUntil).toLocaleString()}${runtimeMeta.crashLoopCount ? ` \xB7 loop count ${runtimeMeta.crashLoopCount}` : ""}` : runtimeMeta.crashLoopCount ? `Crash loop count tracked: ${runtimeMeta.crashLoopCount}` : "No crash cooldown is active.";
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ReactAppShell, { pageData, subtitle: "React server console", pageClassName: "react-console-page", shellClassName: "react-console-shell", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-console-frame", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("main", { className: "react-console-board", children: [
-      pageData.success ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-flash is-success", children: pageData.success }) : null,
-      pageData.error ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-flash is-danger", children: pageData.error }) : null,
-      terminalError ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-flash is-danger", children: terminalError }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-console-topbar", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-console-titleblock", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-console-titleline", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: `react-console-status-dot is-${statusTone(status)}` }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h1", { children: server.name || "Server Console" })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { children: server.description || "Live runtime output and power controls for this server." })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-console-top-actions", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "react-console-action is-success", onClick: () => sendPowerAction("start"), disabled: startDisabled, children: "Start" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "react-console-action is-warning", onClick: () => sendPowerAction("restart"), disabled: restartDisabled, children: "Restart" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "react-console-action is-danger", onClick: () => sendPowerAction("stop"), disabled: stopDisabled, children: "Stop" })
-        ] })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-console-core", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-console-terminal-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-console-terminal-head", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-console-terminal-heading", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h2", { children: "Console" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-console-chart-note", children: "Interactive server stream with direct command input." })
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(ReactAppShell, { pageData, subtitle: "React server console", children: [
+      pageData.success && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm mx-4 lg:mx-8 mt-6", children: pageData.success }),
+      pageData.error && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm mx-4 lg:mx-8 mt-6", children: pageData.error }),
+      terminalError && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm mx-4 lg:mx-8 mt-6", children: terminalError }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "p-4 lg:p-8 grid grid-cols-1 xl:grid-cols-4 gap-6", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "xl:col-span-3 flex flex-col gap-6", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col md:flex-row md:items-center justify-between gap-4", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-4", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: `w-3 h-3 rounded-full shrink-0 ${getToneColorClass(statusTone(status))}` }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h1", { className: "text-xl font-bold text-white tracking-wide", children: server.name || "Server Console" }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-sm text-neutral-400 mt-1", children: server.description || "Live runtime output and power controls." })
+              ] })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-console-terminal-tools", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex bg-neutral-800 rounded-lg border border-neutral-700/50 overflow-hidden shadow-sm shrink-0", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
                 "button",
                 {
                   type: "button",
-                  className: `react-console-mini-toggle${followOutput ? " is-active" : ""}`,
-                  onClick: () => setFollowOutput((current) => !current),
-                  children: "Follow"
+                  className: "px-6 py-2.5 text-sm font-semibold hover:bg-neutral-700 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-r border-neutral-700/50 text-green-500",
+                  onClick: () => sendPowerAction("start"),
+                  disabled: startDisabled,
+                  children: "Start"
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
                 "button",
                 {
                   type: "button",
-                  className: "react-console-mini-toggle",
-                  onClick: () => {
-                    const term = terminalInstanceRef.current;
-                    if (term) {
-                      term.clear();
+                  className: "px-6 py-2.5 text-sm font-semibold hover:bg-neutral-700 text-blue-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-r border-neutral-700/50",
+                  onClick: () => sendPowerAction("restart"),
+                  disabled: restartDisabled,
+                  children: "Restart"
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "px-6 py-2.5 text-sm font-semibold hover:bg-neutral-700 text-red-500 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+                  onClick: () => sendPowerAction("stop"),
+                  disabled: stopDisabled,
+                  children: "Stop"
+                }
+              )
+            ] })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 rounded-lg flex flex-col relative overflow-hidden shadow-lg h-[600px]", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border-b border-neutral-700 px-4 py-3 flex justify-between items-center z-10 shrink-0", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "text-neutral-100 font-bold block", children: "Console" }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-xs text-neutral-500", children: "Interactive server stream" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex bg-neutral-900 rounded overflow-hidden border border-neutral-700", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                  "button",
+                  {
+                    className: `px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors border-r border-neutral-700 ${followOutput ? "bg-primary-600 text-white" : "text-neutral-400 hover:text-white hover:bg-neutral-700"}`,
+                    onClick: () => setFollowOutput((current) => !current),
+                    children: "Follow"
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                  "button",
+                  {
+                    className: "px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-neutral-400 hover:text-white hover:bg-neutral-700 transition-colors",
+                    onClick: () => {
+                      const term = terminalInstanceRef.current;
+                      if (term) term.clear();
+                    },
+                    children: "Clear"
+                  }
+                )
+              ] })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: `flex-1 relative ${terminalBooted ? "" : "opacity-0"} p-2`, style: { minHeight: 0 }, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "w-full h-full", ref: terminalHostRef }) }),
+            !terminalBooted && !terminalError && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "absolute inset-x-0 bottom-16 top-16 flex items-center justify-center flex-col gap-4 text-neutral-500", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "w-8 h-8 border-4 border-neutral-600 border-t-primary-500 rounded-full animate-spin" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { children: "Booting xterm runtime..." })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border-t border-neutral-700 flex items-center shrink-0", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-neutral-500 pl-4 font-mono font-bold", children: "$" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                "input",
+                {
+                  type: "text",
+                  className: "flex-1 bg-transparent border-none text-neutral-200 text-sm font-mono px-3 py-3.5 focus:ring-0 shadow-none outline-none",
+                  value: commandValue,
+                  onChange: (event) => setCommandValue(event.target.value),
+                  onKeyDown: (event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      sendCommand();
+                      return;
+                    }
+                    if (event.key === "ArrowUp") {
+                      event.preventDefault();
+                      if (!history.length) return;
+                      historyIndexRef.current = Math.min(historyIndexRef.current + 1, history.length - 1);
+                      setCommandValue(history[historyIndexRef.current] || "");
+                      return;
+                    }
+                    if (event.key === "ArrowDown") {
+                      event.preventDefault();
+                      if (!history.length) return;
+                      historyIndexRef.current = Math.max(historyIndexRef.current - 1, -1);
+                      setCommandValue(historyIndexRef.current >= 0 ? history[historyIndexRef.current] || "" : "");
                     }
                   },
-                  children: "Clear"
+                  placeholder: connectorOnline ? "Type a command and press Enter..." : "Connector offline",
+                  disabled: !connectorOnline
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                "button",
+                {
+                  className: "px-5 py-3.5 bg-primary-600 hover:bg-primary-500 font-bold text-white text-sm transition-colors border-l border-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed",
+                  onClick: sendCommand,
+                  disabled: !connectorOnline || !String(commandValue || "").trim(),
+                  children: "Send"
                 }
               )
             ] })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: `react-console-terminal-body${terminalBooted ? "" : " is-loading"}`, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-console-terminal-host", ref: terminalHostRef }),
-            !terminalBooted && !terminalError ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-console-terminal-placeholder", children: "Booting xterm runtime\u2026" }) : null
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-console-command-row", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "react-console-command-prefix", children: "$" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              "input",
-              {
-                type: "text",
-                value: commandValue,
-                onChange: (event) => setCommandValue(event.target.value),
-                onKeyDown: (event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    sendCommand();
-                    return;
-                  }
-                  if (event.key === "ArrowUp") {
-                    event.preventDefault();
-                    if (!history.length) return;
-                    historyIndexRef.current = Math.min(historyIndexRef.current + 1, history.length - 1);
-                    setCommandValue(history[historyIndexRef.current] || "");
-                    return;
-                  }
-                  if (event.key === "ArrowDown") {
-                    event.preventDefault();
-                    if (!history.length) return;
-                    historyIndexRef.current = Math.max(historyIndexRef.current - 1, -1);
-                    setCommandValue(historyIndexRef.current >= 0 ? history[historyIndexRef.current] || "" : "");
-                  }
-                },
-                className: "react-console-command-input",
-                placeholder: connectorOnline ? "Type a command and press Enter\u2026" : "Connector offline",
-                disabled: !connectorOnline
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "react-console-send", onClick: sendCommand, disabled: !connectorOnline || !String(commandValue || "").trim(), children: "Send" })
           ] })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("aside", { className: "react-console-details", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-console-side-card", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-console-panel-title", children: "Server Details" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-console-side-list", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ResourceBadge, { icon: "bi-hdd-network", label: "Allocation", value: server.address || "No allocation address" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ResourceBadge, { icon: "bi-hdd-stack", label: "Status", value: formatStatus(status) }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ResourceBadge, { icon: "bi-cpu", label: "CPU Cap", value: limits.cpu ? `${limits.cpu}%` : "Unlimited" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ResourceBadge, { icon: "bi-memory", label: "RAM Cap", value: limits.memory ? `${limits.memory} MB` : "Unlimited" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ResourceBadge, { icon: "bi-device-hdd", label: "Disk Cap", value: limits.disk ? `${limits.disk} MB` : "Unlimited" })
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("aside", { className: "xl:col-span-1 flex flex-col gap-6", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-5", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4", children: "Server Details" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-4", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ResourceBadge, { icon: "bi-hdd-network", label: "Allocation", value: server.address || "No allocation address" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ResourceBadge, { icon: "bi-hdd-stack", label: "Status", value: formatStatus(status) }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "border-t border-neutral-700/50 my-1" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ResourceBadge, { icon: "bi-cpu", label: "CPU Cap", value: limits.cpu ? `${limits.cpu}%` : "Unlimited" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ResourceBadge, { icon: "bi-memory", label: "RAM Cap", value: limits.memory ? `${limits.memory} MB` : "Unlimited" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ResourceBadge, { icon: "bi-device-hdd", label: "Disk Cap", value: limits.disk ? `${limits.disk} MB` : "Unlimited" })
             ] })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-console-side-card", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-console-panel-title", children: "Connector Link" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: `react-console-connection is-${connectorOnline ? "success" : "danger"}`, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("i", { className: `bi ${connectorOnline ? "bi-broadcast-pin" : "bi-wifi-off"}` }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: connectionState })
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-5", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4", children: "Connector Link" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: `flex items-center gap-3 p-3 rounded mb-4 border ${connectorOnline ? "bg-green-600/10 border-green-600/30 text-green-400" : "bg-red-600/10 border-red-600/30 text-red-400"}`, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: `bi ${connectorOnline ? "bi-broadcast-pin" : "bi-wifi-off"}` }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "font-semibold", children: connectionState })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-console-side-links", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Link, { to: ReactRoutes.changeView, className: "react-account-button is-ghost", children: "View Mode" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("a", { href: `/server/${server.containerId}?popout=true`, className: "react-account-button is-ghost", children: "Popout" })
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex gap-2", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Link, { to: ReactRoutes.changeView, className: "flex-1 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-bold py-2 rounded text-center transition-colors", children: "View Mode" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("a", { href: `/server/${server.containerId}?popout=true`, className: "flex-1 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-bold py-2 rounded text-center transition-colors", children: "Popout" })
             ] })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-console-side-card", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-console-panel-title", children: "Runtime Snapshot" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-console-side-list", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-                InlineMetric,
-                {
-                  title: "CPU",
-                  value: `${stats.cpu.toFixed(1)}%`,
-                  note: limits.cpu ? `${limits.cpu}% cap` : "No cap",
-                  tone: "info"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-                InlineMetric,
-                {
-                  title: "Memory",
-                  value: `${Math.round(stats.memory)} MB`,
-                  note: `${memoryPercent.toFixed(0)}% used`,
-                  tone: "success"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-                InlineMetric,
-                {
-                  title: "Disk",
-                  value: `${Math.round(stats.disk)} MB`,
-                  note: `${diskPercent.toFixed(0)}% used`,
-                  tone: "warning"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-                InlineMetric,
-                {
-                  title: "Uptime",
-                  value: formatDuration(stats.uptimeSeconds),
-                  note: "Current runtime session",
-                  tone: "info"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-                InlineMetric,
-                {
-                  title: "Net RX",
-                  value: formatBytes(stats.networkRx),
-                  note: "Inbound since start",
-                  tone: "success"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-                InlineMetric,
-                {
-                  title: "Net TX",
-                  value: formatBytes(stats.networkTx),
-                  note: "Outbound since start",
-                  tone: "warning"
-                }
-              )
-            ] })
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-5", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4", children: "Runtime Snapshot" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "CPU", value: `${stats.cpu.toFixed(1)}%`, note: limits.cpu ? `${limits.cpu}% cap` : "No cap", tone: "primary" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "Memory", value: `${Math.round(stats.memory)} MB`, note: `${memoryPercent.toFixed(0)}% used`, tone: "success" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "Disk", value: `${Math.round(stats.disk)} MB`, note: `${diskPercent.toFixed(0)}% used`, tone: "warning" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "Uptime", value: formatDuration(stats.uptimeSeconds), note: "Current runtime session" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "Net RX", value: formatBytes(stats.networkRx), note: "Inbound since start", tone: "success" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "Net TX", value: formatBytes(stats.networkTx), note: "Outbound since start", tone: "warning" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-console-side-card", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-console-panel-title", children: "Restart Source" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-console-side-list", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              InlineMetric,
-              {
-                title: "Last Trigger",
-                value: formatRuntimeSource(runtimeMeta.lastSource),
-                note: runtimeMeta.lastReason || "No restart source captured yet.",
-                tone: "info"
-              }
-            ) })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-console-side-card", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-console-panel-title", children: "Crash Cooldown" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-console-side-list", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              InlineMetric,
-              {
-                title: "Guard State",
-                value: cooldownValue,
-                note: cooldownNote,
-                tone: cooldownActive ? "warning" : "info"
-              }
-            ) })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-console-side-card", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-console-panel-title", children: "Last Exit" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-console-side-list", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              InlineMetric,
-              {
-                title: "Exit Summary",
-                value: lastExitValue,
-                note: lastExitNote,
-                tone: exitInfo.oomKilled ? "danger" : "info"
-              }
-            ) })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-console-side-card", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-console-panel-title", children: "Recent Runtime Events" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-console-side-list", children: Array.isArray(runtimeMeta.history) && runtimeMeta.history.length ? runtimeMeta.history.map((entry, index) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              InlineMetric,
-              {
-                title: `${entry.kind || "runtime"} \xB7 ${formatRuntimeSource(entry.source)}`,
-                value: entry.summary || "Runtime event recorded.",
-                note: entry.ts ? new Date(entry.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "Live",
-                tone: entry.tone || "info"
-              },
-              `${entry.kind || "runtime"}-${entry.ts || index}-${index}`
-            )) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              InlineMetric,
-              {
-                title: "Runtime",
-                value: "No recent events",
-                note: "Recent restart reasons and crash transitions will appear here.",
-                tone: "info"
-              }
-            ) })
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-5", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4", children: "Guards" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "Restart Trigger", value: formatRuntimeSource(runtimeMeta.lastSource), note: runtimeMeta.lastReason || "No restart source captured yet." }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "Cooldown State", value: cooldownValue, note: cooldownNote, tone: cooldownActive ? "warning" : "primary" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(InlineMetric, { title: "Exit Summary", value: lastExitValue, note: lastExitNote, tone: exitInfo.oomKilled ? "danger" : "primary" })
           ] })
         ] })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-console-graphs", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-          MetricGraphCard,
-          {
-            title: "CPU Usage",
-            value: `${stats.cpu.toFixed(1)}%`,
-            note: limits.cpu ? `${limits.cpu}% server limit` : "No limit configured",
-            percent: limits.cpu ? usagePercent(stats.cpu, limits.cpu) : clamp(stats.cpu, 0, 100),
-            tone: "info",
-            seed: 1
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-          MetricGraphCard,
-          {
-            title: "Memory Usage",
-            value: `${Math.round(stats.memory)} MB`,
-            note: limits.memory ? `${Math.round(limits.memory)} MB limit` : "No memory limit",
-            percent: memoryPercent,
-            tone: "success",
-            seed: 5
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-          MetricGraphCard,
-          {
-            title: "Disk Usage",
-            value: `${Math.round(stats.disk)} MB`,
-            note: limits.disk ? `${Math.round(limits.disk)} MB limit` : "No disk limit",
-            percent: diskPercent,
-            tone: "warning",
-            seed: 9
-          }
-        )
       ] })
-    ] }) }) });
+    ] });
   }
   var server_console_default = ServerConsolePage;
   if (root) {
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ServerConsolePage, { pageData: data }));
+    root.render(/* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ServerConsolePage, { pageData: data }));
     if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
       window.__CPANEL_REACT_BOOTED__();
     }

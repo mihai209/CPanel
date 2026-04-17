@@ -7280,7 +7280,7 @@
   });
 
   // views/react/server-files.jsx
-  var import_react2 = __toESM(require_react());
+  var import_react3 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // views/react/components/ReactAppShell.jsx
@@ -8166,8 +8166,23 @@
     ] });
   }
 
-  // views/react/server-files.jsx
+  // views/react/components/PageContentBlock.jsx
+  var import_react2 = __toESM(require_react());
   var import_jsx_runtime2 = __toESM(require_jsx_runtime());
+  function PageContentBlock({ title, children, className = "" }) {
+    import_react2.default.useEffect(() => {
+      if (title) {
+        document.title = `${title} - CPanel`;
+      }
+    }, [title]);
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: `w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 ${className}`, children: [
+      title && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "mb-6 flex justify-between items-center", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h1", { className: "text-2xl font-bold text-neutral-100", children: title }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "w-full", children })
+    ] });
+  }
+
+  // views/react/server-files.jsx
+  var import_jsx_runtime3 = __toESM(require_jsx_runtime());
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
   var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-files";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
@@ -8209,12 +8224,12 @@
   function ServerFilesPage({ pageData = data }) {
     const manager = pageData.fileManager || {};
     const permissions = pageData.permissions || {};
-    const [currentPath, setCurrentPath] = import_react2.default.useState(() => normalizePath(pageData.initialPath || "/"));
-    const [entries, setEntries] = import_react2.default.useState([]);
-    const [loading, setLoading] = import_react2.default.useState(true);
-    const [error, setError] = import_react2.default.useState(pageData.error || "");
-    const [menuPath, setMenuPath] = import_react2.default.useState("");
-    import_react2.default.useEffect(() => {
+    const [currentPath, setCurrentPath] = import_react3.default.useState(() => normalizePath(pageData.initialPath || "/"));
+    const [entries, setEntries] = import_react3.default.useState([]);
+    const [loading, setLoading] = import_react3.default.useState(true);
+    const [error, setError] = import_react3.default.useState(pageData.error || "");
+    const [menuPath, setMenuPath] = import_react3.default.useState("");
+    import_react3.default.useEffect(() => {
       let cancelled = false;
       setLoading(true);
       setError("");
@@ -8247,110 +8262,163 @@
     }, [currentPath, manager.fetchUrlBase]);
     const breadcrumbs = buildSegments(currentPath);
     const activeServer = pageData.server || {};
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ReactAppShell, { pageData, subtitle: "File manager", pageClassName: "react-files-page", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("main", { className: "react-surface-page", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-surface-header", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "react-surface-eyebrow", children: "Server Workspace" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h1", { children: "File Manager" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "react-surface-copy", children: "Browse container files, jump into the editor, or fall back to the legacy manager for advanced actions." })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-surface-actions", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("a", { href: `${manager.legacyUrl}?legacy=1`, className: "react-ui-button is-ghost", children: "Open Legacy View" }),
-          manager.webUploadEnabled ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "react-inline-note", children: `Uploads enabled up to ${manager.webUploadMaxMb} MB` }) : null
-        ] })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-files-layout", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("aside", { className: "react-ui-panel", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-panel-heading", children: "Storage Access" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-list", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Server" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: activeServer.name || "Server" })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Status" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: activeServer.status || "unknown" })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Writable" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: permissions.canWriteFiles && !permissions.filesWriteLocked ? "Yes" : "Read only" })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "SFTP" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: pageData.sftpDetails && pageData.sftpDetails.available ? "Available" : "Unavailable" })
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ReactAppShell, { pageData, subtitle: "File manager", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+      PageContentBlock,
+      {
+        title: "File Manager",
+        description: "Browse container files, jump into the editor, or fall back to the legacy manager for advanced actions.",
+        eyebrow: "Server Workspace",
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-end gap-3 mb-6", children: [
+            manager.webUploadEnabled ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-sm text-neutral-400 self-center mr-2", children: `Uploads enabled up to ${manager.webUploadMaxMb} MB` }) : null,
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("a", { href: `${manager.legacyUrl}?legacy=1`, className: "bg-neutral-700 hover:bg-neutral-600 text-white font-semibold flex-shrink-0 py-2 px-4 rounded transition-colors text-sm shadow-sm flex items-center gap-2", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-box-arrow-up-right" }),
+              " Open Legacy View"
             ] })
           ] }),
-          permissions.filesWriteLocked ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-inline-alert is-warning", children: "File writes are locked by policy. Use editor and downloads in read-only mode." }) : null
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-ui-panel react-files-panel", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-files-breadcrumbs", children: breadcrumbs.map((segment, index) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-            "button",
-            {
-              type: "button",
-              className: `react-breadcrumb-button${index === breadcrumbs.length - 1 ? " is-active" : ""}`,
-              onClick: () => setCurrentPath(segment.path),
-              children: segment.label
-            },
-            segment.path
-          )) }),
-          error ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-inline-alert is-danger", children: error }) : null,
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-list-header", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { children: "Name" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { children: "Modified" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { children: "Size" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { children: "Actions" })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-list-body", children: [
-            loading ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-empty-state", children: "Loading directory..." }) : null,
-            !loading && entries.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-empty-state", children: "This directory is empty." }) : null,
-            !loading ? entries.map((entry) => {
-              const entryPath = normalizePath(`${currentPath === "/" ? "" : currentPath}/${entry.name || ""}`);
-              const isMenuOpen = menuPath === entryPath;
-              return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-list-row", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-4 gap-6 items-start", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "lg:col-span-1 flex flex-col gap-6", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-white mb-4", children: "Storage Access" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-3", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Server" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "text-neutral-200", children: activeServer.name || "Server" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Status" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "text-neutral-200 capitalize", children: activeServer.status || "unknown" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Writable" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: permissions.canWriteFiles && !permissions.filesWriteLocked ? "text-green-400" : "text-red-400", children: permissions.canWriteFiles && !permissions.filesWriteLocked ? "Yes" : "Read only" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-between items-center", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "SFTP" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "text-neutral-200", children: pageData.sftpDetails && pageData.sftpDetails.available ? "Available" : "Unavailable" })
+                ] })
+              ] }),
+              permissions.filesWriteLocked ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "mt-6 bg-yellow-900/20 border border-yellow-500/30 text-yellow-200 p-3 rounded text-sm flex items-start gap-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-shield-lock text-yellow-500 mt-0.5" }),
+                "File writes are locked by policy. Use editor and downloads in read-only mode."
+              ] }) : null
+            ] }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "lg:col-span-3", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden flex flex-col", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "px-5 py-4 border-b border-neutral-700/70 bg-neutral-800 flex items-center flex-wrap gap-2", children: breadcrumbs.map((segment, index) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(import_react3.default.Fragment, { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
                   "button",
                   {
                     type: "button",
-                    className: "react-file-cell",
-                    onClick: () => {
-                      setMenuPath("");
-                      if (entry.isDirectory) setCurrentPath(entryPath);
-                    },
-                    children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("i", { className: `bi ${entry.isDirectory ? "bi-folder-fill" : "bi-file-earmark-text"}` }),
-                      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: entry.name || "Unnamed item" }),
-                        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: entry.isDirectory ? "Folder" : entry.permissions || "File" })
-                      ] })
-                    ]
+                    className: `font-semibold hover:text-white transition-colors ${index === breadcrumbs.length - 1 ? "text-neutral-100 cursor-default" : "text-neutral-400"}`,
+                    onClick: () => index !== breadcrumbs.length - 1 && setCurrentPath(segment.path),
+                    children: segment.label === "home" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-house-door-fill text-lg relative top-[1px]" }) : segment.label
                   }
                 ),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-row-meta", children: formatDate(entry.modified) }),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-row-meta", children: entry.isDirectory ? "Folder" : formatBytes(entry.size) }),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-row-actions", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "react-ui-button is-ghost is-small", onClick: () => setMenuPath(isMenuOpen ? "" : entryPath), children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("i", { className: "bi bi-three-dots" }) }),
-                  isMenuOpen ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-row-menu", children: [
-                    entry.isDirectory ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "button", className: "react-row-menu-item", onClick: () => {
-                      setCurrentPath(entryPath);
-                      setMenuPath("");
-                    }, children: "Open Folder" }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("a", { className: "react-row-menu-item", href: `${manager.editUrlBase}?path=${encodeURIComponent(entryPath)}`, children: "Edit" }),
-                      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("a", { className: "react-row-menu-item", href: `${manager.previewUrlBase}?path=${encodeURIComponent(entryPath)}`, children: "Preview" }),
-                      permissions.canDownloadFiles ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("a", { className: "react-row-menu-item", href: `${manager.downloadUrlBase}?path=${encodeURIComponent(entryPath)}`, children: "Download" }) : null
-                    ] }),
-                    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("a", { className: "react-row-menu-item", href: `${manager.legacyUrl}?legacy=1&path=${encodeURIComponent(currentPath)}`, children: "Open Legacy Manager" })
-                  ] }) : null
-                ] })
-              ] }, entryPath);
-            }) : null
+                index < breadcrumbs.length - 1 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-neutral-600 font-bold mx-1", children: "/" })
+              ] }, segment.path)) }),
+              error && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-red-600/20 border-b border-red-600/50 text-red-100 p-3 px-5 text-sm flex items-center gap-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-exclamation-triangle-fill text-red-500" }),
+                " ",
+                error
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "grid grid-cols-12 gap-4 px-6 py-3 border-b border-neutral-700/50 bg-neutral-900/30 text-xs font-bold text-neutral-400 uppercase tracking-widest hidden sm:grid", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "col-span-6", children: "Name" }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "col-span-3", children: "Modified" }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "col-span-2 text-right", children: "Size" }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "col-span-1 text-right", children: "Actions" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col min-h-[400px]", children: [
+                loading && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "flex-1 flex justify-center items-center py-16", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col items-center justify-center space-y-4", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "w-10 h-10 border-4 border-neutral-600 border-t-primary-500 rounded-full animate-spin" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-neutral-400 text-sm", children: "Loading directory..." })
+                ] }) }),
+                !loading && entries.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "flex-1 flex justify-center items-center py-16", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-center", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-folder2-open text-4xl text-neutral-600 block mb-3" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-neutral-400 text-sm block", children: "This directory is empty." })
+                ] }) }),
+                !loading && entries.map((entry) => {
+                  const entryPath = normalizePath(`${currentPath === "/" ? "" : currentPath}/${entry.name || ""}`);
+                  const isMenuOpen = menuPath === entryPath;
+                  return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "grid sm:grid-cols-12 gap-0 sm:gap-4 px-0 sm:px-6 py-0 border-b border-neutral-700/30 hover:bg-neutral-700/20 transition-colors group relative", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "sm:col-span-6 flex items-center", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+                      "button",
+                      {
+                        type: "button",
+                        className: "w-full text-left px-5 sm:px-0 py-4 flex items-center gap-4 hover:text-white transition-colors",
+                        onClick: () => {
+                          setMenuPath("");
+                          if (entry.isDirectory) setCurrentPath(entryPath);
+                        },
+                        children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: `text-2xl ${entry.isDirectory ? "bi bi-folder-fill text-primary-400 group-hover:text-primary-300" : "bi bi-file-earmark-text text-neutral-400 group-hover:text-neutral-300"}` }),
+                          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "overflow-hidden", children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "block text-neutral-200 text-sm truncate font-semibold", children: entry.name || "Unnamed item" }),
+                            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "block text-xs text-neutral-500 sm:hidden mt-0.5", children: entry.isDirectory ? "Folder" : entry.permissions || "File" })
+                          ] })
+                        ]
+                      }
+                    ) }),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "hidden sm:flex col-span-3 items-center", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-sm text-neutral-400 truncate", children: formatDate(entry.modified) }) }),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "hidden sm:flex col-span-2 items-center justify-end", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-sm text-neutral-400 font-mono", children: entry.isDirectory ? "Folder" : formatBytes(entry.size) }) }),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "hidden sm:flex col-span-1 items-center justify-end", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                        "button",
+                        {
+                          type: "button",
+                          className: "w-8 h-8 flex items-center justify-center rounded text-neutral-400 hover:text-white hover:bg-neutral-600 transition-colors",
+                          onClick: (e) => {
+                            e.stopPropagation();
+                            setMenuPath(isMenuOpen ? "" : entryPath);
+                          },
+                          children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-three-dots" })
+                        }
+                      ),
+                      isMenuOpen && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "absolute right-6 top-12 z-10 w-48 bg-neutral-800 border border-neutral-600 rounded shadow-xl py-1 transform origin-top-right transition-all", children: [
+                        entry.isDirectory ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+                          "button",
+                          {
+                            type: "button",
+                            className: "w-full text-left px-4 py-2 text-sm text-neutral-300 hover:text-white hover:bg-neutral-700",
+                            onClick: () => {
+                              setCurrentPath(entryPath);
+                              setMenuPath("");
+                            },
+                            children: [
+                              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-folder-symlink mr-2" }),
+                              " Open Folder"
+                            ]
+                          }
+                        ) : /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(import_jsx_runtime3.Fragment, { children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("a", { className: "block px-4 py-2 text-sm text-neutral-300 hover:text-white hover:bg-neutral-700", href: `${manager.editUrlBase}?path=${encodeURIComponent(entryPath)}`, children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-pencil mr-2" }),
+                            " Edit"
+                          ] }),
+                          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("a", { className: "block px-4 py-2 text-sm text-neutral-300 hover:text-white hover:bg-neutral-700", href: `${manager.previewUrlBase}?path=${encodeURIComponent(entryPath)}`, children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-eye mr-2" }),
+                            " Preview"
+                          ] }),
+                          permissions.canDownloadFiles && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("a", { className: "block px-4 py-2 text-sm text-neutral-300 hover:text-white hover:bg-neutral-700 mt-1 border-t border-neutral-700/50 pt-2", href: `${manager.downloadUrlBase}?path=${encodeURIComponent(entryPath)}`, children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-cloud-arrow-down mr-2" }),
+                            " Download"
+                          ] })
+                        ] }),
+                        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "border-t border-neutral-700/50 mt-1 pt-1", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("a", { className: "block px-4 py-2 text-xs text-neutral-400 hover:text-white hover:bg-neutral-700", href: `${manager.legacyUrl}?legacy=1&path=${encodeURIComponent(currentPath)}`, children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-box-arrow-up-right mr-1" }),
+                          " Open Legacy Manager"
+                        ] }) })
+                      ] })
+                    ] })
+                  ] }, entryPath);
+                })
+              ] })
+            ] }) })
           ] })
-        ] })
-      ] })
-    ] }) });
+        ]
+      }
+    ) });
   }
   var server_files_default = ServerFilesPage;
   if (root) {
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ServerFilesPage, { pageData: data }));
+    root.render(/* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ServerFilesPage, { pageData: data }));
     if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
       window.__CPANEL_REACT_BOOTED__();
     }

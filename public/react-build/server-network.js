@@ -7280,7 +7280,7 @@
   });
 
   // views/react/server-network.jsx
-  var import_react2 = __toESM(require_react());
+  var import_react3 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // views/react/components/ReactAppShell.jsx
@@ -8166,8 +8166,23 @@
     ] });
   }
 
-  // views/react/server-network.jsx
+  // views/react/components/PageContentBlock.jsx
+  var import_react2 = __toESM(require_react());
   var import_jsx_runtime2 = __toESM(require_jsx_runtime());
+  function PageContentBlock({ title, children, className = "" }) {
+    import_react2.default.useEffect(() => {
+      if (title) {
+        document.title = `${title} - CPanel`;
+      }
+    }, [title]);
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: `w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 ${className}`, children: [
+      title && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "mb-6 flex justify-between items-center", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h1", { className: "text-2xl font-bold text-neutral-100", children: title }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "w-full", children })
+    ] });
+  }
+
+  // views/react/server-network.jsx
+  var import_jsx_runtime3 = __toESM(require_jsx_runtime());
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
   var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-network";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
@@ -8177,56 +8192,73 @@
     const summary = pageData.networkSummary || {};
     const canManage = Boolean(pageData.permissions && pageData.permissions.canManageNetwork);
     const actions = pageData.actions || {};
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ReactAppShell, { pageData, subtitle: "Network", pageClassName: "react-network-page", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("main", { className: "react-surface-page", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("section", { className: "react-surface-header", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "react-surface-eyebrow", children: "Routing" }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h1", { children: "Network" }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "react-surface-copy", children: "Review assigned allocations, switch the primary binding, and assign additional ports through the existing server routes." })
-      ] }) }),
-      pageData.success || pageData.error ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: `react-inline-alert ${pageData.error ? "is-danger" : "is-success"}`, children: pageData.error || pageData.success }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-network-grid", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-ui-panel", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-panel-heading", children: "Allocation Summary" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-list", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Total assigned" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: allocations.length })
+    const inputClass = "w-full bg-neutral-900 border border-neutral-700/50 rounded p-2.5 text-sm text-neutral-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-shadow";
+    const labelClass = "block text-xs font-bold text-neutral-400 uppercase tracking-wide mb-1.5";
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ReactAppShell, { pageData, subtitle: "Network", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(PageContentBlock, { title: "Network Settings", description: "Review assigned allocations, switch the primary binding, and assign additional ports.", eyebrow: "Routing", children: [
+      pageData.success && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-check-circle-fill text-green-500" }),
+        pageData.success
+      ] }),
+      pageData.error && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-exclamation-triangle-fill text-red-500" }),
+        pageData.error
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mb-6", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 lg:col-span-1", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-4", children: "Allocation Summary" }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-4", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-3", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Total assigned" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "text-neutral-200 font-mono", children: allocations.length })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Token inventory" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: summary.allocationTokens || 0 })
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-3", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Token inventory" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "text-neutral-200 font-mono", children: summary.allocationTokens || 0 })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Assignable left" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: summary.remainingAssignable || 0 })
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-between items-center", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Assignable left" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "text-neutral-200 font-mono", children: summary.remainingAssignable || 0 })
             ] })
           ] }),
-          summary.inventoryAssignBlockedReason ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-inline-alert is-warning", children: summary.inventoryAssignBlockedReason }) : null
-        ] }),
-        canManage && availableAllocations.length ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-ui-panel", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-panel-heading", children: "Assign Allocation" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("form", { method: "POST", action: actions.assign, className: "react-stack-form", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { className: "react-form-field", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Available port" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("select", { name: "allocationId", defaultValue: availableAllocations[0].id, children: availableAllocations.map((entry) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("option", { value: entry.id, children: `${entry.ip}:${entry.port}` }, entry.id)) })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "submit", className: "react-ui-button is-primary", children: "Assign Port" })
+          summary.inventoryAssignBlockedReason && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "mt-6 bg-yellow-900/20 border border-yellow-500/30 text-yellow-200 p-3 rounded text-sm flex items-start gap-2", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-exclamation-circle text-yellow-500 mt-0.5" }),
+            summary.inventoryAssignBlockedReason
           ] })
+        ] }),
+        canManage && availableAllocations.length ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 lg:col-span-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-6", children: "Assign Allocation" }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("form", { method: "POST", action: actions.assign, className: "flex flex-col gap-5", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "Available Port" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "relative", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("select", { name: "allocationId", defaultValue: availableAllocations[0].id, className: `${inputClass} font-mono appearance-none`, children: availableAllocations.map((entry) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("option", { value: entry.id, children: `${entry.ip}:${entry.port}` }, entry.id)) }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-neutral-400", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-chevron-down" }) })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "block text-xs text-neutral-500 mt-2", children: "These are unassigned ports mapped to your node that are currently reserved exclusively for you." })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "mt-2 flex justify-end", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "submit", className: "bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm", children: "Assign Port" }) })
+          ] })
+        ] }) : canManage && !availableAllocations.length ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 lg:col-span-2 flex flex-col justify-center items-center text-center", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-hdd-network text-4xl text-neutral-600 mb-3" }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-1", children: "No Ports Available" }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-sm text-neutral-400", children: "You do not have any free allocations available to assign." })
         ] }) : null
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-ui-panel", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-panel-heading", children: "Assigned Allocations" }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-list-body", children: [
-          !allocations.length ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-empty-state", children: "No allocations are assigned to this server." }) : null,
-          allocations.map((entry) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-list-row is-stacked-mobile", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-list-main", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: `react-pill-badge ${entry.isPrimary ? "is-success" : "is-muted"}`, children: entry.isPrimary ? "Primary" : "Secondary" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: `${entry.ip}:${entry.port}` }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: entry.notes || "No notes configured." })
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "px-6 py-4 border-b border-neutral-700 bg-neutral-800/80", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "Assigned Allocations" }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col", children: [
+          !allocations.length ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "p-8 text-center text-sm text-neutral-500", children: "No allocations are assigned to this server." }) : null,
+          allocations.map((entry, index) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: `p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${index !== allocations.length - 1 ? "border-b border-neutral-700/50" : ""}`, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-2", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-3", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "text-neutral-100 font-mono text-lg tracking-wide bg-neutral-900 border border-neutral-700 px-3 py-1 rounded", children: `${entry.ip}:${entry.port}` }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: `px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wide inline-block ${entry.isPrimary ? "bg-primary-600/20 text-primary-400 border border-primary-600/30" : "bg-neutral-700 text-neutral-400 border border-neutral-600"}`, children: entry.isPrimary ? "Primary" : "Secondary" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-sm text-neutral-500 itlaic", children: entry.notes || "No notes configured." })
             ] }),
-            canManage ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-row-actions", children: [
-              !entry.isPrimary ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("form", { method: "POST", action: `${actions.primaryBase}/${entry.id}/primary`, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "submit", className: "react-ui-button is-ghost is-small", children: "Make Primary" }) }) : null,
-              !entry.isPrimary ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("form", { method: "POST", action: `${actions.removeBase}/${entry.id}/delete`, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "submit", className: "react-ui-button is-danger is-small", children: "Remove" }) }) : null
+            canManage ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-wrap items-center gap-2 sm:justify-end shrink-0 pt-3 sm:pt-0 border-t border-neutral-700 sm:border-0 mt-2 sm:mt-0", children: [
+              !entry.isPrimary ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("form", { method: "POST", action: `${actions.primaryBase}/${entry.id}/primary`, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "submit", className: "bg-transparent hover:bg-neutral-700 text-neutral-300 hover:text-white border border-neutral-600 hover:border-neutral-500 text-xs font-semibold py-2 px-4 rounded transition-colors disabled:opacity-50", children: "Make Primary" }) }) : null,
+              !entry.isPrimary ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("form", { method: "POST", action: `${actions.removeBase}/${entry.id}/delete`, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "submit", className: "bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-600/30 hover:border-red-600 text-xs font-semibold py-2 px-4 rounded transition-colors disabled:opacity-50", children: "Remove" }) }) : null
             ] }) : null
           ] }, entry.id))
         ] })
@@ -8235,7 +8267,7 @@
   }
   var server_network_default = ServerNetworkPage;
   if (root) {
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ServerNetworkPage, { pageData: data }));
+    root.render(/* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ServerNetworkPage, { pageData: data }));
     if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
       window.__CPANEL_REACT_BOOTED__();
     }

@@ -7280,7 +7280,7 @@
   });
 
   // views/react/change-view.jsx
-  var import_react2 = __toESM(require_react());
+  var import_react3 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // views/react/ReactRoutes.js
@@ -8166,13 +8166,28 @@
     ] });
   }
 
-  // views/react/change-view.jsx
+  // views/react/components/PageContentBlock.jsx
+  var import_react2 = __toESM(require_react());
   var import_jsx_runtime2 = __toESM(require_jsx_runtime());
+  function PageContentBlock({ title, children, className = "" }) {
+    import_react2.default.useEffect(() => {
+      if (title) {
+        document.title = `${title} - CPanel`;
+      }
+    }, [title]);
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: `w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 ${className}`, children: [
+      title && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "mb-6 flex justify-between items-center", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h1", { className: "text-2xl font-bold text-neutral-100", children: title }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "w-full", children })
+    ] });
+  }
+
+  // views/react/change-view.jsx
+  var import_jsx_runtime3 = __toESM(require_jsx_runtime());
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
   var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "change-view";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
   function ChangeViewPage({ pageData = data }) {
-    import_react2.default.useEffect(() => {
+    import_react3.default.useEffect(() => {
       if (!pageData.applied) return;
       try {
         window.localStorage.clear();
@@ -8183,38 +8198,46 @@
       }, 150);
       return () => window.clearTimeout(timer);
     }, []);
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ReactAppShell, { pageData, subtitle: "Change renderer", pageClassName: "react-experimental-page", shellClassName: "react-experimental-shell", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("main", { className: "react-experimental-layout", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-experimental-scroll", children: [
-      pageData.success ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-flash is-success", children: pageData.success }) : null,
-      pageData.error ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-flash is-danger", children: pageData.error }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-experimental-grid react-change-view-grid", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-account-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-section-title", children: "Legacy EJS View" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-muted", children: "Stable production renderer. Full theme support and complete route coverage." }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-experimental-stat-row", children: pageData.currentViewMode === "ejs" ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "react-account-badge is-success", children: "Active" }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "react-account-badge is-muted", children: "Available" }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("form", { method: "POST", action: "/experimental/change-view", className: "react-account-form", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "hidden", name: "viewMode", value: "ejs" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-form-actions", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "submit", className: "react-account-button is-primary", children: "Use EJS View" }) })
-          ] })
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ReactAppShell, { pageData, subtitle: "Change renderer", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(PageContentBlock, { title: "Renderer Mode", children: [
+      pageData.success && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm", children: pageData.success }),
+      pageData.error && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm", children: pageData.error }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-6", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 flex flex-col hover:border-neutral-500 transition-colors", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-between items-start mb-4", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "Legacy EJS View" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-sm text-neutral-400 mt-1", children: "Stable production renderer. Full theme support and complete route coverage." })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide ${pageData.currentViewMode === "ejs" ? "bg-green-600 text-white" : "bg-neutral-700 text-neutral-400"}`, children: pageData.currentViewMode === "ejs" ? "Active" : "Available" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "mt-auto pt-4 border-t border-neutral-700", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("form", { method: "POST", action: "/experimental/change-view", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { type: "hidden", name: "viewMode", value: "ejs" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "submit", className: "w-full bg-neutral-700 hover:bg-neutral-600 text-neutral-200 font-semibold py-2 px-4 rounded transition-colors text-sm", children: "Use EJS View" })
+          ] }) })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-account-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-section-title", children: "React Beta View" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-muted", children: "Dark fixed renderer for migrated pages. Faster iteration, partial route coverage, no custom themes." }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-experimental-stat-row", children: pageData.currentViewMode === "react" ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "react-account-badge is-info", children: "Active" }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "react-account-badge is-muted", children: "Available" }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("form", { method: "POST", action: "/experimental/change-view", className: "react-account-form", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "hidden", name: "viewMode", value: "react" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-form-actions", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "submit", className: "react-account-button is-primary", children: "Use React Beta" }) })
-          ] })
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 flex flex-col hover:border-neutral-500 transition-colors", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-between items-start mb-4", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "React Beta View" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-sm text-neutral-400 mt-1", children: "Dark fixed renderer for migrated pages. Faster iteration, partial route coverage, no custom themes." })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide ${pageData.currentViewMode === "react" ? "bg-primary-600 text-white" : "bg-neutral-700 text-neutral-400"}`, children: pageData.currentViewMode === "react" ? "Active" : "Available" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "mt-auto pt-4 border-t border-neutral-700", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("form", { method: "POST", action: "/experimental/change-view", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { type: "hidden", name: "viewMode", value: "react" }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "submit", className: "w-full bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-4 rounded transition-colors text-sm shadow-sm opacity-90 shadow-primary-900/50", children: "Use React Beta" })
+          ] }) })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-account-card react-experimental-wide", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-section-title", children: "Apply Behavior" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-account-muted", children: "Switching renderer clears localStorage and redirects back to the main dashboard. This avoids stale UI state crossing between EJS and React." })
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 md:col-span-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-2", children: "Apply Behavior" }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-sm text-neutral-400", children: "Switching renderer clears localStorage and redirects back to the main dashboard. This avoids stale UI state crossing between EJS and React." })
         ] })
       ] })
-    ] }) }) });
+    ] }) });
   }
   var change_view_default = ChangeViewPage;
   if (root) {
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ChangeViewPage, { pageData: data }));
+    root.render(/* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ChangeViewPage, { pageData: data }));
     if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
       window.__CPANEL_REACT_BOOTED__();
     }

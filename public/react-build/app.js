@@ -9202,6 +9202,18 @@
     if (["stopped", "offline", "error"].includes(value)) return "danger";
     return "muted";
   }
+  function getToneColorClass(tone) {
+    switch (tone) {
+      case "success":
+        return "bg-green-500";
+      case "warning":
+        return "bg-yellow-500";
+      case "danger":
+        return "bg-red-500";
+      default:
+        return "bg-neutral-500";
+    }
+  }
   function parseMetric(value) {
     const numeric = Number.parseFloat(String(value || "0").replace(/[^0-9.-]/g, ""));
     if (!Number.isFinite(numeric)) return 0;
@@ -9247,67 +9259,22 @@
     return clamp(safeValue / safeLimit * 100, 0, 100);
   }
   function ResourceBadge({ icon, label, value }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "react-console-resource", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: `bi ${icon}` }),
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-3", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: `bi ${icon} text-lg text-neutral-400` }),
       /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("strong", { children: value }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { children: label })
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("strong", { className: "block text-sm font-bold text-neutral-200", children: value }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "block text-xs text-neutral-500", children: label })
       ] })
     ] });
   }
   function InlineMetric({ title, value, note, tone = "" }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: `react-console-inline-metric${tone ? ` is-${tone}` : ""}`, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { children: title }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("strong", { children: value }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("small", { children: note })
-    ] });
-  }
-  function buildTrendPoints(percent, seed) {
-    const safe = clamp(Number(percent) || 0, 0, 100);
-    const points = [];
-    for (let index = 0; index < 12; index += 1) {
-      const progress = index / 11;
-      const wobble = Math.sin((index + seed) * 0.82) * 6 + Math.cos((index + seed) * 0.47) * 3;
-      const value = clamp(safe * (0.38 + progress * 0.62) + wobble, 4, 100);
-      const x = index / 11 * 100;
-      const y = 100 - value;
-      points.push(`${x},${y}`);
-    }
-    return points.join(" ");
-  }
-  function MetricGraphCard({ title, value, note, percent, tone = "info", seed = 1 }) {
-    const safePercent = clamp(Number(percent) || 0, 0, 100);
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("article", { className: `react-console-graph-card is-${tone}`, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "react-console-graph-head", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { children: title }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("strong", { children: value })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("small", { children: note })
+    const toneTextClass = tone === "success" ? "text-green-400" : tone === "warning" ? "text-yellow-400" : tone === "danger" ? "text-red-400" : "text-primary-400";
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-col mb-1 pb-2 border-b border-neutral-700/50 last:border-0 last:pb-0", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between items-center", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-xs font-bold text-neutral-400 uppercase tracking-wide", children: title }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("strong", { className: `font-mono text-sm ${toneTextClass}`, children: value })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-console-graph-canvas", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("svg", { viewBox: "0 0 100 100", preserveAspectRatio: "none", "aria-hidden": "true", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("defs", { children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("linearGradient", { id: `consoleGraphFill-${title.replace(/\s+/g, "-")}`, x1: "0%", x2: "0%", y1: "0%", y2: "100%", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("stop", { offset: "0%", stopColor: "currentColor", stopOpacity: "0.34" }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("stop", { offset: "100%", stopColor: "currentColor", stopOpacity: "0.02" })
-        ] }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-          "polyline",
-          {
-            className: "react-console-graph-line",
-            points: buildTrendPoints(safePercent, seed),
-            fill: "none",
-            vectorEffect: "non-scaling-stroke"
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-          "polygon",
-          {
-            className: "react-console-graph-fill",
-            points: `0,100 ${buildTrendPoints(safePercent, seed)} 100,100`,
-            fill: `url(#consoleGraphFill-${title.replace(/\s+/g, "-")})`
-          }
-        )
-      ] }) })
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("small", { className: "text-xs text-neutral-500 mt-1", children: note })
     ] });
   }
   function scrubAnsi(text) {
@@ -9416,7 +9383,8 @@
         terminalHostRef.current.innerHTML = "";
         const term = new window.Terminal({
           theme: {
-            background: "#10161d",
+            background: "#18181b",
+            // neutral-900 equivalent for console
             foreground: "#eef4fb",
             cursor: "#eef4fb",
             black: "#16161a",
@@ -9433,7 +9401,8 @@
           fontSize: 13,
           cursorBlink: true,
           scrollback: 5e3,
-          convertEol: true
+          convertEol: true,
+          padding: "16px"
         });
         const fitAddon = new window.FitAddon.FitAddon();
         const webLinksAddon = new window.WebLinksAddon.WebLinksAddon();
@@ -9640,273 +9609,172 @@
     const cooldownActive = cooldownUntil > Date.now();
     const cooldownValue = cooldownActive ? "Active" : "Idle";
     const cooldownNote = cooldownActive ? `Cooldown until ${new Date(cooldownUntil).toLocaleString()}${runtimeMeta.crashLoopCount ? ` \xB7 loop count ${runtimeMeta.crashLoopCount}` : ""}` : runtimeMeta.crashLoopCount ? `Crash loop count tracked: ${runtimeMeta.crashLoopCount}` : "No crash cooldown is active.";
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ReactAppShell, { pageData, subtitle: "React server console", pageClassName: "react-console-page", shellClassName: "react-console-shell", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-console-frame", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("main", { className: "react-console-board", children: [
-      pageData.success ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-account-flash is-success", children: pageData.success }) : null,
-      pageData.error ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-account-flash is-danger", children: pageData.error }) : null,
-      terminalError ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-account-flash is-danger", children: terminalError }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("section", { className: "react-console-topbar", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "react-console-titleblock", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "react-console-titleline", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `react-console-status-dot is-${statusTone(status)}` }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h1", { children: server.name || "Server Console" })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { children: server.description || "Live runtime output and power controls for this server." })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "react-console-top-actions", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { type: "button", className: "react-console-action is-success", onClick: () => sendPowerAction("start"), disabled: startDisabled, children: "Start" }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { type: "button", className: "react-console-action is-warning", onClick: () => sendPowerAction("restart"), disabled: restartDisabled, children: "Restart" }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { type: "button", className: "react-console-action is-danger", onClick: () => sendPowerAction("stop"), disabled: stopDisabled, children: "Stop" })
-        ] })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("section", { className: "react-console-core", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("section", { className: "react-console-terminal-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "react-console-terminal-head", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "react-console-terminal-heading", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h2", { children: "Console" }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-console-chart-note", children: "Interactive server stream with direct command input." })
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(ReactAppShell, { pageData, subtitle: "React server console", children: [
+      pageData.success && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm mx-4 lg:mx-8 mt-6", children: pageData.success }),
+      pageData.error && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm mx-4 lg:mx-8 mt-6", children: pageData.error }),
+      terminalError && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm mx-4 lg:mx-8 mt-6", children: terminalError }),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "p-4 lg:p-8 grid grid-cols-1 xl:grid-cols-4 gap-6", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "xl:col-span-3 flex flex-col gap-6", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-col md:flex-row md:items-center justify-between gap-4", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-4", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `w-3 h-3 rounded-full shrink-0 ${getToneColorClass(statusTone(status))}` }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h1", { className: "text-xl font-bold text-white tracking-wide", children: server.name || "Server Console" }),
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-sm text-neutral-400 mt-1", children: server.description || "Live runtime output and power controls." })
+              ] })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "react-console-terminal-tools", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex bg-neutral-800 rounded-lg border border-neutral-700/50 overflow-hidden shadow-sm shrink-0", children: [
               /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
                 "button",
                 {
                   type: "button",
-                  className: `react-console-mini-toggle${followOutput ? " is-active" : ""}`,
-                  onClick: () => setFollowOutput((current) => !current),
-                  children: "Follow"
+                  className: "px-6 py-2.5 text-sm font-semibold hover:bg-neutral-700 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-r border-neutral-700/50 text-green-500",
+                  onClick: () => sendPowerAction("start"),
+                  disabled: startDisabled,
+                  children: "Start"
                 }
               ),
               /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
                 "button",
                 {
                   type: "button",
-                  className: "react-console-mini-toggle",
-                  onClick: () => {
-                    const term = terminalInstanceRef.current;
-                    if (term) {
-                      term.clear();
-                    }
-                  },
-                  children: "Clear"
+                  className: "px-6 py-2.5 text-sm font-semibold hover:bg-neutral-700 text-blue-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-r border-neutral-700/50",
+                  onClick: () => sendPowerAction("restart"),
+                  disabled: restartDisabled,
+                  children: "Restart"
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "px-6 py-2.5 text-sm font-semibold hover:bg-neutral-700 text-red-500 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+                  onClick: () => sendPowerAction("stop"),
+                  disabled: stopDisabled,
+                  children: "Stop"
                 }
               )
             ] })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: `react-console-terminal-body${terminalBooted ? "" : " is-loading"}`, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-console-terminal-host", ref: terminalHostRef }),
-            !terminalBooted && !terminalError ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-console-terminal-placeholder", children: "Booting xterm runtime\u2026" }) : null
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "react-console-command-row", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "react-console-command-prefix", children: "$" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-              "input",
-              {
-                type: "text",
-                value: commandValue,
-                onChange: (event) => setCommandValue(event.target.value),
-                onKeyDown: (event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    sendCommand();
-                    return;
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 rounded-lg flex flex-col relative overflow-hidden shadow-lg h-[600px]", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800 border-b border-neutral-700 px-4 py-3 flex justify-between items-center z-10 shrink-0", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("strong", { className: "text-neutral-100 font-bold block", children: "Console" }),
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-xs text-neutral-500", children: "Interactive server stream" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex bg-neutral-900 rounded overflow-hidden border border-neutral-700", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                  "button",
+                  {
+                    className: `px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors border-r border-neutral-700 ${followOutput ? "bg-primary-600 text-white" : "text-neutral-400 hover:text-white hover:bg-neutral-700"}`,
+                    onClick: () => setFollowOutput((current) => !current),
+                    children: "Follow"
                   }
-                  if (event.key === "ArrowUp") {
-                    event.preventDefault();
-                    if (!history.length) return;
-                    historyIndexRef.current = Math.min(historyIndexRef.current + 1, history.length - 1);
-                    setCommandValue(history[historyIndexRef.current] || "");
-                    return;
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                  "button",
+                  {
+                    className: "px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-neutral-400 hover:text-white hover:bg-neutral-700 transition-colors",
+                    onClick: () => {
+                      const term = terminalInstanceRef.current;
+                      if (term) term.clear();
+                    },
+                    children: "Clear"
                   }
-                  if (event.key === "ArrowDown") {
-                    event.preventDefault();
-                    if (!history.length) return;
-                    historyIndexRef.current = Math.max(historyIndexRef.current - 1, -1);
-                    setCommandValue(historyIndexRef.current >= 0 ? history[historyIndexRef.current] || "" : "");
-                  }
-                },
-                className: "react-console-command-input",
-                placeholder: connectorOnline ? "Type a command and press Enter\u2026" : "Connector offline",
-                disabled: !connectorOnline
-              }
-            ),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { type: "button", className: "react-console-send", onClick: sendCommand, disabled: !connectorOnline || !String(commandValue || "").trim(), children: "Send" })
+                )
+              ] })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `flex-1 relative ${terminalBooted ? "" : "opacity-0"} p-2`, style: { minHeight: 0 }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-full h-full", ref: terminalHostRef }) }),
+            !terminalBooted && !terminalError && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "absolute inset-x-0 bottom-16 top-16 flex items-center justify-center flex-col gap-4 text-neutral-500", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-8 h-8 border-4 border-neutral-600 border-t-primary-500 rounded-full animate-spin" }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { children: "Booting xterm runtime..." })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800 border-t border-neutral-700 flex items-center shrink-0", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-neutral-500 pl-4 font-mono font-bold", children: "$" }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                "input",
+                {
+                  type: "text",
+                  className: "flex-1 bg-transparent border-none text-neutral-200 text-sm font-mono px-3 py-3.5 focus:ring-0 shadow-none outline-none",
+                  value: commandValue,
+                  onChange: (event) => setCommandValue(event.target.value),
+                  onKeyDown: (event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      sendCommand();
+                      return;
+                    }
+                    if (event.key === "ArrowUp") {
+                      event.preventDefault();
+                      if (!history.length) return;
+                      historyIndexRef.current = Math.min(historyIndexRef.current + 1, history.length - 1);
+                      setCommandValue(history[historyIndexRef.current] || "");
+                      return;
+                    }
+                    if (event.key === "ArrowDown") {
+                      event.preventDefault();
+                      if (!history.length) return;
+                      historyIndexRef.current = Math.max(historyIndexRef.current - 1, -1);
+                      setCommandValue(historyIndexRef.current >= 0 ? history[historyIndexRef.current] || "" : "");
+                    }
+                  },
+                  placeholder: connectorOnline ? "Type a command and press Enter..." : "Connector offline",
+                  disabled: !connectorOnline
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                "button",
+                {
+                  className: "px-5 py-3.5 bg-primary-600 hover:bg-primary-500 font-bold text-white text-sm transition-colors border-l border-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed",
+                  onClick: sendCommand,
+                  disabled: !connectorOnline || !String(commandValue || "").trim(),
+                  children: "Send"
+                }
+              )
+            ] })
           ] })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("aside", { className: "react-console-details", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("section", { className: "react-console-side-card", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-console-panel-title", children: "Server Details" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "react-console-side-list", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("aside", { className: "xl:col-span-1 flex flex-col gap-6", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-5", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4", children: "Server Details" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-col gap-4", children: [
               /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ResourceBadge, { icon: "bi-hdd-network", label: "Allocation", value: server.address || "No allocation address" }),
               /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ResourceBadge, { icon: "bi-hdd-stack", label: "Status", value: formatStatus(status) }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "border-t border-neutral-700/50 my-1" }),
               /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ResourceBadge, { icon: "bi-cpu", label: "CPU Cap", value: limits.cpu ? `${limits.cpu}%` : "Unlimited" }),
               /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ResourceBadge, { icon: "bi-memory", label: "RAM Cap", value: limits.memory ? `${limits.memory} MB` : "Unlimited" }),
               /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ResourceBadge, { icon: "bi-device-hdd", label: "Disk Cap", value: limits.disk ? `${limits.disk} MB` : "Unlimited" })
             ] })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("section", { className: "react-console-side-card", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-console-panel-title", children: "Connector Link" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: `react-console-connection is-${connectorOnline ? "success" : "danger"}`, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-5", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4", children: "Connector Link" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: `flex items-center gap-3 p-3 rounded mb-4 border ${connectorOnline ? "bg-green-600/10 border-green-600/30 text-green-400" : "bg-red-600/10 border-red-600/30 text-red-400"}`, children: [
               /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: `bi ${connectorOnline ? "bi-broadcast-pin" : "bi-wifi-off"}` }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { children: connectionState })
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "font-semibold", children: connectionState })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "react-console-side-links", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Link, { to: ReactRoutes.changeView, className: "react-account-button is-ghost", children: "View Mode" }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("a", { href: `/server/${server.containerId}?popout=true`, className: "react-account-button is-ghost", children: "Popout" })
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex gap-2", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Link, { to: ReactRoutes.changeView, className: "flex-1 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-bold py-2 rounded text-center transition-colors", children: "View Mode" }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("a", { href: `/server/${server.containerId}?popout=true`, className: "flex-1 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-bold py-2 rounded text-center transition-colors", children: "Popout" })
             ] })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("section", { className: "react-console-side-card", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-console-panel-title", children: "Runtime Snapshot" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "react-console-side-list", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                InlineMetric,
-                {
-                  title: "CPU",
-                  value: `${stats.cpu.toFixed(1)}%`,
-                  note: limits.cpu ? `${limits.cpu}% cap` : "No cap",
-                  tone: "info"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                InlineMetric,
-                {
-                  title: "Memory",
-                  value: `${Math.round(stats.memory)} MB`,
-                  note: `${memoryPercent.toFixed(0)}% used`,
-                  tone: "success"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                InlineMetric,
-                {
-                  title: "Disk",
-                  value: `${Math.round(stats.disk)} MB`,
-                  note: `${diskPercent.toFixed(0)}% used`,
-                  tone: "warning"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                InlineMetric,
-                {
-                  title: "Uptime",
-                  value: formatDuration(stats.uptimeSeconds),
-                  note: "Current runtime session",
-                  tone: "info"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                InlineMetric,
-                {
-                  title: "Net RX",
-                  value: formatBytes(stats.networkRx),
-                  note: "Inbound since start",
-                  tone: "success"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                InlineMetric,
-                {
-                  title: "Net TX",
-                  value: formatBytes(stats.networkTx),
-                  note: "Outbound since start",
-                  tone: "warning"
-                }
-              )
-            ] })
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-5", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4", children: "Runtime Snapshot" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(InlineMetric, { title: "CPU", value: `${stats.cpu.toFixed(1)}%`, note: limits.cpu ? `${limits.cpu}% cap` : "No cap", tone: "primary" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(InlineMetric, { title: "Memory", value: `${Math.round(stats.memory)} MB`, note: `${memoryPercent.toFixed(0)}% used`, tone: "success" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(InlineMetric, { title: "Disk", value: `${Math.round(stats.disk)} MB`, note: `${diskPercent.toFixed(0)}% used`, tone: "warning" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(InlineMetric, { title: "Uptime", value: formatDuration(stats.uptimeSeconds), note: "Current runtime session" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(InlineMetric, { title: "Net RX", value: formatBytes(stats.networkRx), note: "Inbound since start", tone: "success" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(InlineMetric, { title: "Net TX", value: formatBytes(stats.networkTx), note: "Outbound since start", tone: "warning" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("section", { className: "react-console-side-card", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-console-panel-title", children: "Restart Source" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-console-side-list", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-              InlineMetric,
-              {
-                title: "Last Trigger",
-                value: formatRuntimeSource(runtimeMeta.lastSource),
-                note: runtimeMeta.lastReason || "No restart source captured yet.",
-                tone: "info"
-              }
-            ) })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("section", { className: "react-console-side-card", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-console-panel-title", children: "Crash Cooldown" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-console-side-list", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-              InlineMetric,
-              {
-                title: "Guard State",
-                value: cooldownValue,
-                note: cooldownNote,
-                tone: cooldownActive ? "warning" : "info"
-              }
-            ) })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("section", { className: "react-console-side-card", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-console-panel-title", children: "Last Exit" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-console-side-list", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-              InlineMetric,
-              {
-                title: "Exit Summary",
-                value: lastExitValue,
-                note: lastExitNote,
-                tone: exitInfo.oomKilled ? "danger" : "info"
-              }
-            ) })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("section", { className: "react-console-side-card", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-console-panel-title", children: "Recent Runtime Events" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "react-console-side-list", children: Array.isArray(runtimeMeta.history) && runtimeMeta.history.length ? runtimeMeta.history.map((entry, index) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-              InlineMetric,
-              {
-                title: `${entry.kind || "runtime"} \xB7 ${formatRuntimeSource(entry.source)}`,
-                value: entry.summary || "Runtime event recorded.",
-                note: entry.ts ? new Date(entry.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "Live",
-                tone: entry.tone || "info"
-              },
-              `${entry.kind || "runtime"}-${entry.ts || index}-${index}`
-            )) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-              InlineMetric,
-              {
-                title: "Runtime",
-                value: "No recent events",
-                note: "Recent restart reasons and crash transitions will appear here.",
-                tone: "info"
-              }
-            ) })
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-5", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4", children: "Guards" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(InlineMetric, { title: "Restart Trigger", value: formatRuntimeSource(runtimeMeta.lastSource), note: runtimeMeta.lastReason || "No restart source captured yet." }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(InlineMetric, { title: "Cooldown State", value: cooldownValue, note: cooldownNote, tone: cooldownActive ? "warning" : "primary" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(InlineMetric, { title: "Exit Summary", value: lastExitValue, note: lastExitNote, tone: exitInfo.oomKilled ? "danger" : "primary" })
           ] })
         ] })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("section", { className: "react-console-graphs", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-          MetricGraphCard,
-          {
-            title: "CPU Usage",
-            value: `${stats.cpu.toFixed(1)}%`,
-            note: limits.cpu ? `${limits.cpu}% server limit` : "No limit configured",
-            percent: limits.cpu ? usagePercent(stats.cpu, limits.cpu) : clamp(stats.cpu, 0, 100),
-            tone: "info",
-            seed: 1
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-          MetricGraphCard,
-          {
-            title: "Memory Usage",
-            value: `${Math.round(stats.memory)} MB`,
-            note: limits.memory ? `${Math.round(limits.memory)} MB limit` : "No memory limit",
-            percent: memoryPercent,
-            tone: "success",
-            seed: 5
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-          MetricGraphCard,
-          {
-            title: "Disk Usage",
-            value: `${Math.round(stats.disk)} MB`,
-            note: limits.disk ? `${Math.round(limits.disk)} MB limit` : "No disk limit",
-            percent: diskPercent,
-            tone: "warning",
-            seed: 9
-          }
-        )
       ] })
-    ] }) }) });
+    ] });
   }
   if (root2) {
     root2.render(/* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ServerConsolePage, { pageData: data2 }));
@@ -9998,106 +9866,159 @@
     }, [currentPath, manager.fetchUrlBase]);
     const breadcrumbs = buildSegments(currentPath);
     const activeServer = pageData.server || {};
-    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ReactAppShell, { pageData, subtitle: "File manager", pageClassName: "react-files-page", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("main", { className: "react-surface-page", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: "react-surface-header", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "react-surface-eyebrow", children: "Server Workspace" }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h1", { children: "File Manager" }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "react-surface-copy", children: "Browse container files, jump into the editor, or fall back to the legacy manager for advanced actions." })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "react-surface-actions", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("a", { href: `${manager.legacyUrl}?legacy=1`, className: "react-ui-button is-ghost", children: "Open Legacy View" }),
-          manager.webUploadEnabled ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "react-inline-note", children: `Uploads enabled up to ${manager.webUploadMaxMb} MB` }) : null
-        ] })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: "react-files-layout", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("aside", { className: "react-ui-panel", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "react-panel-heading", children: "Storage Access" }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "react-stat-list", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { children: "Server" }),
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("strong", { children: activeServer.name || "Server" })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { children: "Status" }),
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("strong", { children: activeServer.status || "unknown" })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { children: "Writable" }),
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("strong", { children: permissions.canWriteFiles && !permissions.filesWriteLocked ? "Yes" : "Read only" })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { children: "SFTP" }),
-              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("strong", { children: pageData.sftpDetails && pageData.sftpDetails.available ? "Available" : "Unavailable" })
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ReactAppShell, { pageData, subtitle: "File manager", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+      PageContentBlock,
+      {
+        title: "File Manager",
+        description: "Browse container files, jump into the editor, or fall back to the legacy manager for advanced actions.",
+        eyebrow: "Server Workspace",
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-end gap-3 mb-6", children: [
+            manager.webUploadEnabled ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-sm text-neutral-400 self-center mr-2", children: `Uploads enabled up to ${manager.webUploadMaxMb} MB` }) : null,
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("a", { href: `${manager.legacyUrl}?legacy=1`, className: "bg-neutral-700 hover:bg-neutral-600 text-white font-semibold flex-shrink-0 py-2 px-4 rounded transition-colors text-sm shadow-sm flex items-center gap-2", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-box-arrow-up-right" }),
+              " Open Legacy View"
             ] })
           ] }),
-          permissions.filesWriteLocked ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "react-inline-alert is-warning", children: "File writes are locked by policy. Use editor and downloads in read-only mode." }) : null
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("section", { className: "react-ui-panel react-files-panel", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "react-files-breadcrumbs", children: breadcrumbs.map((segment, index) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
-            "button",
-            {
-              type: "button",
-              className: `react-breadcrumb-button${index === breadcrumbs.length - 1 ? " is-active" : ""}`,
-              onClick: () => setCurrentPath(segment.path),
-              children: segment.label
-            },
-            segment.path
-          )) }),
-          error ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "react-inline-alert is-danger", children: error }) : null,
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "react-list-header", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { children: "Name" }),
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { children: "Modified" }),
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { children: "Size" }),
-            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { children: "Actions" })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "react-list-body", children: [
-            loading ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "react-empty-state", children: "Loading directory..." }) : null,
-            !loading && entries.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "react-empty-state", children: "This directory is empty." }) : null,
-            !loading ? entries.map((entry) => {
-              const entryPath = normalizePath(`${currentPath === "/" ? "" : currentPath}/${entry.name || ""}`);
-              const isMenuOpen = menuPath === entryPath;
-              return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "react-list-row", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-4 gap-6 items-start", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "lg:col-span-1 flex flex-col gap-6", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h2", { className: "text-lg font-bold text-white mb-4", children: "Storage Access" }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex flex-col gap-3", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Server" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("strong", { className: "text-neutral-200", children: activeServer.name || "Server" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Status" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("strong", { className: "text-neutral-200 capitalize", children: activeServer.status || "unknown" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Writable" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("strong", { className: permissions.canWriteFiles && !permissions.filesWriteLocked ? "text-green-400" : "text-red-400", children: permissions.canWriteFiles && !permissions.filesWriteLocked ? "Yes" : "Read only" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-between items-center", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "SFTP" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("strong", { className: "text-neutral-200", children: pageData.sftpDetails && pageData.sftpDetails.available ? "Available" : "Unavailable" })
+                ] })
+              ] }),
+              permissions.filesWriteLocked ? /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "mt-6 bg-yellow-900/20 border border-yellow-500/30 text-yellow-200 p-3 rounded text-sm flex items-start gap-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-shield-lock text-yellow-500 mt-0.5" }),
+                "File writes are locked by policy. Use editor and downloads in read-only mode."
+              ] }) : null
+            ] }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "lg:col-span-3", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden flex flex-col", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "px-5 py-4 border-b border-neutral-700/70 bg-neutral-800 flex items-center flex-wrap gap-2", children: breadcrumbs.map((segment, index) => /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_react7.default.Fragment, { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                   "button",
                   {
                     type: "button",
-                    className: "react-file-cell",
-                    onClick: () => {
-                      setMenuPath("");
-                      if (entry.isDirectory) setCurrentPath(entryPath);
-                    },
-                    children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: `bi ${entry.isDirectory ? "bi-folder-fill" : "bi-file-earmark-text"}` }),
-                      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("strong", { children: entry.name || "Unnamed item" }),
-                        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { children: entry.isDirectory ? "Folder" : entry.permissions || "File" })
-                      ] })
-                    ]
+                    className: `font-semibold hover:text-white transition-colors ${index === breadcrumbs.length - 1 ? "text-neutral-100 cursor-default" : "text-neutral-400"}`,
+                    onClick: () => index !== breadcrumbs.length - 1 && setCurrentPath(segment.path),
+                    children: segment.label === "home" ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-house-door-fill text-lg relative top-[1px]" }) : segment.label
                   }
                 ),
-                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "react-row-meta", children: formatDate(entry.modified) }),
-                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "react-row-meta", children: entry.isDirectory ? "Folder" : formatBytes2(entry.size) }),
-                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "react-row-actions", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", className: "react-ui-button is-ghost is-small", onClick: () => setMenuPath(isMenuOpen ? "" : entryPath), children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-three-dots" }) }),
-                  isMenuOpen ? /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "react-row-menu", children: [
-                    entry.isDirectory ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", className: "react-row-menu-item", onClick: () => {
-                      setCurrentPath(entryPath);
-                      setMenuPath("");
-                    }, children: "Open Folder" }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("a", { className: "react-row-menu-item", href: `${manager.editUrlBase}?path=${encodeURIComponent(entryPath)}`, children: "Edit" }),
-                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("a", { className: "react-row-menu-item", href: `${manager.previewUrlBase}?path=${encodeURIComponent(entryPath)}`, children: "Preview" }),
-                      permissions.canDownloadFiles ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("a", { className: "react-row-menu-item", href: `${manager.downloadUrlBase}?path=${encodeURIComponent(entryPath)}`, children: "Download" }) : null
-                    ] }),
-                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("a", { className: "react-row-menu-item", href: `${manager.legacyUrl}?legacy=1&path=${encodeURIComponent(currentPath)}`, children: "Open Legacy Manager" })
-                  ] }) : null
-                ] })
-              ] }, entryPath);
-            }) : null
+                index < breadcrumbs.length - 1 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-neutral-600 font-bold mx-1", children: "/" })
+              ] }, segment.path)) }),
+              error && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "bg-red-600/20 border-b border-red-600/50 text-red-100 p-3 px-5 text-sm flex items-center gap-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-exclamation-triangle-fill text-red-500" }),
+                " ",
+                error
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "grid grid-cols-12 gap-4 px-6 py-3 border-b border-neutral-700/50 bg-neutral-900/30 text-xs font-bold text-neutral-400 uppercase tracking-widest hidden sm:grid", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "col-span-6", children: "Name" }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "col-span-3", children: "Modified" }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "col-span-2 text-right", children: "Size" }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "col-span-1 text-right", children: "Actions" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex flex-col min-h-[400px]", children: [
+                loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex-1 flex justify-center items-center py-16", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex flex-col items-center justify-center space-y-4", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-10 h-10 border-4 border-neutral-600 border-t-primary-500 rounded-full animate-spin" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-neutral-400 text-sm", children: "Loading directory..." })
+                ] }) }),
+                !loading && entries.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex-1 flex justify-center items-center py-16", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-center", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-folder2-open text-4xl text-neutral-600 block mb-3" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-neutral-400 text-sm block", children: "This directory is empty." })
+                ] }) }),
+                !loading && entries.map((entry) => {
+                  const entryPath = normalizePath(`${currentPath === "/" ? "" : currentPath}/${entry.name || ""}`);
+                  const isMenuOpen = menuPath === entryPath;
+                  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "grid sm:grid-cols-12 gap-0 sm:gap-4 px-0 sm:px-6 py-0 border-b border-neutral-700/30 hover:bg-neutral-700/20 transition-colors group relative", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "sm:col-span-6 flex items-center", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+                      "button",
+                      {
+                        type: "button",
+                        className: "w-full text-left px-5 sm:px-0 py-4 flex items-center gap-4 hover:text-white transition-colors",
+                        onClick: () => {
+                          setMenuPath("");
+                          if (entry.isDirectory) setCurrentPath(entryPath);
+                        },
+                        children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: `text-2xl ${entry.isDirectory ? "bi bi-folder-fill text-primary-400 group-hover:text-primary-300" : "bi bi-file-earmark-text text-neutral-400 group-hover:text-neutral-300"}` }),
+                          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "overflow-hidden", children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("strong", { className: "block text-neutral-200 text-sm truncate font-semibold", children: entry.name || "Unnamed item" }),
+                            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "block text-xs text-neutral-500 sm:hidden mt-0.5", children: entry.isDirectory ? "Folder" : entry.permissions || "File" })
+                          ] })
+                        ]
+                      }
+                    ) }),
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "hidden sm:flex col-span-3 items-center", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-sm text-neutral-400 truncate", children: formatDate(entry.modified) }) }),
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "hidden sm:flex col-span-2 items-center justify-end", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-sm text-neutral-400 font-mono", children: entry.isDirectory ? "Folder" : formatBytes2(entry.size) }) }),
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "hidden sm:flex col-span-1 items-center justify-end", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                        "button",
+                        {
+                          type: "button",
+                          className: "w-8 h-8 flex items-center justify-center rounded text-neutral-400 hover:text-white hover:bg-neutral-600 transition-colors",
+                          onClick: (e) => {
+                            e.stopPropagation();
+                            setMenuPath(isMenuOpen ? "" : entryPath);
+                          },
+                          children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-three-dots" })
+                        }
+                      ),
+                      isMenuOpen && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "absolute right-6 top-12 z-10 w-48 bg-neutral-800 border border-neutral-600 rounded shadow-xl py-1 transform origin-top-right transition-all", children: [
+                        entry.isDirectory ? /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+                          "button",
+                          {
+                            type: "button",
+                            className: "w-full text-left px-4 py-2 text-sm text-neutral-300 hover:text-white hover:bg-neutral-700",
+                            onClick: () => {
+                              setCurrentPath(entryPath);
+                              setMenuPath("");
+                            },
+                            children: [
+                              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-folder-symlink mr-2" }),
+                              " Open Folder"
+                            ]
+                          }
+                        ) : /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("a", { className: "block px-4 py-2 text-sm text-neutral-300 hover:text-white hover:bg-neutral-700", href: `${manager.editUrlBase}?path=${encodeURIComponent(entryPath)}`, children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-pencil mr-2" }),
+                            " Edit"
+                          ] }),
+                          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("a", { className: "block px-4 py-2 text-sm text-neutral-300 hover:text-white hover:bg-neutral-700", href: `${manager.previewUrlBase}?path=${encodeURIComponent(entryPath)}`, children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-eye mr-2" }),
+                            " Preview"
+                          ] }),
+                          permissions.canDownloadFiles && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("a", { className: "block px-4 py-2 text-sm text-neutral-300 hover:text-white hover:bg-neutral-700 mt-1 border-t border-neutral-700/50 pt-2", href: `${manager.downloadUrlBase}?path=${encodeURIComponent(entryPath)}`, children: [
+                            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-cloud-arrow-down mr-2" }),
+                            " Download"
+                          ] })
+                        ] }),
+                        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "border-t border-neutral-700/50 mt-1 pt-1", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("a", { className: "block px-4 py-2 text-xs text-neutral-400 hover:text-white hover:bg-neutral-700", href: `${manager.legacyUrl}?legacy=1&path=${encodeURIComponent(currentPath)}`, children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-box-arrow-up-right mr-1" }),
+                          " Open Legacy Manager"
+                        ] }) })
+                      ] })
+                    ] })
+                  ] }, entryPath);
+                })
+              ] })
+            ] }) })
           ] })
-        ] })
-      ] })
-    ] }) });
+        ]
+      }
+    ) });
   }
   if (root3) {
     root3.render(/* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ServerFilesPage, { pageData: data3 }));
@@ -10136,6 +10057,12 @@
     if (["queued", "running", "retrying"].includes(value)) return "warning";
     return "danger";
   }
+  function statusColorClass(status) {
+    const tone = statusTone2(status);
+    if (tone === "success") return "bg-green-600/20 text-green-400 border border-green-600/30";
+    if (tone === "warning") return "bg-yellow-600/20 text-yellow-400 border border-yellow-600/30";
+    return "bg-red-600/20 text-red-400 border border-red-600/30";
+  }
   function ServerBackupsPage({ pageData = data4 }) {
     const server = pageData.server || {};
     const backups = Array.isArray(pageData.backups) ? pageData.backups : [];
@@ -10143,91 +10070,150 @@
     const permissions = pageData.permissions || {};
     const policy = pageData.backupPolicy || {};
     const actions = pageData.actions || {};
-    return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(ReactAppShell, { pageData, subtitle: "Backups", pageClassName: "react-backups-page", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("main", { className: "react-surface-page", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("section", { className: "react-surface-header", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: "react-surface-eyebrow", children: "Recovery" }),
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("h1", { children: "Backups" }),
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: "react-surface-copy", children: "Review backup history, connect Google Drive for storage, and trigger fresh snapshots from the same backend flow used by EJS." })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "react-surface-actions", children: permissions.canManageBackups ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("form", { method: "POST", action: actions.run, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { type: "submit", className: "react-ui-button is-primary", children: "Create Backup" }) }) : null })
-      ] }),
-      pageData.success || pageData.error ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: `react-inline-alert ${pageData.error ? "is-danger" : "is-success"}`, children: pageData.error || pageData.success }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("section", { className: "react-backups-grid", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "react-ui-panel", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "react-panel-heading", children: "Drive Integration" }),
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "react-stat-list", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { children: "Server" }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { children: server.name || "Server" })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { children: "Drive Ready" }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { children: driveState.ready ? "Ready" : "Needs setup" })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { children: "Last Run" }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { children: formatWhen(policy.lastRunAt) })
-            ] })
+    const inputClass = "w-full bg-neutral-900 border border-neutral-700/50 rounded p-2.5 text-sm text-neutral-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-shadow";
+    const labelClass = "block text-xs font-bold text-neutral-400 uppercase tracking-wide mb-1.5";
+    return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(ReactAppShell, { pageData, subtitle: "Backups", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+      PageContentBlock,
+      {
+        title: "Backups",
+        description: "Review backup history, connect Google Drive for storage, and trigger fresh snapshots.",
+        eyebrow: "Recovery",
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "flex justify-end mb-6", children: permissions.canManageBackups ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("form", { method: "POST", action: actions.run, children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("button", { type: "submit", className: "bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm flex items-center gap-2", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-hdd-rack" }),
+            " Create Backup"
+          ] }) }) : null }),
+          pageData.success && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-check-circle-fill text-green-500" }),
+            pageData.success
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: "react-panel-copy", children: driveState.statusText || "Google Drive state is unavailable." }),
-          driveState.canConnect ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("a", { href: actions.connectGoogle || driveState.connectUrl, className: "react-ui-button is-ghost", children: "Connect Google Drive" }) : null
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "react-ui-panel", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "react-panel-heading", children: "Policy" }),
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("form", { method: "POST", action: actions.savePolicy, className: "react-stack-form", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("label", { className: "react-form-field", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { children: "Enable scheduled backups" }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("input", { type: "checkbox", name: "enabled", defaultChecked: Boolean(policy.autoEnabled) })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("label", { className: "react-form-field", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { children: "Interval in minutes" }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("input", { type: "number", name: "intervalMinutes", min: "5", max: "10080", defaultValue: policy.intervalMinutes || 360 })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { type: "submit", className: "react-ui-button is-primary", disabled: !permissions.canManageBackupPolicy, children: "Save Policy" })
-          ] })
-        ] })
-      ] }),
-      pageData.activeJob ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("section", { className: "react-ui-panel", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "react-panel-heading", children: "Active Job" }),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "react-stat-list", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "react-stat-row", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { children: "Status" }),
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { children: pageData.activeJob.status })
+          pageData.error && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-exclamation-triangle-fill text-red-500" }),
+            pageData.error
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "react-stat-row", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { children: "Type" }),
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { children: pageData.activeJob.type })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "react-stat-row", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { children: "Updated" }),
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { children: formatWhen(pageData.activeJob.updatedAt) })
-          ] })
-        ] })
-      ] }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("section", { className: "react-ui-panel", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "react-panel-heading", children: "Backup History" }),
-        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "react-list-body", children: [
-          !backups.length ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "react-empty-state", children: "No backups were recorded yet." }) : null,
-          backups.map((entry) => /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "react-list-row is-stacked-mobile", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "react-list-main", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: `react-pill-badge is-${statusTone2(entry.status)}`, children: entry.status || "unknown" }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { children: formatWhen(entry.createdAt) }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { children: [
-                entry.trigger || "manual",
-                " \xB7 ",
-                formatBytes3(entry.sizeBytes)
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start mb-6", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center gap-3 mb-6", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-google text-2xl text-primary-400" }),
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "Drive Integration" })
               ] }),
-              entry.error ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("small", { children: entry.error }) : null
+              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex flex-col gap-4 mb-4", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-3", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Server" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { className: "text-neutral-200", children: server.name || "Server" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-3", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Drive Ready" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { className: driveState.ready ? "text-green-400" : "text-neutral-400", children: driveState.ready ? "Ready" : "Needs setup" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex justify-between items-center pb-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Last Run" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { className: "text-neutral-200 font-mono text-sm", children: formatWhen(policy.lastRunAt) })
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("p", { className: "text-sm text-neutral-400 italic mb-4", children: driveState.statusText || "Google Drive state is unavailable." }),
+              driveState.canConnect ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("a", { href: actions.connectGoogle || driveState.connectUrl, className: "inline-block bg-neutral-700 hover:bg-neutral-600 text-white font-semibold py-2 px-6 rounded transition-colors text-sm text-center w-full shadow-sm", children: "Connect Google Drive" }) : null
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "react-row-actions", children: [
-              entry.webViewLink ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("a", { href: entry.webViewLink, className: "react-ui-button is-ghost is-small", target: "_blank", rel: "noreferrer", children: "Open File" }) : null,
-              entry.folderLink ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("a", { href: entry.folderLink, className: "react-ui-button is-ghost is-small", target: "_blank", rel: "noreferrer", children: "Folder" }) : null
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 flex flex-col h-full", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center gap-3 mb-6", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-calendar-event text-2xl text-primary-400" }),
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "Automated Policy" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("form", { method: "POST", action: actions.savePolicy, className: "flex flex-col gap-5 flex-1", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("label", { className: "flex items-start gap-3 cursor-pointer group mb-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                    "input",
+                    {
+                      type: "checkbox",
+                      name: "enabled",
+                      defaultChecked: Boolean(policy.autoEnabled),
+                      className: "w-5 h-5 mt-0.5 rounded border-neutral-600 bg-neutral-900 text-primary-600 focus:ring-primary-600 focus:ring-offset-neutral-800"
+                    }
+                  ),
+                  /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "block text-sm font-bold text-neutral-200 group-hover:text-white transition-colors", children: "Enable scheduled backups" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "block text-xs text-neutral-500 mt-1", children: "Automatically generates periodic backups in the background." })
+                  ] })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("label", { className: "mb-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: labelClass, children: "Interval in minutes" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "relative", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                      "input",
+                      {
+                        type: "number",
+                        name: "intervalMinutes",
+                        min: "5",
+                        max: "10080",
+                        defaultValue: policy.intervalMinutes || 360,
+                        className: inputClass
+                      }
+                    ),
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-neutral-500 text-xs font-bold", children: "MIN" })
+                  ] })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "mt-auto flex justify-end flex-wrap pt-4", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("button", { type: "submit", className: "w-full bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm disabled:opacity-50", disabled: !permissions.canManageBackupPolicy, children: "Save Policy" }) })
+              ] })
             ] })
-          ] }, entry.id))
-        ] })
-      ] })
-    ] }) });
+          ] }),
+          pageData.activeJob ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "bg-primary-900/20 border-2 border-primary-600/50 rounded-lg p-6 mb-6", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("h2", { className: "text-lg font-bold text-white mb-4 flex items-center gap-2", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-arrow-repeat animate-spin text-primary-400" }),
+              " Active Backup Job"
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-4", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "bg-neutral-900/50 p-3 rounded", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "block text-xs font-bold text-neutral-500 uppercase", children: "Status" }),
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { className: "block text-sm text-primary-300 mt-1", children: pageData.activeJob.status })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "bg-neutral-900/50 p-3 rounded", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "block text-xs font-bold text-neutral-500 uppercase", children: "Type" }),
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { className: "block text-sm text-neutral-200 mt-1", children: pageData.activeJob.type })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "bg-neutral-900/50 p-3 rounded", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "block text-xs font-bold text-neutral-500 uppercase", children: "Updated" }),
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { className: "block text-sm text-neutral-200 mt-1 font-mono", children: formatWhen(pageData.activeJob.updatedAt) })
+              ] })
+            ] })
+          ] }) : null,
+          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "px-6 py-4 border-b border-neutral-700 bg-neutral-800/80", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "Backup History" }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex flex-col", children: [
+              !backups.length ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "p-8 text-center text-sm text-neutral-500", children: "No backups were recorded yet." }) : null,
+              backups.map((entry, index) => /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: `p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors hover:bg-neutral-700/20 ${index !== backups.length - 1 ? "border-b border-neutral-700/50" : ""}`, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex flex-col gap-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center gap-3", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-archive text-xl text-neutral-400" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { className: "text-neutral-100 font-mono text-sm tracking-wide", children: formatWhen(entry.createdAt) }),
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: `px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide inline-block ${statusColorClass(entry.status)}`, children: entry.status || "unknown" })
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "text-sm text-neutral-400 flex items-center gap-2 pl-8", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "capitalize", children: entry.trigger || "manual" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "text-neutral-600", children: "\u2022" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "font-mono", children: formatBytes3(entry.sizeBytes) })
+                  ] }),
+                  entry.error ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "text-xs text-red-400 font-mono mt-1 pl-8 bg-red-900/10 p-2 rounded", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-exclamation-triangle mr-1" }),
+                    " ",
+                    entry.error
+                  ] }) : null
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex flex-wrap items-center gap-2 sm:justify-end shrink-0 pt-3 sm:pt-0 border-t border-neutral-700 sm:border-0 pl-8 sm:pl-0", children: [
+                  entry.webViewLink ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("a", { href: entry.webViewLink, className: "bg-transparent hover:bg-neutral-700 text-neutral-300 hover:text-white border border-neutral-600 hover:border-neutral-500 text-xs font-semibold py-1.5 px-4 rounded transition-colors flex items-center gap-2", target: "_blank", rel: "noreferrer", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-link-45deg" }),
+                    " Open File"
+                  ] }) : null,
+                  entry.folderLink ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("a", { href: entry.folderLink, className: "bg-neutral-700 hover:bg-neutral-600 text-white border border-neutral-600 hover:border-neutral-500 text-xs font-semibold py-1.5 px-4 rounded transition-colors flex items-center gap-2", target: "_blank", rel: "noreferrer", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-folder2-open" }),
+                    " Folder"
+                  ] }) : null
+                ] })
+              ] }, entry.id))
+            ] })
+          ] })
+        ]
+      }
+    ) });
   }
   if (root4) {
     root4.render(/* @__PURE__ */ (0, import_jsx_runtime8.jsx)(ServerBackupsPage, { pageData: data4 }));
@@ -10249,56 +10235,73 @@
     const summary = pageData.networkSummary || {};
     const canManage = Boolean(pageData.permissions && pageData.permissions.canManageNetwork);
     const actions = pageData.actions || {};
-    return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ReactAppShell, { pageData, subtitle: "Network", pageClassName: "react-network-page", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("main", { className: "react-surface-page", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("section", { className: "react-surface-header", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "react-surface-eyebrow", children: "Routing" }),
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("h1", { children: "Network" }),
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "react-surface-copy", children: "Review assigned allocations, switch the primary binding, and assign additional ports through the existing server routes." })
-      ] }) }),
-      pageData.success || pageData.error ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: `react-inline-alert ${pageData.error ? "is-danger" : "is-success"}`, children: pageData.error || pageData.success }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("section", { className: "react-network-grid", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "react-ui-panel", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "react-panel-heading", children: "Allocation Summary" }),
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "react-stat-list", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { children: "Total assigned" }),
-              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("strong", { children: allocations.length })
+    const inputClass = "w-full bg-neutral-900 border border-neutral-700/50 rounded p-2.5 text-sm text-neutral-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-shadow";
+    const labelClass = "block text-xs font-bold text-neutral-400 uppercase tracking-wide mb-1.5";
+    return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ReactAppShell, { pageData, subtitle: "Network", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(PageContentBlock, { title: "Network Settings", description: "Review assigned allocations, switch the primary binding, and assign additional ports.", eyebrow: "Routing", children: [
+      pageData.success && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("i", { className: "bi bi-check-circle-fill text-green-500" }),
+        pageData.success
+      ] }),
+      pageData.error && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("i", { className: "bi bi-exclamation-triangle-fill text-red-500" }),
+        pageData.error
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mb-6", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 lg:col-span-1", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-4", children: "Allocation Summary" }),
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex flex-col gap-4", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-3", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Total assigned" }),
+              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("strong", { className: "text-neutral-200 font-mono", children: allocations.length })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { children: "Token inventory" }),
-              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("strong", { children: summary.allocationTokens || 0 })
+            /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-3", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Token inventory" }),
+              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("strong", { className: "text-neutral-200 font-mono", children: summary.allocationTokens || 0 })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { children: "Assignable left" }),
-              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("strong", { children: summary.remainingAssignable || 0 })
+            /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex justify-between items-center", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Assignable left" }),
+              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("strong", { className: "text-neutral-200 font-mono", children: summary.remainingAssignable || 0 })
             ] })
           ] }),
-          summary.inventoryAssignBlockedReason ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "react-inline-alert is-warning", children: summary.inventoryAssignBlockedReason }) : null
-        ] }),
-        canManage && availableAllocations.length ? /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "react-ui-panel", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "react-panel-heading", children: "Assign Allocation" }),
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("form", { method: "POST", action: actions.assign, className: "react-stack-form", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("label", { className: "react-form-field", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { children: "Available port" }),
-              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("select", { name: "allocationId", defaultValue: availableAllocations[0].id, children: availableAllocations.map((entry) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("option", { value: entry.id, children: `${entry.ip}:${entry.port}` }, entry.id)) })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "submit", className: "react-ui-button is-primary", children: "Assign Port" })
+          summary.inventoryAssignBlockedReason && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "mt-6 bg-yellow-900/20 border border-yellow-500/30 text-yellow-200 p-3 rounded text-sm flex items-start gap-2", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("i", { className: "bi bi-exclamation-circle text-yellow-500 mt-0.5" }),
+            summary.inventoryAssignBlockedReason
           ] })
+        ] }),
+        canManage && availableAllocations.length ? /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 lg:col-span-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-6", children: "Assign Allocation" }),
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("form", { method: "POST", action: actions.assign, className: "flex flex-col gap-5", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("label", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: labelClass, children: "Available Port" }),
+              /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "relative", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("select", { name: "allocationId", defaultValue: availableAllocations[0].id, className: `${inputClass} font-mono appearance-none`, children: availableAllocations.map((entry) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("option", { value: entry.id, children: `${entry.ip}:${entry.port}` }, entry.id)) }),
+                /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-neutral-400", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("i", { className: "bi bi-chevron-down" }) })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "block text-xs text-neutral-500 mt-2", children: "These are unassigned ports mapped to your node that are currently reserved exclusively for you." })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "mt-2 flex justify-end", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "submit", className: "bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm", children: "Assign Port" }) })
+          ] })
+        ] }) : canManage && !availableAllocations.length ? /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 lg:col-span-2 flex flex-col justify-center items-center text-center", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("i", { className: "bi bi-hdd-network text-4xl text-neutral-600 mb-3" }),
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-1", children: "No Ports Available" }),
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "text-sm text-neutral-400", children: "You do not have any free allocations available to assign." })
         ] }) : null
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("section", { className: "react-ui-panel", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "react-panel-heading", children: "Assigned Allocations" }),
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "react-list-body", children: [
-          !allocations.length ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "react-empty-state", children: "No allocations are assigned to this server." }) : null,
-          allocations.map((entry) => /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "react-list-row is-stacked-mobile", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "react-list-main", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: `react-pill-badge ${entry.isPrimary ? "is-success" : "is-muted"}`, children: entry.isPrimary ? "Primary" : "Secondary" }),
-              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("strong", { children: `${entry.ip}:${entry.port}` }),
-              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { children: entry.notes || "No notes configured." })
+      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "px-6 py-4 border-b border-neutral-700 bg-neutral-800/80", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "Assigned Allocations" }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex flex-col", children: [
+          !allocations.length ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "p-8 text-center text-sm text-neutral-500", children: "No allocations are assigned to this server." }) : null,
+          allocations.map((entry, index) => /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: `p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${index !== allocations.length - 1 ? "border-b border-neutral-700/50" : ""}`, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex flex-col gap-2", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex items-center gap-3", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("strong", { className: "text-neutral-100 font-mono text-lg tracking-wide bg-neutral-900 border border-neutral-700 px-3 py-1 rounded", children: `${entry.ip}:${entry.port}` }),
+                /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: `px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wide inline-block ${entry.isPrimary ? "bg-primary-600/20 text-primary-400 border border-primary-600/30" : "bg-neutral-700 text-neutral-400 border border-neutral-600"}`, children: entry.isPrimary ? "Primary" : "Secondary" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("span", { className: "text-sm text-neutral-500 itlaic", children: entry.notes || "No notes configured." })
             ] }),
-            canManage ? /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "react-row-actions", children: [
-              !entry.isPrimary ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("form", { method: "POST", action: `${actions.primaryBase}/${entry.id}/primary`, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "submit", className: "react-ui-button is-ghost is-small", children: "Make Primary" }) }) : null,
-              !entry.isPrimary ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("form", { method: "POST", action: `${actions.removeBase}/${entry.id}/delete`, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "submit", className: "react-ui-button is-danger is-small", children: "Remove" }) }) : null
+            canManage ? /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex flex-wrap items-center gap-2 sm:justify-end shrink-0 pt-3 sm:pt-0 border-t border-neutral-700 sm:border-0 mt-2 sm:mt-0", children: [
+              !entry.isPrimary ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("form", { method: "POST", action: `${actions.primaryBase}/${entry.id}/primary`, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "submit", className: "bg-transparent hover:bg-neutral-700 text-neutral-300 hover:text-white border border-neutral-600 hover:border-neutral-500 text-xs font-semibold py-2 px-4 rounded transition-colors disabled:opacity-50", children: "Make Primary" }) }) : null,
+              !entry.isPrimary ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("form", { method: "POST", action: `${actions.removeBase}/${entry.id}/delete`, children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("button", { type: "submit", className: "bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-600/30 hover:border-red-600 text-xs font-semibold py-2 px-4 rounded transition-colors disabled:opacity-50", children: "Remove" }) }) : null
             ] }) : null
           ] }, entry.id))
         ] })
@@ -10331,7 +10334,7 @@
       "button",
       {
         type: "button",
-        className: "react-ui-button is-ghost is-small",
+        className: "bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white border border-neutral-700 font-semibold py-1.5 px-3 rounded text-sm transition-colors opacity-90 hover:opacity-100 flex items-center justify-center min-w-[70px]",
         onClick: async () => {
           try {
             await navigator.clipboard.writeText(value);
@@ -10350,58 +10353,80 @@
     const canManage = Boolean(pageData.permissions && pageData.permissions.canManageApiKeys);
     const permissionCatalog = Array.isArray(pageData.apiPermissionCatalog) ? pageData.apiPermissionCatalog : [];
     const actions = pageData.actions || {};
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ReactAppShell, { pageData, subtitle: "API keys", pageClassName: "react-api-page", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("main", { className: "react-surface-page", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("section", { className: "react-surface-header", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "react-surface-eyebrow", children: "Automation" }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h1", { children: "API Keys" }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "react-surface-copy", children: "Create and rotate per-server API credentials without leaving the React view. Existing POST flows remain unchanged." })
-      ] }) }),
-      pageData.success || pageData.error ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: `react-inline-alert ${pageData.error ? "is-danger" : "is-success"}`, children: pageData.error || pageData.success }) : null,
-      pageData.freshToken && pageData.freshToken.token ? /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("section", { className: "react-ui-panel", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "react-panel-heading", children: "New Token" }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "react-token-row", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("code", { children: pageData.freshToken.token }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(CopyTokenButton, { value: pageData.freshToken.token })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "react-panel-copy", children: "This is the only time the full token is shown." })
+    const inputClass = "w-full bg-neutral-900 border border-neutral-700/50 rounded p-2.5 text-sm text-neutral-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-shadow";
+    const labelClass = "block text-xs font-bold text-neutral-400 uppercase tracking-wide mb-1.5";
+    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(ReactAppShell, { pageData, subtitle: "API keys", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(PageContentBlock, { title: "API Keys", description: "Create and rotate per-server API credentials without leaving the React view. Existing POST flows remain unchanged.", eyebrow: "Automation", children: [
+      pageData.success && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("i", { className: "bi bi-check-circle-fill text-green-500" }),
+        pageData.success
+      ] }),
+      pageData.error && /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("i", { className: "bi bi-exclamation-triangle-fill text-red-500" }),
+        pageData.error
+      ] }),
+      pageData.freshToken && pageData.freshToken.token ? /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("section", { className: "bg-neutral-800 border-2 border-primary-600/50 rounded-lg p-6 mb-6", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h2", { className: "text-lg font-bold text-white mb-2", children: "New Token Created" }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-sm text-primary-300 mb-4 font-semibold", children: "This is the only time the full token is shown. Please copy it now." }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 flex flex-col sm:flex-row items-center justify-between rounded p-4 gap-4", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("code", { className: "text-primary-400 font-mono text-sm break-all", children: pageData.freshToken.token }),
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "shrink-0 w-full sm:w-auto flex justify-end", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(CopyTokenButton, { value: pageData.freshToken.token }) })
+        ] })
       ] }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("section", { className: "react-api-grid", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "react-ui-panel", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "react-panel-heading", children: "Create API Key" }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("form", { method: "POST", action: actions.create, className: "react-stack-form", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("label", { className: "react-form-field", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "Description" }),
-              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("input", { type: "text", name: "name", maxLength: 120, required: true, placeholder: "CI deploy key" })
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-12 gap-6 items-start", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "lg:col-span-4 flex flex-col gap-6", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-6", children: "Create API Key" }),
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("form", { method: "POST", action: actions.create, className: "flex flex-col gap-5", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("label", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: labelClass, children: "Description" }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("input", { type: "text", name: "name", maxLength: 120, required: true, placeholder: "CI deploy key", className: inputClass })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("label", { className: "react-form-field", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: "Expires at" }),
-              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("input", { type: "datetime-local", name: "expiresAt" })
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("label", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: labelClass, children: "Expires at" }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("input", { type: "datetime-local", name: "expiresAt", className: `${inputClass} text-neutral-400` })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "react-check-grid", children: permissionCatalog.map((permission) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("label", { className: "react-check-tile", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("input", { type: "checkbox", name: "permissions", value: permission, defaultChecked: permission === "server.view" }),
-              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: permission })
-            ] }, permission)) }),
-            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "submit", className: "react-ui-button is-primary", disabled: !canManage, children: "Create Key" })
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "mt-2", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: labelClass, children: "Permissions" }),
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "bg-neutral-900/50 border border-neutral-700/50 rounded-lg p-4 flex flex-col gap-3 max-h-[300px] overflow-y-auto mt-2", children: permissionCatalog.map((permission) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("label", { className: "flex items-start gap-3 cursor-pointer group", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+                  "input",
+                  {
+                    type: "checkbox",
+                    name: "permissions",
+                    value: permission,
+                    defaultChecked: permission === "server.view",
+                    className: "w-4 h-4 mt-0.5 rounded border-neutral-600 bg-neutral-900 text-primary-600 focus:ring-primary-600 focus:ring-offset-neutral-800"
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-sm text-neutral-300 font-mono group-hover:text-white transition-colors", children: permission })
+              ] }, permission)) })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "mt-2 flex justify-end", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "submit", className: "w-full bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm disabled:opacity-50", disabled: !canManage, children: "Create Key" }) })
           ] })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "react-ui-panel", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "react-panel-heading", children: "API Keys" }),
-          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "react-list-body", children: [
-            !apiKeys.length ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "react-empty-state", children: "No API keys exist for this server yet." }) : null,
-            apiKeys.map((entry) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "react-list-row is-stacked-mobile", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "react-list-main", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: `react-pill-badge ${entry.active ? "is-success" : "is-danger"}`, children: entry.active ? "Active" : "Inactive" }),
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { children: entry.name }),
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { children: entry.keyPrefixMasked }),
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("small", { children: `Last used: ${formatDate2(entry.lastUsedAt, "Never")}` })
+        ] }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "lg:col-span-8 flex flex-col gap-6", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "px-6 py-4 border-b border-neutral-700 bg-neutral-800/80", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "Active API Keys" }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex flex-col", children: [
+            !apiKeys.length ? /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "p-8 text-center text-sm text-neutral-500", children: "No API keys exist for this server yet." }) : null,
+            apiKeys.map((entry, index) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: `p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${index !== apiKeys.length - 1 ? "border-b border-neutral-700/50" : ""}`, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex flex-col gap-1.5", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex flex-wrap items-center gap-3", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("strong", { className: "text-neutral-100", children: entry.name }),
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: `px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${entry.active ? "bg-green-600/20 text-green-400 border border-green-600/30" : "bg-red-600/20 text-red-400 border border-red-600/30"}`, children: entry.active ? "Active" : "Inactive" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "flex items-center gap-2 mt-1", children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-sm font-mono text-neutral-400 bg-neutral-900 px-2 py-0.5 rounded", children: entry.keyPrefixMasked }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("small", { className: "text-xs text-neutral-500 mt-1 flex items-center gap-1.5", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("i", { className: "bi bi-clock-history" }),
+                  "Last used: ",
+                  formatDate2(entry.lastUsedAt, "Never")
+                ] })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "react-row-actions", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("form", { method: "POST", action: `${actions.keyBase}/${entry.id}/rotate`, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "submit", className: "react-ui-button is-ghost is-small", disabled: !canManage || !entry.active, children: "Rotate" }) }),
-                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("form", { method: "POST", action: `${actions.keyBase}/${entry.id}/revoke`, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "submit", className: "react-ui-button is-danger is-small", disabled: !canManage || !entry.active, children: "Revoke" }) })
+              /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex flex-wrap items-center gap-2 sm:justify-end shrink-0 pt-2 sm:pt-0 mt-3 sm:mt-0 border-t border-neutral-700 sm:border-0", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("form", { method: "POST", action: `${actions.keyBase}/${entry.id}/rotate`, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "submit", className: "bg-transparent hover:bg-neutral-700 text-neutral-300 hover:text-white border border-neutral-600 hover:border-neutral-500 text-xs font-semibold py-1.5 px-3 rounded transition-colors disabled:opacity-50", disabled: !canManage || !entry.active, children: "Rotate" }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("form", { method: "POST", action: `${actions.keyBase}/${entry.id}/revoke`, children: /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("button", { type: "submit", className: "bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-600/30 hover:border-red-600 text-xs font-semibold py-1.5 px-3 rounded transition-colors disabled:opacity-50", disabled: !canManage || !entry.active, children: "Revoke" }) })
               ] })
             ] }, entry.id))
           ] })
-        ] })
+        ] }) })
       ] })
     ] }) });
   }
@@ -10420,15 +10445,15 @@
   var standaloneEntry7 = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "account";
   var root7 = standaloneEntry7 ? (0, import_client7.createRoot)(document.getElementById("reactRoot")) : null;
   function LinkedProviderCard({ provider }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-provider", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-provider-main", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: `bi ${provider.icon}`, style: { color: provider.color } }),
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700/50 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between mb-2", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: `bi ${provider.icon} text-2xl`, style: { color: provider.color } }),
         /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("strong", { children: provider.name }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: provider.isLinked ? "Linked to this account" : "Available to connect" })
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("strong", { className: "block text-sm font-bold text-neutral-200", children: provider.name }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-xs text-neutral-400", children: provider.isLinked ? "Linked to this account" : "Available to connect" })
         ] })
       ] }),
-      provider.isLinked ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("form", { method: "POST", action: provider.unlinkAction, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "submit", className: "react-account-button is-danger", children: "Unlink" }) }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("a", { href: provider.linkAction, className: "react-account-button is-ghost", children: "Connect" })
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "mt-4 sm:mt-0 shrink-0", children: provider.isLinked ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("form", { method: "POST", action: provider.unlinkAction, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "submit", className: "bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 border border-red-600/30 text-xs font-semibold py-1.5 px-4 rounded transition-colors w-full sm:w-auto", children: "Unlink" }) }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("a", { href: provider.linkAction, className: "inline-block bg-neutral-700 hover:bg-neutral-600 text-neutral-200 text-xs font-semibold py-1.5 px-4 rounded transition-colors text-center w-full sm:w-auto", children: "Connect" }) })
     ] });
   }
   function AccountPage({ pageData = data7 }) {
@@ -10510,141 +10535,190 @@
         }));
       }
     };
-    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ReactAppShell, { pageData, subtitle: "Account surface", pageClassName: "react-account-page", shellClassName: "react-account-shell", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("main", { className: "react-account-layout", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("section", { className: "react-account-main", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-scroll", children: [
-      pageData.success ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-flash is-success", children: pageData.success }) : null,
-      pageData.error ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-flash is-danger", children: pageData.error }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-grid", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-card react-account-profile-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-profile", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("img", { src: avatar, alt: user.username || "User", className: "react-account-avatar" }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h1", { children: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username || "Account" }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-username", children: [
+    const inputClass = "w-full bg-neutral-900 border border-neutral-700/50 rounded p-2.5 text-sm text-neutral-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-shadow";
+    const labelClass = "block text-xs font-bold text-neutral-400 uppercase tracking-wide mb-1.5";
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ReactAppShell, { pageData, subtitle: "Account surface", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(PageContentBlock, { title: "Your Account", children: [
+      pageData.success && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-check-circle-fill text-green-500" }),
+        pageData.success
+      ] }),
+      pageData.error && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-exclamation-triangle-fill text-red-500" }),
+        pageData.error
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-12 gap-6 items-start", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lg:col-span-4 flex flex-col gap-6", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col items-center text-center", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("img", { src: avatar, alt: user.username || "User", className: "w-24 h-24 rounded-full border-4 border-neutral-700 shadow-md mb-4" }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h1", { className: "text-xl font-bold text-white leading-tight", children: [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username || "Account" }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "text-sm text-neutral-400 mt-1 font-mono", children: [
                 "@",
                 user.username || "unknown"
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-email", children: user.email || "No email set" })
-            ] })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-badges", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: `react-account-badge ${user.twoFactorEnabled ? "is-success" : "is-muted"}`, children: user.twoFactorEnabled ? "2FA Active" : "2FA Inactive" }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: "react-account-badge is-info", children: [
-              "Theme: ",
-              pageData.activeTheme || "default"
-            ] })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-inline-actions", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(Link, { to: ReactRoutes.deviceLogin, className: "react-account-button is-ghost", children: "Device History" }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("a", { href: ReactRoutes.themes, className: "react-account-button is-ghost", children: "Themes" }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(Link, { to: ReactRoutes.experimentalFeatures, className: "react-account-button is-ghost", children: "Experimental" })
-          ] })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-section-title", children: "Account Details" }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("form", { method: "POST", action: "/account/update", className: "react-account-form", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-form-grid", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: "First Name" }),
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "text", name: "firstName", defaultValue: user.firstName || "", required: true })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: "Last Name" }),
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "text", name: "lastName", defaultValue: user.lastName || "", required: true })
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-sm text-neutral-500 mt-0.5", children: user.email || "No email set" }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-wrap items-center justify-center gap-2 mt-4", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: `px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wide ${user.twoFactorEnabled ? "bg-green-600/20 text-green-400 border border-green-600/30" : "bg-neutral-700 text-neutral-400"}`, children: user.twoFactorEnabled ? "2FA Active" : "2FA Inactive" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: "px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wide bg-primary-600/20 text-primary-400 border border-primary-600/30", children: [
+                  "Theme: ",
+                  pageData.activeTheme || "default"
+                ] })
               ] })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: "Email" }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "email", name: "email", defaultValue: user.email || "", required: true })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-form-grid", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: "Avatar Provider" }),
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("select", { name: "avatarProvider", defaultValue: user.avatarProvider || "gravatar", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "gravatar", children: "Gravatar" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "url", children: "Custom URL" })
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "mt-8 flex flex-col gap-2", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(Link, { to: ReactRoutes.deviceLogin, className: "w-full bg-neutral-700/50 hover:bg-neutral-700 text-neutral-300 text-sm font-semibold py-2 px-4 rounded transition-colors text-center border border-transparent hover:border-neutral-600 flex justify-center items-center gap-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-clock-history" }),
+                " Device History"
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("a", { href: ReactRoutes.themes, className: "w-full bg-neutral-700/50 hover:bg-neutral-700 text-neutral-300 text-sm font-semibold py-2 px-4 rounded transition-colors text-center border border-transparent hover:border-neutral-600 flex justify-center items-center gap-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-palette2" }),
+                " Themes"
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(Link, { to: ReactRoutes.experimentalFeatures, className: "w-full bg-neutral-700/50 hover:bg-neutral-700 text-neutral-300 text-sm font-semibold py-2 px-4 rounded transition-colors text-center border border-transparent hover:border-neutral-600 flex justify-center items-center gap-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-stars" }),
+                " Experimental"
+              ] })
+            ] })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-4", children: "Linked Accounts" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { children: linkedProviders.length > 0 ? linkedProviders.map((provider) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(LinkedProviderCard, { provider }, provider.id)) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-sm text-neutral-400 text-center py-4", children: "No external providers are configured for this account yet." }) })
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "lg:col-span-8 flex flex-col gap-6", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-6", children: "Account Details" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("form", { method: "POST", action: "/account/update", className: "flex flex-col gap-5", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-5", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: labelClass, children: "First Name" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "text", name: "firstName", defaultValue: user.firstName || "", required: true, className: inputClass })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: labelClass, children: "Last Name" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "text", name: "lastName", defaultValue: user.lastName || "", required: true, className: inputClass })
                 ] })
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: "Avatar URL" }),
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "url", name: "avatarUrl", defaultValue: user.avatarUrl || "", placeholder: "https://example.com/avatar.png" })
-              ] })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: "Username" }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "text", value: user.username || "", readOnly: true })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-form-actions", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "submit", className: "react-account-button is-primary", children: "Save Account" }) })
-          ] })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-section-title", children: "Update Password" }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("form", { method: "POST", action: "/account/password", className: "react-account-form", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: "Current Password" }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "password", name: "currentPassword", required: true })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: "New Password" }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "password", name: "newPassword", required: true })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: "Confirm New Password" }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "password", name: "confirmPassword", required: true })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-form-actions", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "submit", className: "react-account-button is-primary", children: "Update Password" }) })
-          ] })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-section-title", children: "Linked Accounts" }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-provider-list", children: linkedProviders.length > 0 ? linkedProviders.map((provider) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(LinkedProviderCard, { provider }, provider.id)) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-muted", children: "No external providers are configured for this account yet." }) })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-section-title", children: "Two-Factor Authentication" }),
-          user.twoFactorEnabled ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-twofa-block", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-muted", children: "Two-factor authentication is enabled. Enter your current password to disable it." }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: "Current Password" }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-                "input",
-                {
-                  type: "password",
-                  value: disableState.password,
-                  onChange: (event) => setDisableState((current) => ({ ...current, password: event.target.value }))
-                }
-              )
-            ] }),
-            disableState.error ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-inline-error", children: disableState.error }) : null,
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: "react-account-button is-danger", onClick: disable2FA, disabled: disableState.loading, children: disableState.loading ? "Disabling..." : "Disable 2FA" })
-          ] }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-twofa-block", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-muted", children: "Start setup to receive a QR code and manual secret for your authenticator app." }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: "react-account-button is-primary", onClick: start2FASetup, disabled: setupState.loading, children: setupState.loading ? "Loading..." : "Start 2FA Setup" }),
-            setupState.qrCodeUrl ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "react-account-twofa-setup", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-twofa-qr-wrap", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("img", { src: setupState.qrCodeUrl, alt: "2FA QR code", className: "react-account-twofa-qr" }) }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: "Manual Secret" }),
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "text", value: setupState.secret, readOnly: true })
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: labelClass, children: "Email" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "email", name: "email", defaultValue: user.email || "", required: true, className: inputClass })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-5", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: labelClass, children: "Avatar Provider" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("select", { name: "avatarProvider", defaultValue: user.avatarProvider || "gravatar", className: `${inputClass} pr-8 appearance-none`, children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "gravatar", children: "Gravatar" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "url", children: "Custom URL" })
+                  ] })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: labelClass, children: "Avatar URL" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "url", name: "avatarUrl", defaultValue: user.avatarUrl || "", placeholder: "https://example.com/avatar.png", className: inputClass })
+                ] })
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: "Verification Code" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: labelClass, children: "Username" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "text", value: user.username || "", readOnly: true, className: `${inputClass} bg-neutral-800/50 cursor-not-allowed text-neutral-500 ring-0 focus:ring-0` }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "block text-xs text-neutral-500 mt-1", children: "Usernames cannot be changed." })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "mt-2 flex justify-end", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "submit", className: "bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm", children: "Save Account" }) })
+            ] })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-6", children: "Update Password" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("form", { method: "POST", action: "/account/password", className: "flex flex-col gap-5", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: labelClass, children: "Current Password" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "password", name: "currentPassword", required: true, className: inputClass })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-5", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: labelClass, children: "New Password" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "password", name: "newPassword", required: true, className: inputClass })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: labelClass, children: "Confirm New Password" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "password", name: "confirmPassword", required: true, className: inputClass })
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "mt-2 flex justify-end", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "submit", className: "bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm", children: "Update Password" }) })
+            ] })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-4", children: "Two-Factor Authentication" }),
+            user.twoFactorEnabled ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-sm text-neutral-400 mb-5", children: "Two-factor authentication is currently enabled on your account. If you would like to disable it, you must securely confirm your password below." }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col sm:flex-row gap-4 items-end", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { className: "flex-1 w-full", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: labelClass, children: "Current Password" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+                    "input",
+                    {
+                      type: "password",
+                      value: disableState.password,
+                      onChange: (e) => setDisableState({ ...disableState, password: e.target.value }),
+                      className: inputClass
+                    }
+                  )
+                ] }),
                 /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-                  "input",
+                  "button",
                   {
-                    type: "text",
-                    value: setupState.code,
-                    maxLength: 6,
-                    onChange: (event) => setSetupState((current) => ({ ...current, code: event.target.value.replace(/[^0-9]/g, "") })),
-                    placeholder: "000000"
+                    type: "button",
+                    className: "w-full sm:w-auto bg-red-600 hover:bg-red-500 text-white font-semibold flex-shrink-0 h-10 px-6 rounded transition-colors text-sm shadow-sm disabled:opacity-50",
+                    onClick: disable2FA,
+                    disabled: disableState.loading,
+                    children: disableState.loading ? "Disabling..." : "Disable 2FA"
                   }
                 )
               ] }),
-              setupState.error ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-inline-error", children: setupState.error }) : null,
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: "react-account-button is-primary", onClick: enable2FA, disabled: setupState.loading, children: setupState.loading ? "Verifying..." : "Verify and Enable" })
-            ] }) : null,
-            !setupState.qrCodeUrl && setupState.error ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "react-account-inline-error", children: setupState.error }) : null
+              disableState.error && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-red-400 text-sm mt-2 font-bold", children: disableState.error })
+            ] }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-sm text-neutral-400 mb-5", children: "Enable two-factor authentication to add an extra layer of security to your account. You will be required to input a code generated by your authenticator app each time you log in." }),
+              !setupState.qrCodeUrl ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+                "button",
+                {
+                  type: "button",
+                  className: "bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm disabled:opacity-50",
+                  onClick: start2FASetup,
+                  disabled: setupState.loading,
+                  children: setupState.loading ? "Connecting..." : "Begin Setup"
+                }
+              ) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700/50 rounded-lg p-6 flex flex-col md:flex-row items-center md:items-start gap-8", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "bg-white p-2 rounded shrink-0 shadow-lg", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("img", { src: setupState.qrCodeUrl, alt: "2FA QR code", className: "w-32 h-32 md:w-40 md:h-40", style: { imageRendering: "pixelated" } }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex-1 w-full", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { className: "block mb-4", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: labelClass, children: "Manual Setup Key" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "text", value: setupState.secret, readOnly: true, className: `${inputClass} font-mono`, onClick: (e) => e.target.select() }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "block text-xs text-neutral-500 mt-1", children: "If you cannot scan the QR code, manually input this secret into your app." })
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { className: "block mb-5", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: labelClass, children: "Authentication Code" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+                      "input",
+                      {
+                        type: "text",
+                        value: setupState.code,
+                        maxLength: 6,
+                        onChange: (event) => setSetupState({ ...setupState, code: event.target.value.replace(/[^0-9]/g, "") }),
+                        placeholder: "000000",
+                        className: `${inputClass} font-mono tracking-widest text-lg py-3`
+                      }
+                    )
+                  ] }),
+                  setupState.error && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-red-400 text-sm mb-4 font-bold", children: setupState.error }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex gap-3", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: "bg-neutral-700 hover:bg-neutral-600 text-white font-semibold py-2 px-6 rounded transition-colors text-sm", onClick: () => setSetupState({ loading: false, qrCodeUrl: "", secret: "", code: "", error: "" }), children: "Cancel" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", className: "bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm disabled:opacity-50", onClick: enable2FA, disabled: setupState.loading || setupState.code.length !== 6, children: setupState.loading ? "Verifying..." : "Verify & Enable" })
+                  ] })
+                ] })
+              ] }),
+              !setupState.qrCodeUrl && setupState.error && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-red-400 text-sm mt-4 font-bold", children: setupState.error })
+            ] })
           ] })
         ] })
       ] })
-    ] }) }) }) });
+    ] }) });
   }
   if (root7) {
     root7.render(/* @__PURE__ */ (0, import_jsx_runtime11.jsx)(AccountPage, { pageData: data7 }));
@@ -10670,26 +10744,28 @@
   function DeviceLoginPage({ pageData = data8 }) {
     const user = pageData.user || {};
     const events = Array.isArray(pageData.events) ? pageData.events : [];
-    return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(ReactAppShell, { pageData, subtitle: "Device login history", pageClassName: "react-experimental-page", shellClassName: "react-experimental-shell", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("main", { className: "react-experimental-layout", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "react-experimental-scroll", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "react-account-card", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "react-account-section-title", children: "Recent login activity" }),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "react-account-muted", children: "Latest account access records across device and login flow." }),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "react-account-inline-actions", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Link, { to: ReactRoutes.account, className: "react-account-button is-ghost", children: "Back to Account" }) })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "react-account-provider-list", style: { marginTop: "18px" }, children: events.length > 0 ? events.map((entry) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "react-account-provider react-device-event", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "react-account-provider-main", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("i", { className: "bi bi-phone" }),
+    return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(ReactAppShell, { pageData, subtitle: "Device login history", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(PageContentBlock, { title: "Activity History", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 mb-6", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "flex justify-between items-center", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "Recent login activity" }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-sm text-neutral-400 mt-1", children: "Latest account access records across device and login flow." })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(Link, { to: ReactRoutes.account, className: "bg-neutral-700 hover:bg-neutral-600 text-neutral-200 text-sm font-semibold py-2 px-4 rounded transition-colors hidden sm:block", children: "Back to Account" })
+      ] }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "flex flex-col gap-2", children: events.length > 0 ? events.map((entry) => /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "flex items-center gap-4", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "bg-neutral-700 text-neutral-300 p-3 rounded-full flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("i", { className: "bi bi-phone text-xl leading-none" }) }),
           /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("strong", { children: entry.username || user.username || "Unknown" }),
-            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { children: `${entry.operatingSystem || "Unknown OS"} \u2022 ${entry.loginType || "Standard"} \u2022 ${entry.ipAddress || "unknown"}` })
+            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "font-bold text-neutral-100", children: entry.username || user.username || "Unknown" }),
+            /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "text-sm text-neutral-400 mt-0.5", children: `${entry.operatingSystem || "Unknown OS"} \u2022 ${entry.loginType || "Standard"} \u2022 ${entry.ipAddress || "unknown"}` })
           ] })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "react-device-event-meta", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("strong", { children: entry.location || "Unknown" }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("span", { children: formatDate3(entry.createdAt) })
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "mt-4 md:mt-0 flex flex-col md:items-end", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "font-semibold text-neutral-200", children: entry.location || "Unknown" }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "text-sm text-neutral-500 font-mono mt-0.5", children: formatDate3(entry.createdAt) })
         ] })
-      ] }, entry.id || `${entry.ipAddress}-${entry.createdAt}`)) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "react-account-card", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "react-account-muted", children: "No login history yet." }) }) })
-    ] }) }) });
+      ] }, entry.id || `${entry.ipAddress}-${entry.createdAt}`)) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-8 text-center", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-neutral-400", children: "No login history yet." }) }) })
+    ] }) });
   }
   if (root8) {
     root8.render(/* @__PURE__ */ (0, import_jsx_runtime12.jsx)(DeviceLoginPage, { pageData: data8 }));
@@ -10705,93 +10781,91 @@
   var data9 = window.__CPANEL_REACT_PAGE_DATA__ || {};
   var standaloneEntry9 = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "experimental-features";
   var root9 = standaloneEntry9 ? (0, import_client9.createRoot)(document.getElementById("reactRoot")) : null;
+  function MetricItem({ title, value, note, active }) {
+    return /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "bg-neutral-900/50 border border-neutral-700/50 rounded-lg p-4", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "flex justify-between items-center mb-1", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "text-xs font-bold text-neutral-500 uppercase tracking-wide", children: title }),
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("strong", { className: `text-sm ${active ? "text-primary-400" : "text-neutral-300"}`, children: value })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "text-xs text-neutral-500", children: note })
+    ] });
+  }
   function ExperimentalFeaturesPage({ pageData = data9 }) {
     const user = pageData.user || {};
     const aiAvailable = Boolean(pageData.aiAdminEnabled && pageData.aiProviderReady);
-    return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(ReactAppShell, { pageData, subtitle: "Experimental features", pageClassName: "react-experimental-page", shellClassName: "react-experimental-shell", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("main", { className: "react-experimental-layout", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "react-experimental-scroll", children: [
-      pageData.success ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "react-account-flash is-success", children: pageData.success }) : null,
-      pageData.error ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "react-account-flash is-danger", children: pageData.error }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "react-experimental-grid", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("section", { className: "react-account-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "react-account-section-title", children: "React View Mode" }),
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "react-account-muted", children: "Switch between the stable EJS renderer and the React beta renderer for migrated pages." }),
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "react-experimental-stat-row", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: `react-account-badge ${pageData.currentViewMode === "react" ? "is-info" : "is-muted"}`, children: pageData.currentViewMode === "react" ? "React Active" : "EJS Active" }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "react-account-inline-actions", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Link, { to: ReactRoutes.changeView, className: "react-account-button is-primary", children: "Open Change View" }) })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("section", { className: "react-account-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "react-account-section-title", children: "AI Agents" }),
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "react-account-muted", children: "User-side AI is controlled both by admin configuration and your own opt-in setting." }),
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "react-experimental-stat-list", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "react-side-item", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "react-side-item-head", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("strong", { children: "Admin switch" }),
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { children: pageData.aiAdminEnabled ? "Enabled" : "Disabled" })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "react-side-item-note", children: "Global AI availability from admin settings." })
+    return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(ReactAppShell, { pageData, subtitle: "Experimental features", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)(PageContentBlock, { title: "Beta Features", children: [
+      pageData.success && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm", children: pageData.success }),
+      pageData.error && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm", children: pageData.error }),
+      /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-2 gap-6", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("section", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 flex flex-col hover:border-neutral-500 transition-colors", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "flex justify-between items-start mb-4", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "React View Mode" }),
+              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "text-sm text-neutral-400 mt-1", children: "Switch between the stable EJS renderer and the React beta renderer for migrated pages." })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "react-side-item", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "react-side-item-head", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("strong", { children: "Provider state" }),
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { children: pageData.aiProviderReady ? "Ready" : "Not ready" })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "react-side-item-note", children: "At least one enabled provider with an API key." })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "react-side-item", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "react-side-item-head", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("strong", { children: "Daily quota" }),
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { children: `${pageData.quotaUsed || 0}/${pageData.quotaLimit || 100}` })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "react-side-item-note", children: "Usage resets daily." })
-            ] })
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: `px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide shrink-0 ml-4 ${pageData.currentViewMode === "react" ? "bg-primary-600 text-white" : "bg-neutral-700 text-neutral-400"}`, children: pageData.currentViewMode === "react" ? "React Active" : "EJS Active" })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("form", { method: "POST", action: "/experimental-features/ai", className: "react-account-form", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("label", { className: "react-experimental-toggle", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "mt-auto pt-4", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Link, { to: ReactRoutes.changeView, className: "inline-block bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm", children: "Open Change View" }) })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("section", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 flex flex-col hover:border-neutral-500 transition-colors", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "mb-4", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "AI Agents" }),
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "text-sm text-neutral-400 mt-1", children: "User-side AI is controlled both by admin configuration and your own opt-in setting." })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(MetricItem, { title: "Admin switch", value: pageData.aiAdminEnabled ? "Enabled" : "Disabled", active: pageData.aiAdminEnabled, note: "Global AI availability from admin settings." }),
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(MetricItem, { title: "Provider state", value: pageData.aiProviderReady ? "Ready" : "Not ready", active: pageData.aiProviderReady, note: "At least one enabled provider with an API key." }),
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "sm:col-span-2", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(MetricItem, { title: "Daily quota", value: `${pageData.quotaUsed || 0}/${pageData.quotaLimit || 100}`, active: true, note: "Usage resets daily." }) })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("form", { method: "POST", action: "/experimental-features/ai", className: "mt-auto border-t border-neutral-700 pt-5", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("label", { className: `flex items-start gap-3 cursor-pointer ${!aiAvailable ? "opacity-50" : ""}`, children: [
               /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
                 "input",
                 {
                   type: "checkbox",
                   name: "enabled",
                   value: "true",
+                  className: "w-5 h-5 mt-0.5 rounded border-neutral-600 bg-neutral-900 text-primary-600 focus:ring-primary-600 focus:ring-offset-neutral-800",
                   defaultChecked: Boolean(user.experimentalAiEnabled),
                   disabled: !aiAvailable
                 }
               ),
               /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("strong", { children: "Enable experimental AI for this account" }),
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { children: aiAvailable ? "You can opt in safely from here." : "Admin must enable AI and configure at least one provider first." })
+                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("strong", { className: "block text-sm font-bold text-neutral-200", children: "Enable experimental AI for this account" }),
+                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { className: "block text-sm text-neutral-400 mt-0.5", children: aiAvailable ? "You can opt in safely from here." : "Admin must enable AI and configure at least one provider first." })
               ] })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "react-account-form-actions", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "submit", className: "react-account-button is-primary", disabled: !aiAvailable, children: "Save Experimental AI" }) })
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "mt-5", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("button", { type: "submit", className: "bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed", disabled: !aiAvailable, children: "Save Experimental AI" }) })
           ] })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("section", { className: "react-account-card react-experimental-wide", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "react-account-section-title", children: "Current Beta Notes" }),
-          /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "react-experimental-note-grid", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "react-side-item is-info", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "react-side-item-head", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("strong", { children: "Dark fixed renderer" }),
+        /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("section", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 lg:col-span-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-4", children: "Current Beta Notes" }),
+          /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-4", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "bg-primary-900/20 border border-primary-500/30 rounded p-4", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "text-xs font-bold text-primary-400 uppercase tracking-wide mb-1 flex justify-between", children: [
+                "Dark fixed renderer ",
                 /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { children: "React" })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "react-side-item-note", children: "React beta ignores custom themes and uses a fixed dark surface." })
+              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "text-sm text-primary-200/70 mt-2", children: "React beta ignores custom themes and uses a fixed dark surface." })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "react-side-item is-warning", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "react-side-item-head", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("strong", { children: "Partial route coverage" }),
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "bg-yellow-900/20 border border-yellow-500/30 rounded p-4", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "text-xs font-bold text-yellow-400 uppercase tracking-wide mb-1 flex justify-between", children: [
+                "Partial route coverage ",
                 /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { children: "Migrating" })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "react-side-item-note", children: "Only migrated pages use React. Everything else falls back to EJS." })
+              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "text-sm text-yellow-200/70 mt-2", children: "Only migrated pages use React. Everything else falls back to EJS." })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "react-side-item", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "react-side-item-head", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("strong", { children: "Storage reset on switch" }),
+            /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "bg-neutral-900/50 border border-neutral-700 rounded p-4", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "text-xs font-bold text-neutral-400 uppercase tracking-wide mb-1 flex justify-between", children: [
+                "Storage reset on switch ",
                 /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("span", { children: "Local only" })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "react-side-item-note", children: "Changing the renderer clears localStorage to avoid stale client state." })
+              /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "text-sm text-neutral-400 mt-2", children: "Changing the renderer clears localStorage to avoid stale client state." })
             ] })
           ] })
         ] })
       ] })
-    ] }) }) });
+    ] }) });
   }
   if (root9) {
     root9.render(/* @__PURE__ */ (0, import_jsx_runtime13.jsx)(ExperimentalFeaturesPage, { pageData: data9 }));
@@ -10819,34 +10893,42 @@
       }, 150);
       return () => window.clearTimeout(timer);
     }, []);
-    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(ReactAppShell, { pageData, subtitle: "Change renderer", pageClassName: "react-experimental-page", shellClassName: "react-experimental-shell", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("main", { className: "react-experimental-layout", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "react-experimental-scroll", children: [
-      pageData.success ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "react-account-flash is-success", children: pageData.success }) : null,
-      pageData.error ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "react-account-flash is-danger", children: pageData.error }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "react-experimental-grid react-change-view-grid", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("section", { className: "react-account-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "react-account-section-title", children: "Legacy EJS View" }),
-          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "react-account-muted", children: "Stable production renderer. Full theme support and complete route coverage." }),
-          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "react-experimental-stat-row", children: pageData.currentViewMode === "ejs" ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "react-account-badge is-success", children: "Active" }) : /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "react-account-badge is-muted", children: "Available" }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("form", { method: "POST", action: "/experimental/change-view", className: "react-account-form", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(ReactAppShell, { pageData, subtitle: "Change renderer", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)(PageContentBlock, { title: "Renderer Mode", children: [
+      pageData.success && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm", children: pageData.success }),
+      pageData.error && /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm", children: pageData.error }),
+      /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-6", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("section", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 flex flex-col hover:border-neutral-500 transition-colors", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "flex justify-between items-start mb-4", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "Legacy EJS View" }),
+              /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { className: "text-sm text-neutral-400 mt-1", children: "Stable production renderer. Full theme support and complete route coverage." })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: `px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide ${pageData.currentViewMode === "ejs" ? "bg-green-600 text-white" : "bg-neutral-700 text-neutral-400"}`, children: pageData.currentViewMode === "ejs" ? "Active" : "Available" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "mt-auto pt-4 border-t border-neutral-700", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("form", { method: "POST", action: "/experimental/change-view", children: [
             /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("input", { type: "hidden", name: "viewMode", value: "ejs" }),
-            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "react-account-form-actions", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "submit", className: "react-account-button is-primary", children: "Use EJS View" }) })
-          ] })
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "submit", className: "w-full bg-neutral-700 hover:bg-neutral-600 text-neutral-200 font-semibold py-2 px-4 rounded transition-colors text-sm", children: "Use EJS View" })
+          ] }) })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("section", { className: "react-account-card", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "react-account-section-title", children: "React Beta View" }),
-          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "react-account-muted", children: "Dark fixed renderer for migrated pages. Faster iteration, partial route coverage, no custom themes." }),
-          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "react-experimental-stat-row", children: pageData.currentViewMode === "react" ? /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "react-account-badge is-info", children: "Active" }) : /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: "react-account-badge is-muted", children: "Available" }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("form", { method: "POST", action: "/experimental/change-view", className: "react-account-form", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("section", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 flex flex-col hover:border-neutral-500 transition-colors", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "flex justify-between items-start mb-4", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "React Beta View" }),
+              /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { className: "text-sm text-neutral-400 mt-1", children: "Dark fixed renderer for migrated pages. Faster iteration, partial route coverage, no custom themes." })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("span", { className: `px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide ${pageData.currentViewMode === "react" ? "bg-primary-600 text-white" : "bg-neutral-700 text-neutral-400"}`, children: pageData.currentViewMode === "react" ? "Active" : "Available" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "mt-auto pt-4 border-t border-neutral-700", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("form", { method: "POST", action: "/experimental/change-view", children: [
             /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("input", { type: "hidden", name: "viewMode", value: "react" }),
-            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "react-account-form-actions", children: /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "submit", className: "react-account-button is-primary", children: "Use React Beta" }) })
-          ] })
+            /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("button", { type: "submit", className: "w-full bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-4 rounded transition-colors text-sm shadow-sm opacity-90 shadow-primary-900/50", children: "Use React Beta" })
+          ] }) })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("section", { className: "react-account-card react-experimental-wide", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "react-account-section-title", children: "Apply Behavior" }),
-          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: "react-account-muted", children: "Switching renderer clears localStorage and redirects back to the main dashboard. This avoids stale UI state crossing between EJS and React." })
+        /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("section", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 md:col-span-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-2", children: "Apply Behavior" }),
+          /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { className: "text-sm text-neutral-400", children: "Switching renderer clears localStorage and redirects back to the main dashboard. This avoids stale UI state crossing between EJS and React." })
         ] })
       ] })
-    ] }) }) });
+    ] }) });
   }
   if (root10) {
     root10.render(/* @__PURE__ */ (0, import_jsx_runtime14.jsx)(ChangeViewPage, { pageData: data10 }));

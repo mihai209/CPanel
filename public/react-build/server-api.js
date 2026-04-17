@@ -7280,7 +7280,7 @@
   });
 
   // views/react/server-api.jsx
-  var import_react2 = __toESM(require_react());
+  var import_react3 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // views/react/components/ReactAppShell.jsx
@@ -8166,8 +8166,23 @@
     ] });
   }
 
-  // views/react/server-api.jsx
+  // views/react/components/PageContentBlock.jsx
+  var import_react2 = __toESM(require_react());
   var import_jsx_runtime2 = __toESM(require_jsx_runtime());
+  function PageContentBlock({ title, children, className = "" }) {
+    import_react2.default.useEffect(() => {
+      if (title) {
+        document.title = `${title} - CPanel`;
+      }
+    }, [title]);
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: `w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 ${className}`, children: [
+      title && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "mb-6 flex justify-between items-center", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h1", { className: "text-2xl font-bold text-neutral-100", children: title }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "w-full", children })
+    ] });
+  }
+
+  // views/react/server-api.jsx
+  var import_jsx_runtime3 = __toESM(require_jsx_runtime());
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
   var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-api";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
@@ -8177,13 +8192,13 @@
     return Number.isNaN(date.getTime()) ? fallback : date.toLocaleString();
   }
   function CopyTokenButton({ value }) {
-    const [copied, setCopied] = import_react2.default.useState(false);
+    const [copied, setCopied] = import_react3.default.useState(false);
     if (!value) return null;
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
       "button",
       {
         type: "button",
-        className: "react-ui-button is-ghost is-small",
+        className: "bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white border border-neutral-700 font-semibold py-1.5 px-3 rounded text-sm transition-colors opacity-90 hover:opacity-100 flex items-center justify-center min-w-[70px]",
         onClick: async () => {
           try {
             await navigator.clipboard.writeText(value);
@@ -8202,64 +8217,86 @@
     const canManage = Boolean(pageData.permissions && pageData.permissions.canManageApiKeys);
     const permissionCatalog = Array.isArray(pageData.apiPermissionCatalog) ? pageData.apiPermissionCatalog : [];
     const actions = pageData.actions || {};
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ReactAppShell, { pageData, subtitle: "API keys", pageClassName: "react-api-page", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("main", { className: "react-surface-page", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("section", { className: "react-surface-header", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "react-surface-eyebrow", children: "Automation" }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h1", { children: "API Keys" }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "react-surface-copy", children: "Create and rotate per-server API credentials without leaving the React view. Existing POST flows remain unchanged." })
-      ] }) }),
-      pageData.success || pageData.error ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: `react-inline-alert ${pageData.error ? "is-danger" : "is-success"}`, children: pageData.error || pageData.success }) : null,
-      pageData.freshToken && pageData.freshToken.token ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-ui-panel", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-panel-heading", children: "New Token" }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-token-row", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("code", { children: pageData.freshToken.token }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(CopyTokenButton, { value: pageData.freshToken.token })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "react-panel-copy", children: "This is the only time the full token is shown." })
+    const inputClass = "w-full bg-neutral-900 border border-neutral-700/50 rounded p-2.5 text-sm text-neutral-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-shadow";
+    const labelClass = "block text-xs font-bold text-neutral-400 uppercase tracking-wide mb-1.5";
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ReactAppShell, { pageData, subtitle: "API keys", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(PageContentBlock, { title: "API Keys", description: "Create and rotate per-server API credentials without leaving the React view. Existing POST flows remain unchanged.", eyebrow: "Automation", children: [
+      pageData.success && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-check-circle-fill text-green-500" }),
+        pageData.success
+      ] }),
+      pageData.error && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-exclamation-triangle-fill text-red-500" }),
+        pageData.error
+      ] }),
+      pageData.freshToken && pageData.freshToken.token ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("section", { className: "bg-neutral-800 border-2 border-primary-600/50 rounded-lg p-6 mb-6", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-white mb-2", children: "New Token Created" }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-sm text-primary-300 mb-4 font-semibold", children: "This is the only time the full token is shown. Please copy it now." }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 flex flex-col sm:flex-row items-center justify-between rounded p-4 gap-4", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("code", { className: "text-primary-400 font-mono text-sm break-all", children: pageData.freshToken.token }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "shrink-0 w-full sm:w-auto flex justify-end", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(CopyTokenButton, { value: pageData.freshToken.token }) })
+        ] })
       ] }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-api-grid", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-ui-panel", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-panel-heading", children: "Create API Key" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("form", { method: "POST", action: actions.create, className: "react-stack-form", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { className: "react-form-field", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Description" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "text", name: "name", maxLength: 120, required: true, placeholder: "CI deploy key" })
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-12 gap-6 items-start", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "lg:col-span-4 flex flex-col gap-6", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-6", children: "Create API Key" }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("form", { method: "POST", action: actions.create, className: "flex flex-col gap-5", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "Description" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { type: "text", name: "name", maxLength: 120, required: true, placeholder: "CI deploy key", className: inputClass })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { className: "react-form-field", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Expires at" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "datetime-local", name: "expiresAt" })
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "Expires at" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("input", { type: "datetime-local", name: "expiresAt", className: `${inputClass} text-neutral-400` })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-check-grid", children: permissionCatalog.map((permission) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { className: "react-check-tile", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "checkbox", name: "permissions", value: permission, defaultChecked: permission === "server.view" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: permission })
-            ] }, permission)) }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "submit", className: "react-ui-button is-primary", disabled: !canManage, children: "Create Key" })
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "mt-2", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "Permissions" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "bg-neutral-900/50 border border-neutral-700/50 rounded-lg p-4 flex flex-col gap-3 max-h-[300px] overflow-y-auto mt-2", children: permissionCatalog.map((permission) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { className: "flex items-start gap-3 cursor-pointer group", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                  "input",
+                  {
+                    type: "checkbox",
+                    name: "permissions",
+                    value: permission,
+                    defaultChecked: permission === "server.view",
+                    className: "w-4 h-4 mt-0.5 rounded border-neutral-600 bg-neutral-900 text-primary-600 focus:ring-primary-600 focus:ring-offset-neutral-800"
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-sm text-neutral-300 font-mono group-hover:text-white transition-colors", children: permission })
+              ] }, permission)) })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "mt-2 flex justify-end", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "submit", className: "w-full bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm disabled:opacity-50", disabled: !canManage, children: "Create Key" }) })
           ] })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-ui-panel", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-panel-heading", children: "API Keys" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-list-body", children: [
-            !apiKeys.length ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-empty-state", children: "No API keys exist for this server yet." }) : null,
-            apiKeys.map((entry) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-list-row is-stacked-mobile", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-list-main", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: `react-pill-badge ${entry.active ? "is-success" : "is-danger"}`, children: entry.active ? "Active" : "Inactive" }),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: entry.name }),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: entry.keyPrefixMasked }),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("small", { children: `Last used: ${formatDate(entry.lastUsedAt, "Never")}` })
+        ] }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "lg:col-span-8 flex flex-col gap-6", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "px-6 py-4 border-b border-neutral-700 bg-neutral-800/80", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "Active API Keys" }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col", children: [
+            !apiKeys.length ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "p-8 text-center text-sm text-neutral-500", children: "No API keys exist for this server yet." }) : null,
+            apiKeys.map((entry, index) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: `p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${index !== apiKeys.length - 1 ? "border-b border-neutral-700/50" : ""}`, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-1.5", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-wrap items-center gap-3", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "text-neutral-100", children: entry.name }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: `px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${entry.active ? "bg-green-600/20 text-green-400 border border-green-600/30" : "bg-red-600/20 text-red-400 border border-red-600/30"}`, children: entry.active ? "Active" : "Inactive" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "flex items-center gap-2 mt-1", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-sm font-mono text-neutral-400 bg-neutral-900 px-2 py-0.5 rounded", children: entry.keyPrefixMasked }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("small", { className: "text-xs text-neutral-500 mt-1 flex items-center gap-1.5", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-clock-history" }),
+                  "Last used: ",
+                  formatDate(entry.lastUsedAt, "Never")
+                ] })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-row-actions", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("form", { method: "POST", action: `${actions.keyBase}/${entry.id}/rotate`, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "submit", className: "react-ui-button is-ghost is-small", disabled: !canManage || !entry.active, children: "Rotate" }) }),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("form", { method: "POST", action: `${actions.keyBase}/${entry.id}/revoke`, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "submit", className: "react-ui-button is-danger is-small", disabled: !canManage || !entry.active, children: "Revoke" }) })
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-wrap items-center gap-2 sm:justify-end shrink-0 pt-2 sm:pt-0 mt-3 sm:mt-0 border-t border-neutral-700 sm:border-0", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("form", { method: "POST", action: `${actions.keyBase}/${entry.id}/rotate`, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "submit", className: "bg-transparent hover:bg-neutral-700 text-neutral-300 hover:text-white border border-neutral-600 hover:border-neutral-500 text-xs font-semibold py-1.5 px-3 rounded transition-colors disabled:opacity-50", disabled: !canManage || !entry.active, children: "Rotate" }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("form", { method: "POST", action: `${actions.keyBase}/${entry.id}/revoke`, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "submit", className: "bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white border border-red-600/30 hover:border-red-600 text-xs font-semibold py-1.5 px-3 rounded transition-colors disabled:opacity-50", disabled: !canManage || !entry.active, children: "Revoke" }) })
               ] })
             ] }, entry.id))
           ] })
-        ] })
+        ] }) })
       ] })
     ] }) });
   }
   var server_api_default = ServerApiPage;
   if (root) {
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ServerApiPage, { pageData: data }));
+    root.render(/* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ServerApiPage, { pageData: data }));
     if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
       window.__CPANEL_REACT_BOOTED__();
     }

@@ -7280,7 +7280,7 @@
   });
 
   // views/react/server-backups.jsx
-  var import_react2 = __toESM(require_react());
+  var import_react3 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // views/react/components/ReactAppShell.jsx
@@ -8166,8 +8166,23 @@
     ] });
   }
 
-  // views/react/server-backups.jsx
+  // views/react/components/PageContentBlock.jsx
+  var import_react2 = __toESM(require_react());
   var import_jsx_runtime2 = __toESM(require_jsx_runtime());
+  function PageContentBlock({ title, children, className = "" }) {
+    import_react2.default.useEffect(() => {
+      if (title) {
+        document.title = `${title} - CPanel`;
+      }
+    }, [title]);
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: `w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 ${className}`, children: [
+      title && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "mb-6 flex justify-between items-center", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h1", { className: "text-2xl font-bold text-neutral-100", children: title }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "w-full", children })
+    ] });
+  }
+
+  // views/react/server-backups.jsx
+  var import_jsx_runtime3 = __toESM(require_jsx_runtime());
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
   var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-backups";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
@@ -8194,6 +8209,12 @@
     if (["queued", "running", "retrying"].includes(value)) return "warning";
     return "danger";
   }
+  function statusColorClass(status) {
+    const tone = statusTone(status);
+    if (tone === "success") return "bg-green-600/20 text-green-400 border border-green-600/30";
+    if (tone === "warning") return "bg-yellow-600/20 text-yellow-400 border border-yellow-600/30";
+    return "bg-red-600/20 text-red-400 border border-red-600/30";
+  }
   function ServerBackupsPage({ pageData = data }) {
     const server = pageData.server || {};
     const backups = Array.isArray(pageData.backups) ? pageData.backups : [];
@@ -8201,95 +8222,154 @@
     const permissions = pageData.permissions || {};
     const policy = pageData.backupPolicy || {};
     const actions = pageData.actions || {};
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ReactAppShell, { pageData, subtitle: "Backups", pageClassName: "react-backups-page", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("main", { className: "react-surface-page", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-surface-header", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "react-surface-eyebrow", children: "Recovery" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h1", { children: "Backups" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "react-surface-copy", children: "Review backup history, connect Google Drive for storage, and trigger fresh snapshots from the same backend flow used by EJS." })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-surface-actions", children: permissions.canManageBackups ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("form", { method: "POST", action: actions.run, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "submit", className: "react-ui-button is-primary", children: "Create Backup" }) }) : null })
-      ] }),
-      pageData.success || pageData.error ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: `react-inline-alert ${pageData.error ? "is-danger" : "is-success"}`, children: pageData.error || pageData.success }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-backups-grid", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-ui-panel", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-panel-heading", children: "Drive Integration" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-list", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Server" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: server.name || "Server" })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Drive Ready" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: driveState.ready ? "Ready" : "Needs setup" })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-row", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Last Run" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: formatWhen(policy.lastRunAt) })
-            ] })
+    const inputClass = "w-full bg-neutral-900 border border-neutral-700/50 rounded p-2.5 text-sm text-neutral-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-shadow";
+    const labelClass = "block text-xs font-bold text-neutral-400 uppercase tracking-wide mb-1.5";
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ReactAppShell, { pageData, subtitle: "Backups", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+      PageContentBlock,
+      {
+        title: "Backups",
+        description: "Review backup history, connect Google Drive for storage, and trigger fresh snapshots.",
+        eyebrow: "Recovery",
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "flex justify-end mb-6", children: permissions.canManageBackups ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("form", { method: "POST", action: actions.run, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("button", { type: "submit", className: "bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm flex items-center gap-2", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-hdd-rack" }),
+            " Create Backup"
+          ] }) }) : null }),
+          pageData.success && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-check-circle-fill text-green-500" }),
+            pageData.success
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "react-panel-copy", children: driveState.statusText || "Google Drive state is unavailable." }),
-          driveState.canConnect ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("a", { href: actions.connectGoogle || driveState.connectUrl, className: "react-ui-button is-ghost", children: "Connect Google Drive" }) : null
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-ui-panel", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-panel-heading", children: "Policy" }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("form", { method: "POST", action: actions.savePolicy, className: "react-stack-form", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { className: "react-form-field", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Enable scheduled backups" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "checkbox", name: "enabled", defaultChecked: Boolean(policy.autoEnabled) })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("label", { className: "react-form-field", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Interval in minutes" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("input", { type: "number", name: "intervalMinutes", min: "5", max: "10080", defaultValue: policy.intervalMinutes || 360 })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("button", { type: "submit", className: "react-ui-button is-primary", disabled: !permissions.canManageBackupPolicy, children: "Save Policy" })
-          ] })
-        ] })
-      ] }),
-      pageData.activeJob ? /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-ui-panel", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-panel-heading", children: "Active Job" }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-list", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-row", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Status" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: pageData.activeJob.status })
+          pageData.error && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-exclamation-triangle-fill text-red-500" }),
+            pageData.error
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-row", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Type" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: pageData.activeJob.type })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-stat-row", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { children: "Updated" }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: formatWhen(pageData.activeJob.updatedAt) })
-          ] })
-        ] })
-      ] }) : null,
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("section", { className: "react-ui-panel", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-panel-heading", children: "Backup History" }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-list-body", children: [
-          !backups.length ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "react-empty-state", children: "No backups were recorded yet." }) : null,
-          backups.map((entry) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-list-row is-stacked-mobile", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-list-main", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: `react-pill-badge is-${statusTone(entry.status)}`, children: entry.status || "unknown" }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("strong", { children: formatWhen(entry.createdAt) }),
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("span", { children: [
-                entry.trigger || "manual",
-                " \xB7 ",
-                formatBytes(entry.sizeBytes)
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-2 gap-6 items-start mb-6", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-3 mb-6", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-google text-2xl text-primary-400" }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "Drive Integration" })
               ] }),
-              entry.error ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("small", { children: entry.error }) : null
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-4 mb-4", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-3", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Server" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "text-neutral-200", children: server.name || "Server" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-3", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Drive Ready" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: driveState.ready ? "text-green-400" : "text-neutral-400", children: driveState.ready ? "Ready" : "Needs setup" })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex justify-between items-center pb-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Last Run" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "text-neutral-200 font-mono text-sm", children: formatWhen(policy.lastRunAt) })
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("p", { className: "text-sm text-neutral-400 italic mb-4", children: driveState.statusText || "Google Drive state is unavailable." }),
+              driveState.canConnect ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("a", { href: actions.connectGoogle || driveState.connectUrl, className: "inline-block bg-neutral-700 hover:bg-neutral-600 text-white font-semibold py-2 px-6 rounded transition-colors text-sm text-center w-full shadow-sm", children: "Connect Google Drive" }) : null
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "react-row-actions", children: [
-              entry.webViewLink ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("a", { href: entry.webViewLink, className: "react-ui-button is-ghost is-small", target: "_blank", rel: "noreferrer", children: "Open File" }) : null,
-              entry.folderLink ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("a", { href: entry.folderLink, className: "react-ui-button is-ghost is-small", target: "_blank", rel: "noreferrer", children: "Folder" }) : null
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6 flex flex-col h-full", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-3 mb-6", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-calendar-event text-2xl text-primary-400" }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "Automated Policy" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("form", { method: "POST", action: actions.savePolicy, className: "flex flex-col gap-5 flex-1", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { className: "flex items-start gap-3 cursor-pointer group mb-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                    "input",
+                    {
+                      type: "checkbox",
+                      name: "enabled",
+                      defaultChecked: Boolean(policy.autoEnabled),
+                      className: "w-5 h-5 mt-0.5 rounded border-neutral-600 bg-neutral-900 text-primary-600 focus:ring-primary-600 focus:ring-offset-neutral-800"
+                    }
+                  ),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "block text-sm font-bold text-neutral-200 group-hover:text-white transition-colors", children: "Enable scheduled backups" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "block text-xs text-neutral-500 mt-1", children: "Automatically generates periodic backups in the background." })
+                  ] })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("label", { className: "mb-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: labelClass, children: "Interval in minutes" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "relative", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+                      "input",
+                      {
+                        type: "number",
+                        name: "intervalMinutes",
+                        min: "5",
+                        max: "10080",
+                        defaultValue: policy.intervalMinutes || 360,
+                        className: inputClass
+                      }
+                    ),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-neutral-500 text-xs font-bold", children: "MIN" })
+                  ] })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "mt-auto flex justify-end flex-wrap pt-4", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("button", { type: "submit", className: "w-full bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm disabled:opacity-50", disabled: !permissions.canManageBackupPolicy, children: "Save Policy" }) })
+              ] })
             ] })
-          ] }, entry.id))
-        ] })
-      ] })
-    ] }) });
+          ] }),
+          pageData.activeJob ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-primary-900/20 border-2 border-primary-600/50 rounded-lg p-6 mb-6", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("h2", { className: "text-lg font-bold text-white mb-4 flex items-center gap-2", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-arrow-repeat animate-spin text-primary-400" }),
+              " Active Backup Job"
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-4", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-900/50 p-3 rounded", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "block text-xs font-bold text-neutral-500 uppercase", children: "Status" }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "block text-sm text-primary-300 mt-1", children: pageData.activeJob.status })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-900/50 p-3 rounded", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "block text-xs font-bold text-neutral-500 uppercase", children: "Type" }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "block text-sm text-neutral-200 mt-1", children: pageData.activeJob.type })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-900/50 p-3 rounded", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "block text-xs font-bold text-neutral-500 uppercase", children: "Updated" }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "block text-sm text-neutral-200 mt-1 font-mono", children: formatWhen(pageData.activeJob.updatedAt) })
+              ] })
+            ] })
+          ] }) : null,
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "px-6 py-4 border-b border-neutral-700 bg-neutral-800/80", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "Backup History" }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col", children: [
+              !backups.length ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "p-8 text-center text-sm text-neutral-500", children: "No backups were recorded yet." }) : null,
+              backups.map((entry, index) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: `p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors hover:bg-neutral-700/20 ${index !== backups.length - 1 ? "border-b border-neutral-700/50" : ""}`, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-col gap-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-3", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-archive text-xl text-neutral-400" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("strong", { className: "text-neutral-100 font-mono text-sm tracking-wide", children: formatWhen(entry.createdAt) }),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: `px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide inline-block ${statusColorClass(entry.status)}`, children: entry.status || "unknown" })
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-sm text-neutral-400 flex items-center gap-2 pl-8", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "capitalize", children: entry.trigger || "manual" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-neutral-600", children: "\u2022" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "font-mono", children: formatBytes(entry.sizeBytes) })
+                  ] }),
+                  entry.error ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-xs text-red-400 font-mono mt-1 pl-8 bg-red-900/10 p-2 rounded", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-exclamation-triangle mr-1" }),
+                    " ",
+                    entry.error
+                  ] }) : null
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex flex-wrap items-center gap-2 sm:justify-end shrink-0 pt-3 sm:pt-0 border-t border-neutral-700 sm:border-0 pl-8 sm:pl-0", children: [
+                  entry.webViewLink ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("a", { href: entry.webViewLink, className: "bg-transparent hover:bg-neutral-700 text-neutral-300 hover:text-white border border-neutral-600 hover:border-neutral-500 text-xs font-semibold py-1.5 px-4 rounded transition-colors flex items-center gap-2", target: "_blank", rel: "noreferrer", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-link-45deg" }),
+                    " Open File"
+                  ] }) : null,
+                  entry.folderLink ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("a", { href: entry.folderLink, className: "bg-neutral-700 hover:bg-neutral-600 text-white border border-neutral-600 hover:border-neutral-500 text-xs font-semibold py-1.5 px-4 rounded transition-colors flex items-center gap-2", target: "_blank", rel: "noreferrer", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-folder2-open" }),
+                    " Folder"
+                  ] }) : null
+                ] })
+              ] }, entry.id))
+            ] })
+          ] })
+        ]
+      }
+    ) });
   }
   var server_backups_default = ServerBackupsPage;
   if (root) {
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ServerBackupsPage, { pageData: data }));
+    root.render(/* @__PURE__ */ (0, import_jsx_runtime3.jsx)(ServerBackupsPage, { pageData: data }));
     if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
       window.__CPANEL_REACT_BOOTED__();
     }
