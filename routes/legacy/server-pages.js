@@ -1010,6 +1010,7 @@ function registerServerPagesRoutes(ctx) {
                     tags: Array.isArray(server.tags) ? server.tags : []
                 })),
                 isAdminDashboard,
+                showOthersServers,
                 openIncidents,
                 pendingMaintenance,
                 openSecurityAlerts,
@@ -11067,6 +11068,64 @@ function registerServerPagesRoutes(ctx) {
         } catch (err) {
             console.error('Error loading AI manage page:', err);
             return res.redirect('/server/notfound');
+        }
+    });
+
+    app.post('/server/:containerId/activity/clear', requireAuth, async (req, res) => {
+        try {
+            const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+            if (!server) return res.status(404).json({ success: false, error: 'Server not found' });
+
+            const access = await resolveServerAccess(server, req.session.user);
+            if (!hasServerPermission(access, 'server.activity.clear') && !req.session.user.isAdmin) {
+                return res.status(403).json({ success: false, error: 'Insufficient permissions' });
+            }
+
+            const serverPathBase = `/server/${server.containerId}`;
+            
+            // Clear Audit Logs
+            await AuditLog.destroy({
+                where: {
+                    [Op.or]: [
+                        { targetType: 'server', targetId: String(server.id) },
+                        { path: serverPathBase },
+                        { path: { [Op.like]: `${serverPathBase}/%` } },
+                        { path: { [Op.like]: `${serverPathBase}?%` } }
+                    ]
+                }
+            });
+
+            // Clear Change Logs
+            await ServerChangeLog.destroy({
+                where: { serverId: server.id }
+            });
+
+            res.json({ success: true, message: 'Activity history cleared successfully' });
+        } catch (err) {
+            console.error('Error clearing activity log:', err);
+            res.status(500).json({ success: false, error: 'Failed to clear activity history' });
+        }
+    });
+
+    app.post('/server/:containerId/backups/clear', requireAuth, async (req, res) => {
+        try {
+            const server = await Server.findOne({ where: { containerId: req.params.containerId } });
+            if (!server) return res.status(404).json({ success: false, error: 'Server not found' });
+
+            const access = await resolveServerAccess(server, req.session.user);
+            if (!hasServerPermission(access, 'server.backups.manage') && !req.session.user.isAdmin) {
+                return res.status(403).json({ success: false, error: 'Insufficient permissions' });
+            }
+
+            // Clear Backup History from DB
+            await ServerBackup.destroy({
+                where: { serverId: server.id }
+            });
+
+            res.json({ success: true, message: 'Backup history cleared successfully' });
+        } catch (err) {
+            console.error('Error clearing backup history:', err);
+            res.status(500).json({ success: false, error: 'Failed to clear backup history' });
         }
     });
 
@@ -22784,8 +22843,75 @@ app.get('/api/client/servers/:containerId', async (req, res) => {
                 files: result.files
             });
         } catch (error) {
-            console.error('Server API create folder endpoint failed:', error);
+            console.error('Server API rename endpoint failed:', error);
             return res.status(500).json({ success: false, error: 'Internal server error.' });
+        }
+    });
+
+    app.post('/api/client/servers/:containerId/files/archive', async (req, res) => {
+        try {
+            const auth = await authenticateServerApiClientRequest(req, 'server.files.write');
+            if (!auth.ok) return res.status(auth.status).json({ success: false, error: auth.error });
+
+            const directory = String(req.body.directory || '/').trim() || '/';
+            const files = Array.isArray(req.body.files) ? req.body.files : [];
+            const archiveName = String(req.body.name || 'archive.zip').trim();
+
+            if (files.length === 0 || !archiveName) {
+                return res.status(400).json({ success: false, error: 'Files and archive name are required.' });
+            }
+
+            const server = auth.server;
+            const connectorWs = connectorConnections.get(server.allocation.connectorId);
+            if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+                return res.status(503).json({ success: false, error: 'Connector is offline.' });
+            }
+
+            connectorWs.send(JSON.stringify({
+                type: 'create_archive',
+                serverId: server.id,
+                directory,
+                files,
+                archiveName
+            }));
+
+            // We don't wait for completion here as it might take a while, 
+            // the connector will broadcast an archive_complete event later.
+            // But we can wait a bit for an ACK or Error.
+            res.json({ success: true, message: 'Archive creation started.' });
+        } catch (error) {
+            console.error('Archive API failed:', error);
+            res.status(500).json({ success: false, error: 'Internal server error.' });
+        }
+    });
+
+    app.post('/api/client/servers/:containerId/files/unarchive', async (req, res) => {
+        try {
+            const auth = await authenticateServerApiClientRequest(req, 'server.files.write');
+            if (!auth.ok) return res.status(auth.status).json({ success: false, error: auth.error });
+
+            const directory = String(req.body.directory || '/').trim() || '/';
+            const name = String(req.body.name || '').trim();
+
+            if (!name) return res.status(400).json({ success: false, error: 'File name is required.' });
+
+            const server = auth.server;
+            const connectorWs = connectorConnections.get(server.allocation.connectorId);
+            if (!connectorWs || connectorWs.readyState !== WebSocket.OPEN) {
+                return res.status(503).json({ success: false, error: 'Connector is offline.' });
+            }
+
+            connectorWs.send(JSON.stringify({
+                type: 'extract_archive',
+                serverId: server.id,
+                directory,
+                name
+            }));
+
+            res.json({ success: true, message: 'Extraction started.' });
+        } catch (error) {
+            console.error('Unarchive API failed:', error);
+            res.status(500).json({ success: false, error: 'Internal server error.' });
         }
     });
 

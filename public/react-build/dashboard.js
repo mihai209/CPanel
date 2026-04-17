@@ -7280,7 +7280,7 @@
   });
 
   // views/react/dashboard.jsx
-  var import_react5 = __toESM(require_react());
+  var import_react6 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // node_modules/react-router-dom/dist/index.js
@@ -8074,21 +8074,91 @@
   }
 
   // views/react/components/ReactAppShell.jsx
+  var import_react2 = __toESM(require_react());
+
+  // views/react/components/ProvisioningBarrier.jsx
   var import_react = __toESM(require_react());
   var import_jsx_runtime = __toESM(require_jsx_runtime());
+  function ProvisioningBarrier({ status = "installing", containerId }) {
+    const isReinstall = status === "reinstalling";
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col items-center justify-center min-h-[500px] py-20 px-6 text-center", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "relative mb-8", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute -inset-10 bg-primary-600/10 rounded-full blur-3xl animate-pulse" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "relative w-32 h-32 flex items-center justify-center", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { className: "w-full h-full text-primary-500 animate-[spin_3s_linear_infinite]", viewBox: "0 0 100 100", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "circle",
+            {
+              cx: "50",
+              cy: "50",
+              r: "45",
+              fill: "none",
+              stroke: "currentColor",
+              strokeWidth: "2",
+              strokeDasharray: "200 100",
+              strokeLinecap: "round"
+            }
+          ) }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-0 flex items-center justify-center text-primary-400", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: `bi ${isReinstall ? "bi-arrow-clockwise" : "bi-tools"} text-4xl` }) })
+        ] })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { className: "text-3xl font-black text-white uppercase tracking-[0.2em] mb-4", children: isReinstall ? "System Reinstall" : "Server Provisioning" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { className: "text-neutral-500 font-bold uppercase tracking-widest text-xs max-w-md mx-auto leading-relaxed mb-8", children: [
+        "Your server instance is currently being ",
+        isReinstall ? "reinstalled" : "set up",
+        " on the node. Administrative tools are temporarily disabled to ensure data integrity during file restoration."
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex flex-col items-center gap-4", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-2 bg-neutral-800/50 px-4 py-2 rounded-full border border-neutral-700/50", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "w-2 h-2 bg-primary-500 rounded-full animate-ping" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "text-[10px] font-black text-neutral-300 uppercase tracking-widest", children: [
+            "Working on ",
+            containerId?.substring(0, 12) || "unknown"
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-4 flex gap-4", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+          "a",
+          {
+            href: `/server/${containerId}`,
+            className: "bg-neutral-800 hover:bg-neutral-700 text-neutral-100 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-3 border border-neutral-700",
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: "bi bi-terminal text-lg opacity-50" }),
+              "Open Console"
+            ]
+          }
+        ) })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-16 grid grid-cols-1 sm:grid-cols-3 gap-8 w-full max-w-2xl opacity-40 grayscale group-hover:grayscale-0 transition-all", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "text-center", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-xl text-neutral-400 mb-1 font-black", children: "1" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[10px] text-neutral-600 uppercase font-black tracking-widest", children: "Allocating Resources" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "text-center", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-xl text-white mb-1 font-black", children: "2" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[10px] text-primary-400 uppercase font-black tracking-widest ring-1 ring-primary-500/20 rounded-full px-2 py-1", children: "Running Install Script" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "text-center", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-xl text-neutral-400 mb-1 font-black", children: "3" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[10px] text-neutral-600 uppercase font-black tracking-widest", children: "Starting Instance" })
+        ] })
+      ] })
+    ] });
+  }
+
+  // views/react/components/ReactAppShell.jsx
+  var import_jsx_runtime2 = __toESM(require_jsx_runtime());
   function InternalTopAction({ to, icon, title }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
       NavLink,
       {
         to,
         title,
         className: ({ isActive }) => `text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700 ${isActive ? "text-neutral-100 bg-neutral-700" : ""}`,
-        children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: `bi ${icon}` })
+        children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("i", { className: `bi ${icon}` })
       }
     );
   }
   function PrimaryNavLink({ to, label }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
       NavLink,
       {
         to,
@@ -8106,43 +8176,49 @@
   }) {
     const brandImage = resolveBrandImage(pageData);
     const userAvatar = resolveUserAvatar(pageData.user || {}, brandImage);
-    const [mobileNavOpen, setMobileNavOpen] = import_react.default.useState(false);
+    const [mobileNavOpen, setMobileNavOpen] = import_react2.default.useState(false);
     const serverNavItems = Array.isArray(pageData.serverNavItems) ? pageData.serverNavItems : [];
     const shellNavItems = [
       { to: ReactRoutes.dashboard, label: "Dashboard" },
       { to: ReactRoutes.account, label: "Account" }
     ];
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: `min-h-screen bg-neutral-900 text-neutral-200 flex flex-col ${pageClassName || ""}`, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "bg-neutral-800 border-b border-neutral-700 w-full flex items-center justify-between px-4 lg:px-8 h-16 shrink-0", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-4", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", { src: brandImage, alt: pageData.brandName || "CPanel", className: "w-8 h-8 rounded shrink-0" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-lg font-bold text-neutral-100 leading-tight", children: pageData.brandName || "CPanel" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-xs text-neutral-400 font-semibold", children: subtitle })
+    const isProvisioning = ["installing", "reinstalling"].includes(pageData.server?.status);
+    const currentPath = window.location.pathname;
+    const isConsolePage = currentPath.endsWith("/console") || currentPath.endsWith(pageData.server?.containerId);
+    const blockedPageKeys = ["files", "backups", "dbs", "network", "users", "api", "schedules", "startup", "timeline"];
+    const activeNavItem = serverNavItems.find((item) => item.active);
+    const shouldBlock = isProvisioning && activeNavItem && blockedPageKeys.includes(activeNavItem.key);
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: `min-h-screen bg-neutral-900 text-neutral-200 flex flex-col ${pageClassName || ""}`, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "bg-neutral-800 border-b border-neutral-700 w-full flex items-center justify-between px-4 lg:px-8 h-16 shrink-0", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "flex items-center gap-4", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("img", { src: brandImage, alt: pageData.brandName || "CPanel", className: "w-8 h-8 rounded shrink-0" }),
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "text-lg font-bold text-neutral-100 leading-tight", children: pageData.brandName || "CPanel" }),
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "text-xs text-neutral-400 font-semibold", children: subtitle })
           ] })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("nav", { className: "hidden md:flex items-center h-full ml-10 flex-1", children: [
-          shellNavItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PrimaryNavLink, { to: item.to, label: item.label }, item.to)),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex-1" })
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("nav", { className: "hidden md:flex items-center h-full ml-10 flex-1", children: [
+          shellNavItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(PrimaryNavLink, { to: item.to, label: item.label }, item.to)),
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "flex-1" })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-3 md:gap-4 shrink-0", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "flex items-center gap-3 md:gap-4 shrink-0", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
             "button",
             {
               type: "button",
               className: "md:hidden text-neutral-400 hover:text-neutral-100 p-2",
               title: "Toggle navigation",
               onClick: () => setMobileNavOpen(!mobileNavOpen),
-              children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: "bi bi-list text-2xl" })
+              children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("i", { className: "bi bi-list text-2xl" })
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "hidden md:flex items-center gap-2", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(InternalTopAction, { to: ReactRoutes.experimentalFeatures, icon: "bi-sliders", title: "Experimental Features" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", { className: "text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700", href: ReactRoutes.changeView, title: "Exit Beta", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: "bi bi-door-open" }) })
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "hidden md:flex items-center gap-2", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(InternalTopAction, { to: ReactRoutes.experimentalFeatures, icon: "bi-sliders", title: "Experimental Features" }),
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("a", { className: "text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700", href: ReactRoutes.changeView, title: "Exit Beta", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("i", { className: "bi bi-door-open" }) })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-3 pl-4 border-l border-neutral-700", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-sm font-semibold hidden md:block", children: pageData.user?.username || "Guest" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "flex items-center gap-3 pl-4 border-l border-neutral-700", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "text-sm font-semibold hidden md:block", children: pageData.user?.username || "Guest" }),
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
               "img",
               {
                 src: userAvatar,
@@ -8153,8 +8229,8 @@
           ] })
         ] })
       ] }),
-      mobileNavOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "md:hidden bg-neutral-800 border-b border-neutral-700 flex flex-col", children: [
-        shellNavItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+      mobileNavOpen && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "md:hidden bg-neutral-800 border-b border-neutral-700 flex flex-col", children: [
+        shellNavItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
           NavLink,
           {
             to: item.to,
@@ -8163,9 +8239,9 @@
           },
           item.to
         )),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(NavLink, { to: ReactRoutes.changeView, className: "px-4 py-3 text-sm font-semibold border-l-4 border-transparent text-neutral-400 hover:text-white", children: "Exit Beta Mode" })
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(NavLink, { to: ReactRoutes.changeView, className: "px-4 py-3 text-sm font-semibold border-l-4 border-transparent text-neutral-400 hover:text-white", children: "Exit Beta Mode" })
       ] }),
-      serverNavItems.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("nav", { className: "bg-neutral-800/55 border-b border-neutral-700/50 flex flex-col md:flex-row overflow-x-auto px-4 lg:px-8 py-1 md:py-0", children: [
+      serverNavItems.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("nav", { className: "bg-neutral-800/55 border-b border-neutral-700/50 flex flex-row overflow-x-auto no-scrollbar px-4 lg:px-8 py-0 md:py-0 w-full whitespace-nowrap scroll-smooth", children: [
         { name: "Home", keys: ["overview", "console", "activity"] },
         { name: "Data", keys: ["files", "backups", "dbs"] },
         { name: "Access", keys: ["network", "users", "api", "schedules"] },
@@ -8173,41 +8249,48 @@
       ].map((group) => {
         const groupItems = serverNavItems.filter((item) => group.keys.includes(item.key));
         if (groupItems.length === 0) return null;
-        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center group/navgroup", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "hidden lg:block h-3 w-px bg-neutral-700 mx-1 first:hidden" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex items-center overflow-x-auto no-scrollbar", children: groupItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-            "a",
-            {
-              href: item.href,
-              className: `px-3 py-3 text-[11px] font-black uppercase tracking-widest whitespace-nowrap transition-all border-b-2 hover:translate-y-[-1px] ${item.active ? "text-primary-400 border-primary-500 bg-primary-500/5" : "text-neutral-500 border-transparent hover:text-neutral-300"}`,
-              children: item.label
-            },
-            item.href
-          )) })
+        return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "flex items-center group/navgroup shrink-0 h-12", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "hidden lg:block h-3 w-px bg-neutral-700 mx-1 first:hidden opacity-50" }),
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "flex items-center", children: groupItems.map((item) => {
+            const isDisabled = isProvisioning && blockedPageKeys.includes(item.key);
+            return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+              "a",
+              {
+                href: isDisabled ? "#" : item.href,
+                onClick: isDisabled ? (e) => e.preventDefault() : void 0,
+                className: `px-3 py-4 text-[11px] font-black uppercase tracking-widest whitespace-nowrap transition-all border-b-2 flex items-center h-full ${isDisabled ? "text-neutral-700 border-transparent cursor-not-allowed grayscale" : item.active ? "text-primary-400 border-primary-500 bg-primary-500/5" : "text-neutral-500 border-transparent hover:text-neutral-300 hover:translate-y-[-1px]"}`,
+                children: [
+                  item.label,
+                  isDisabled && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("i", { className: "bi bi-lock-fill ms-2 text-[8px] opacity-40" })
+                ]
+              },
+              item.href
+            );
+          }) })
         ] }, group.name);
       }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("main", { className: "flex-1 w-full bg-neutral-900", children })
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("main", { className: "flex-1 w-full bg-neutral-900", children: shouldBlock ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ProvisioningBarrier, { status: pageData.server.status, containerId: pageData.server.containerId }) : children })
     ] });
   }
 
   // views/react/components/PageContentBlock.jsx
-  var import_react2 = __toESM(require_react());
-  var import_jsx_runtime2 = __toESM(require_jsx_runtime());
+  var import_react3 = __toESM(require_react());
+  var import_jsx_runtime3 = __toESM(require_jsx_runtime());
   function PageContentBlock({ title, children, className = "" }) {
-    import_react2.default.useEffect(() => {
+    import_react3.default.useEffect(() => {
       if (title) {
         document.title = `${title} - CPanel`;
       }
     }, [title]);
-    return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: `w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 ${className}`, children: [
-      title && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "mb-6 flex justify-between items-center", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h1", { className: "text-2xl font-bold text-neutral-100", children: title }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "w-full", children })
+    return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: `w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 ${className}`, children: [
+      title && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "mb-6 flex justify-between items-center", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h1", { className: "text-2xl font-bold text-neutral-100", children: title }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "w-full", children })
     ] });
   }
 
   // views/react/components/ServerRow.jsx
-  var import_react3 = __toESM(require_react());
-  var import_jsx_runtime3 = __toESM(require_jsx_runtime());
+  var import_react4 = __toESM(require_react());
+  var import_jsx_runtime4 = __toESM(require_jsx_runtime());
   function formatLimit(mb) {
     if (!mb || mb <= 0) return "N/A";
     if (mb >= 1024) return `${(mb / 1024).toFixed(mb % 1024 === 0 ? 0 : 1)} GB`;
@@ -8227,103 +8310,119 @@
     } else if (rawStatus === "installing") {
       statusColor = "bg-yellow-500 text-neutral-900";
     }
-    return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-5 hover:border-neutral-500 transition-colors duration-200 flex flex-col md:flex-row md:items-center justify-between group", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex-1 min-w-0", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-3 mb-1", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("h3", { className: "text-lg font-bold text-neutral-100 truncate group-hover:text-primary-400 transition-colors", children: server.name }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: `text-xs px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide ${statusColor}`, children: statusLabel })
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "bg-neutral-900/50 backdrop-blur-sm border border-neutral-800/80 rounded-[1.5rem] p-6 hover:border-primary-500/30 hover:bg-neutral-800/40 transition-all duration-300 flex flex-col lg:flex-row lg:items-center justify-between group shadow-lg hover:shadow-primary-900/5", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "flex-1 min-w-0", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "flex items-center gap-4 mb-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: `w-2.5 h-2.5 rounded-full ${server.isSuspended ? "bg-red-500" : rawStatus === "running" ? "bg-green-500" : "bg-neutral-700"} shadow-[0_0_10px_rgba(34,197,94,0.3)]` }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("h3", { className: "text-lg font-black text-neutral-100 truncate group-hover:text-primary-400 transition-colors tracking-tight", children: server.name }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: `text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-[0.1em] ${statusColor} bg-opacity-10 ring-1 ring-inset ring-current`, children: statusLabel })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-2 mt-1", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-xs text-neutral-500 font-mono truncate", children: server.containerId?.substring(0, 12) }),
-          isAdminDashboard && server.owner && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "flex items-center gap-1.5 ml-2 pl-2 border-l border-neutral-700", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("i", { className: "bi bi-person text-[10px] text-neutral-500" }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("span", { className: "text-[10px] font-bold text-neutral-400 uppercase tracking-tighter", children: server.owner.username })
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "flex items-center gap-3 mt-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "text-[10px] text-neutral-500 font-black uppercase tracking-widest bg-neutral-800/50 px-2 py-0.5 rounded", children: server.containerId?.substring(0, 12) }),
+          isAdminDashboard && server.owner && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "flex items-center gap-2 pl-3 border-l border-neutral-800", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("i", { className: "bi bi-person-badge text-xs text-primary-500/70" }),
+            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "text-[10px] font-black text-neutral-400 uppercase tracking-widest", children: server.owner.username })
           ] })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "mt-4 md:mt-0 flex gap-4 md:ml-6 shrink-0", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-center", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-xs text-neutral-500 uppercase font-bold tracking-wider mb-0.5", children: "CPU" }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-sm font-mono text-neutral-200", children: server.cpu ? `${server.cpu}%` : "N/A" })
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "mt-6 lg:mt-0 flex flex-wrap sm:flex-nowrap items-center gap-6 lg:ml-8 shrink-0", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "flex-1 sm:flex-none", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "text-[10px] text-neutral-500 uppercase font-black tracking-widest mb-1 opacity-60", children: "CPU Usage" }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "text-sm font-black text-neutral-200 tabular-nums", children: server.cpu ? `${server.cpu}%` : "0%" })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-center", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-xs text-neutral-500 uppercase font-bold tracking-wider mb-0.5", children: "Memory" }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-sm font-mono text-neutral-200", children: formatLimit(server.memory) })
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "w-px h-8 bg-neutral-800 hidden sm:block" }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "flex-1 sm:flex-none", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "text-[10px] text-neutral-500 uppercase font-black tracking-widest mb-1 opacity-60", children: "Memory" }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "text-sm font-black text-neutral-200 tabular-nums", children: formatLimit(server.memory) })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)("div", { className: "text-center", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-xs text-neutral-500 uppercase font-bold tracking-wider mb-0.5", children: "Disk" }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "text-sm font-mono text-neutral-200", children: formatLimit(server.disk) })
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "w-px h-8 bg-neutral-800 hidden sm:block" }),
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "flex-1 sm:flex-none", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "text-[10px] text-neutral-500 uppercase font-black tracking-widest mb-1 opacity-60", children: "Storage" }),
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "text-sm font-black text-neutral-200 tabular-nums", children: formatLimit(server.disk) })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("div", { className: "ml-2 pl-4 border-l border-neutral-700 flex flex-col justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)("a", { href: `/server/${server.containerId}`, className: "text-neutral-300 hover:text-white bg-neutral-700 hover:bg-neutral-600 px-4 py-2 rounded font-semibold text-sm transition-colors", children: "Manage" }) })
+        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "w-full sm:w-auto mt-4 sm:mt-0 sm:ml-4", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("a", { href: `/server/${server.containerId}`, className: "flex items-center justify-center gap-2 bg-neutral-800 hover:bg-primary-600 text-neutral-100 hover:text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all duration-300 shadow-xl shadow-black/20 hover:shadow-primary-900/20 active:scale-95", children: [
+          "Manage ",
+          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("i", { className: "bi bi-arrow-right-short text-lg" })
+        ] }) })
       ] })
     ] });
   }
 
   // views/react/components/Spinner.jsx
-  var import_react4 = __toESM(require_react());
-  var import_jsx_runtime4 = __toESM(require_jsx_runtime());
+  var import_react5 = __toESM(require_react());
+  var import_jsx_runtime5 = __toESM(require_jsx_runtime());
   function Spinner({ centered, size = "default" }) {
     const sizeClasses = size === "large" ? "w-10 h-10 border-4" : "w-5 h-5 border-2";
-    const spinner = /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: `animate-spin rounded-full border-t-primary-500 border-neutral-700 ${sizeClasses}` });
+    const spinner = /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: `animate-spin rounded-full border-t-primary-500 border-neutral-700 ${sizeClasses}` });
     if (centered) {
-      return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "flex justify-center items-center w-full py-16", children: spinner });
+      return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex justify-center items-center w-full py-16", children: spinner });
     }
     return spinner;
   }
 
   // views/react/dashboard.jsx
-  var import_jsx_runtime5 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime6 = __toESM(require_jsx_runtime());
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
   var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "dashboard";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
   function DashboardPage({ pageData = data }) {
-    const [servers, setServers] = import_react5.default.useState(Array.isArray(pageData.servers) ? pageData.servers : null);
-    import_react5.default.useEffect(() => {
+    const [servers, setServers] = import_react6.default.useState(Array.isArray(pageData.servers) ? pageData.servers : null);
+    import_react6.default.useEffect(() => {
       if (!pageData.servers) {
         setServers([]);
       } else {
         setServers(pageData.servers);
       }
     }, [pageData]);
-    const isAdminDashboard = Boolean(pageData.isAdminDashboard);
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ReactAppShell, { pageData, subtitle: "React view beta", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+    const isViewingAllServers = Boolean(pageData.showOthersServers);
+    const userIsAdmin = Boolean(pageData.isAdminDashboard);
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ReactAppShell, { pageData, subtitle: "React view beta", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
       PageContentBlock,
       {
-        title: isAdminDashboard ? "System Overview" : "Dashboard",
-        description: isAdminDashboard ? "Viewing all active servers across the system." : "Individual overview of your servers and instances.",
+        title: isViewingAllServers ? "System Overview" : "Dashboard",
+        description: isViewingAllServers ? "Viewing all active servers across the system." : "Individual overview of your servers and instances.",
         children: [
-          pageData.user?.isAdmin && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex justify-between items-center mb-6 bg-neutral-800/50 border border-neutral-700/50 p-4 rounded-xl", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center gap-3", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: `w-3 h-3 rounded-full ${isAdminDashboard ? "bg-primary-500 animate-pulse" : "bg-neutral-600"}` }),
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-sm font-bold text-neutral-300 uppercase tracking-widest", children: isAdminDashboard ? "Admin View: All Servers" : "Private View: My Servers" })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
-              "a",
-              {
-                href: isAdminDashboard ? "/" : "/?others=true",
-                className: `px-4 py-2 rounded-lg text-xs font-bold transition-all ${isAdminDashboard ? "bg-primary-600 hover:bg-primary-500 text-white shadow-lg shadow-primary-900/20" : "bg-neutral-700 hover:bg-neutral-600 text-neutral-300"}`,
-                children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: `bi ${isAdminDashboard ? "bi-shield-check" : "bi-shield-lock"} me-2` }),
-                  isAdminDashboard ? "Exit Admin Mode" : "Enter Admin Mode"
-                ]
-              }
-            )
+          userIsAdmin && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "mb-10 group relative", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "absolute -inset-1 bg-gradient-to-r from-primary-600/20 to-purple-600/20 rounded-[2.5rem] blur-xl opacity-50 group-hover:opacity-100 transition duration-1000 group-hover:duration-200" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "relative flex flex-col sm:flex-row justify-between items-center bg-neutral-900/80 backdrop-blur-xl border border-neutral-800/50 p-6 sm:p-8 rounded-[2rem] shadow-2xl overflow-hidden ring-1 ring-white/5", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-6 mb-6 sm:mb-0", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-inner ${isViewingAllServers ? "bg-primary-500/10 text-primary-400 ring-2 ring-primary-500/20" : "bg-neutral-800 text-neutral-500"}`, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: `bi ${isViewingAllServers ? "bi-shield-check" : "bi-shield-lock"} text-2xl` }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h4", { className: "text-sm font-black text-white uppercase tracking-[0.2em] leading-none mb-2", children: isViewingAllServers ? "System-Wide Administration" : "Personal Instance Dashboard" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-xs text-neutral-500 font-bold uppercase tracking-widest opacity-80", children: isViewingAllServers ? "Global visibility enabled: Viewing all network servers" : "Filtered view: Only showing your private instances" })
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                "a",
+                {
+                  href: isViewingAllServers ? "/" : "/?others=true",
+                  className: `group relative px-8 py-4 rounded-xl text-xs font-black uppercase tracking-[0.25em] transition-all duration-300 flex items-center gap-3 overflow-hidden ${isViewingAllServers ? "bg-neutral-800 hover:bg-neutral-700 text-primary-400 border border-neutral-700" : "bg-primary-600 hover:bg-primary-500 text-white shadow-2xl shadow-primary-900/40"}`,
+                  children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "relative z-10 flex items-center gap-3", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: `bi ${isViewingAllServers ? "bi-toggle-on text-lg" : "bi-toggle-off text-lg opacity-50"}` }),
+                    isViewingAllServers ? "Leave Admin View" : "Enter Admin View"
+                  ] })
+                }
+              )
+            ] })
           ] }),
-          !servers ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(Spinner, { centered: true, size: "large" }) : servers.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex flex-col gap-2", children: servers.map((server) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          !servers ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(Spinner, { centered: true, size: "large" }) : servers.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex flex-col gap-2", children: servers.map((server) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
             ServerRow,
             {
               server,
-              isAdminDashboard
+              isAdminDashboard: isViewingAllServers
             },
             server.id || server.containerId
-          )) }) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("p", { className: "text-center text-sm text-neutral-400 mt-10", children: "There are no servers associated with your account." })
+          )) }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-col items-center justify-center py-24 bg-neutral-900/30 border border-neutral-800/50 border-dashed rounded-3xl", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-stack text-4xl text-neutral-800 mb-4" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-center text-sm font-bold text-neutral-500 uppercase tracking-widest", children: isViewingAllServers ? "No servers found in the system." : "You do not have any active servers." })
+          ] })
         ]
       }
     ) });
   }
   var dashboard_default = DashboardPage;
   if (root) {
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime5.jsx)(DashboardPage, { pageData: data }));
+    root.render(/* @__PURE__ */ (0, import_jsx_runtime6.jsx)(DashboardPage, { pageData: data }));
     if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
       window.__CPANEL_REACT_BOOTED__();
     }

@@ -51,6 +51,32 @@ export function ServerBackupsPage({ pageData = data }) {
     const inputClass = "w-full bg-neutral-900 border border-neutral-700/50 rounded p-2.5 text-sm text-neutral-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-shadow";
     const labelClass = "block text-xs font-bold text-neutral-400 uppercase tracking-wide mb-1.5";
 
+    const [isClearing, setIsClearing] = React.useState(false);
+
+    const handleClearHistory = async () => {
+        if (!window.confirm('Are you sure you want to clear the backup history for this server? This only removes the database records; actual files in Google Drive will not be deleted.')) {
+            return;
+        }
+
+        setIsClearing(true);
+        try {
+            const response = await fetch(`/server/${server.containerId}/backups/clear`, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' }
+            });
+            const payload = await response.json();
+            if (payload.success) {
+                window.location.reload();
+            } else {
+                alert(payload.error || 'Failed to clear backup history.');
+                setIsClearing(false);
+            }
+        } catch (err) {
+            alert('An error occurred while clearing backup history.');
+            setIsClearing(false);
+        }
+    };
+
     return (
         <ReactAppShell pageData={pageData} subtitle="Backups">
             <PageContentBlock 
@@ -58,7 +84,17 @@ export function ServerBackupsPage({ pageData = data }) {
                 description="Review backup history, connect Google Drive for storage, and trigger fresh snapshots." 
                 eyebrow="Recovery"
             >
-                <div className="flex justify-end mb-6">
+                <div className="flex justify-end gap-3 mb-6">
+                    {permissions.canManageBackups && (
+                        <button 
+                            onClick={handleClearHistory}
+                            disabled={isClearing}
+                            className="bg-red-900/10 hover:bg-red-600/20 text-red-400 border border-red-500/30 font-semibold py-2 px-4 rounded transition-colors text-sm flex items-center gap-2 disabled:opacity-50"
+                        >
+                            <i className={`bi ${isClearing ? 'bi-hourglass-split' : 'bi-trash3'}`}></i> 
+                            {isClearing ? 'Clearing...' : 'Clear History'}
+                        </button>
+                    )}
                     {permissions.canManageBackups ? (
                          <form method="POST" action={actions.run}>
                              <button type="submit" className="bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-6 rounded transition-colors text-sm shadow-sm flex items-center gap-2">

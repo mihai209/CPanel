@@ -707,6 +707,24 @@ export function ServerConsolePage({ pageData = data }) {
                             </button>
                         </div>
                     </div>
+                    
+                    {/* Quick Actions Bar */}
+                    {macros.length > 0 && (
+                        <div className="flex flex-wrap gap-2 items-center bg-neutral-900 border border-neutral-800 p-4 rounded-2xl shadow-inner shadow-black/40">
+                            <span className="text-[10px] font-black text-neutral-600 uppercase tracking-widest mr-2 flex items-center gap-1">
+                                <i className="bi bi-lightning-fill text-yellow-500"></i> Macros
+                            </span>
+                            {macros.map(m => (
+                                <button 
+                                    key={m.id}
+                                    onClick={() => runMacro(m.id)}
+                                    className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 hover:border-neutral-500 rounded-xl text-[10px] font-black text-neutral-300 uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
+                                >
+                                    {m.name}
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
                     {/* Terminal Block */}
                     <div className="bg-neutral-900 border border-neutral-700 rounded-lg flex flex-col overflow-hidden shadow-lg h-[600px] relative">
@@ -804,27 +822,8 @@ export function ServerConsolePage({ pageData = data }) {
                             
                             {/* Actions Group */}
                             <div className="flex items-center w-full md:w-auto border-t md:border-t-0 md:border-l border-neutral-700">
-                                {macros.length > 0 && (
-                                    <div className="px-3 py-2 md:py-0 border-r border-neutral-700">
-                                        <select 
-                                            className="bg-neutral-900 border border-neutral-700 rounded text-xs text-neutral-300 px-2 py-1.5 focus:ring-primary-500 focus:border-primary-500 cursor-pointer outline-none"
-                                            onChange={(e) => {
-                                                if (e.target.value) {
-                                                    runMacro(e.target.value);
-                                                    e.target.value = '';
-                                                }
-                                            }}
-                                            defaultValue=""
-                                        >
-                                            <option value="" disabled>Run a Macro...</option>
-                                            {macros.map(m => (
-                                                <option key={m.id} value={m.id}>{m.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
                                 <button 
-                                    className="flex-1 md:flex-none px-5 py-3.5 bg-primary-600 hover:bg-primary-500 font-bold text-white text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex-1 md:flex-none px-8 py-3.5 bg-primary-600 hover:bg-primary-500 font-black text-white text-[10px] uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
                                     onClick={sendCommand} 
                                     disabled={!connectorOnline || !String(commandValue || '').trim()}
                                 >
@@ -836,85 +835,82 @@ export function ServerConsolePage({ pageData = data }) {
                 </div>
 
                 {/* Sidebar details */}
-                <aside className="xl:col-span-1 flex flex-col gap-6">
+                <aside className="xl:col-span-1 flex flex-col gap-4">
                     
-                    {/* Server details */}
-                    <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-5">
-                        <div className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4">Server Details</div>
-                        <div className="flex flex-col gap-4">
-                            <ResourceBadge icon="bi-hdd-network" label="Allocation" value={server.address || 'No allocation address'} />
-                            <ResourceBadge icon="bi-hdd-stack" label="Status" value={formatStatus(status)} />
-                            <div className="border-t border-neutral-700/50 my-1"></div>
-                            <ResourceBadge icon="bi-cpu" label="CPU Cap" value={limits.cpu ? `${limits.cpu}%` : 'Unlimited'} />
-                            <ResourceBadge icon="bi-memory" label="RAM Cap" value={limits.memory ? `${limits.memory} MB` : 'Unlimited'} />
-                            <ResourceBadge icon="bi-device-hdd" label="Disk Cap" value={limits.disk ? `${limits.disk} MB` : 'Unlimited'} />
+                    {/* Connection Status Card */}
+                    <div className="bg-neutral-800 border border-neutral-700 rounded-2xl p-5 shadow-lg">
+                        <div className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <i className="bi bi-broadcast text-primary-400"></i> Connectivity
                         </div>
-                    </div>
-
-                    {/* Connector Link */}
-                    <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-5">
-                        <div className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4">Connector Link</div>
-                        <div className={`flex items-center gap-3 p-3 rounded mb-4 border ${connectorOnline ? 'bg-green-600/10 border-green-600/30 text-green-400' : 'bg-red-600/10 border-red-600/30 text-red-400'}`}>
-                            <i className={`bi ${connectorOnline ? 'bi-broadcast-pin' : 'bi-wifi-off'}`}></i>
-                            <span className="font-semibold">{connectionState}</span>
-                        </div>
-                        <div className="flex gap-2">
-                            <Link to={ReactRoutes.changeView} className="flex-1 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-bold py-2 rounded text-center transition-colors">View Mode</Link>
-                            <a href={`/server/${server.containerId}?popout=true`} className="flex-1 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-bold py-2 rounded text-center transition-colors">Popout</a>
+                        <div className="space-y-4">
+                            <div className={`p-4 rounded-xl border flex flex-col gap-1 ${connectorOnline ? 'bg-green-500/5 border-green-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Daemon Status</span>
+                                    <div className={`w-2 h-2 rounded-full ${connectorOnline ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'bg-red-500'}`}></div>
+                                </div>
+                                <span className={`text-sm font-black uppercase tracking-widest ${connectorOnline ? 'text-green-400' : 'text-red-400'}`}>
+                                    {connectionState}
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Link to={ReactRoutes.changeView} className="bg-neutral-900 border border-neutral-700 hover:border-neutral-500 text-neutral-300 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl text-center transition-all">
+                                    View Mode
+                                </Link>
+                                <a href={`/server/${server.containerId}?popout=true`} className="bg-neutral-900 border border-neutral-700 hover:border-neutral-500 text-neutral-300 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl text-center transition-all">
+                                    Popout
+                                </a>
+                            </div>
                         </div>
                     </div>
 
                     {/* Minecraft Player View (if valid) */}
                     {isMinecraft && (
-                        <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-5 flex flex-col h-full max-h-[400px]">
+                        <div className="bg-neutral-800 border border-neutral-700 rounded-2xl p-5 shadow-lg flex flex-col max-h-[400px]">
                             <div className="flex justify-between items-center mb-4">
-                                <div className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Online Players</div>
-                                <span className="text-xs font-bold bg-neutral-900 border border-neutral-700 px-2 py-0.5 rounded text-neutral-400">
-                                    {players.length} Online
+                                <div className="text-[10px] font-black text-neutral-500 uppercase tracking-widest flex items-center gap-2">
+                                    <i className="bi bi-people text-primary-400"></i> Players
+                                </div>
+                                <span className="text-[10px] font-black bg-neutral-900 border border-neutral-700 px-2 py-0.5 rounded-lg text-neutral-400">
+                                    {players.length} Active
                                 </span>
                             </div>
-                            <div className="flex-1 overflow-y-auto pr-1">
+                            <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
                                 {playersLoading ? (
-                                    <div className="text-sm text-neutral-500 animate-pulse text-center mt-4">Loading players...</div>
+                                    <div className="text-[10px] font-black text-neutral-600 uppercase tracking-widest text-center py-8">Syncing...</div>
                                 ) : playersError ? (
-                                    <div className="text-sm text-red-400 text-center mt-4">{playersError}</div>
+                                    <div className="text-[10px] font-black text-red-500 uppercase tracking-widest text-center py-8">{playersError}</div>
                                 ) : players.length === 0 ? (
-                                    <div className="text-sm text-neutral-500 text-center mt-4">No players online.</div>
+                                    <div className="text-[10px] font-black text-neutral-600 uppercase tracking-widest text-center py-8">Void Empty</div>
                                 ) : (
-                                    <div className="flex flex-col gap-3">
+                                    <div className="flex flex-col gap-2">
                                         {players.map(p => (
-                                            <div key={p.name} className="bg-neutral-900 border border-neutral-700/50 p-3 rounded-lg flex flex-col gap-3 group">
-                                                <div className="flex items-center gap-3">
+                                            <div key={p.name} className="bg-neutral-900 border border-neutral-700/30 p-2 rounded-xl flex items-center justify-between group transition-colors hover:border-neutral-600">
+                                                <div className="flex items-center gap-2 min-w-0">
                                                     <img 
                                                         src={p.headUrl} 
-                                                        className="w-8 h-8 rounded shrink-0 shadow-sm" 
+                                                        className="w-6 h-6 rounded shadow-sm grayscale group-hover:grayscale-0 transition-all" 
                                                         alt={p.name} 
                                                         onError={(e) => { e.target.src = 'https://minotar.net/avatar/Steve/40' }}
                                                     />
-                                                    <strong className="text-sm text-white truncate flex-1">{p.name}</strong>
+                                                    <span className="text-xs font-bold text-neutral-300 truncate">{p.name}</span>
                                                 </div>
                                                 
-                                                <div className="grid grid-cols-3 gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button 
                                                         onClick={() => handleMcAction('kick', p.name)} 
                                                         disabled={!mcPerms.canKick}
-                                                        className="bg-neutral-800 hover:bg-neutral-700 text-[10px] uppercase font-bold text-neutral-300 py-1 rounded disabled:opacity-50"
+                                                        className="w-6 h-6 flex items-center justify-center bg-neutral-800 hover:bg-red-900/40 text-neutral-400 hover:text-red-400 rounded-lg transition-colors"
+                                                        title="Kick"
                                                     >
-                                                        Kick
+                                                        <i className="bi bi-door-open-fill text-[10px]"></i>
                                                     </button>
                                                     <button 
                                                         onClick={() => handleMcAction('ban', p.name)} 
                                                         disabled={!mcPerms.canBan}
-                                                        className="bg-red-900/50 hover:bg-red-900 text-[10px] uppercase font-bold text-red-400 py-1 rounded disabled:opacity-50"
+                                                        className="w-6 h-6 flex items-center justify-center bg-neutral-800 hover:bg-red-900 text-neutral-400 hover:text-white rounded-lg transition-colors"
+                                                        title="Ban"
                                                     >
-                                                        Ban
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleMcAction('op', p.name)} 
-                                                        disabled={!mcPerms.canOp}
-                                                        className="bg-green-900/50 hover:bg-green-900 text-[10px] uppercase font-bold text-green-400 py-1 rounded disabled:opacity-50"
-                                                    >
-                                                        OP
+                                                        <i className="bi bi-hammer text-[10px]"></i>
                                                     </button>
                                                 </div>
                                             </div>
@@ -925,23 +921,26 @@ export function ServerConsolePage({ pageData = data }) {
                         </div>
                     )}
 
-                    {/* Runtime Snapshot */}
-                    <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-5">
-                        <div className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4">Runtime Snapshot</div>
-                        <InlineMetric title="CPU" value={`${stats.cpu.toFixed(1)}%`} note={limits.cpu ? `${limits.cpu}% cap` : 'No cap'} tone="primary" />
-                        <InlineMetric title="Memory" value={`${Math.round(stats.memory)} MB`} note={`${memoryPercent.toFixed(0)}% used`} tone="success" />
-                        <InlineMetric title="Disk" value={`${Math.round(stats.disk)} MB`} note={`${diskPercent.toFixed(0)}% used`} tone="warning" />
-                        <InlineMetric title="Uptime" value={formatDuration(stats.uptimeSeconds)} note="Current runtime session" />
-                        <InlineMetric title="Net RX" value={formatBytes(stats.networkRx)} note="Inbound since start" tone="success" />
-                        <InlineMetric title="Net TX" value={formatBytes(stats.networkTx)} note="Outbound since start" tone="warning" />
-                    </div>
-
-                    {/* Guards / Exits */}
-                    <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-5">
-                        <div className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4">Guards</div>
-                        <InlineMetric title="Restart Trigger" value={formatRuntimeSource(runtimeMeta.lastSource)} note={runtimeMeta.lastReason || 'No restart source captured yet.'} />
-                        <InlineMetric title="Cooldown State" value={cooldownValue} note={cooldownNote} tone={cooldownActive ? 'warning' : 'primary'} />
-                        <InlineMetric title="Exit Summary" value={lastExitValue} note={lastExitNote} tone={exitInfo.oomKilled ? 'danger' : 'primary'} />
+                    {/* System & Guards Card */}
+                    <div className="bg-neutral-800 border border-neutral-700 rounded-2xl p-5 shadow-lg">
+                        <div className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <i className="bi bi-cpu text-primary-400"></i> Vital Metrics
+                        </div>
+                        <div className="space-y-1">
+                            <InlineMetric title="Core Load" value={`${stats.cpu.toFixed(1)}%`} note={limits.cpu ? `${limits.cpu}% cap` : 'No cap'} tone="primary" />
+                            <InlineMetric title="Memory Buffer" value={`${Math.round(stats.memory)} MB`} note={`${memoryPercent.toFixed(0)}% used`} tone="success" />
+                            <InlineMetric title="Disk Index" value={`${Math.round(stats.disk)} MB`} note={`${diskPercent.toFixed(0)}% used`} tone="warning" />
+                            <InlineMetric title="Session Time" value={formatDuration(stats.uptimeSeconds)} note="Current runtime session" />
+                            
+                            <div className="h-px bg-neutral-700/50 my-4"></div>
+                            
+                            <div className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <i className="bi bi-shield-check text-primary-400"></i> Guard System
+                            </div>
+                            <InlineMetric title="Last Trigger" value={formatRuntimeSource(runtimeMeta.lastSource)} note={runtimeMeta.lastReason || 'Stable state.'} />
+                            <InlineMetric title="Cooldown" value={cooldownValue} note={cooldownNote} tone={cooldownActive ? 'warning' : 'primary'} />
+                            <InlineMetric title="Exit Trace" value={lastExitValue} note={lastExitNote} tone={exitInfo.oomKilled ? 'danger' : 'primary'} />
+                        </div>
                     </div>
 
                 </aside>

@@ -7,6 +7,85 @@ const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'server-file-editor';
 const root = standaloneEntry ? createRoot(document.getElementById('reactRoot')) : null;
 
+function FileTreeItem({ item, currentPath, onFileSwitch, serverId, depth = 0 }) {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [children, setChildren] = useState([]);
+    const [loading, setLoading] = useState(false);
+    
+    const fullPath = (item.directory === '/' ? '' : item.directory) + '/' + item.name;
+    const isActive = fullPath === currentPath;
+
+    const toggleExpand = async (e) => {
+        e.stopPropagation();
+        if (!item.isDirectory) {
+            onFileSwitch(fullPath);
+            return;
+        }
+
+        const nextState = !isExpanded;
+        setIsExpanded(nextState);
+
+        if (nextState && children.length === 0) {
+            setLoading(true);
+            try {
+                const res = await fetch(`/api/client/servers/${serverId}/files/list?path=${encodeURIComponent(fullPath)}`, {
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin'
+                });
+                const payload = await res.json();
+                if (payload.files) {
+                    setChildren(payload.files.sort((a, b) => {
+                        if (a.isDirectory && !b.isDirectory) return -1;
+                        if (!a.isDirectory && b.isDirectory) return 1;
+                        return a.name.localeCompare(b.name);
+                    }));
+                }
+            } catch (err) {
+                console.error('Failed to load subfolder:', err);
+            } finally {
+                setLoading(false);
+            }
+        }
+    };
+
+    return (
+        <div className="select-none">
+            <div 
+                onClick={toggleExpand}
+                style={{ paddingLeft: `${(depth * 12) + 12}px` }}
+                className={`flex items-center gap-2 py-1.5 cursor-pointer rounded-lg transition-colors group ${isActive ? 'bg-primary-900/20 text-primary-300' : 'hover:bg-neutral-800/50 text-neutral-400 hover:text-neutral-200'}`}
+            >
+                <i className={`bi ${item.isDirectory ? (isExpanded ? 'bi-chevron-down text-[10px]' : 'bi-chevron-right text-[10px]') : 'bi-file-earmark-text text-neutral-600'}`}></i>
+                <i className={`bi ${item.isDirectory ? (isExpanded ? 'bi-folder2-open text-amber-500' : 'bi-folder-fill text-amber-600/80') : 'bi-file-earmark-text'}`}></i>
+                <span className={`text-[11px] truncate ${isActive ? 'font-bold' : 'font-medium'}`}>
+                    {item.name}
+                </span>
+                {loading && <div className="w-2 h-2 border border-neutral-700 border-t-primary-500 rounded-full animate-spin ml-auto mr-2"></div>}
+            </div>
+            
+            {item.isDirectory && isExpanded && (
+                <div className="mt-0.5">
+                    {children.map(child => (
+                        <FileTreeItem 
+                            key={`${fullPath}/${child.name}`} 
+                            item={{ ...child, directory: fullPath }} 
+                            currentPath={currentPath}
+                            onFileSwitch={onFileSwitch}
+                            serverId={serverId}
+                            depth={depth + 1}
+                        />
+                    ))}
+                    {children.length === 0 && !loading && (
+                        <div style={{ paddingLeft: `${((depth + 1) * 12) + 28}px` }} className="text-[10px] text-neutral-600 italic py-1">
+                            (empty)
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 export function ServerFileEditorPage({ pageData = data }) {
     const server = pageData.server || {};
     const urlParams = new URLSearchParams(window.location.search);
@@ -19,8 +98,8 @@ export function ServerFileEditorPage({ pageData = data }) {
     const [status, setStatus] = useState({ type: 'idle', message: '' });
     const [isUnsaved, setIsUnsaved] = useState(false);
 
-    const [dirFiles, setDirFiles] = useState(pageData.dirFiles || []);
-    const [dirLoading, setDirLoading] = useState(false);
+    const [rootFiles, setRootFiles] = useState([]);
+    const [rootLoading, setRootLoading] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
 
     const parentPath = pageData.parentPath || filePath.split('/').slice(0, -1).join('/') || '/';
@@ -48,31 +127,33 @@ export function ServerFileEditorPage({ pageData = data }) {
             setLoading(false);
         });
 
-        // Only fetch dir list if it wasn't pre-populated by the backend
-        if (!pageData.dirFiles || pageData.dirFiles.length === 0) {
-            setDirLoading(true);
-            fetch(`/api/client/servers/${server.containerId}/files?path=${encodeURIComponent(parentPath)}`, {
-                headers: { 'Accept': 'application/json' },
-                credentials: 'same-origin'
-            })
-            .then(res => res.json())
-            .then(payload => {
-                if (cancelled) return;
-                if (payload.files) {
-                    setDirFiles(payload.files.filter(f => !f.isDirectory));
-                }
-                setDirLoading(false);
-            })
-            .catch(() => {
-                if (!cancelled) setDirLoading(false);
-            });
-        }
+        // Load root files for the tree
+        setRootLoading(true);
+        fetch(`/api/client/servers/${server.containerId}/files/list?path=/`, {
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin'
+        })
+        .then(res => res.json())
+        .then(payload => {
+            if (cancelled) return;
+            if (payload.files) {
+                setRootFiles(payload.files.sort((a, b) => {
+                    if (a.isDirectory && !b.isDirectory) return -1;
+                    if (!a.isDirectory && b.isDirectory) return 1;
+                    return a.name.localeCompare(b.name);
+                }));
+            }
+            setRootLoading(false);
+        })
+        .catch(() => {
+            if (!cancelled) setRootLoading(false);
+        });
 
         return () => { cancelled = true; };
-    }, [server.containerId, filePath, parentPath, pageData.dirFiles]);
+    }, [server.containerId, filePath]);
 
     const handleSave = async () => {
-        if (saving || pageData.editWriteLocked) return;
+        if (saving || loading || pageData.editWriteLocked) return;
         setSaving(true);
         setStatus({ type: 'idle', message: '' });
 
@@ -183,34 +264,27 @@ export function ServerFileEditorPage({ pageData = data }) {
                     </div>
 
                     <div className="flex-1 flex overflow-hidden">
-                        {/* File Tree Sidebar */}
+                        {/* Recursive File Tree Sidebar */}
                         {sidebarOpen && (
                             <div className="w-64 bg-neutral-900/30 border-r border-neutral-800 flex flex-col overflow-hidden shrink-0">
-                                <div className="p-4 border-b border-neutral-800/50 flex items-center justify-between">
-                                    <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Directory Files</span>
-                                    {dirLoading && <div className="w-3 h-3 border border-neutral-700 border-t-primary-500 rounded-full animate-spin"></div>}
+                                <div className="p-4 border-b border-neutral-800/50 flex items-center justify-between bg-neutral-900/20">
+                                    <span className="text-[10px] font-black text-neutral-400 uppercase tracking-widest">Root Filesystem</span>
+                                    {rootLoading && <div className="w-3 h-3 border border-neutral-700 border-t-primary-500 rounded-full animate-spin"></div>}
                                 </div>
-                                <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
-                                    <div className="space-y-1">
-                                        {dirFiles.map(file => {
-                                            const fullPath = (parentPath === '/' ? '' : parentPath) + '/' + file.name;
-                                            const isActive = fullPath === filePath;
-                                            return (
-                                                <button
-                                                    key={file.name}
-                                                    onClick={() => handleFileSwitch(fullPath)}
-                                                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all group ${isActive ? 'bg-primary-900/20 border border-primary-500/20' : 'hover:bg-neutral-800/50 border border-transparent'}`}
-                                                >
-                                                    <i className={`bi ${isActive ? 'bi-file-earmark-text-fill text-primary-400' : 'bi-file-earmark-text text-neutral-600 group-hover:text-neutral-400'}`}></i>
-                                                    <span className={`text-xs truncate ${isActive ? 'text-primary-300 font-bold' : 'text-neutral-500 group-hover:text-neutral-300'}`}>
-                                                        {file.name}
-                                                    </span>
-                                                </button>
-                                            );
-                                        })}
-                                        {dirFiles.length === 0 && !dirLoading && (
-                                            <div className="p-4 text-center text-[10px] text-neutral-600 uppercase tracking-widest leading-loose">
-                                                No other files <br/> in this folder
+                                <div className="flex-1 overflow-y-auto p-2 custom-scrollbar bg-neutral-900/10">
+                                    <div className="space-y-0.5">
+                                        {rootFiles.map(file => (
+                                            <FileTreeItem 
+                                                key={file.name} 
+                                                item={{ ...file, directory: '/' }} 
+                                                currentPath={filePath}
+                                                onFileSwitch={handleFileSwitch}
+                                                serverId={server.containerId}
+                                            />
+                                        ))}
+                                        {rootFiles.length === 0 && !rootLoading && (
+                                            <div className="p-8 text-center text-[10px] text-neutral-600 uppercase tracking-widest leading-loose">
+                                                No files found <br/> in root directory
                                             </div>
                                         )}
                                     </div>

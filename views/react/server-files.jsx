@@ -55,7 +55,8 @@ export function ServerFilesPage({ pageData = data }) {
     const [error, setError] = React.useState(pageData.error || '');
     const [menuPath, setMenuPath] = React.useState('');
     const [isDragging, setIsDragging] = React.useState(false);
-    const [uploadProgress, setUploadProgress] = React.useState({ active: false, current: '', progress: 0 });
+    const [fileQueue, setFileQueue] = React.useState([]);
+    const [isQueueExpanded, setIsQueueExpanded] = React.useState(true);
 
     const reloadFiles = React.useCallback(() => {
         setLoading(true);
@@ -81,24 +82,43 @@ export function ServerFilesPage({ pageData = data }) {
             });
     }, [currentPath, manager.fetchUrlBase]);
 
-    const uploadFile = async (file) => {
-        setUploadProgress({ active: true, current: file.name, progress: 0 });
-        try {
-            const response = await fetch(`${manager.uploadUrlBase || `/server/${pageData.server?.containerId}/files/upload`}?path=${encodeURIComponent(currentPath)}&name=${encodeURIComponent(file.name)}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/octet-stream',
-                    'x-file-name': file.name
-                },
-                body: file,
-                credentials: 'same-origin'
+    const uploadFile = (file, queueId) => {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            const url = `${manager.uploadUrlBase || `/server/${pageData.server?.containerId}/files/upload`}?path=${encodeURIComponent(currentPath)}&name=${encodeURIComponent(file.name)}`;
+            
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    setFileQueue(prev => prev.map(item => item.id === queueId ? { ...item, progress: percent } : item));
+                }
             });
-            const payload = await response.json();
-            if (!response.ok || payload.error) throw new Error(payload.error || 'Upload failed');
-        } catch (err) {
-            console.error('Upload error:', err);
-            setError(`Failed to upload ${file.name}: ${err.message}`);
-        }
+
+            xhr.addEventListener('load', () => {
+                try {
+                    const payload = JSON.parse(xhr.responseText);
+                    if (xhr.status >= 200 && xhr.status < 300 && !payload.error) {
+                        setFileQueue(prev => prev.map(item => item.id === queueId ? { ...item, status: 'done', progress: 100 } : item));
+                        resolve();
+                    } else {
+                        throw new Error(payload.error || 'Upload failed');
+                    }
+                } catch (err) {
+                    setFileQueue(prev => prev.map(item => item.id === queueId ? { ...item, status: 'error', error: err.message } : item));
+                    reject(err);
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                setFileQueue(prev => prev.map(item => item.id === queueId ? { ...item, status: 'error', error: 'Network error' } : item));
+                reject(new Error('Network error'));
+            });
+
+            xhr.open('POST', url, true);
+            xhr.setRequestHeader('x-file-name', file.name);
+            xhr.withCredentials = true;
+            xhr.send(file);
+        });
     };
 
     const handleDrop = async (e) => {
@@ -109,12 +129,56 @@ export function ServerFilesPage({ pageData = data }) {
         const droppedFiles = Array.from(e.dataTransfer.files);
         if (droppedFiles.length === 0) return;
 
-        setLoading(true);
-        for (const file of droppedFiles) {
-            await uploadFile(file);
-        }
-        setUploadProgress({ active: false, current: '', progress: 0 });
+        const newEntries = droppedFiles.map(f => ({
+            id: Math.random().toString(36).substring(7),
+            name: f.name,
+            size: f.size,
+            progress: 0,
+            status: 'uploading'
+        }));
+
+        setFileQueue(prev => [...newEntries, ...prev]);
+        setIsQueueExpanded(true);
+
+        // Upload files (parallel)
+        await Promise.allSettled(droppedFiles.map((file, idx) => uploadFile(file, newEntries[idx].id)));
+        
         reloadFiles();
+    };
+
+    const handleArchive = async (fileName) => {
+        if (!fileName) return;
+        setLoading(true);
+        try {
+            const response = await fetch(`/api/client/servers/${pageData.server?.containerId}/files/archive`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ directory: currentPath, files: [fileName], name: `${fileName}.zip` })
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.error) throw new Error(payload.error || 'Archive failed');
+            reloadFiles();
+        } catch (err) {
+            setError(err.message);
+            setLoading(false);
+        }
+    };
+
+    const handleUnarchive = async (fileName) => {
+        setLoading(true);
+        try {
+            const response = await fetch(`/api/client/servers/${pageData.server?.containerId}/files/unarchive`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ directory: currentPath, name: fileName })
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.error) throw new Error(payload.error || 'Extraction failed');
+            reloadFiles();
+        } catch (err) {
+            setError(err.message);
+            setLoading(false);
+        }
     };
 
     const handleDragOver = (e) => {
@@ -235,12 +299,70 @@ export function ServerFilesPage({ pageData = data }) {
                             </div>
                         )}
 
-                        {uploadProgress.active && (
-                            <div className="absolute top-4 right-4 z-50 bg-neutral-900 border border-neutral-700 p-4 rounded-xl shadow-2xl flex items-center gap-4 animate-in slide-in-from-right-4">
-                                <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
-                                <div>
-                                    <div className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Uploading...</div>
-                                    <div className="text-xs font-bold text-white max-w-[150px] truncate">{uploadProgress.current}</div>
+                        {fileQueue.length > 0 && (
+                            <div className={`fixed bottom-6 right-6 z-[60] w-80 bg-neutral-900 border border-neutral-700 rounded-2xl shadow-2xl transition-all duration-300 ${isQueueExpanded ? 'translate-y-0 opacity-100' : 'translate-y-[calc(100%-50px)]'}`}>
+                                <div 
+                                    className="p-4 border-b border-neutral-800 flex items-center justify-between cursor-pointer hover:bg-neutral-800/50 transition-colors rounded-t-2xl"
+                                    onClick={() => setIsQueueExpanded(!isQueueExpanded)}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="relative">
+                                            <i className="bi bi-cloud-arrow-up text-xl text-primary-500"></i>
+                                            {fileQueue.filter(f => f.status === 'uploading').length > 0 && (
+                                                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"></span>
+                                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-primary-500"></span>
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] font-black text-neutral-500 uppercase tracking-widest leading-none mb-1">Queue Manager</div>
+                                            <div className="text-xs font-bold text-white leading-none">
+                                                {fileQueue.filter(f => f.status === 'done').length} of {fileQueue.length} files uploaded
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <i className={`bi ${isQueueExpanded ? 'bi-chevron-down' : 'bi-chevron-up'} text-neutral-500`}></i>
+                                        <button 
+                                            className="text-neutral-500 hover:text-white transition-colors"
+                                            onClick={(e) => { e.stopPropagation(); setFileQueue([]); }}
+                                        >
+                                            <i className="bi bi-x-lg text-xs"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className={`overflow-y-auto max-h-64 flex flex-col divide-y divide-neutral-800 transition-all ${isQueueExpanded ? 'opacity-100' : 'opacity-0 h-0 pointer-events-none'}`}>
+                                    {fileQueue.map(item => (
+                                        <div key={item.id} className="p-4 hover:bg-white/[0.02] transition-colors">
+                                            <div className="flex justify-between items-start mb-2 gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="text-xs font-bold text-neutral-200 truncate">{item.name}</div>
+                                                    <div className="text-[10px] text-neutral-500 font-mono mt-0.5">{formatBytes(item.size)}</div>
+                                                </div>
+                                                {item.status === 'done' ? (
+                                                    <i className="bi bi-check-circle-fill text-green-500"></i>
+                                                ) : item.status === 'error' ? (
+                                                    <i className="bi bi-exclamation-circle-fill text-red-500"></i>
+                                                ) : (
+                                                    <span className="text-[10px] font-black text-primary-500">{item.progress}%</span>
+                                                )}
+                                            </div>
+                                            
+                                            {item.status === 'uploading' && (
+                                                <div className="h-1 w-full bg-neutral-800 rounded-full overflow-hidden">
+                                                    <div 
+                                                        className="h-full bg-primary-500 transition-all duration-300 ease-out"
+                                                        style={{ width: `${item.progress}%` }}
+                                                    ></div>
+                                                </div>
+                                            )}
+                                            {item.status === 'error' && (
+                                                <div className="text-[10px] text-red-500 mt-1 truncate">{item.error}</div>
+                                            )}
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}
@@ -311,7 +433,12 @@ export function ServerFilesPage({ pageData = data }) {
                                                     className="w-full text-left px-5 sm:px-0 py-4 flex items-center gap-4 hover:text-white transition-colors"
                                                     onClick={() => {
                                                         setMenuPath('');
-                                                        if (entry.isDirectory) setCurrentPath(entryPath);
+                                                        if (entry.isDirectory) {
+                                                            setCurrentPath(entryPath);
+                                                        } else {
+                                                            // For files, navigate to editor
+                                                            window.location.href = `${manager.editUrlBase}?path=${encodeURIComponent(entryPath)}`;
+                                                        }
                                                     }}
                                                 >
                                                     <i className={`text-2xl ${entry.isDirectory ? 'bi bi-folder-fill text-primary-400 group-hover:text-primary-300' : 'bi bi-file-earmark-text text-neutral-400 group-hover:text-neutral-300'}`}></i>
@@ -330,10 +457,10 @@ export function ServerFilesPage({ pageData = data }) {
                                                 <div className="text-sm text-neutral-400 font-mono">{entry.isDirectory ? 'Folder' : formatBytes(entry.size)}</div>
                                             </div>
                                             
-                                            <div className="hidden sm:flex col-span-1 items-center justify-end">
+                                            <div className="flex sm:col-span-1 items-center justify-end px-4 sm:px-0 py-2 sm:py-0">
                                                 <button 
                                                     type="button" 
-                                                    className="w-8 h-8 flex items-center justify-center rounded text-neutral-400 hover:text-white hover:bg-neutral-600 transition-colors" 
+                                                    className="w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg sm:rounded text-neutral-400 hover:text-white hover:bg-neutral-700 sm:hover:bg-neutral-600 transition-colors border border-neutral-700 sm:border-0" 
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setMenuPath(isMenuOpen ? '' : entryPath);
@@ -343,29 +470,56 @@ export function ServerFilesPage({ pageData = data }) {
                                                 </button>
                                                 
                                                 {isMenuOpen && (
-                                                    <div className="absolute right-6 top-12 z-10 w-48 bg-neutral-800 border border-neutral-600 rounded shadow-xl py-1 transform origin-top-right transition-all">
+                                                    <div className="absolute right-4 sm:right-6 top-14 sm:top-12 z-50 w-56 bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl py-2 transform origin-top-right transition-all overflow-hidden ring-1 ring-black/50">
                                                         {entry.isDirectory ? (
                                                             <button 
                                                                 type="button" 
-                                                                className="w-full text-left px-4 py-2 text-sm text-neutral-300 hover:text-white hover:bg-neutral-700" 
+                                                                className="w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-3 transition-colors" 
                                                                 onClick={() => { setCurrentPath(entryPath); setMenuPath(''); }}
                                                             >
-                                                                <i className="bi bi-folder-symlink mr-2"></i> Open Folder
+                                                                <i className="bi bi-folder-symlink text-primary-400"></i> Open Folder
                                                             </button>
                                                         ) : (
                                                             <>
-                                                                <a className="block px-4 py-2 text-sm text-neutral-300 hover:text-white hover:bg-neutral-700" href={`${manager.editUrlBase}?path=${encodeURIComponent(entryPath)}`}><i className="bi bi-pencil mr-2"></i> Edit</a>
-                                                                <a className="block px-4 py-2 text-sm text-neutral-300 hover:text-white hover:bg-neutral-700" href={`${manager.previewUrlBase}?path=${encodeURIComponent(entryPath)}`}><i className="bi bi-eye mr-2"></i> Preview</a>
+                                                                <a className="flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors" href={`${manager.editUrlBase}?path=${encodeURIComponent(entryPath)}`}>
+                                                                    <i className="bi bi-pencil text-neutral-400"></i> Edit File
+                                                                </a>
+                                                                <a className="flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors" href={`${manager.previewUrlBase}?path=${encodeURIComponent(entryPath)}`}>
+                                                                    <i className="bi bi-eye text-neutral-400"></i> Preview
+                                                                </a>
                                                                 {permissions.canDownloadFiles && (
-                                                                    <a className="block px-4 py-2 text-sm text-neutral-300 hover:text-white hover:bg-neutral-700 mt-1 border-t border-neutral-700/50 pt-2" href={`${manager.downloadUrlBase}?path=${encodeURIComponent(entryPath)}`}>
-                                                                        <i className="bi bi-cloud-arrow-down mr-2"></i> Download
+                                                                    <a className="flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 mt-1 border-t border-neutral-800/50 pt-2 transition-colors" href={`${manager.downloadUrlBase}?path=${encodeURIComponent(entryPath)}`}>
+                                                                        <i className="bi bi-cloud-arrow-down text-blue-400"></i> Download
                                                                     </a>
                                                                 )}
                                                             </>
                                                         )}
-                                                        <div className="border-t border-neutral-700/50 mt-1 pt-1">
-                                                            <a className="block px-4 py-2 text-xs text-neutral-400 hover:text-white hover:bg-neutral-700" href={`${manager.legacyUrl}?legacy=1&path=${encodeURIComponent(currentPath)}`}>
-                                                                <i className="bi bi-box-arrow-up-right mr-1"></i> Open Legacy Manager
+                                                        
+                                                        {/* Archive Actions */}
+                                                        {!permissions.filesWriteLocked && (
+                                                            <div className="mt-1 pt-1 border-t border-neutral-800/50">
+                                                                <button 
+                                                                    type="button"
+                                                                    className="w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-3 transition-colors"
+                                                                    onClick={() => { handleArchive(entry.name); setMenuPath(''); }}
+                                                                >
+                                                                    <i className="bi bi-file-zip text-yellow-400"></i> Archive
+                                                                </button>
+                                                                {!entry.isDirectory && (entry.name.endsWith('.zip') || entry.name.endsWith('.tar.gz') || entry.name.endsWith('.tar')) && (
+                                                                    <button 
+                                                                        type="button"
+                                                                        className="w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-3 transition-colors"
+                                                                        onClick={() => { handleUnarchive(entry.name); setMenuPath(''); }}
+                                                                    >
+                                                                        <i className="bi bi-file-earmark-zip text-green-400"></i> Unarchive
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        <div className="border-t border-neutral-800/50 mt-1 pt-1">
+                                                            <a className="flex items-center gap-3 px-4 py-2.5 text-xs text-neutral-500 hover:text-white hover:bg-neutral-800 transition-colors" href={`${manager.legacyUrl}?legacy=1&path=${encodeURIComponent(currentPath)}`}>
+                                                                <i className="bi bi-box-arrow-up-right"></i> Legacy Mode
                                                             </a>
                                                         </div>
                                                     </div>

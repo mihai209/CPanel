@@ -63,10 +63,50 @@ export function ServerActivityPage({ pageData = data }) {
     const server = pageData.server || {};
     const logs = pageData.logs || [];
     const changeLogs = pageData.changeLogs || [];
+    const [isClearing, setIsClearing] = React.useState(false);
+
+    const handleClearLogs = async () => {
+        if (!window.confirm('Are you sure you want to PERMANENTLY clear all activity and change logs for this server? This action cannot be undone.')) {
+            return;
+        }
+
+        setIsClearing(true);
+        try {
+            const response = await fetch(`/server/${server.containerId}/activity/clear`, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' }
+            });
+            const payload = await response.json();
+            if (payload.success) {
+                window.location.reload();
+            } else {
+                alert(payload.error || 'Failed to clear logs.');
+                setIsClearing(false);
+            }
+        } catch (err) {
+            alert('An error occurred while clearing logs.');
+            setIsClearing(false);
+        }
+    };
+
+    const canClear = pageData.user?.isAdmin || (pageData.permissions && pageData.permissions['server.activity.clear']);
 
     return (
         <ReactAppShell pageData={pageData} subtitle="Activity">
             <PageContentBlock title="Server Activity" description="Tracking all events and state changes for your server.">
+                
+                {canClear && (
+                    <div className="flex justify-end mb-6">
+                        <button 
+                            onClick={handleClearLogs}
+                            disabled={isClearing}
+                            className="bg-red-900/30 hover:bg-red-600 border border-red-500/50 text-red-200 hover:text-white font-black text-[10px] uppercase tracking-[0.2em] py-2.5 px-5 rounded-xl transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-900/20"
+                        >
+                            <i className={`bi ${isClearing ? 'bi-hourglass-split' : 'bi-trash3-fill'}`}></i>
+                            {isClearing ? 'Clearing History...' : 'Clear Activity History'}
+                        </button>
+                    </div>
+                )}
                 
                 {/* Changes Table */}
                 <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden mb-8 shadow-sm">

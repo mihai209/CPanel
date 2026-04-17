@@ -24,29 +24,42 @@ export function DashboardPage({ pageData = data }) {
         }
     }, [pageData]);
 
-    const isAdminDashboard = Boolean(pageData.isAdminDashboard);
+    const isViewingAllServers = Boolean(pageData.showOthersServers);
+    const userIsAdmin = Boolean(pageData.isAdminDashboard);
 
     return (
         <ReactAppShell pageData={pageData} subtitle="React view beta">
             <PageContentBlock 
-                title={isAdminDashboard ? "System Overview" : "Dashboard"} 
-                description={isAdminDashboard ? "Viewing all active servers across the system." : "Individual overview of your servers and instances."}
+                title={isViewingAllServers ? "System Overview" : "Dashboard"} 
+                description={isViewingAllServers ? "Viewing all active servers across the system." : "Individual overview of your servers and instances."}
             >
-                {pageData.user?.isAdmin && (
-                    <div className="flex justify-between items-center mb-6 bg-neutral-800/50 border border-neutral-700/50 p-4 rounded-xl">
-                        <div className="flex items-center gap-3">
-                            <div className={`w-3 h-3 rounded-full ${isAdminDashboard ? 'bg-primary-500 animate-pulse' : 'bg-neutral-600'}`}></div>
-                            <span className="text-sm font-bold text-neutral-300 uppercase tracking-widest">
-                                {isAdminDashboard ? 'Admin View: All Servers' : 'Private View: My Servers'}
-                            </span>
+                {userIsAdmin && (
+                    <div className="mb-10 group relative">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-primary-600/20 to-purple-600/20 rounded-[2.5rem] blur-xl opacity-50 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
+                        <div className="relative flex flex-col sm:flex-row justify-between items-center bg-neutral-900/80 backdrop-blur-xl border border-neutral-800/50 p-6 sm:p-8 rounded-[2rem] shadow-2xl overflow-hidden ring-1 ring-white/5">
+                            <div className="flex items-center gap-6 mb-6 sm:mb-0">
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-inner ${isViewingAllServers ? 'bg-primary-500/10 text-primary-400 ring-2 ring-primary-500/20' : 'bg-neutral-800 text-neutral-500'}`}>
+                                    <i className={`bi ${isViewingAllServers ? 'bi-shield-check' : 'bi-shield-lock'} text-2xl`}></i>
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-black text-white uppercase tracking-[0.2em] leading-none mb-2">
+                                        {isViewingAllServers ? 'System-Wide Administration' : 'Personal Instance Dashboard'}
+                                    </h4>
+                                    <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest opacity-80">
+                                        {isViewingAllServers ? 'Global visibility enabled: Viewing all network servers' : 'Filtered view: Only showing your private instances'}
+                                    </p>
+                                </div>
+                            </div>
+                            <a 
+                                href={isViewingAllServers ? '/' : '/?others=true'}
+                                className={`group relative px-8 py-4 rounded-xl text-xs font-black uppercase tracking-[0.25em] transition-all duration-300 flex items-center gap-3 overflow-hidden ${isViewingAllServers ? 'bg-neutral-800 hover:bg-neutral-700 text-primary-400 border border-neutral-700' : 'bg-primary-600 hover:bg-primary-500 text-white shadow-2xl shadow-primary-900/40'}`}
+                            >
+                                <span className="relative z-10 flex items-center gap-3">
+                                    <i className={`bi ${isViewingAllServers ? 'bi-toggle-on text-lg' : 'bi-toggle-off text-lg opacity-50'}`}></i>
+                                    {isViewingAllServers ? 'Leave Admin View' : 'Enter Admin View'}
+                                </span>
+                            </a>
                         </div>
-                        <a 
-                            href={isAdminDashboard ? '/' : '/?others=true'}
-                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${isAdminDashboard ? 'bg-primary-600 hover:bg-primary-500 text-white shadow-lg shadow-primary-900/20' : 'bg-neutral-700 hover:bg-neutral-600 text-neutral-300'}`}
-                        >
-                            <i className={`bi ${isAdminDashboard ? 'bi-shield-check' : 'bi-shield-lock'} me-2`}></i>
-                            {isAdminDashboard ? 'Exit Admin Mode' : 'Enter Admin Mode'}
-                        </a>
                     </div>
                 )}
                 
@@ -58,14 +71,17 @@ export function DashboardPage({ pageData = data }) {
                             <ServerRow
                                 key={server.id || server.containerId}
                                 server={server}
-                                isAdminDashboard={isAdminDashboard}
+                                isAdminDashboard={isViewingAllServers}
                             />
                         ))}
                     </div>
                 ) : (
-                    <p className="text-center text-sm text-neutral-400 mt-10">
-                        There are no servers associated with your account.
-                    </p>
+                    <div className="flex flex-col items-center justify-center py-24 bg-neutral-900/30 border border-neutral-800/50 border-dashed rounded-3xl">
+                        <i className="bi bi-stack text-4xl text-neutral-800 mb-4"></i>
+                        <p className="text-center text-sm font-bold text-neutral-500 uppercase tracking-widest">
+                            {isViewingAllServers ? 'No servers found in the system.' : 'You do not have any active servers.'}
+                        </p>
+                    </div>
                 )}
             </PageContentBlock>
         </ReactAppShell>

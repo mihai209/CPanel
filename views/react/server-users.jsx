@@ -52,6 +52,43 @@ const userPermissionDescriptions = {
     'server.policy': 'Configure policy engine.'
 };
 
+function PermissionBadge({ permissions }) {
+    const [isHovered, setIsHovered] = React.useState(false);
+    if (!Array.isArray(permissions)) return null;
+
+    return (
+        <div 
+            className="relative inline-block"
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
+            <div className="bg-primary-900/30 text-primary-400 border border-primary-500/30 px-3 py-1 rounded-full text-[11px] font-bold tracking-tight cursor-help shadow-sm hover:bg-primary-900/50 transition-colors flex items-center gap-2">
+                <i className="bi bi-shield-check"></i>
+                {permissions.length} Permissions
+            </div>
+            
+            {isHovered && (
+                <div className="absolute z-50 left-0 mt-2 p-4 bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl w-72 animate-in fade-in zoom-in-95 duration-200 pointer-events-none">
+                    <div className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3 border-b border-neutral-800 pb-2 flex justify-between">
+                        <span>Permission Bundle</span>
+                        <span className="text-primary-500">{permissions.length} items</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-64 overflow-y-auto no-scrollbar">
+                        {permissions.map(p => (
+                            <span key={p} className="text-[10px] font-semibold bg-neutral-800 text-neutral-200 px-2 py-0.5 rounded border border-neutral-700">
+                                {p}
+                            </span>
+                        ))}
+                    </div>
+                    <div className="mt-3 text-[10px] text-neutral-500 italic">
+                        Move mouse away to close list
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export function ServerUsersPage({ pageData = data }) {
     const server = pageData.server || {};
     const memberships = Array.isArray(pageData.memberships) ? pageData.memberships : [];
@@ -174,9 +211,7 @@ export function ServerUsersPage({ pageData = data }) {
                                             <div className="text-xs text-neutral-500">{entry.user?.email || ''}</div>
                                         </td>
                                         <td className="px-5 py-4">
-                                            <code className="text-xs text-primary-300 bg-neutral-900 border border-neutral-700 px-2 py-1 rounded shadow-sm break-all">
-                                                {Array.isArray(entry.permissions) ? entry.permissions.join(', ') : ''}
-                                            </code>
+                                            <PermissionBadge permissions={entry.permissions} />
                                         </td>
                                         <td className="px-5 py-4 text-sm text-neutral-400">
                                             {entry.invitedBy ? entry.invitedBy.username : '-'}
