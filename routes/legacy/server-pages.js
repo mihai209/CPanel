@@ -118,7 +118,8 @@ function registerServerPagesRoutes(ctx) {
             email: userSession.email || '',
             avatarUrl: userSession.avatarUrl || '',
             avatarProvider: userSession.avatarProvider || 'gravatar',
-            gravatarHash: userSession.gravatarHash || (email ? nodeCrypto.createHash('md5').update(email).digest('hex') : '')
+            gravatarHash: userSession.gravatarHash || (email ? nodeCrypto.createHash('md5').update(email).digest('hex') : ''),
+            isAdmin: Boolean(userSession.isAdmin)
         };
     }
 
@@ -150,6 +151,12 @@ function registerServerPagesRoutes(ctx) {
                 : null,
             hasServerPermission(access, 'server.startup')
                 ? { key: 'startup', label: 'Startup', href: `/server/${containerId}/startup`, active: activeKey === 'startup' }
+                : null,
+            (isServerLikelyMinecraft(server) && (hasServerPermission(access, 'server.view') || hasServerPermission(access, 'server.files')))
+                ? { key: 'mccenter', label: 'MC Center', href: `/server/${containerId}/minecraft-center`, active: activeKey === 'mccenter' }
+                : null,
+            (isServerLikelyMinecraft(server) && (hasServerPermission(access, 'server.view') || hasServerPermission(access, 'server.files')))
+                ? { key: 'mcinstaller', label: 'MC Installer', href: `/server/${containerId}/minecraft/installer`, active: activeKey === 'mcinstaller' }
                 : null,
             hasServerPermission(access, 'server.activity.view')
                 ? { key: 'activity', label: 'Activity', href: `/server/${containerId}/activity`, active: activeKey === 'activity' }
@@ -1221,21 +1228,25 @@ function registerServerPagesRoutes(ctx) {
                 return true;
             });
 
-            return res.render('connectors-check', {
-                user: req.session.user,
+            return res.render('loader', {
                 title: 'Connectors Check',
-                path: '/connectors-check',
-                cards: filteredCards,
-                totalCards: cards.length,
-                filters: {
-                    status: filterStatus,
-                    search: filterSearch,
-                    minFreeRamGb,
-                    minFreeDiskGb,
-                    minFreeAllocations
-                },
-                success: req.query.success || null,
-                error: req.query.error || null
+                reactPageData: {
+                    routePath: '/connectors-check',
+                    brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                    faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                    user: buildReactUserSummary(req.session.user),
+                    cards: filteredCards,
+                    totalCards: cards.length,
+                    filters: {
+                        status: filterStatus,
+                        search: filterSearch,
+                        minFreeRamGb,
+                        minFreeDiskGb,
+                        minFreeAllocations
+                    },
+                    success: req.query.success || null,
+                    error: req.query.error || null
+                }
             });
         } catch (error) {
             console.error('Error loading connectors-check page:', error);
@@ -12467,6 +12478,7 @@ return res.render('server/users', {
         user: buildReactUserSummary(req.session.user),
         server: server.toJSON(),
         serverNavItems: buildReactServerNavItems(server, access, 'activity'),
+        permissions: Array.from(access.permissions || []),
         logs,
         changeLogs
     };
@@ -22311,7 +22323,10 @@ res.render('server/startup', {
         try {
             const server = await Server.findOne({
                 where: { containerId: req.params.containerId },
-                include: [{ model: Image, as: 'image' }]
+                include: [
+                    { model: Image, as: 'image' },
+                    { model: Allocation, as: 'allocation' }
+                ]
             });
 
             if (!server) return res.redirect('/server/notfound');

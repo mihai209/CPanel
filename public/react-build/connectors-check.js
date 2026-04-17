@@ -7279,7 +7279,7 @@
     }
   });
 
-  // views/react/server-files.jsx
+  // views/react/connectors-check.jsx
   var import_react6 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
@@ -8583,518 +8583,239 @@
     ] });
   }
 
-  // views/react/server-files.jsx
+  // views/react/connectors-check.jsx
   var import_jsx_runtime6 = __toESM(require_jsx_runtime());
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
-  var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-files";
+  var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "connectors-check";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
-  function normalizePath(value) {
-    const raw = String(value || "/").trim().replace(/\\/g, "/");
-    if (!raw || raw === "/") return "/";
-    const normalized = raw.startsWith("/") ? raw : `/${raw}`;
-    return normalized.replace(/\/+/g, "/").replace(/\/$/, "") || "/";
+  function fmt(value, digits = 1) {
+    const num = Number(value || 0);
+    if (!Number.isFinite(num)) return "0";
+    return num.toFixed(digits);
   }
-  function formatBytes(value) {
-    const bytes = Math.max(0, Number(value) || 0);
-    if (!bytes) return "0 B";
-    const units = ["B", "KB", "MB", "GB", "TB"];
-    let current = bytes;
-    let index = 0;
-    while (current >= 1024 && index < units.length - 1) {
-      current /= 1024;
-      index += 1;
-    }
-    return `${current >= 100 || index === 0 ? current.toFixed(0) : current.toFixed(2)} ${units[index]}`;
+  function fmtTime(value) {
+    if (!value) return "Never";
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return "Never";
+    return dt.toLocaleString();
   }
-  function formatDate(value) {
-    if (!value) return "-";
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
-  }
-  function buildSegments(pathname) {
-    const normalized = normalizePath(pathname);
-    if (normalized === "/") return [{ label: "home", path: "/" }];
-    const parts = normalized.split("/").filter(Boolean);
-    const segments = [{ label: "home", path: "/" }];
-    let current = "";
-    parts.forEach((part) => {
-      current += `/${part}`;
-      segments.push({ label: part, path: current });
-    });
-    return segments;
-  }
-  function ServerFilesPage({ pageData = data }) {
-    const manager = pageData.fileManager || {};
-    const permissions = pageData.permissions || {};
-    const [currentPath, setCurrentPath] = import_react6.default.useState(() => normalizePath(pageData.initialPath || "/"));
-    const [entries, setEntries] = import_react6.default.useState([]);
-    const [loading, setLoading] = import_react6.default.useState(true);
-    const [error, setError] = import_react6.default.useState(pageData.error || "");
-    const [menuPath, setMenuPath] = import_react6.default.useState("");
-    const [isDragging, setIsDragging] = import_react6.default.useState(false);
-    const [fileQueue, setFileQueue] = import_react6.default.useState([]);
-    const [isQueueExpanded, setIsQueueExpanded] = import_react6.default.useState(true);
-    const reloadFiles = import_react6.default.useCallback(() => {
-      setLoading(true);
-      setError("");
-      fetch(`${manager.fetchUrlBase}?path=${encodeURIComponent(currentPath)}`, {
-        credentials: "same-origin",
-        headers: { Accept: "application/json" }
-      }).then(async (response) => {
-        const payload = await response.json().catch(() => ({}));
-        const nextEntries = Array.isArray(payload.files) ? payload.files : [];
-        nextEntries.sort((left, right) => {
-          if (left.isDirectory && !right.isDirectory) return -1;
-          if (!left.isDirectory && right.isDirectory) return 1;
-          return String(left.name || "").localeCompare(String(right.name || ""), void 0, { numeric: true, sensitivity: "base" });
-        });
-        setEntries(nextEntries);
-        setLoading(false);
-      }).catch(() => {
-        setLoading(false);
-        setError("Failed to refresh files.");
-      });
-    }, [currentPath, manager.fetchUrlBase]);
-    const uploadFile = (file, queueId) => {
-      return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        const url = `${manager.uploadUrlBase || `/server/${pageData.server?.containerId}/files/upload`}?path=${encodeURIComponent(currentPath)}&name=${encodeURIComponent(file.name)}`;
-        xhr.upload.addEventListener("progress", (e) => {
-          if (e.lengthComputable) {
-            const percent = Math.round(e.loaded / e.total * 100);
-            setFileQueue((prev) => prev.map((item) => item.id === queueId ? { ...item, progress: percent } : item));
-          }
-        });
-        xhr.addEventListener("load", () => {
-          try {
-            const payload = JSON.parse(xhr.responseText);
-            if (xhr.status >= 200 && xhr.status < 300 && !payload.error) {
-              setFileQueue((prev) => prev.map((item) => item.id === queueId ? { ...item, status: "done", progress: 100 } : item));
-              resolve();
-            } else {
-              throw new Error(payload.error || "Upload failed");
-            }
-          } catch (err) {
-            setFileQueue((prev) => prev.map((item) => item.id === queueId ? { ...item, status: "error", error: err.message } : item));
-            reject(err);
-          }
-        });
-        xhr.addEventListener("error", () => {
-          setFileQueue((prev) => prev.map((item) => item.id === queueId ? { ...item, status: "error", error: "Network error" } : item));
-          reject(new Error("Network error"));
-        });
-        xhr.open("POST", url, true);
-        xhr.setRequestHeader("x-file-name", file.name);
-        xhr.withCredentials = true;
-        xhr.send(file);
-      });
-    };
-    const handleDrop = async (e) => {
-      e.preventDefault();
-      setIsDragging(false);
-      if (permissions.filesWriteLocked) return;
-      const droppedFiles = Array.from(e.dataTransfer.files);
-      if (droppedFiles.length === 0) return;
-      const newEntries = droppedFiles.map((f) => ({
-        id: Math.random().toString(36).substring(7),
-        name: f.name,
-        size: f.size,
-        progress: 0,
-        status: "uploading"
-      }));
-      setFileQueue((prev) => [...newEntries, ...prev]);
-      setIsQueueExpanded(true);
-      await Promise.allSettled(droppedFiles.map((file, idx) => uploadFile(file, newEntries[idx].id)));
-      reloadFiles();
-    };
-    const handleArchive = async (fileName) => {
-      if (!fileName) return;
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/client/servers/${pageData.server?.containerId}/files/archive`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ directory: currentPath, files: [fileName], name: `${fileName}.zip` })
-        });
-        const payload = await response.json();
-        if (!response.ok || payload.error) throw new Error(payload.error || "Archive failed");
-        reloadFiles();
-      } catch (err) {
-        setError(err.message);
-        setLoading(false);
-      }
-    };
-    const handleUnarchive = async (fileName) => {
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/client/servers/${pageData.server?.containerId}/files/unarchive`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ directory: currentPath, name: fileName })
-        });
-        const payload = await response.json();
-        if (!response.ok || payload.error) throw new Error(payload.error || "Extraction failed");
-        reloadFiles();
-      } catch (err) {
-        setError(err.message);
-        setLoading(false);
-      }
-    };
-    const handleDelete = async (fileName) => {
-      if (!window.confirm(`Are you sure you want to delete "${fileName}"? This action is permanent and cannot be undone.`)) {
-        return;
-      }
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/client/servers/${pageData.server?.containerId}/files/delete`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ directory: currentPath, files: [fileName] })
-        });
-        const payload = await response.json();
-        if (!response.ok || payload.error) throw new Error(payload.error || "Delete failed");
-        reloadFiles();
-      } catch (err) {
-        setError(err.message);
-        setLoading(false);
-      }
-    };
-    const handleDragOver = (e) => {
-      e.preventDefault();
-      if (!permissions.filesWriteLocked) setIsDragging(true);
-    };
-    const handleDragLeave = (e) => {
-      e.preventDefault();
-      if (!e.currentTarget.contains(e.relatedTarget)) {
-        setIsDragging(false);
-      }
-    };
-    import_react6.default.useEffect(() => {
-      let cancelled = false;
-      setLoading(true);
-      setError("");
-      fetch(`${manager.fetchUrlBase}?path=${encodeURIComponent(currentPath)}`, {
-        credentials: "same-origin",
-        headers: { Accept: "application/json" }
-      }).then(async (response) => {
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok || payload.error) {
-          throw new Error(payload.error || `Failed to load ${currentPath}`);
-        }
-        if (cancelled) return;
-        const nextEntries = Array.isArray(payload.files) ? payload.files : [];
-        nextEntries.sort((left, right) => {
-          if (left.isDirectory && !right.isDirectory) return -1;
-          if (!left.isDirectory && right.isDirectory) return 1;
-          return String(left.name || "").localeCompare(String(right.name || ""), void 0, { numeric: true, sensitivity: "base" });
-        });
-        setEntries(nextEntries);
-        setLoading(false);
-      }).catch((requestError) => {
-        if (cancelled) return;
-        setEntries([]);
-        setLoading(false);
-        setError(requestError && requestError.message ? requestError.message : "Failed to load files.");
-      });
-      return () => {
-        cancelled = true;
-      };
-    }, [currentPath, manager.fetchUrlBase]);
-    const breadcrumbs = buildSegments(currentPath);
-    const activeServer = pageData.server || {};
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ReactAppShell, { pageData, subtitle: "File manager", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
-      PageContentBlock,
-      {
-        title: "File Manager",
-        description: "Browse container files, jump into the editor, or fall back to the legacy manager for advanced actions.",
-        eyebrow: "Server Workspace",
-        children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-end gap-3 mb-6", children: [
-            manager.webUploadEnabled ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-sm text-neutral-400 self-center mr-2", children: `Uploads enabled up to ${manager.webUploadMaxMb} MB` }) : null,
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("a", { href: `${manager.legacyUrl}?legacy=1`, className: "bg-neutral-700 hover:bg-neutral-600 text-white font-semibold flex-shrink-0 py-2 px-4 rounded transition-colors text-sm shadow-sm flex items-center gap-2", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-box-arrow-up-right" }),
-              " Open Legacy View"
+  var getSeverityTheme = (pct) => {
+    if (pct >= 95) return { bg: "bg-red-500/20", bar: "bg-red-500", text: "text-red-400" };
+    if (pct >= 80) return { bg: "bg-yellow-500/20", bar: "bg-yellow-500", text: "text-yellow-400" };
+    return { bg: "bg-primary-500/20", bar: "bg-primary-500", text: "text-primary-400" };
+  };
+  function ConnectorGridCard({ item }) {
+    const { connector, metrics, isOnline, statusData } = item;
+    const ramTheme = getSeverityTheme(metrics.memoryUsagePct);
+    const diskTheme = getSeverityTheme(metrics.diskUsagePct);
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800/50 border border-neutral-700/50 rounded-2xl p-6 hover:border-neutral-600 transition-all group shadow-xl", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between items-start mb-6", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h3", { className: "text-lg font-bold text-white group-hover:text-primary-400 transition-colors uppercase tracking-tight", children: connector.name }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "text-xs text-neutral-500 font-mono mt-1", children: [
+            connector.fqdn,
+            " ",
+            connector.location?.shortName && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-neutral-700 mx-1", children: "|" }),
+            " ",
+            connector.location?.shortName
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: `px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${isOnline ? "bg-green-500/10 text-green-500 border border-green-500/20" : "bg-neutral-700 text-neutral-400 border border-neutral-600"}`, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: `w-1.5 h-1.5 rounded-full ${isOnline ? "bg-green-500 animate-pulse" : "bg-neutral-500"}` }),
+          isOnline ? "Online" : "Offline"
+        ] })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "grid grid-cols-2 gap-6 mb-6", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "space-y-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between items-end", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-[10px] font-black text-neutral-500 uppercase tracking-widest", children: "RAM Capacity" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: `text-xs font-bold ${ramTheme.text}`, children: [
+              fmt(metrics.memoryFreeGb),
+              " GB Free"
             ] })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-4 gap-6 items-start", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "lg:col-span-1 flex flex-col gap-6", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h2", { className: "text-lg font-bold text-white mb-4", children: "Storage Access" }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-col gap-3", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-2", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Server" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("strong", { className: "text-neutral-200", children: activeServer.name || "Server" })
-                ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-2", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Status" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("strong", { className: "text-neutral-200 capitalize", children: activeServer.status || "unknown" })
-                ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-2", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Writable" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("strong", { className: permissions.canWriteFiles && !permissions.filesWriteLocked ? "text-green-400" : "text-red-400", children: permissions.canWriteFiles && !permissions.filesWriteLocked ? "Yes" : "Read only" })
-                ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between items-center", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "SFTP" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("strong", { className: "text-neutral-200", children: pageData.sftpDetails && pageData.sftpDetails.available ? "Available" : "Unavailable" })
-                ] })
-              ] }),
-              permissions.filesWriteLocked ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "mt-6 bg-yellow-900/20 border border-yellow-500/30 text-yellow-200 p-3 rounded text-sm flex items-start gap-2", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-shield-lock text-yellow-500 mt-0.5" }),
-                "File writes are locked by policy. Use editor and downloads in read-only mode."
-              ] }) : null
-            ] }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
-              "div",
-              {
-                className: "lg:col-span-3 relative",
-                onDragOver: handleDragOver,
-                onDragLeave: handleDragLeave,
-                onDrop: handleDrop,
-                children: [
-                  isDragging && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "absolute inset-0 z-50 bg-primary-600/20 backdrop-blur-[2px] border-2 border-dashed border-primary-500 rounded-lg flex items-center justify-center pointer-events-none transition-all duration-300", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-900 px-8 py-10 rounded-2xl shadow-2xl border border-neutral-700 flex flex-col items-center animate-bounce", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-cloud-arrow-up text-5xl text-primary-500 mb-4" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-xl font-black text-white uppercase tracking-widest", children: "Drop to Upload" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "text-sm text-neutral-400 mt-2", children: [
-                      "File(s) will be uploaded to ",
-                      currentPath
-                    ] })
-                  ] }) }),
-                  fileQueue.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: `fixed bottom-6 right-6 z-[60] w-80 bg-neutral-900 border border-neutral-700 rounded-2xl shadow-2xl transition-all duration-300 ${isQueueExpanded ? "translate-y-0 opacity-100" : "translate-y-[calc(100%-50px)]"}`, children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
-                      "div",
-                      {
-                        className: "p-4 border-b border-neutral-800 flex items-center justify-between cursor-pointer hover:bg-neutral-800/50 transition-colors rounded-t-2xl",
-                        onClick: () => setIsQueueExpanded(!isQueueExpanded),
-                        children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-3", children: [
-                            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "relative", children: [
-                              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-cloud-arrow-up text-xl text-primary-500" }),
-                              fileQueue.filter((f) => f.status === "uploading").length > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "absolute -top-1 -right-1 flex h-3 w-3", children: [
-                                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75" }),
-                                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "relative inline-flex rounded-full h-3 w-3 bg-primary-500" })
-                              ] })
-                            ] }),
-                            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
-                              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-[10px] font-black text-neutral-500 uppercase tracking-widest leading-none mb-1", children: "Queue Manager" }),
-                              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "text-xs font-bold text-white leading-none", children: [
-                                fileQueue.filter((f) => f.status === "done").length,
-                                " of ",
-                                fileQueue.length,
-                                " files uploaded"
-                              ] })
-                            ] })
-                          ] }),
-                          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-4", children: [
-                            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: `bi ${isQueueExpanded ? "bi-chevron-down" : "bi-chevron-up"} text-neutral-500` }),
-                            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                              "button",
-                              {
-                                className: "text-neutral-500 hover:text-white transition-colors",
-                                onClick: (e) => {
-                                  e.stopPropagation();
-                                  setFileQueue([]);
-                                },
-                                children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-x-lg text-xs" })
-                              }
-                            )
-                          ] })
-                        ]
-                      }
-                    ),
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `overflow-y-auto max-h-64 flex flex-col divide-y divide-neutral-800 transition-all ${isQueueExpanded ? "opacity-100" : "opacity-0 h-0 pointer-events-none"}`, children: fileQueue.map((item) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "p-4 hover:bg-white/[0.02] transition-colors", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between items-start mb-2 gap-3", children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "min-w-0", children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-xs font-bold text-neutral-200 truncate", children: item.name }),
-                          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-[10px] text-neutral-500 font-mono mt-0.5", children: formatBytes(item.size) })
-                        ] }),
-                        item.status === "done" ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-check-circle-fill text-green-500" }) : item.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-exclamation-circle-fill text-red-500" }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "text-[10px] font-black text-primary-500", children: [
-                          item.progress,
-                          "%"
-                        ] })
-                      ] }),
-                      item.status === "uploading" && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "h-1 w-full bg-neutral-800 rounded-full overflow-hidden", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                        "div",
-                        {
-                          className: "h-full bg-primary-500 transition-all duration-300 ease-out",
-                          style: { width: `${item.progress}%` }
-                        }
-                      ) }),
-                      item.status === "error" && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-[10px] text-red-500 mt-1 truncate", children: item.error })
-                    ] }, item.id)) })
-                  ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden flex flex-col", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "px-5 py-4 border-b border-neutral-700/70 bg-neutral-800 flex items-center flex-wrap gap-2", children: breadcrumbs.map((segment, index) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_react6.default.Fragment, { children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                        "button",
-                        {
-                          type: "button",
-                          className: `font-semibold hover:text-white transition-colors ${index === breadcrumbs.length - 1 ? "text-neutral-100 cursor-default" : "text-neutral-400"}`,
-                          onClick: () => index !== breadcrumbs.length - 1 && setCurrentPath(segment.path),
-                          children: segment.label === "home" ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-house-door-fill text-lg relative top-[1px]" }) : segment.label
-                        }
-                      ),
-                      index < breadcrumbs.length - 1 && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-neutral-600 font-bold mx-1", children: "/" })
-                    ] }, segment.path)) }),
-                    error && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-red-600/20 border-b border-red-600/50 text-red-100 p-3 px-5 text-sm flex items-center gap-2", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-exclamation-triangle-fill text-red-500" }),
-                      " ",
-                      error
-                    ] }),
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "grid grid-cols-12 gap-4 px-6 py-3 border-b border-neutral-700/50 bg-neutral-900/30 text-xs font-bold text-neutral-400 uppercase tracking-widest hidden sm:grid", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "col-span-6", children: "Name" }),
-                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "col-span-3", children: "Modified" }),
-                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "col-span-2 text-right", children: "Size" }),
-                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "col-span-1 text-right", children: "Actions" })
-                    ] }),
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-col min-h-[400px]", children: [
-                      loading && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex-1 flex justify-center items-center py-16", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-col items-center justify-center space-y-4", children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-10 h-10 border-4 border-neutral-600 border-t-primary-500 rounded-full animate-spin" }),
-                        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-neutral-400 text-sm", children: "Loading directory..." })
-                      ] }) }),
-                      !loading && entries.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex-1 flex justify-center items-center py-16", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "text-center", children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-folder2-open text-4xl text-neutral-600 block mb-3" }),
-                        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-neutral-400 text-sm block", children: "This directory is empty." })
-                      ] }) }),
-                      !loading && entries.map((entry) => {
-                        const entryPath = normalizePath(`${currentPath === "/" ? "" : currentPath}/${entry.name || ""}`);
-                        const isMenuOpen = menuPath === entryPath;
-                        return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "grid sm:grid-cols-12 gap-0 sm:gap-4 px-0 sm:px-6 py-0 border-b border-neutral-700/30 hover:bg-neutral-700/20 transition-colors group relative", children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "sm:col-span-6 flex items-center", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
-                            "button",
-                            {
-                              type: "button",
-                              className: "w-full text-left px-5 sm:px-0 py-4 flex items-center gap-4 hover:text-white transition-colors",
-                              onClick: () => {
-                                setMenuPath("");
-                                if (entry.isDirectory) {
-                                  setCurrentPath(entryPath);
-                                } else {
-                                  window.location.href = `${manager.editUrlBase}?path=${encodeURIComponent(entryPath)}`;
-                                }
-                              },
-                              children: [
-                                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: `text-2xl ${entry.isDirectory ? "bi bi-folder-fill text-primary-400 group-hover:text-primary-300" : "bi bi-file-earmark-text text-neutral-400 group-hover:text-neutral-300"}` }),
-                                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "overflow-hidden", children: [
-                                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("strong", { className: "block text-neutral-200 text-sm truncate font-semibold", children: entry.name || "Unnamed item" }),
-                                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "block text-xs text-neutral-500 sm:hidden mt-0.5", children: entry.isDirectory ? "Folder" : entry.permissions || "File" })
-                                ] })
-                              ]
-                            }
-                          ) }),
-                          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "hidden sm:flex col-span-3 items-center", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-sm text-neutral-400 truncate", children: formatDate(entry.modified) }) }),
-                          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "hidden sm:flex col-span-2 items-center justify-end", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-sm text-neutral-400 font-mono", children: entry.isDirectory ? "Folder" : formatBytes(entry.size) }) }),
-                          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex sm:col-span-1 items-center justify-end px-4 sm:px-0 py-2 sm:py-0", children: [
-                            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
-                              "button",
-                              {
-                                type: "button",
-                                className: "w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg sm:rounded text-neutral-400 hover:text-white hover:bg-neutral-700 sm:hover:bg-neutral-600 transition-colors border border-neutral-700 sm:border-0",
-                                onClick: (e) => {
-                                  e.stopPropagation();
-                                  setMenuPath(isMenuOpen ? "" : entryPath);
-                                },
-                                children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-three-dots" })
-                              }
-                            ),
-                            isMenuOpen && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "absolute right-4 sm:right-6 top-14 sm:top-12 z-50 w-56 bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl py-2 transform origin-top-right transition-all overflow-hidden ring-1 ring-black/50", children: [
-                              entry.isDirectory ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
-                                "button",
-                                {
-                                  type: "button",
-                                  className: "w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-3 transition-colors",
-                                  onClick: () => {
-                                    setCurrentPath(entryPath);
-                                    setMenuPath("");
-                                  },
-                                  children: [
-                                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-folder-symlink text-primary-400" }),
-                                    " Open Folder"
-                                  ]
-                                }
-                              ) : /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
-                                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("a", { className: "flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors", href: `${manager.editUrlBase}?path=${encodeURIComponent(entryPath)}`, children: [
-                                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-pencil text-neutral-400" }),
-                                  " Edit File"
-                                ] }),
-                                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("a", { className: "flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors", href: `${manager.previewUrlBase}?path=${encodeURIComponent(entryPath)}`, children: [
-                                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-eye text-neutral-400" }),
-                                  " Preview"
-                                ] }),
-                                permissions.canDownloadFiles && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("a", { className: "flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 mt-1 border-t border-neutral-800/50 pt-2 transition-colors", href: `${manager.downloadUrlBase}?path=${encodeURIComponent(entryPath)}`, children: [
-                                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-cloud-arrow-down text-blue-400" }),
-                                  " Download"
-                                ] })
-                              ] }),
-                              !permissions.filesWriteLocked && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "mt-1 pt-1 border-t border-neutral-800/50", children: [
-                                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
-                                  "button",
-                                  {
-                                    type: "button",
-                                    className: "w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-3 transition-colors",
-                                    onClick: () => {
-                                      handleArchive(entry.name);
-                                      setMenuPath("");
-                                    },
-                                    children: [
-                                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-file-zip text-yellow-400" }),
-                                      " Archive"
-                                    ]
-                                  }
-                                ),
-                                !entry.isDirectory && (entry.name.endsWith(".zip") || entry.name.endsWith(".tar.gz") || entry.name.endsWith(".tar")) && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
-                                  "button",
-                                  {
-                                    type: "button",
-                                    className: "w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-3 transition-colors",
-                                    onClick: () => {
-                                      handleUnarchive(entry.name);
-                                      setMenuPath("");
-                                    },
-                                    children: [
-                                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-file-earmark-zip text-green-400" }),
-                                      " Unarchive"
-                                    ]
-                                  }
-                                ),
-                                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
-                                  "button",
-                                  {
-                                    type: "button",
-                                    className: "w-full text-left px-4 py-2.5 text-sm text-red-400 hover:text-white hover:bg-red-500/10 flex items-center gap-3 transition-colors",
-                                    onClick: () => {
-                                      handleDelete(entry.name);
-                                      setMenuPath("");
-                                    },
-                                    children: [
-                                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-trash3 text-red-500" }),
-                                      " Delete"
-                                    ]
-                                  }
-                                )
-                              ] }),
-                              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "border-t border-neutral-800/50 mt-1 pt-1", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("a", { className: "flex items-center gap-3 px-4 py-2.5 text-xs text-neutral-500 hover:text-white hover:bg-neutral-800 transition-colors", href: `${manager.legacyUrl}?legacy=1&path=${encodeURIComponent(currentPath)}`, children: [
-                                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-box-arrow-up-right" }),
-                                " Legacy Mode"
-                              ] }) })
-                            ] })
-                          ] })
-                        ] }, entryPath);
-                      })
-                    ] })
-                  ] })
-                ]
-              }
-            )
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "h-2 bg-neutral-900 rounded-full overflow-hidden", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+            "div",
+            {
+              className: `h-full transition-all duration-1000 ease-out ${ramTheme.bar}`,
+              style: { width: `${Math.min(100, metrics.memoryUsagePct)}%` }
+            }
+          ) }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between text-[10px] font-bold", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "text-neutral-500", children: [
+              fmt(metrics.memoryUsedGb),
+              " used"
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "text-neutral-400", children: [
+              fmt(metrics.memoryCapGb),
+              " cap"
+            ] })
           ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "space-y-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between items-end", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-[10px] font-black text-neutral-500 uppercase tracking-widest", children: "Disk Capacity" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: `text-xs font-bold ${diskTheme.text}`, children: [
+              fmt(metrics.diskFreeGb),
+              " GB Free"
+            ] })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "h-2 bg-neutral-900 rounded-full overflow-hidden", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+            "div",
+            {
+              className: `h-full transition-all duration-1000 ease-out ${diskTheme.bar}`,
+              style: { width: `${Math.min(100, metrics.diskUsagePct)}%` }
+            }
+          ) }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between text-[10px] font-bold", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "text-neutral-500", children: [
+              fmt(metrics.diskUsedGb),
+              " used"
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "text-neutral-400", children: [
+              fmt(metrics.diskCapGb),
+              " cap"
+            ] })
+          ] })
+        ] })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "grid grid-cols-3 gap-4 py-4 border-t border-neutral-700/30", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-[9px] font-black text-neutral-600 uppercase tracking-widest mb-1", children: "Allocations" }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "text-sm font-bold text-neutral-200", children: [
+            metrics.freeAllocations,
+            " ",
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "text-neutral-600 text-[10px]", children: [
+              "/ ",
+              metrics.totalAllocations
+            ] })
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-[9px] font-black text-neutral-600 uppercase tracking-widest mb-1", children: "CPU Host" }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "text-sm font-bold text-neutral-200", children: [
+            fmt(metrics.cpuLivePercent, 1),
+            "%"
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-[9px] font-black text-neutral-600 uppercase tracking-widest mb-1", children: "CPU Allocs" }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "text-sm font-bold text-neutral-200", children: [
+            fmt(metrics.cpuAllocatedCores, 2),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-[10px] text-neutral-600 ms-1", children: "C" })
+          ] })
+        ] })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "mt-4 pt-4 border-t border-neutral-700/30 flex items-center justify-between", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "text-[10px] text-neutral-500 font-bold uppercase tracking-wider", children: [
+          "Last Seen: ",
+          fmtTime(statusData?.lastSeen)
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+          "a",
+          {
+            href: `/admin/connectors/${connector.id}`,
+            className: "text-[10px] font-black text-primary-400 hover:text-primary-300 uppercase tracking-[0.2em] transition-colors",
+            children: "Manage Node"
+          }
+        )
+      ] })
+    ] });
+  }
+  function ConnectorsCheckPage({ pageData = data }) {
+    const items = pageData.cards || [];
+    const filters = pageData.filters || {};
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ReactAppShell, { pageData, subtitle: "Infrastructure Health", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+      PageContentBlock,
+      {
+        title: "Connectors Check",
+        description: "Monitor real-time resource availability and node health across your global connector network.",
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-2xl p-6 mb-8 shadow-2xl", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("form", { method: "GET", action: "/connectors-check", className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 items-end", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "lg:col-span-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("label", { className: "block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-2", children: "Search Network" }),
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                  "input",
+                  {
+                    type: "text",
+                    name: "search",
+                    defaultValue: filters.search,
+                    placeholder: "Name, FQDN or Location...",
+                    className: "w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:border-primary-500 transition-colors outline-none"
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("label", { className: "block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-2", children: "Node Status" }),
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+                  "select",
+                  {
+                    name: "status",
+                    defaultValue: filters.status,
+                    className: "w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:border-primary-500 transition-colors outline-none",
+                    children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("option", { value: "all", children: "All States" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("option", { value: "online", children: "Online Only" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("option", { value: "offline", children: "Offline Only" })
+                    ]
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("label", { className: "block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-2", children: "Min RAM (GB)" }),
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                  "input",
+                  {
+                    type: "number",
+                    step: "0.1",
+                    name: "minFreeRamGb",
+                    defaultValue: filters.minFreeRamGb,
+                    className: "w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:border-primary-500 transition-colors outline-none"
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("label", { className: "block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-2", children: "Min Alloc Free" }),
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+                  "input",
+                  {
+                    type: "number",
+                    name: "minFreeAllocations",
+                    defaultValue: filters.minFreeAllocations,
+                    className: "w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:border-primary-500 transition-colors outline-none"
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex gap-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { type: "submit", className: "flex-1 bg-primary-600 hover:bg-primary-500 text-white font-black text-[10px] uppercase tracking-widest py-3 rounded-xl transition-all shadow-lg shadow-primary-900/20 active:scale-95", children: "Apply" }),
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("a", { href: "/connectors-check", className: "p-3 bg-neutral-700 hover:bg-neutral-600 text-white rounded-xl transition-colors", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-arrow-counterclockwise" }) })
+              ] })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "mt-4 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "text-neutral-500", children: [
+                "Filtered Analysis: ",
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-neutral-200", children: items.length }),
+                " nodes found"
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "text-neutral-500", children: [
+                "Total Cluster Size: ",
+                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-neutral-200", children: pageData.totalCards })
+              ] })
+            ] })
+          ] }),
+          items.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "py-20 flex flex-col items-center justify-center bg-neutral-800/20 border border-neutral-800 border-dashed rounded-3xl", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-activity text-5xl text-neutral-700 mb-4" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h3", { className: "text-lg font-bold text-neutral-400", children: "No connectors match your parameters." }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-sm text-neutral-600 mt-1", children: "Try relaxing your RAM or Allocation requirements." })
+          ] }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "grid grid-cols-1 xl:grid-cols-2 gap-6", children: items.map((item, idx) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "animate-in fade-in slide-in-from-bottom-4 duration-500", style: { animationDelay: `${idx * 40}ms` }, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ConnectorGridCard, { item }) }, item.connector.id || idx)) })
         ]
       }
     ) });
   }
-  var server_files_default = ServerFilesPage;
+  var connectors_check_default = ConnectorsCheckPage;
   if (root) {
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ServerFilesPage, { pageData: data }));
-    if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
-      window.__CPANEL_REACT_BOOTED__();
-    }
+    root.render(/* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ConnectorsCheckPage, { pageData: data }));
   }
 })();
 /*! Bundled license information:

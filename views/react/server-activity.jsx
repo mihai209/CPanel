@@ -89,7 +89,7 @@ export function ServerActivityPage({ pageData = data }) {
         }
     };
 
-    const canClear = pageData.user?.isAdmin || (pageData.permissions && pageData.permissions['server.activity.clear']);
+    const canClear = pageData.user?.isAdmin || (Array.isArray(pageData.permissions) ? pageData.permissions.includes('server.activity.clear') : (pageData.permissions && pageData.permissions['server.activity.clear']));
 
     return (
         <ReactAppShell pageData={pageData} subtitle="Activity">

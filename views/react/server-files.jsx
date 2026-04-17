@@ -181,6 +181,27 @@ export function ServerFilesPage({ pageData = data }) {
         }
     };
 
+    const handleDelete = async (fileName) => {
+        if (!window.confirm(`Are you sure you want to delete "${fileName}"? This action is permanent and cannot be undone.`)) {
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const response = await fetch(`/api/client/servers/${pageData.server?.containerId}/files/delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ directory: currentPath, files: [fileName] })
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.error) throw new Error(payload.error || 'Delete failed');
+            reloadFiles();
+        } catch (err) {
+            setError(err.message);
+            setLoading(false);
+        }
+    };
+
     const handleDragOver = (e) => {
         e.preventDefault();
         if (!permissions.filesWriteLocked) setIsDragging(true);
@@ -514,6 +535,13 @@ export function ServerFilesPage({ pageData = data }) {
                                                                         <i className="bi bi-file-earmark-zip text-green-400"></i> Unarchive
                                                                     </button>
                                                                 )}
+                                                                <button 
+                                                                    type="button"
+                                                                    className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:text-white hover:bg-red-500/10 flex items-center gap-3 transition-colors"
+                                                                    onClick={() => { handleDelete(entry.name); setMenuPath(''); }}
+                                                                >
+                                                                    <i className="bi bi-trash3 text-red-500"></i> Delete
+                                                                </button>
                                                             </div>
                                                         )}
 

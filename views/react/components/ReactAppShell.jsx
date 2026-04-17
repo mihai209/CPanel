@@ -2,6 +2,8 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { ReactRoutes, resolveBrandImage, resolveUserAvatar } from '../ReactRoutes.js';
 import ProvisioningBarrier from './ProvisioningBarrier.jsx';
+import GlobalStatusModal from './GlobalStatusModal.jsx';
+import NotificationBell from './NotificationBell.jsx';
 
 function InternalTopAction({ to, icon, title }) {
     return (
@@ -88,6 +90,8 @@ export default function ReactAppShell({
                     </button>
                     
                     <div className="hidden md:flex items-center gap-2">
+                        <NotificationBell />
+                        <div className="h-6 w-px bg-neutral-700 mx-2"></div>
                         <InternalTopAction to={ReactRoutes.experimentalFeatures} icon="bi-sliders" title="Experimental Features" />
                         <a className="text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700" href={ReactRoutes.changeView} title="Exit Beta">
                             <i className="bi bi-door-open"></i>
@@ -132,6 +136,7 @@ export default function ReactAppShell({
                         { name: 'Home', keys: ['overview', 'console', 'activity'] },
                         { name: 'Data', keys: ['files', 'backups', 'dbs'] },
                         { name: 'Access', keys: ['network', 'users', 'api', 'schedules'] },
+                        { name: 'Special', keys: ['mccenter', 'mcinstaller'] },
                         { name: 'Config', keys: ['startup', 'timeline'] }
                     ].map((group) => {
                         const groupItems = serverNavItems.filter(item => group.keys.includes(item.key));
@@ -170,6 +175,31 @@ export default function ReactAppShell({
                     children
                 )}
             </main>
+
+            {/* Global Modals & Toasts */}
+            <GlobalStatusModal />
+
+            {/* Global Footer */}
+            <footer className="w-full py-8 border-t border-neutral-800 bg-neutral-900 mt-auto">
+                <div className="px-4 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div className="flex items-center gap-3">
+                        <span className="text-xs font-black text-neutral-100 uppercase tracking-[0.2em] opacity-80">
+                            CPanel Rocky &copy; 2026
+                        </span>
+                    </div>
+                    <div>
+                        <a 
+                            href="https://github.com/mihai209" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-[10px] font-bold text-neutral-500 hover:text-primary-400 transition-colors uppercase tracking-[0.1em] flex items-center gap-2"
+                        >
+                            <i className="bi bi-github"></i>
+                            mihai209(github.com/mihai209)
+                        </a>
+                    </div>
+                </div>
+            </footer>
         </div>
     );
 }

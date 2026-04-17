@@ -42,10 +42,10 @@ export function DashboardPage({ pageData = data }) {
                                     <i className={`bi ${isViewingAllServers ? 'bi-shield-check' : 'bi-shield-lock'} text-2xl`}></i>
                                 </div>
                                 <div>
-                                    <h4 className="text-sm font-black text-white uppercase tracking-[0.2em] leading-none mb-2">
+                                    <h4 className="text-[11px] font-black text-white uppercase tracking-[0.2em] leading-none mb-2 opacity-90">
                                         {isViewingAllServers ? 'System-Wide Administration' : 'Personal Instance Dashboard'}
                                     </h4>
-                                    <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest opacity-80">
+                                    <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest opacity-70">
                                         {isViewingAllServers ? 'Global visibility enabled: Viewing all network servers' : 'Filtered view: Only showing your private instances'}
                                     </p>
                                 </div>
