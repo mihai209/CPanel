@@ -1,2103 +1,1090 @@
-:root {
-    --react-bg: #33465a;
-    --react-bg-dark: #243343;
-    --react-panel: #3d5268;
-    --react-panel-soft: #465d74;
-    --react-border: rgba(230, 239, 249, 0.09);
-    --react-text: #eef4fb;
-    --react-muted: #b0bfd0;
-    --react-accent: #29c5ce;
-    --react-good: #29c780;
-    --react-warn: #f6a545;
-    --react-danger: #ff6c6c;
+*, ::before, ::after {
+  --tw-border-spacing-x: 0;
+  --tw-border-spacing-y: 0;
+  --tw-translate-x: 0;
+  --tw-translate-y: 0;
+  --tw-rotate: 0;
+  --tw-skew-x: 0;
+  --tw-skew-y: 0;
+  --tw-scale-x: 1;
+  --tw-scale-y: 1;
+  --tw-pan-x:  ;
+  --tw-pan-y:  ;
+  --tw-pinch-zoom:  ;
+  --tw-scroll-snap-strictness: proximity;
+  --tw-gradient-from-position:  ;
+  --tw-gradient-via-position:  ;
+  --tw-gradient-to-position:  ;
+  --tw-ordinal:  ;
+  --tw-slashed-zero:  ;
+  --tw-numeric-figure:  ;
+  --tw-numeric-spacing:  ;
+  --tw-numeric-fraction:  ;
+  --tw-ring-inset:  ;
+  --tw-ring-offset-width: 0px;
+  --tw-ring-offset-color: #fff;
+  --tw-ring-color: rgb(59 130 246 / 0.5);
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-shadow: 0 0 #0000;
+  --tw-shadow-colored: 0 0 #0000;
+  --tw-blur:  ;
+  --tw-brightness:  ;
+  --tw-contrast:  ;
+  --tw-grayscale:  ;
+  --tw-hue-rotate:  ;
+  --tw-invert:  ;
+  --tw-saturate:  ;
+  --tw-sepia:  ;
+  --tw-drop-shadow:  ;
+  --tw-backdrop-blur:  ;
+  --tw-backdrop-brightness:  ;
+  --tw-backdrop-contrast:  ;
+  --tw-backdrop-grayscale:  ;
+  --tw-backdrop-hue-rotate:  ;
+  --tw-backdrop-invert:  ;
+  --tw-backdrop-opacity:  ;
+  --tw-backdrop-saturate:  ;
+  --tw-backdrop-sepia:  ;
+  --tw-contain-size:  ;
+  --tw-contain-layout:  ;
+  --tw-contain-paint:  ;
+  --tw-contain-style:  ;
 }
 
+::backdrop {
+  --tw-border-spacing-x: 0;
+  --tw-border-spacing-y: 0;
+  --tw-translate-x: 0;
+  --tw-translate-y: 0;
+  --tw-rotate: 0;
+  --tw-skew-x: 0;
+  --tw-skew-y: 0;
+  --tw-scale-x: 1;
+  --tw-scale-y: 1;
+  --tw-pan-x:  ;
+  --tw-pan-y:  ;
+  --tw-pinch-zoom:  ;
+  --tw-scroll-snap-strictness: proximity;
+  --tw-gradient-from-position:  ;
+  --tw-gradient-via-position:  ;
+  --tw-gradient-to-position:  ;
+  --tw-ordinal:  ;
+  --tw-slashed-zero:  ;
+  --tw-numeric-figure:  ;
+  --tw-numeric-spacing:  ;
+  --tw-numeric-fraction:  ;
+  --tw-ring-inset:  ;
+  --tw-ring-offset-width: 0px;
+  --tw-ring-offset-color: #fff;
+  --tw-ring-color: rgb(59 130 246 / 0.5);
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-shadow: 0 0 #0000;
+  --tw-shadow-colored: 0 0 #0000;
+  --tw-blur:  ;
+  --tw-brightness:  ;
+  --tw-contrast:  ;
+  --tw-grayscale:  ;
+  --tw-hue-rotate:  ;
+  --tw-invert:  ;
+  --tw-saturate:  ;
+  --tw-sepia:  ;
+  --tw-drop-shadow:  ;
+  --tw-backdrop-blur:  ;
+  --tw-backdrop-brightness:  ;
+  --tw-backdrop-contrast:  ;
+  --tw-backdrop-grayscale:  ;
+  --tw-backdrop-hue-rotate:  ;
+  --tw-backdrop-invert:  ;
+  --tw-backdrop-opacity:  ;
+  --tw-backdrop-saturate:  ;
+  --tw-backdrop-sepia:  ;
+  --tw-contain-size:  ;
+  --tw-contain-layout:  ;
+  --tw-contain-paint:  ;
+  --tw-contain-style:  ;
+}
+
+/*
+! tailwindcss v3.4.19 | MIT License | https://tailwindcss.com
+*/
+
+/*
+1. Prevent padding and border from affecting element width. (https://github.com/mozdevs/cssremedy/issues/4)
+2. Allow adding a border to an element by just adding a border-width. (https://github.com/tailwindcss/tailwindcss/pull/116)
+*/
+
+*,
+::before,
+::after {
+  box-sizing: border-box;
+  /* 1 */
+  border-width: 0;
+  /* 2 */
+  border-style: solid;
+  /* 2 */
+  border-color: #e5e7eb;
+  /* 2 */
+}
+
+::before,
+::after {
+  --tw-content: '';
+}
+
+/*
+1. Use a consistent sensible line-height in all browsers.
+2. Prevent adjustments of font size after orientation changes in iOS.
+3. Use a more readable tab size.
+4. Use the user's configured `sans` font-family by default.
+5. Use the user's configured `sans` font-feature-settings by default.
+6. Use the user's configured `sans` font-variation-settings by default.
+7. Disable tap highlights on iOS
+*/
+
 html,
+:host {
+  line-height: 1.5;
+  /* 1 */
+  -webkit-text-size-adjust: 100%;
+  /* 2 */
+  -moz-tab-size: 4;
+  /* 3 */
+  -o-tab-size: 4;
+     tab-size: 4;
+  /* 3 */
+  font-family: Manrope, system-ui, sans-serif;
+  /* 4 */
+  font-feature-settings: normal;
+  /* 5 */
+  font-variation-settings: normal;
+  /* 6 */
+  -webkit-tap-highlight-color: transparent;
+  /* 7 */
+}
+
+/*
+1. Remove the margin in all browsers.
+2. Inherit line-height from `html` so users can set them as a class directly on the `html` element.
+*/
+
 body {
-    height: 100%;
-    margin: 0;
-    background: linear-gradient(180deg, #2c3f52 0%, #34485d 100%);
-    color: var(--react-text);
-    font-family: "Inter", system-ui, sans-serif;
-    overflow: hidden;
+  margin: 0;
+  /* 1 */
+  line-height: inherit;
+  /* 2 */
 }
 
-body.react-view-body {
-    height: 100%;
-    background: linear-gradient(180deg, #2c3f52 0%, #34485d 100%);
-    overflow: hidden;
-}
-
-.react-basic-page {
-    height: 100vh;
-    padding: 28px;
-    overflow: hidden;
-    box-sizing: border-box;
-}
-
-.react-basic-shell {
-    max-width: 1320px;
-    height: calc(100vh - 56px);
-    margin: 0 auto;
-    border-radius: 28px;
-    overflow: hidden;
-    border: 1px solid var(--react-border);
-    background: rgba(42, 58, 76, 0.95);
-    box-shadow: 0 24px 52px rgba(8, 13, 20, 0.28);
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-}
-
-.react-basic-topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 18px;
-    padding: 18px 26px;
-    background: rgba(21, 31, 42, 0.45);
-    border-bottom: 1px solid var(--react-border);
-}
-
-.react-basic-brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.react-basic-brand-mark {
-    width: 46px;
-    height: 46px;
-    border-radius: 14px;
-    display: grid;
-    place-items: center;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    overflow: hidden;
-}
-
-.react-brand-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.react-basic-brand-title {
-    font-size: 1.2rem;
-    font-weight: 800;
-}
-
-.react-basic-brand-subtitle {
-    font-size: 0.84rem;
-    color: var(--react-muted);
-}
-
-.react-basic-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.react-top-action {
-    width: 42px;
-    height: 42px;
-    display: grid;
-    place-items: center;
-    border-radius: 12px;
-    color: var(--react-text);
-    text-decoration: none;
-    border: 1px solid var(--react-border);
-    background: rgba(255, 255, 255, 0.03);
-}
-
-.react-top-action:hover,
-.react-top-action.is-active {
-    border-color: rgba(41, 197, 206, 0.28);
-    background: rgba(41, 197, 206, 0.12);
-}
-
-.react-basic-user {
-    display: inline-flex;
-    align-items: center;
-    gap: 9px;
-    padding: 10px 14px;
-    border-radius: 999px;
-    border: 1px solid var(--react-border);
-    background: rgba(255, 255, 255, 0.04);
-    font-weight: 600;
-}
-
-.react-basic-user-avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(255, 255, 255, 0.08);
-}
-
-.react-basic-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.7fr) 290px;
-    gap: 18px;
-    padding: 22px;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.react-basic-main,
-.react-basic-side {
-    min-height: 0;
-}
-
-.react-basic-main {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-}
-
-.react-server-list-scroll {
-    min-height: 0;
-    overflow-y: auto;
-    padding-right: 6px;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
-}
-
-.react-server-list-scroll::-webkit-scrollbar {
-    width: 8px;
-}
-
-.react-server-list-scroll::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.14);
-    border-radius: 999px;
-}
-
-.react-basic-heading {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 14px;
-    margin-bottom: 16px;
-}
-
-.react-basic-heading h1 {
-    margin: 0;
-    font-size: 2rem;
-    font-weight: 800;
-}
-
-.react-basic-heading p {
-    margin: 8px 0 0;
-    color: var(--react-muted);
-}
-
-.react-basic-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 10px 14px;
-    border-radius: 999px;
-    border: 1px solid var(--react-border);
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--react-text);
-    text-decoration: none;
-    font-size: 0.86rem;
-    white-space: nowrap;
-}
-
-.react-server-list,
-.react-side-list,
-.react-basic-side {
-    display: grid;
-    gap: 14px;
-}
-
-.react-server-row,
-.react-side-card,
-.react-empty-state {
-    border-radius: 20px;
-    border: 1px solid var(--react-border);
-    background: rgba(255, 255, 255, 0.04);
-}
-
-.react-server-row {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 16px;
-    padding: 16px;
-    color: inherit;
-    text-decoration: none;
-    transition: 140ms ease;
-}
-
-.react-server-row:hover {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(41, 197, 206, 0.18);
-}
-
-.react-server-icon {
-    width: 52px;
-    height: 52px;
-    border-radius: 15px;
-    display: grid;
-    place-items: center;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.react-server-icon.is-success {
-    color: var(--react-good);
-}
-
-.react-server-icon.is-warning {
-    color: var(--react-warn);
-}
-
-.react-server-icon.is-danger {
-    color: var(--react-danger);
-}
-
-.react-server-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-}
-
-.react-server-name {
-    font-size: 1.08rem;
-    font-weight: 700;
-}
-
-.react-server-description,
-.react-renderer-note,
-.react-side-item-note {
-    margin-top: 4px;
-    font-size: 0.88rem;
-    color: var(--react-muted);
-}
-
-.react-status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 11px;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.03);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-size: 0.72rem;
-    color: var(--react-muted);
-}
-
-.react-status-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: currentColor;
-}
-
-.react-status-badge.is-success {
-    color: var(--react-good);
-}
-
-.react-status-badge.is-warning {
-    color: var(--react-warn);
-}
-
-.react-status-badge.is-danger {
-    color: var(--react-danger);
-}
-
-.react-server-resources {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 16px;
-}
-
-.react-resource-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    background: rgba(16, 25, 35, 0.16);
-    min-width: 120px;
-}
-
-.react-resource-pill i {
-    color: var(--react-muted);
-}
-
-.react-resource-pill strong,
-.react-side-item-head strong {
-    display: block;
-    font-size: 0.96rem;
-}
-
-.react-resource-pill span,
-.react-side-item-head span {
-    display: block;
-    font-size: 0.76rem;
-    color: var(--react-muted);
-}
-
-.react-resource-pill.is-info {
-    border-color: rgba(41, 197, 206, 0.22);
-}
-
-.react-side-card {
-    padding: 16px;
-}
-
-.react-side-title {
-    font-size: 0.95rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--react-muted);
-    margin-bottom: 12px;
-}
-
-.react-side-item {
-    padding: 12px 13px;
-    border-radius: 14px;
-    background: rgba(16, 25, 35, 0.16);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.react-side-item.is-warning {
-    border-color: rgba(246, 165, 69, 0.22);
-}
-
-.react-side-item.is-danger {
-    border-color: rgba(255, 108, 108, 0.2);
-}
-
-.react-side-item.is-info {
-    border-color: rgba(41, 197, 206, 0.2);
-}
-
-.react-side-item-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 10px;
-}
-
-.react-empty-state {
-    padding: 20px;
-    display: grid;
-    gap: 6px;
-}
-
-.react-empty-state span {
-    color: var(--react-muted);
-    font-size: 0.9rem;
-}
-
-@media (max-width: 1080px) {
-    html,
-    body,
-    body.react-view-body,
-    .react-basic-page {
-        overflow: auto;
-    }
-
-    .react-basic-shell {
-        height: auto;
-    }
-
-    .react-basic-grid {
-        grid-template-columns: 1fr;
-        overflow: visible;
-    }
-
-    .react-basic-main,
-    .react-basic-side,
-    .react-server-list-scroll {
-        min-height: initial;
-    }
-
-    .react-server-list-scroll {
-        overflow: visible;
-        padding-right: 0;
-    }
-}
-
-@media (max-width: 760px) {
-    .react-basic-page {
-        padding: 14px;
-    }
-
-    .react-basic-topbar,
-    .react-basic-heading,
-    .react-server-head {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .react-basic-actions {
-        width: 100%;
-        justify-content: space-between;
-    }
-
-    .react-server-row {
-        grid-template-columns: 1fr;
-    }
-}
-
-.react-account-page {
-    overflow: hidden;
-}
-
-.react-account-shell {
-    height: calc(100vh - 56px);
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-}
-
-.react-account-layout {
-    display: grid;
-    grid-template-rows: minmax(0, 1fr);
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-}
-
-.react-account-main {
-    min-height: 0;
-    overflow: hidden;
-}
-
-.react-account-scroll {
-    height: 100%;
-    min-height: 0;
-    overflow-y: auto;
-    padding: 22px;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
-}
-
-.react-account-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;
-}
-
-.react-account-card {
-    border-radius: 20px;
-    border: 1px solid var(--react-border);
-    background: rgba(255, 255, 255, 0.04);
-    padding: 18px;
-}
-
-.react-account-profile-card {
-    grid-column: 1 / -1;
-}
-
-.react-account-profile {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
-.react-account-avatar {
-    width: 88px;
-    height: 88px;
-    border-radius: 24px;
-    object-fit: cover;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: rgba(255, 255, 255, 0.06);
-}
-
-.react-account-profile h1 {
-    margin: 0;
-    font-size: 1.5rem;
-    font-weight: 800;
-}
-
-.react-account-username,
-.react-account-email,
-.react-account-muted {
-    margin-top: 4px;
-    color: var(--react-muted);
-}
-
-.react-account-badges,
-.react-account-inline-actions,
-.react-account-form-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 16px;
-}
-
-.react-account-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 8px 12px;
-    border-radius: 999px;
-    font-size: 0.76rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.04);
-}
-
-.react-account-badge.is-success {
-    color: var(--react-good);
-}
-
-.react-account-badge.is-info {
-    color: var(--react-accent);
-}
-
-.react-account-badge.is-muted {
-    color: var(--react-muted);
-}
-
-.react-account-section-title {
-    font-size: 1rem;
-    font-weight: 700;
-    margin-bottom: 14px;
-}
-
-.react-account-form,
-.react-account-twofa-block {
-    display: grid;
-    gap: 14px;
-}
-
-.react-account-form label,
-.react-account-twofa-block label {
-    display: grid;
-    gap: 7px;
-}
-
-.react-account-form span,
-.react-account-twofa-block span {
-    font-size: 0.8rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--react-muted);
-}
-
-.react-account-form input,
-.react-account-form select,
-.react-account-twofa-block input {
-    width: 100%;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(16, 25, 35, 0.34);
-    color: var(--react-text);
-    padding: 12px 13px;
-    outline: none;
-}
-
-.react-account-form input[readonly] {
-    color: var(--react-muted);
-}
-
-.react-account-form-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-}
-
-.react-account-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 42px;
-    padding: 10px 14px;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--react-text);
-    text-decoration: none;
-    font-weight: 700;
-}
-
-.react-account-button.is-primary {
-    background: rgba(41, 197, 206, 0.16);
-    border-color: rgba(41, 197, 206, 0.22);
-}
-
-.react-account-button.is-danger {
-    background: rgba(255, 108, 108, 0.12);
-    border-color: rgba(255, 108, 108, 0.22);
-}
-
-.react-account-button.is-ghost {
-    background: rgba(255, 255, 255, 0.04);
-}
-
-.react-account-provider-list {
-    display: grid;
-    gap: 12px;
-}
-
-.react-account-provider {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 14px;
-    border-radius: 16px;
-    background: rgba(16, 25, 35, 0.16);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.react-account-provider-main {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.react-account-provider-main i {
-    font-size: 1.35rem;
-}
-
-.react-account-provider-main strong,
-.react-account-provider-main span {
-    display: block;
-}
-
-.react-account-provider-main span {
-    font-size: 0.84rem;
-    color: var(--react-muted);
-}
-
-.react-account-inline-error {
-    color: #ff9b9b;
-    font-size: 0.88rem;
-}
-
-.react-account-twofa-setup {
-    display: grid;
-    gap: 14px;
-}
-
-.react-account-twofa-qr-wrap {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 12px;
-    border-radius: 18px;
-    background: #fff;
-    width: fit-content;
-}
-
-.react-account-twofa-qr {
-    width: 190px;
-    height: 190px;
-    object-fit: contain;
-}
-
-.react-account-flash {
-    margin-bottom: 16px;
-    padding: 14px 16px;
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.04);
-}
-
-.react-account-flash.is-success {
-    color: #aaf3cc;
-    border-color: rgba(41, 199, 128, 0.2);
-}
-
-.react-account-flash.is-danger {
-    color: #ffb6b6;
-    border-color: rgba(255, 108, 108, 0.2);
-}
-
-@media (max-width: 1080px) {
-    .react-account-scroll {
-        overflow: visible;
-        height: auto;
-    }
-
-    .react-account-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (max-width: 760px) {
-    .react-account-form-grid,
-    .react-account-provider,
-    .react-account-profile {
-        grid-template-columns: 1fr;
-        flex-direction: column;
-        align-items: flex-start;
-    }
-}
-
-.react-experimental-page,
-.react-experimental-shell,
-.react-experimental-layout {
-    overflow: hidden;
-}
-
-.react-experimental-shell {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-}
-
-.react-experimental-layout {
-    display: grid;
-    grid-template-rows: minmax(0, 1fr);
-    height: 100%;
-    min-height: 0;
-}
-
-.react-experimental-scroll {
-    height: 100%;
-    min-height: 0;
-    overflow-y: auto;
-    padding: 22px;
-}
-
-.react-experimental-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;
-}
-
-.react-experimental-wide {
-    grid-column: 1 / -1;
-}
-
-.react-experimental-stat-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 14px;
-    margin-bottom: 10px;
-}
-
-.react-experimental-stat-list,
-.react-experimental-note-grid {
-    display: grid;
-    gap: 12px;
-    margin-top: 16px;
-}
-
-.react-experimental-toggle {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 12px;
-    align-items: start;
-    padding: 14px;
-    border-radius: 16px;
-    background: rgba(16, 25, 35, 0.16);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.react-experimental-toggle input {
-    margin-top: 4px;
-}
-
-.react-experimental-toggle strong,
-.react-experimental-toggle span {
-    display: block;
-}
-
-.react-experimental-toggle span {
-    margin-top: 4px;
-    color: var(--react-muted);
-    font-size: 0.86rem;
-}
-
-.react-device-event {
-    align-items: flex-start;
-}
-
-.react-device-event-meta {
-    text-align: right;
-}
-
-.react-device-event-meta strong,
-.react-device-event-meta span {
-    display: block;
-}
-
-.react-device-event-meta span {
-    margin-top: 4px;
-    color: var(--react-muted);
-    font-size: 0.84rem;
-}
-
-@media (max-width: 1080px) {
-    .react-experimental-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (max-width: 760px) {
-    .react-device-event-meta {
-        text-align: left;
-    }
-}
-
-.react-console-page,
-.react-console-shell,
-.react-console-frame {
-    overflow: hidden;
-}
-
-.react-console-frame {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-    min-height: 0;
-}
-
-.react-console-board {
-    min-height: 0;
-    display: grid;
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
-    gap: 16px;
-    padding: 18px 22px 22px;
-    overflow: hidden;
-}
-
-.react-console-subnav {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 22px;
-    border-bottom: 1px solid var(--react-border);
-    background: rgba(18, 26, 36, 0.34);
-    overflow-x: auto;
-}
-
-.react-console-subnav-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 38px;
-    padding: 8px 14px;
-    border-radius: 999px;
-    color: var(--react-muted);
-    text-decoration: none;
-    white-space: nowrap;
-    border: 1px solid transparent;
-    background: rgba(255, 255, 255, 0.02);
-}
-
-.react-console-subnav-link.is-active,
-.react-console-subnav-link:hover {
-    color: var(--react-text);
-    border-color: rgba(41, 197, 206, 0.28);
-    background: rgba(41, 197, 206, 0.12);
-}
-
-.react-console-topbar {
-    display: flex;
-    align-items: end;
-    justify-content: space-between;
-    gap: 16px;
-}
-
-.react-console-titleblock {
-    min-width: 0;
-}
-
-.react-console-titleline {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.react-console-titleline h1 {
-    margin: 0;
-    font-size: 1.6rem;
-    font-weight: 800;
-    line-height: 1.1;
-}
-
-.react-console-titleblock p {
-    margin: 10px 0 0;
-    color: var(--react-muted);
-    max-width: 64ch;
-}
-
-.react-console-top-actions {
-    display: inline-flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-
-.react-console-core {
-    min-height: 0;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 300px;
-    gap: 16px;
-    overflow: hidden;
-}
-
-.react-console-details {
-    min-height: 0;
-    display: grid;
-    gap: 14px;
-    align-content: start;
-}
-
-.react-console-side-card,
-.react-console-terminal-card,
-.react-console-graph-card {
-    border-radius: 20px;
-    border: 1px solid var(--react-border);
-    background: rgba(255, 255, 255, 0.04);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
-}
-
-.react-console-side-card {
-    padding: 16px;
-}
-
-.react-console-server-header {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 16px;
-}
-
-.react-console-server-header h1 {
-    margin: 0;
-    font-size: 1.2rem;
-    font-weight: 800;
-}
-
-.react-console-server-meta {
-    margin-top: 6px;
-    color: var(--react-muted);
-    font-size: 0.86rem;
-    word-break: break-word;
-}
-
-.react-console-status-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    margin-top: 6px;
-    flex: 0 0 auto;
-}
-
-.react-console-status-dot.is-success {
-    background: var(--react-good);
-    box-shadow: 0 0 0 6px rgba(41, 199, 128, 0.12);
-}
-
-.react-console-status-dot.is-warning {
-    background: var(--react-warn);
-    box-shadow: 0 0 0 6px rgba(246, 165, 69, 0.12);
-}
-
-.react-console-status-dot.is-danger {
-    background: var(--react-danger);
-    box-shadow: 0 0 0 6px rgba(255, 108, 108, 0.12);
-}
-
-.react-console-status-dot.is-muted {
-    background: rgba(255, 255, 255, 0.28);
-    box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.06);
-}
-
-.react-console-panel-title {
-    margin-bottom: 12px;
-    color: var(--react-text);
-    font-size: 0.82rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
-
-.react-console-side-list,
-.react-console-side-links,
-.react-console-actions {
-    display: grid;
-    gap: 10px;
-}
+/*
+1. Add the correct height in Firefox.
+2. Correct the inheritance of border color in Firefox. (https://bugzilla.mozilla.org/show_bug.cgi?id=190655)
+3. Ensure horizontal rules are visible by default.
+*/
 
-.react-console-resource {
-    display: grid;
-    grid-template-columns: 18px minmax(0, 1fr);
-    gap: 10px;
-    align-items: start;
-    padding: 11px 12px;
-    border-radius: 16px;
-    background: rgba(11, 18, 26, 0.22);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+hr {
+  height: 0;
+  /* 1 */
+  color: inherit;
+  /* 2 */
+  border-top-width: 1px;
+  /* 3 */
 }
 
-.react-console-resource i {
-    color: var(--react-accent);
-}
-
-.react-console-resource strong,
-.react-console-resource span {
-    display: block;
-}
-
-.react-console-resource span {
-    margin-top: 4px;
-    color: var(--react-muted);
-    font-size: 0.82rem;
-}
-
-.react-console-connection {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 12px;
-    padding: 10px 14px;
-    border-radius: 999px;
-    font-weight: 700;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.react-console-connection.is-success {
-    color: #bff8dd;
-    background: rgba(41, 199, 128, 0.1);
-}
-
-.react-console-connection.is-danger {
-    color: #ffbcbc;
-    background: rgba(255, 108, 108, 0.1);
-}
-
-.react-console-action {
-    min-height: 46px;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--react-text);
-    font-weight: 800;
-}
-
-.react-console-action:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-}
-
-.react-console-action.is-success {
-    background: rgba(41, 199, 128, 0.16);
-    border-color: rgba(41, 199, 128, 0.22);
-}
-
-.react-console-action.is-warning {
-    background: rgba(246, 165, 69, 0.16);
-    border-color: rgba(246, 165, 69, 0.22);
-}
-
-.react-console-action.is-danger {
-    background: rgba(255, 108, 108, 0.16);
-    border-color: rgba(255, 108, 108, 0.22);
-}
-
-.react-console-side-note {
-    color: var(--react-muted);
-    font-size: 0.88rem;
-    line-height: 1.5;
-}
-
-.react-console-terminal-card {
-    min-height: 0;
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr) auto;
-    overflow: hidden;
-}
-
-.react-console-terminal-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 16px 16px 12px;
-}
-
-.react-console-terminal-head h2 {
-    margin: 0;
-    font-size: 0.98rem;
-    font-weight: 800;
-}
-
-.react-console-chart-note {
-    margin-top: 6px;
-    color: var(--react-muted);
-    font-size: 0.84rem;
-}
-
-.react-console-terminal-tools {
-    display: inline-flex;
-    gap: 8px;
-}
-
-.react-console-mini-toggle {
-    min-height: 34px;
-    padding: 7px 10px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--react-text);
-    font-weight: 700;
-    font-size: 0.83rem;
-}
-
-.react-console-mini-toggle.is-active {
-    border-color: rgba(41, 197, 206, 0.28);
-    background: rgba(41, 197, 206, 0.14);
-}
-
-.react-console-terminal-body {
-    min-height: 0;
-    padding: 0 16px 16px;
-    position: relative;
-    overflow: hidden;
-}
-
-.react-console-terminal-host {
-    height: 100%;
-    min-height: 360px;
-    border-radius: 18px;
-    overflow: hidden;
-    background: #10161d;
-}
-
-.react-console-terminal-host .xterm {
-    height: 100%;
-}
-
-.react-console-terminal-host .xterm-viewport {
-    border-radius: 18px;
-}
-
-.react-console-terminal-placeholder {
-    position: absolute;
-    inset: 0 16px 16px;
-    display: grid;
-    place-items: center;
-    border-radius: 18px;
-    background: rgba(11, 18, 26, 0.72);
-    color: var(--react-muted);
-    pointer-events: none;
-}
-
-.react-console-terminal-body.is-loading {
-    min-height: 320px;
-}
+/*
+Add the correct text decoration in Chrome, Edge, and Safari.
+*/
 
-.react-console-command-row {
-    display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) 88px;
-    gap: 10px;
-    align-items: center;
-    padding: 12px 16px 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+abbr:where([title]) {
+  -webkit-text-decoration: underline dotted;
+          text-decoration: underline dotted;
 }
 
-.react-console-command-prefix {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 44px;
-    border-radius: 14px;
-    background: rgba(11, 18, 26, 0.4);
-    color: var(--react-muted);
-    font-weight: 800;
-}
-
-.react-console-command-input {
-    width: 100%;
-    min-height: 44px;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(11, 18, 26, 0.4);
-    color: var(--react-text);
-    padding: 0 14px;
-    outline: none;
-}
-
-.react-console-send {
-    min-height: 44px;
-    border-radius: 14px;
-    border: 1px solid rgba(41, 197, 206, 0.24);
-    background: rgba(41, 197, 206, 0.14);
-    color: var(--react-text);
-    font-weight: 800;
-}
-
-.react-console-send:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-}
-
-.react-console-graphs {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
-}
-
-.react-console-inline-metric {
-    display: grid;
-    gap: 4px;
-    padding: 12px 14px;
-    border-radius: 16px;
-    background: rgba(11, 18, 26, 0.22);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.react-console-inline-metric span {
-    color: var(--react-muted);
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.react-console-inline-metric strong {
-    font-size: 1rem;
-    font-weight: 800;
-}
-
-.react-console-inline-metric small {
-    color: var(--react-muted);
-    font-size: 0.8rem;
-}
-
-.react-console-inline-metric.is-info strong {
-    color: #8ec6ff;
-}
-
-.react-console-inline-metric.is-success strong {
-    color: #8cf0c4;
-}
-
-.react-console-inline-metric.is-warning strong {
-    color: #ffd08a;
-}
-
-.react-console-inline-metric.is-danger strong {
-    color: #ff9b9b;
-}
+/*
+Remove the default font size and weight for headings.
+*/
 
-.react-console-graph-card {
-    display: grid;
-    gap: 14px;
-    padding: 16px;
-    overflow: hidden;
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-size: inherit;
+  font-weight: inherit;
 }
 
-.react-console-graph-head {
-    display: flex;
-    align-items: start;
-    justify-content: space-between;
-    gap: 12px;
-}
-
-.react-console-graph-head span {
-    display: block;
-    color: var(--react-muted);
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.react-console-graph-head strong {
-    display: block;
-    margin-top: 8px;
-    font-size: 1.15rem;
-    font-weight: 800;
-}
-
-.react-console-graph-head small {
-    color: var(--react-muted);
-    font-size: 0.82rem;
-    text-align: right;
-    max-width: 18ch;
-}
-
-.react-console-graph-canvas {
-    height: 150px;
-    border-radius: 16px;
-    overflow: hidden;
-    background:
-        linear-gradient(to top, rgba(255, 255, 255, 0.04) 1px, transparent 1px) 0 0 / 100% 25%,
-        rgba(11, 18, 26, 0.2);
-    padding: 10px;
-}
-
-.react-console-graph-canvas svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
-.react-console-graph-card .react-console-graph-line {
-    stroke: currentColor;
-    stroke-width: 2.8;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-.react-console-graph-card.is-info {
-    color: #63baff;
-}
-
-.react-console-graph-card.is-success {
-    color: #52d49f;
-}
-
-.react-console-graph-card.is-warning {
-    color: #ffbd61;
-}
+/*
+Reset links to optimize for opt-in styling instead of opt-out.
+*/
 
-@media (max-width: 1180px) {
-    .react-console-core {
-        grid-template-columns: 1fr;
-    }
+a {
+  color: inherit;
+  text-decoration: inherit;
 }
-
-@media (max-width: 820px) {
-    .react-console-subnav,
-    .react-console-board {
-        padding-left: 16px;
-        padding-right: 16px;
-    }
-
-    .react-console-topbar,
-    .react-console-graph-head,
-    .react-console-terminal-head {
-        flex-direction: column;
-        align-items: flex-start;
-    }
 
-    .react-console-graphs {
-        grid-template-columns: 1fr;
-    }
+/*
+Add the correct font weight in Edge and Safari.
+*/
 
-    .react-console-command-row {
-        grid-template-columns: 1fr;
-    }
-
-    .react-console-command-prefix {
-        display: none;
-    }
-}
-
-/* v1.9 React refresh */
-:root {
-    --react-bg: #09111a;
-    --react-bg-dark: #0d1722;
-    --react-panel: #111d2a;
-    --react-panel-soft: #172536;
-    --react-panel-strong: #1d2d42;
-    --react-border: rgba(170, 194, 219, 0.14);
-    --react-border-strong: rgba(170, 194, 219, 0.22);
-    --react-text: #eef5fc;
-    --react-muted: #8ea4bb;
-    --react-accent: #35c8d7;
-    --react-good: #39ca88;
-    --react-warn: #f2b15d;
-    --react-danger: #f16a74;
+b,
+strong {
+  font-weight: bolder;
 }
 
-html,
-body,
-body.react-view-body {
-    background:
-        radial-gradient(circle at top right, rgba(53, 200, 215, 0.14), transparent 28%),
-        linear-gradient(180deg, #0a121c 0%, #0d1824 55%, #101c29 100%);
-    color: var(--react-text);
-    font-family: "Manrope", system-ui, sans-serif;
-}
+/*
+1. Use the user's configured `mono` font-family by default.
+2. Use the user's configured `mono` font-feature-settings by default.
+3. Use the user's configured `mono` font-variation-settings by default.
+4. Correct the odd `em` font sizing in all browsers.
+*/
 
 code,
-pre,
-.react-token-row code {
-    font-family: "IBM Plex Mono", monospace;
+kbd,
+samp,
+pre {
+  font-family: "IBM Plex Mono", monospace;
+  /* 1 */
+  font-feature-settings: normal;
+  /* 2 */
+  font-variation-settings: normal;
+  /* 3 */
+  font-size: 1em;
+  /* 4 */
+}
+
+/*
+Add the correct font size in all browsers.
+*/
+
+small {
+  font-size: 80%;
+}
+
+/*
+Prevent `sub` and `sup` elements from affecting the line height in all browsers.
+*/
+
+sub,
+sup {
+  font-size: 75%;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+}
+
+sub {
+  bottom: -0.25em;
+}
+
+sup {
+  top: -0.5em;
+}
+
+/*
+1. Remove text indentation from table contents in Chrome and Safari. (https://bugs.chromium.org/p/chromium/issues/detail?id=999088, https://bugs.webkit.org/show_bug.cgi?id=201297)
+2. Correct table border color inheritance in all Chrome and Safari. (https://bugs.chromium.org/p/chromium/issues/detail?id=935729, https://bugs.webkit.org/show_bug.cgi?id=195016)
+3. Remove gaps between table borders by default.
+*/
+
+table {
+  text-indent: 0;
+  /* 1 */
+  border-color: inherit;
+  /* 2 */
+  border-collapse: collapse;
+  /* 3 */
+}
+
+/*
+1. Change the font styles in all browsers.
+2. Remove the margin in Firefox and Safari.
+3. Remove default padding in all browsers.
+*/
+
+button,
+input,
+optgroup,
+select,
+textarea {
+  font-family: inherit;
+  /* 1 */
+  font-feature-settings: inherit;
+  /* 1 */
+  font-variation-settings: inherit;
+  /* 1 */
+  font-size: 100%;
+  /* 1 */
+  font-weight: inherit;
+  /* 1 */
+  line-height: inherit;
+  /* 1 */
+  letter-spacing: inherit;
+  /* 1 */
+  color: inherit;
+  /* 1 */
+  margin: 0;
+  /* 2 */
+  padding: 0;
+  /* 3 */
 }
 
-.react-basic-page {
-    min-height: 100vh;
-    padding: 18px;
-    overflow: auto;
+/*
+Remove the inheritance of text transform in Edge and Firefox.
+*/
+
+button,
+select {
+  text-transform: none;
+}
+
+/*
+1. Correct the inability to style clickable types in iOS and Safari.
+2. Remove default button styles.
+*/
+
+button,
+input:where([type='button']),
+input:where([type='reset']),
+input:where([type='submit']) {
+  -webkit-appearance: button;
+  /* 1 */
+  background-color: transparent;
+  /* 2 */
+  background-image: none;
+  /* 2 */
+}
+
+/*
+Use the modern Firefox focus style for all focusable elements.
+*/
+
+:-moz-focusring {
+  outline: auto;
+}
+
+/*
+Remove the additional `:invalid` styles in Firefox. (https://github.com/mozilla/gecko-dev/blob/2f9eacd9d3d995c937b4251a5557d95d494c9be1/layout/style/res/forms.css#L728-L737)
+*/
+
+:-moz-ui-invalid {
+  box-shadow: none;
+}
+
+/*
+Add the correct vertical alignment in Chrome and Firefox.
+*/
+
+progress {
+  vertical-align: baseline;
+}
+
+/*
+Correct the cursor style of increment and decrement buttons in Safari.
+*/
+
+::-webkit-inner-spin-button,
+::-webkit-outer-spin-button {
+  height: auto;
+}
+
+/*
+1. Correct the odd appearance in Chrome and Safari.
+2. Correct the outline style in Safari.
+*/
+
+[type='search'] {
+  -webkit-appearance: textfield;
+  /* 1 */
+  outline-offset: -2px;
+  /* 2 */
+}
+
+/*
+Remove the inner padding in Chrome and Safari on macOS.
+*/
+
+::-webkit-search-decoration {
+  -webkit-appearance: none;
+}
+
+/*
+1. Correct the inability to style clickable types in iOS and Safari.
+2. Change font properties to `inherit` in Safari.
+*/
+
+::-webkit-file-upload-button {
+  -webkit-appearance: button;
+  /* 1 */
+  font: inherit;
+  /* 2 */
+}
+
+/*
+Add the correct display in Chrome and Safari.
+*/
+
+summary {
+  display: list-item;
+}
+
+/*
+Removes the default spacing and border for appropriate elements.
+*/
+
+blockquote,
+dl,
+dd,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+hr,
+figure,
+p,
+pre {
+  margin: 0;
+}
+
+fieldset {
+  margin: 0;
+  padding: 0;
+}
+
+legend {
+  padding: 0;
+}
+
+ol,
+ul,
+menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/*
+Reset default styling for dialogs.
+*/
+
+dialog {
+  padding: 0;
+}
+
+/*
+Prevent resizing textareas horizontally by default.
+*/
+
+textarea {
+  resize: vertical;
+}
+
+/*
+1. Reset the default placeholder opacity in Firefox. (https://github.com/tailwindlabs/tailwindcss/issues/3300)
+2. Set the default placeholder color to the user's configured gray 400 color.
+*/
+
+input::-moz-placeholder, textarea::-moz-placeholder {
+  opacity: 1;
+  /* 1 */
+  color: #9ca3af;
+  /* 2 */
+}
+
+input::placeholder,
+textarea::placeholder {
+  opacity: 1;
+  /* 1 */
+  color: #9ca3af;
+  /* 2 */
+}
+
+/*
+Set the default cursor for buttons.
+*/
+
+button,
+[role="button"] {
+  cursor: pointer;
+}
+
+/*
+Make sure disabled buttons don't get the pointer cursor.
+*/
+
+:disabled {
+  cursor: default;
+}
+
+/*
+1. Make replaced elements `display: block` by default. (https://github.com/mozdevs/cssremedy/issues/14)
+2. Add `vertical-align: middle` to align replaced elements more sensibly by default. (https://github.com/jensimmons/cssremedy/issues/14#issuecomment-634934210)
+   This can trigger a poorly considered lint error in some tools but is included by design.
+*/
+
+img,
+svg,
+video,
+canvas,
+audio,
+iframe,
+embed,
+object {
+  display: block;
+  /* 1 */
+  vertical-align: middle;
+  /* 2 */
+}
+
+/*
+Constrain images and videos to the parent width and preserve their intrinsic aspect ratio. (https://github.com/mozdevs/cssremedy/issues/14)
+*/
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Make elements with the HTML hidden attribute stay hidden by default */
+
+[hidden]:where(:not([hidden="until-found"])) {
+  display: none;
+}
+
+body {
+  --tw-bg-opacity: 1;
+  background-color: rgb(19 21 23 / var(--tw-bg-opacity, 1));
+  --tw-text-opacity: 1;
+  color: rgb(229 231 235 / var(--tw-text-opacity, 1));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.container {
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .container {
+    max-width: 640px;
+  }
+}
+
+@media (min-width: 768px) {
+  .container {
+    max-width: 768px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    max-width: 1024px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .container {
+    max-width: 1280px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .container {
+    max-width: 1536px;
+  }
+}
+
+.fixed {
+  position: fixed;
+}
+
+.mx-auto {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.mb-0\.5 {
+  margin-bottom: 0.125rem;
+}
+
+.mb-1 {
+  margin-bottom: 0.25rem;
+}
+
+.mb-6 {
+  margin-bottom: 1.5rem;
 }
 
-.react-basic-shell {
-    max-width: 1460px;
-    min-height: calc(100vh - 36px);
-    height: auto;
-    border-radius: 24px;
-    border: 1px solid var(--react-border);
-    background: linear-gradient(180deg, rgba(13, 23, 34, 0.98), rgba(16, 28, 41, 0.97));
-    box-shadow: 0 28px 70px rgba(2, 8, 16, 0.48);
-    overflow: hidden;
-    display: grid;
-    grid-template-rows: auto auto auto minmax(0, 1fr);
+.ml-10 {
+  margin-left: 2.5rem;
 }
 
-.react-basic-topbar {
-    padding: 16px 22px;
-    gap: 18px;
-    background: rgba(7, 13, 20, 0.74);
-    border-bottom: 1px solid var(--react-border);
+.ml-2 {
+  margin-left: 0.5rem;
 }
 
-.react-basic-brand-title {
-    font-size: 1.15rem;
-    letter-spacing: -0.03em;
+.mt-10 {
+  margin-top: 2.5rem;
 }
 
-.react-basic-brand-subtitle {
-    color: var(--react-muted);
+.mt-4 {
+  margin-top: 1rem;
 }
 
-.react-shell-nav,
-.react-shell-mobile-nav,
-.react-shell-server-nav {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+.flex {
+  display: flex;
 }
 
-.react-shell-nav {
-    flex: 1 1 auto;
-    min-width: 0;
-    justify-content: center;
+.hidden {
+  display: none;
 }
 
-.react-shell-nav-link,
-.react-shell-server-link {
-    display: inline-flex;
-    align-items: center;
-    min-height: 38px;
-    padding: 0 14px;
-    border-radius: 12px;
-    color: var(--react-muted);
-    text-decoration: none;
-    border: 1px solid transparent;
-    transition: 140ms ease;
-    white-space: nowrap;
+.h-10 {
+  height: 2.5rem;
 }
 
-.react-shell-nav-link:hover,
-.react-shell-nav-link.is-active,
-.react-shell-server-link:hover,
-.react-shell-server-link.is-active {
-    color: var(--react-text);
-    border-color: rgba(53, 200, 215, 0.2);
-    background: rgba(53, 200, 215, 0.1);
+.h-16 {
+  height: 4rem;
 }
 
-.react-shell-mobile-nav {
-    display: none;
-    padding: 0 18px 16px;
-    flex-wrap: wrap;
-    border-bottom: 1px solid var(--react-border);
-    background: rgba(7, 13, 20, 0.74);
+.h-5 {
+  height: 1.25rem;
 }
 
-.react-shell-mobile-nav.is-open {
-    display: flex;
+.h-8 {
+  height: 2rem;
 }
 
-.react-shell-server-nav {
-    padding: 10px 22px;
-    overflow-x: auto;
-    border-bottom: 1px solid var(--react-border);
-    background: rgba(255, 255, 255, 0.02);
+.h-full {
+  height: 100%;
 }
 
-.react-basic-actions {
-    gap: 8px;
+.min-h-screen {
+  min-height: 100vh;
 }
 
-.react-top-action,
-.react-basic-user {
-    border-radius: 12px;
-    border-color: var(--react-border);
-    background: rgba(255, 255, 255, 0.03);
-}
-
-.react-top-action:hover,
-.react-top-action.is-active {
-    border-color: rgba(53, 200, 215, 0.24);
-    background: rgba(53, 200, 215, 0.12);
-}
-
-.react-mobile-menu-trigger {
-    display: none;
-}
-
-.react-basic-user {
-    padding: 8px 12px;
-}
-
-.react-surface-page {
-    display: grid;
-    gap: 18px;
-    padding: 22px;
-}
-
-.react-surface-header {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 18px;
-}
-
-.react-surface-eyebrow {
-    margin: 0 0 6px;
-    font-size: 0.74rem;
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-    color: var(--react-accent);
-    font-weight: 800;
-}
-
-.react-surface-header h1 {
-    margin: 0;
-    font-size: clamp(1.8rem, 3vw, 2.6rem);
-    line-height: 1.04;
-    letter-spacing: -0.05em;
-}
-
-.react-surface-copy,
-.react-panel-copy,
-.react-inline-note {
-    margin: 10px 0 0;
-    color: var(--react-muted);
-    max-width: 70ch;
-}
-
-.react-surface-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-
-.react-ui-panel,
-.react-console-side-card,
-.react-console-terminal-card,
-.react-console-graph-card,
-.react-server-row,
-.react-side-card,
-.react-account-card,
-.react-empty-state {
-    border-radius: 18px;
-    border: 1px solid var(--react-border);
-    background: linear-gradient(180deg, rgba(19, 31, 45, 0.92), rgba(16, 27, 39, 0.98));
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+.w-10 {
+  width: 2.5rem;
 }
 
-.react-ui-panel,
-.react-side-card,
-.react-account-card {
-    padding: 18px;
+.w-5 {
+  width: 1.25rem;
 }
 
-.react-panel-heading,
-.react-side-title,
-.react-account-section-title,
-.react-console-panel-title {
-    margin-bottom: 14px;
-    color: #dce8f4;
-    font-size: 0.76rem;
-    font-weight: 800;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
+.w-8 {
+  width: 2rem;
 }
 
-.react-ui-button,
-.react-account-button,
-.react-console-action,
-.react-console-send,
-.react-basic-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    min-height: 42px;
-    padding: 0 15px;
-    border-radius: 12px;
-    border: 1px solid var(--react-border);
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--react-text);
-    font-weight: 800;
-    text-decoration: none;
-    transition: 140ms ease;
+.w-full {
+  width: 100%;
 }
 
-.react-ui-button:hover,
-.react-account-button:hover,
-.react-console-action:hover,
-.react-console-send:hover,
-.react-basic-link:hover {
-    border-color: var(--react-border-strong);
-    transform: translateY(-1px);
+.min-w-0 {
+  min-width: 0px;
 }
 
-.react-ui-button.is-primary,
-.react-account-button.is-primary,
-.react-console-send {
-    background: rgba(53, 200, 215, 0.16);
-    border-color: rgba(53, 200, 215, 0.28);
+.max-w-7xl {
+  max-width: 80rem;
 }
 
-.react-ui-button.is-danger,
-.react-account-button.is-danger,
-.react-console-action.is-danger {
-    background: rgba(241, 106, 116, 0.12);
-    border-color: rgba(241, 106, 116, 0.24);
+.flex-1 {
+  flex: 1 1 0%;
 }
 
-.react-ui-button.is-ghost,
-.react-account-button.is-ghost,
-.react-console-action,
-.react-basic-link {
-    background: rgba(255, 255, 255, 0.03);
+.shrink-0 {
+  flex-shrink: 0;
 }
 
-.react-ui-button.is-small {
-    min-height: 34px;
-    padding: 0 12px;
-    border-radius: 10px;
-    font-size: 0.82rem;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.react-inline-alert {
-    padding: 14px 16px;
-    border-radius: 14px;
-    border: 1px solid var(--react-border);
-    background: rgba(255, 255, 255, 0.04);
+.animate-spin {
+  animation: spin 1s linear infinite;
 }
 
-.react-inline-alert.is-success {
-    border-color: rgba(57, 202, 136, 0.24);
-    color: #b4f0cc;
+.resize {
+  resize: both;
 }
 
-.react-inline-alert.is-warning {
-    border-color: rgba(242, 177, 93, 0.24);
-    color: #ffe0b1;
+.flex-col {
+  flex-direction: column;
 }
 
-.react-inline-alert.is-danger {
-    border-color: rgba(241, 106, 116, 0.24);
-    color: #ffc7cc;
+.items-center {
+  align-items: center;
 }
 
-.react-stat-list,
-.react-side-list {
-    display: grid;
-    gap: 10px;
+.justify-center {
+  justify-content: center;
 }
 
-.react-stat-row,
-.react-side-item {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 11px 12px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+.justify-between {
+  justify-content: space-between;
 }
 
-.react-stat-row span,
-.react-side-item-note,
-.react-list-main span,
-.react-list-main small,
-.react-row-meta {
-    color: var(--react-muted);
+.gap-2 {
+  gap: 0.5rem;
 }
 
-.react-basic-grid {
-    grid-template-columns: minmax(0, 1.8fr) minmax(280px, 340px);
-    padding: 22px;
-    gap: 18px;
+.gap-3 {
+  gap: 0.75rem;
 }
 
-.react-server-row {
-    padding: 18px;
-    gap: 18px;
+.gap-4 {
+  gap: 1rem;
 }
 
-.react-server-row:hover {
-    border-color: rgba(53, 200, 215, 0.24);
-    background: linear-gradient(180deg, rgba(20, 33, 48, 0.96), rgba(18, 30, 43, 1));
+.overflow-x-auto {
+  overflow-x: auto;
 }
 
-.react-server-icon,
-.react-console-status-dot {
-    border-radius: 14px;
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.react-console-board {
-    gap: 18px;
-    padding: 22px;
+.whitespace-nowrap {
+  white-space: nowrap;
 }
 
-.react-console-core {
-    grid-template-columns: 320px minmax(0, 1fr);
-    gap: 18px;
+.rounded {
+  border-radius: 0.25rem;
 }
 
-.react-console-details {
-    gap: 16px;
+.rounded-full {
+  border-radius: 9999px;
 }
 
-.react-console-terminal-card,
-.react-console-graph-card {
-    border-radius: 18px;
+.rounded-lg {
+  border-radius: 0.5rem;
 }
 
-.react-console-terminal-host {
-    min-height: 420px;
-    border-radius: 16px;
-    background: #09111a;
+.border {
+  border-width: 1px;
 }
 
-.react-console-command-input,
-.react-account-form input,
-.react-account-form select,
-.react-account-twofa-block input,
-.react-form-field input,
-.react-form-field select {
-    min-height: 44px;
-    border-radius: 12px;
-    border: 1px solid var(--react-border);
-    background: rgba(7, 13, 20, 0.48);
-    color: var(--react-text);
-    padding: 0 14px;
-    outline: none;
+.border-2 {
+  border-width: 2px;
 }
 
-.react-form-field {
-    display: grid;
-    gap: 8px;
+.border-4 {
+  border-width: 4px;
 }
 
-.react-form-field > span {
-    font-size: 0.74rem;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--react-muted);
-    font-weight: 800;
+.border-b {
+  border-bottom-width: 1px;
 }
 
-.react-stack-form {
-    display: grid;
-    gap: 14px;
+.border-b-2 {
+  border-bottom-width: 2px;
 }
 
-.react-files-layout,
-.react-backups-grid,
-.react-network-grid,
-.react-api-grid {
-    display: grid;
-    grid-template-columns: 300px minmax(0, 1fr);
-    gap: 18px;
+.border-l {
+  border-left-width: 1px;
 }
 
-.react-files-panel {
-    min-width: 0;
+.border-l-4 {
+  border-left-width: 4px;
 }
 
-.react-files-breadcrumbs {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 16px;
+.border-neutral-600 {
+  --tw-border-opacity: 1;
+  border-color: rgb(63 63 70 / var(--tw-border-opacity, 1));
 }
 
-.react-breadcrumb-button {
-    min-height: 34px;
-    padding: 0 12px;
-    border-radius: 10px;
-    border: 1px solid var(--react-border);
-    background: rgba(255, 255, 255, 0.02);
-    color: var(--react-muted);
+.border-neutral-700 {
+  --tw-border-opacity: 1;
+  border-color: rgb(46 48 54 / var(--tw-border-opacity, 1));
 }
 
-.react-breadcrumb-button.is-active,
-.react-breadcrumb-button:hover {
-    color: var(--react-text);
-    border-color: rgba(53, 200, 215, 0.2);
+.border-primary-500 {
+  --tw-border-opacity: 1;
+  border-color: rgb(59 130 246 / var(--tw-border-opacity, 1));
 }
 
-.react-list-header,
-.react-list-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1.8fr) minmax(140px, 0.8fr) minmax(100px, 0.6fr) auto;
-    gap: 12px;
-    align-items: center;
+.border-transparent {
+  border-color: transparent;
 }
 
-.react-list-header {
-    padding: 0 0 10px;
-    color: var(--react-muted);
-    font-size: 0.72rem;
-    font-weight: 800;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    border-bottom: 1px solid var(--react-border);
+.border-t-primary-500 {
+  --tw-border-opacity: 1;
+  border-top-color: rgb(59 130 246 / var(--tw-border-opacity, 1));
 }
 
-.react-list-body {
-    display: grid;
-    gap: 10px;
-    margin-top: 12px;
+.bg-green-600 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(22 163 74 / var(--tw-bg-opacity, 1));
 }
 
-.react-list-row {
-    padding: 14px;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+.bg-neutral-600 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(63 63 70 / var(--tw-bg-opacity, 1));
 }
 
-.react-list-main {
-    display: grid;
-    gap: 4px;
-    min-width: 0;
+.bg-neutral-700 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(46 48 54 / var(--tw-bg-opacity, 1));
 }
 
-.react-list-main strong,
-.react-file-cell strong {
-    color: var(--react-text);
+.bg-neutral-700\/50 {
+  background-color: rgb(46 48 54 / 0.5);
 }
 
-.react-file-cell {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    text-align: left;
+.bg-neutral-800 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(31 32 35 / var(--tw-bg-opacity, 1));
 }
 
-.react-file-cell i {
-    color: var(--react-accent);
-    font-size: 1rem;
+.bg-neutral-800\/50 {
+  background-color: rgb(31 32 35 / 0.5);
 }
+
+.bg-neutral-900 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(19 21 23 / var(--tw-bg-opacity, 1));
+}
+
+.bg-red-600 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(220 38 38 / var(--tw-bg-opacity, 1));
+}
+
+.bg-yellow-500 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(234 179 8 / var(--tw-bg-opacity, 1));
+}
+
+.p-2 {
+  padding: 0.5rem;
+}
+
+.p-5 {
+  padding: 1.25rem;
+}
+
+.px-2 {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+.px-4 {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.py-0\.5 {
+  padding-top: 0.125rem;
+  padding-bottom: 0.125rem;
+}
+
+.py-16 {
+  padding-top: 4rem;
+  padding-bottom: 4rem;
+}
+
+.py-2 {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.py-3 {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.py-6 {
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
+.pl-4 {
+  padding-left: 1rem;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.font-mono {
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.text-2xl {
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+
+.text-lg {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+
+.text-sm {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.text-xs {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.uppercase {
+  text-transform: uppercase;
+}
+
+.leading-tight {
+  line-height: 1.25;
+}
+
+.tracking-wide {
+  letter-spacing: 0.025em;
+}
+
+.tracking-wider {
+  letter-spacing: 0.05em;
+}
+
+.text-neutral-100 {
+  --tw-text-opacity: 1;
+  color: rgb(243 244 246 / var(--tw-text-opacity, 1));
+}
+
+.text-neutral-200 {
+  --tw-text-opacity: 1;
+  color: rgb(229 231 235 / var(--tw-text-opacity, 1));
+}
+
+.text-neutral-300 {
+  --tw-text-opacity: 1;
+  color: rgb(209 213 219 / var(--tw-text-opacity, 1));
+}
+
+.text-neutral-400 {
+  --tw-text-opacity: 1;
+  color: rgb(156 163 175 / var(--tw-text-opacity, 1));
+}
+
+.text-neutral-500 {
+  --tw-text-opacity: 1;
+  color: rgb(82 82 91 / var(--tw-text-opacity, 1));
+}
+
+.text-neutral-900 {
+  --tw-text-opacity: 1;
+  color: rgb(19 21 23 / var(--tw-text-opacity, 1));
+}
+
+.text-white {
+  --tw-text-opacity: 1;
+  color: rgb(255 255 255 / var(--tw-text-opacity, 1));
+}
+
+.filter {
+  filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow);
+}
+
+.transition-colors {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.duration-200 {
+  transition-duration: 200ms;
+}
+
+.hover\:border-neutral-500:hover {
+  --tw-border-opacity: 1;
+  border-color: rgb(82 82 91 / var(--tw-border-opacity, 1));
+}
+
+.hover\:bg-neutral-600:hover {
+  --tw-bg-opacity: 1;
+  background-color: rgb(63 63 70 / var(--tw-bg-opacity, 1));
+}
+
+.hover\:bg-neutral-700:hover {
+  --tw-bg-opacity: 1;
+  background-color: rgb(46 48 54 / var(--tw-bg-opacity, 1));
+}
+
+.hover\:text-neutral-100:hover {
+  --tw-text-opacity: 1;
+  color: rgb(243 244 246 / var(--tw-text-opacity, 1));
+}
+
+.hover\:text-white:hover {
+  --tw-text-opacity: 1;
+  color: rgb(255 255 255 / var(--tw-text-opacity, 1));
+}
+
+.group:hover .group-hover\:text-primary-400 {
+  --tw-text-opacity: 1;
+  color: rgb(96 165 250 / var(--tw-text-opacity, 1));
+}
+
+@media (min-width: 768px) {
+  .md\:ml-6 {
+    margin-left: 1.5rem;
+  }
+
+  .md\:mt-0 {
+    margin-top: 0px;
+  }
 
-.react-file-cell span,
-.react-list-main span,
-.react-list-main small {
+  .md\:block {
     display: block;
-}
+  }
 
-.react-row-actions {
+  .md\:flex {
     display: flex;
+  }
+
+  .md\:hidden {
+    display: none;
+  }
+
+  .md\:flex-row {
+    flex-direction: row;
+  }
+
+  .md\:items-center {
     align-items: center;
-    gap: 8px;
-    justify-content: flex-end;
-    position: relative;
+  }
+
+  .md\:gap-4 {
+    gap: 1rem;
+  }
+
+  .md\:px-6 {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
 }
 
-.react-row-menu {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
-    width: 200px;
-    padding: 8px;
-    border-radius: 14px;
-    border: 1px solid var(--react-border);
-    background: rgba(9, 17, 26, 0.98);
-    box-shadow: 0 18px 34px rgba(0, 0, 0, 0.28);
-    display: grid;
-    gap: 4px;
-    z-index: 4;
-}
-
-.react-row-menu-item {
-    display: block;
-    padding: 10px 12px;
-    border-radius: 10px;
-    color: var(--react-text);
-    text-decoration: none;
-    background: transparent;
-    border: 0;
-    text-align: left;
-}
-
-.react-row-menu-item:hover {
-    background: rgba(53, 200, 215, 0.1);
-}
-
-.react-pill-badge {
-    display: inline-flex;
-    align-items: center;
-    width: fit-content;
-    min-height: 26px;
-    padding: 0 10px;
-    border-radius: 999px;
-    border: 1px solid var(--react-border);
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    font-weight: 800;
-}
-
-.react-pill-badge.is-success {
-    color: #a9efcc;
-    border-color: rgba(57, 202, 136, 0.24);
-}
-
-.react-pill-badge.is-warning {
-    color: #ffd8a0;
-    border-color: rgba(242, 177, 93, 0.24);
-}
-
-.react-pill-badge.is-danger {
-    color: #ffc6cb;
-    border-color: rgba(241, 106, 116, 0.24);
-}
-
-.react-pill-badge.is-muted {
-    color: var(--react-muted);
-}
-
-.react-check-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-}
-
-.react-check-tile {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 44px;
-    padding: 0 12px;
-    border-radius: 12px;
-    border: 1px solid var(--react-border);
-    background: rgba(255, 255, 255, 0.03);
-}
-
-.react-token-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 12px 14px;
-    border-radius: 12px;
-    background: rgba(7, 13, 20, 0.46);
-    border: 1px solid var(--react-border);
-}
-
-.react-token-row code {
-    color: #b9ecff;
-    word-break: break-all;
-}
-
-@media (max-width: 1180px) {
-    .react-basic-shell {
-        min-height: calc(100vh - 32px);
-    }
-
-    .react-console-core,
-    .react-files-layout,
-    .react-backups-grid,
-    .react-network-grid,
-    .react-api-grid,
-    .react-basic-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .react-shell-nav {
-        display: none;
-    }
-
-    .react-mobile-menu-trigger {
-        display: inline-grid;
-    }
-}
-
-@media (max-width: 860px) {
-    .react-basic-page {
-        padding: 10px;
-    }
-
-    .react-basic-shell {
-        min-height: calc(100vh - 20px);
-        border-radius: 18px;
-    }
-
-    .react-basic-topbar,
-    .react-surface-header,
-    .react-console-topbar,
-    .react-console-terminal-head,
-    .react-account-profile,
-    .react-server-head {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .react-basic-actions {
-        width: 100%;
-        justify-content: space-between;
-    }
-
-    .react-basic-user {
-        width: 100%;
-        justify-content: center;
-    }
-
-    .react-surface-page,
-    .react-console-board,
-    .react-account-scroll,
-    .react-experimental-scroll,
-    .react-basic-grid {
-        padding: 16px;
-    }
-
-    .react-list-header {
-        display: none;
-    }
-
-    .react-list-row,
-    .react-list-row.is-stacked-mobile {
-        grid-template-columns: 1fr;
-    }
-
-    .react-row-actions {
-        justify-content: flex-start;
-        flex-wrap: wrap;
-    }
-
-    .react-row-menu {
-        left: 0;
-        right: auto;
-        width: min(220px, calc(100vw - 52px));
-    }
-
-    .react-check-grid,
-    .react-account-grid,
-    .react-account-form-grid,
-    .react-console-graphs,
-    .react-experimental-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .react-shell-server-nav {
-        padding-left: 16px;
-        padding-right: 16px;
-    }
+@media (min-width: 1024px) {
+  .lg\:px-8 {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
 }
