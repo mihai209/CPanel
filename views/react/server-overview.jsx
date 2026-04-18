@@ -239,10 +239,22 @@ export function ServerOverviewPage({ pageData = data }) {
                                     </span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm pt-4 border-t border-neutral-800">
-                                    <span className="text-neutral-500">Health Score</span>
-                                    <span className={`font-bold ${pageData.healthScore >= 80 ? 'text-green-500' : pageData.healthScore >= 50 ? 'text-yellow-500' : 'text-red-500'}`}>
-                                        {pageData.healthScore || 0}%
+                                <div className="flex items-center gap-2">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${
+                                        typeof pageData.healthScore === 'object' 
+                                            ? (pageData.healthScore.badgeClass || 'bg-neutral-800 text-neutral-400')
+                                            : (pageData.healthScore >= 80 ? 'bg-green-500/10 text-green-500 border-green-500/20' : pageData.healthScore >= 50 ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20')
+                                    }`}>
+                                        {typeof pageData.healthScore === 'object' ? pageData.healthScore.grade : (pageData.healthScore >= 80 ? 'Healthy' : 'Warning')}
                                     </span>
+                                    <span className={`font-bold ${
+                                        typeof pageData.healthScore === 'object'
+                                            ? (pageData.healthScore.score >= 80 ? 'text-green-500' : pageData.healthScore.score >= 50 ? 'text-yellow-500' : 'text-red-500')
+                                            : (pageData.healthScore >= 80 ? 'text-green-500' : pageData.healthScore >= 50 ? 'text-yellow-500' : 'text-red-500')
+                                    }`}>
+                                        {typeof pageData.healthScore === 'object' ? pageData.healthScore.score : (pageData.healthScore || 0)}%
+                                    </span>
+                                </div>
                                 </div>
                                 {pageData.serverCost && (
                                     <div className="flex justify-between items-center text-sm">

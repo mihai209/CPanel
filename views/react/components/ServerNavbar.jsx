@@ -94,7 +94,7 @@ export default function ServerNavbar({ pageData = {} }) {
     return (
         <>
             {/* ── Desktop Tab Bar ─────────────────────────────────────── */}
-            <nav className="hidden md:flex bg-neutral-900/80 backdrop-blur-sm border-b border-neutral-800 w-full h-14 items-center px-6 lg:px-10 overflow-x-auto no-scrollbar gap-1.5">
+            <nav className="hidden md:flex bg-neutral-900 border-b border-neutral-800 w-full h-14 items-center px-6 lg:px-10 overflow-x-auto no-scrollbar gap-1.5">
                 {activeGroups.map((group, gIdx) => (
                     <React.Fragment key={group.label}>
                         {/* Group separator */}

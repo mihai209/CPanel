@@ -11217,7 +11217,9 @@ function registerServerPagesRoutes(ctx) {
                         server,
                         aiPolicy,
                         aiAdminEnabled: Boolean(aiAdminConfig.enabled),
-                        serverNavItems: buildReactServerNavItems(server, access, 'ai')
+                        serverNavItems: buildReactServerNavItems(server, access, 'ai'),
+                        activeTheme: getUserThemeId(req.session.user),
+                        customTheme: getUserCustomTheme(req.session.user)
                     }
                 });
             }
@@ -12733,7 +12735,9 @@ return res.render('server/users', {
                     reactPageData: {
                         server,
                         logs,
-                        serverNavItems: buildReactServerNavItems(server, access, 'auditconsole')
+                        serverNavItems: buildReactServerNavItems(server, access, 'auditconsole'),
+                        activeTheme: getUserThemeId(req.session.user),
+                        customTheme: getUserCustomTheme(req.session.user)
                     }
                 });
             }
@@ -12966,7 +12970,9 @@ return res.render('server/users', {
                         success: req.query.success || null,
                         error: req.query.error || null,
                         canRunCommands: hasServerPermission(access, 'server.console'),
-                        serverNavItems: buildReactServerNavItems(server, access, 'performance')
+                        serverNavItems: buildReactServerNavItems(server, access, 'performance'),
+                        activeTheme: getUserThemeId(req.session.user),
+                        customTheme: getUserCustomTheme(req.session.user)
                     }
                 });
             }
@@ -13117,7 +13123,9 @@ return res.render('server/users', {
                         macros,
                         canRunCommands: hasServerPermission(access, 'server.console'),
                         canManageVisibility: Boolean(access.isAdmin || access.isOwner),
-                        serverNavItems: buildReactServerNavItems(server, access, 'macros')
+                        serverNavItems: buildReactServerNavItems(server, access, 'macros'),
+                        activeTheme: getUserThemeId(req.session.user),
+                        customTheme: getUserCustomTheme(req.session.user)
                     }
                 });
             }
@@ -13615,7 +13623,9 @@ return res.render('server/users', {
                         connectorOnline,
                         canPower: hasServerPermission(access, 'server.power'),
                         canConsole: hasServerPermission(access, 'server.console'),
-                        serverNavItems: buildReactServerNavItems(server, access, 'recovery')
+                        serverNavItems: buildReactServerNavItems(server, access, 'recovery'),
+                        activeTheme: getUserThemeId(req.session.user),
+                        customTheme: getUserCustomTheme(req.session.user)
                     }
                 });
             }
@@ -13780,7 +13790,9 @@ return res.render('server/users', {
                         canFixPermissions: hasServerPermission(access, 'server.files.write') || hasServerPermission(access, 'server.startup'),
                         success: req.query.success || null,
                         error: req.query.error || null,
-                        serverNavItems: buildReactServerNavItems(server, access, 'debuglogs')
+                        serverNavItems: buildReactServerNavItems(server, access, 'debuglogs'),
+                        activeTheme: getUserThemeId(req.session.user),
+                        customTheme: getUserCustomTheme(req.session.user)
                     }
                 });
             }
@@ -14969,7 +14981,9 @@ return res.render('server/users', {
                         canManageMounts: hasServerPermission(access, 'server.mounts'),
                         success: req.query.success || null,
                         error: req.query.error || null,
-                        serverNavItems: buildReactServerNavItems(server, access, 'mounts')
+                        serverNavItems: buildReactServerNavItems(server, access, 'mounts'),
+                        activeTheme: getUserThemeId(req.session.user),
+                        customTheme: getUserCustomTheme(req.session.user)
                     }
                 });
             }
@@ -17028,7 +17042,9 @@ return res.render('server/users', {
                         canManageScaling: hasServerPermission(access, 'server.startup'),
                         success: req.query.success || null,
                         error: req.query.error || null,
-                        serverNavItems: buildReactServerNavItems(server, access, 'scaling')
+                        serverNavItems: buildReactServerNavItems(server, access, 'scaling'),
+                        activeTheme: getUserThemeId(req.session.user),
+                        customTheme: getUserCustomTheme(req.session.user)
                     }
                 });
             }
@@ -22411,7 +22427,9 @@ res.render('server/startup', {
                         smartAlerts,
                         success: req.query.success || null,
                         error: req.query.error || null,
-                        serverNavItems: buildReactServerNavItems(server, access, 'smartalerts')
+                        serverNavItems: buildReactServerNavItems(server, access, 'smartalerts'),
+                        activeTheme: getUserThemeId(req.session.user),
+                        customTheme: getUserCustomTheme(req.session.user)
                     }
                 });
             }

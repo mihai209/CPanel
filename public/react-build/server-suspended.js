@@ -7280,9 +7280,95 @@
   });
 
   // views/react/server-suspended.jsx
-  var import_react = __toESM(require_react());
+  var import_react2 = __toESM(require_react());
   var import_client = __toESM(require_client());
+
+  // views/react/components/ThemeContext.jsx
+  var import_react = __toESM(require_react());
   var import_jsx_runtime = __toESM(require_jsx_runtime());
+  var ThemeContext = (0, import_react.createContext)();
+  function ThemeProvider({ children, pageData = {} }) {
+    const [activeTheme, setActiveTheme] = (0, import_react.useState)(pageData.activeTheme || "default");
+    const [previewTheme, setPreviewTheme] = (0, import_react.useState)(null);
+    const [customTheme, setCustomTheme] = (0, import_react.useState)(pageData.customTheme || { enabled: false });
+    const applyTheme = (themeId, isPreview = false) => {
+      if (isPreview) {
+        setPreviewTheme(themeId);
+      } else {
+        setActiveTheme(themeId || activeTheme);
+        setPreviewTheme(null);
+      }
+    };
+    const toggleCustomTheme = (enabled) => {
+      setCustomTheme((prev) => ({ ...prev, enabled }));
+    };
+    const restoreTheme = () => {
+      setPreviewTheme(null);
+    };
+    (0, import_react.useEffect)(() => {
+      if (pageData.activeTheme) {
+        setActiveTheme(pageData.activeTheme);
+      }
+      if (pageData.customTheme) {
+        setCustomTheme(pageData.customTheme);
+      }
+    }, [pageData]);
+    (0, import_react.useEffect)(() => {
+      const themeToApply = previewTheme || activeTheme;
+      let themeLink = document.getElementById("cpanel-theme-css");
+      if (!themeLink) {
+        themeLink = document.createElement("link");
+        themeLink.id = "cpanel-theme-css";
+        themeLink.rel = "stylesheet";
+        document.head.appendChild(themeLink);
+      }
+      const href = `/themes-react/${themeToApply}.css`;
+      if (themeLink.getAttribute("href") !== href) {
+        themeLink.setAttribute("href", href);
+      }
+      document.documentElement.setAttribute("data-theme", themeToApply);
+      document.body.style.background = "var(--cp-body-background)";
+      document.body.style.backgroundSize = "cover";
+      document.body.style.backgroundPosition = "center";
+      document.body.style.backgroundAttachment = "fixed";
+      const customEnabled = previewTheme ? false : customTheme.enabled;
+      document.documentElement.setAttribute("data-user-custom-theme", customEnabled ? "on" : "off");
+      let customStyle = document.getElementById("cpanel-custom-theme-overrides");
+      if (customEnabled) {
+        if (!customStyle) {
+          customStyle = document.createElement("style");
+          customStyle.id = "cpanel-custom-theme-overrides";
+          document.head.appendChild(customStyle);
+        }
+        customStyle.textContent = `
+                :root {
+                    --neutral-900: ${customTheme.panelSurface || "#141419"};
+                    --neutral-800: ${customTheme.cardBackground || "#1f2023"};
+                    --neutral-700: ${customTheme.cardBorder || "#2e3036"};
+                    --primary-500: ${customTheme.accentColor || "#3b82f6"};
+                    --neutral-100: ${customTheme.textColor || "#ffffff"};
+                    --neutral-400: ${customTheme.mutedTextColor || "#a1a1aa"};
+                    --cp-body-background: ${customTheme.backgroundImageUrl ? `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('${customTheme.backgroundImageUrl}'), ${customTheme.backgroundColor || "#0d0d0f"}` : customTheme.backgroundColor || "#0d0d0f"};
+                }
+            `;
+      } else if (customStyle) {
+        customStyle.textContent = "";
+      }
+    }, [activeTheme, previewTheme, customTheme]);
+    const value = {
+      activeTheme,
+      previewTheme,
+      customTheme,
+      applyTheme,
+      toggleCustomTheme,
+      restoreTheme
+    };
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ThemeContext.Provider, { value, children });
+  }
+  var ThemeContext_default = ThemeProvider;
+
+  // views/react/server-suspended.jsx
+  var import_jsx_runtime2 = __toESM(require_jsx_runtime());
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
   var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-suspended";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
@@ -7290,10 +7376,10 @@
     const brandName = pageData.settings?.brandName || "CPanel";
     const server = pageData.server || {};
     const suspendReason = server.suspendReason || null;
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "min-h-screen bg-neutral-950 flex items-center justify-center p-6 font-sans text-neutral-200", children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "max-w-lg w-full bg-neutral-900 border border-yellow-900/20 rounded-2xl p-10 text-center shadow-2xl relative overflow-hidden", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute -top-24 -right-24 w-48 h-48 bg-yellow-600/10 rounded-full blur-3xl" }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "relative z-10", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mb-6", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "min-h-screen bg-neutral-950 flex items-center justify-center p-6 font-sans text-neutral-200", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "max-w-lg w-full bg-neutral-900 border border-yellow-900/20 rounded-2xl p-10 text-center shadow-2xl relative overflow-hidden", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "absolute -top-24 -right-24 w-48 h-48 bg-yellow-600/10 rounded-full blur-3xl" }),
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "relative z-10", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "mb-6", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
           "img",
           {
             src: "/assets/sad-rocky.png",
@@ -7301,28 +7387,28 @@
             className: "w-40 h-40 mx-auto rounded-2xl shadow-lg border border-neutral-800"
           }
         ) }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-yellow-500 text-xs font-black uppercase tracking-[0.2em] mb-3", children: brandName }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", { className: "text-3xl font-extrabold text-white mb-2", children: "Server Suspended" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "inline-block px-3 py-1 bg-neutral-800 border border-neutral-700 rounded text-xs font-mono text-neutral-400 mb-6", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: "bi bi-server me-2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "text-yellow-500 text-xs font-black uppercase tracking-[0.2em] mb-3", children: brandName }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("h1", { className: "text-3xl font-extrabold text-white mb-2", children: "Server Suspended" }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "inline-block px-3 py-1 bg-neutral-800 border border-neutral-700 rounded text-xs font-mono text-neutral-400 mb-6", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("i", { className: "bi bi-server me-2" }),
           server.name || "Unknown Server"
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-neutral-400 text-sm mb-6 leading-relaxed", children: "This server has been suspended by an administrator and is temporarily unavailable. All runtime resources have been halted." }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "bg-yellow-500/5 border border-yellow-500/10 rounded-xl p-5 mb-8 text-left", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "text-[10px] font-bold text-yellow-500 uppercase tracking-widest mb-2 flex items-center", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: "bi bi-chat-left-text me-2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "text-neutral-400 text-sm mb-6 leading-relaxed", children: "This server has been suspended by an administrator and is temporarily unavailable. All runtime resources have been halted." }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "bg-yellow-500/5 border border-yellow-500/10 rounded-xl p-5 mb-8 text-left", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)("div", { className: "text-[10px] font-bold text-yellow-500 uppercase tracking-widest mb-2 flex items-center", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("i", { className: "bi bi-chat-left-text me-2" }),
             " Reason"
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-sm text-neutral-300", children: suspendReason ? suspendReason : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "text-neutral-500 italic", children: "No specific reason was provided by the administrator." }) })
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("div", { className: "text-sm text-neutral-300", children: suspendReason ? suspendReason : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("span", { className: "text-neutral-500 italic", children: "No specific reason was provided by the administrator." }) })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "text-neutral-500 text-xs mb-8", children: "Please contact support or an administrator for more information regarding this suspension." }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("p", { className: "text-neutral-500 text-xs mb-8", children: "Please contact support or an administrator for more information regarding this suspension." }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
           "a",
           {
             href: "/",
             className: "inline-flex items-center justify-center px-8 py-3 bg-neutral-800 hover:bg-neutral-700 text-white font-bold rounded-xl transition-all hover:-translate-y-1 shadow-md border border-neutral-700",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: "bi bi-arrow-left me-2" }),
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)("i", { className: "bi bi-arrow-left me-2" }),
               "Back to Dashboard"
             ]
           }
@@ -7332,7 +7418,9 @@
   }
   var server_suspended_default = ServerSuspendedPage;
   if (root) {
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ServerSuspendedPage, { pageData: data }));
+    root.render(
+      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ThemeContext_default, { pageData: data, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(ServerSuspendedPage, { pageData: data }) })
+    );
   }
 })();
 /*! Bundled license information:
