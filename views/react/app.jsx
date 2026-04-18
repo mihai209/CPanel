@@ -27,6 +27,10 @@ import { ServerNoPermissionsPage } from './server-no-permissions.jsx';
 import { ServerSuspendedPage } from './server-suspended.jsx';
 import { AccountPage } from './account.jsx';
 import { DeviceLoginPage } from './device-login.jsx';
+import { ThemesPage } from './themes.jsx';
+import { RewardsPage } from './rewards.jsx';
+import { AFKPage } from './afk.jsx';
+import { NotificationsPage } from './notifications.jsx';
 import { ExperimentalFeaturesPage } from './experimental-features.jsx';
 import { ChangeViewPage } from './change-view.jsx';
 import ReactAppShell from './components/ReactAppShell.jsx';
@@ -71,6 +75,10 @@ function resolveComponentForPath(pathname) {
     }
     if (current === ReactRoutes.account) return AccountPage;
     if (current === ReactRoutes.deviceLogin) return DeviceLoginPage;
+    if (current === ReactRoutes.themes) return ThemesPage;
+    if (current === ReactRoutes.rewards) return RewardsPage;
+    if (current === ReactRoutes.afk) return AFKPage;
+    if (current === ReactRoutes.notifications) return NotificationsPage;
     if (current === ReactRoutes.experimentalFeatures) return ExperimentalFeaturesPage;
     if (current === ReactRoutes.changeView) return ChangeViewPage;
     return null;
@@ -284,6 +292,10 @@ function AppRouter() {
                 <Route path={ReactRoutes.serverSuspendedPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.account} element={<RoutedPage />} />
                 <Route path={ReactRoutes.deviceLogin} element={<RoutedPage />} />
+                <Route path={ReactRoutes.themes} element={<RoutedPage />} />
+                <Route path={ReactRoutes.rewards} element={<RoutedPage />} />
+                <Route path={ReactRoutes.afk} element={<RoutedPage />} />
+                <Route path={ReactRoutes.notifications} element={<RoutedPage />} />
                 <Route path={ReactRoutes.experimentalFeatures} element={<RoutedPage />} />
                 <Route path={ReactRoutes.changeView} element={<RoutedPage />} />
                 <Route path="*" element={<FullReloadFallback />} />

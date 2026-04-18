@@ -60,7 +60,7 @@ const THEME_PREVIEWS = Object.freeze({
     hacker: {
         eyebrow: 'Terminal',
         summary: 'Hard green glow over near-black control surfaces.',
-        background: 'linear-gradient(180deg, #030807 0%, #07110e 38%, #081511 100%)',
+        background: 'linear-gradient(rgba(3, 8, 7, 0.82), rgba(3, 8, 7, 0.82)), url(\'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1280&q=80\'), linear-gradient(180deg, #030807 0%, #07110e 38%, #081511 100%)',
         swatches: ['#3bff9a', '#0b1b13', '#dfffee']
     },
     'jurassic-summer': {
@@ -84,7 +84,7 @@ const THEME_PREVIEWS = Object.freeze({
     minecraft: {
         eyebrow: 'Blocky',
         summary: 'Minecraft-inspired greens and earthy shadows.',
-        background: 'linear-gradient(145deg, #183320 0%, #355f32 100%)',
+        background: 'linear-gradient(rgba(11, 24, 11, 0.82), rgba(11, 24, 11, 0.82)), url(\'https://images2.alphacoders.com/137/thumb-1920-1370592.jpeg\'), linear-gradient(145deg, #183320 0%, #355f32 100%)',
         swatches: ['#6cc04a', '#8b5e3c', '#eef7ea']
     },
     'minimal-summer-clean': {
@@ -108,7 +108,7 @@ const THEME_PREVIEWS = Object.freeze({
     'retro-synth': {
         eyebrow: 'Synthwave',
         summary: 'Sunset magenta and electric cyan over dark chrome.',
-        background: 'linear-gradient(145deg, #180d26 0%, #36124a 100%)',
+        background: 'linear-gradient(rgba(26, 15, 47, 0.82), rgba(26, 15, 47, 0.82)), url(\'https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&w=1280&q=60&fm=webp\'), linear-gradient(145deg, #180d26 0%, #36124a 100%)',
         swatches: ['#ff5db1', '#5bc0ff', '#ffe6f7']
     },
     'school-again': {
@@ -150,7 +150,7 @@ const THEME_PREVIEWS = Object.freeze({
     'zombie-apocalipse': {
         eyebrow: 'Survival',
         summary: 'Muted decay with toxic green and ember red accents.',
-        background: 'linear-gradient(180deg, #181b16 0%, #262d21 38%, #0f120e 100%)',
+        background: 'linear-gradient(rgba(24, 27, 22, 0.85), rgba(24, 27, 22, 0.85)), url(\'https://images6.alphacoders.com/605/605671.jpg\'), linear-gradient(180deg, #181b16 0%, #262d21 38%, #0f120e 100%)',
         swatches: ['#92ff58', '#ff7858', '#f0f7e9']
     }
 });

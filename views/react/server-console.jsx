@@ -662,6 +662,37 @@ export function ServerConsolePage({ pageData = data }) {
         { action: 'Start/Stop server', keys: 'Ctrl + Shift + S' }
     ];
 
+    const commandInputRef = React.useRef(null);
+
+    React.useEffect(() => {
+        const handleGlobalKeyDown = (e) => {
+            // Ctrl + K: Focus input
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                if (commandInputRef.current) commandInputRef.current.focus();
+            }
+            // Ctrl + L: Clear console
+            if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+                e.preventDefault();
+                if (terminalInstanceRef.current) terminalInstanceRef.current.clear();
+            }
+            // Ctrl + Shift + R: Restart
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'R') {
+                e.preventDefault();
+                if (!restartDisabled) sendPowerAction('restart');
+            }
+            // Ctrl + Shift + S: Start/Stop
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'S') {
+                e.preventDefault();
+                if (!startDisabled) sendPowerAction('start');
+                else if (!stopDisabled) sendPowerAction('stop');
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }, [restartDisabled, startDisabled, stopDisabled, sendPowerAction]);
+
     const content = (
         <>
             {pageData.success && (
@@ -825,12 +856,18 @@ export function ServerConsolePage({ pageData = data }) {
                             <div className="flex-1 flex items-center w-full min-w-0">
                                 <span className="text-neutral-500 pl-4 font-mono font-bold">$</span>
                                 <input
+                                    ref={commandInputRef}
                                     type="text"
                                     className="w-full bg-transparent border-none text-neutral-200 text-sm font-mono px-3 py-4 focus:ring-0 shadow-none outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                     value={commandValue}
                                     onChange={(event) => setCommandValue(event.target.value)}
                                     onKeyDown={(event) => {
                                         if (event.key === 'Enter') {
+                                            event.preventDefault();
+                                            sendCommand();
+                                            return;
+                                        }
+                                        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
                                             event.preventDefault();
                                             sendCommand();
                                             return;

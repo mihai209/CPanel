@@ -26,16 +26,14 @@ function InternalTopAction({ to, icon, title }) {
 }
 
 function PrimaryNavLink({ to, label }) {
-    const currentPath = window.location.pathname;
-    const isActive = currentPath === to || (to !== '/' && currentPath.startsWith(to));
-    
     return (
-        <a 
-            href={to} 
-            className={`px-4 py-3 text-sm font-semibold transition-colors ${isActive ? 'text-white border-b-2 border-primary-500' : 'text-neutral-400 hover:text-white'}`}
+        <NavLink 
+            to={to} 
+            end={to === '/'}
+            className={({ isActive }) => `px-4 py-3 text-sm font-semibold transition-colors ${isActive ? 'text-white border-b-2 border-primary-500' : 'text-neutral-400 hover:text-white'}`}
         >
             {label}
-        </a>
+        </NavLink>
     );
 }
 
@@ -66,10 +64,18 @@ export default function ReactAppShell({
 
     return (
         <ThemeProvider pageData={pageData}>
-            <div className={`min-h-screen bg-neutral-900 text-neutral-200 flex flex-col ${pageClassName || ''}`}>
+            <div 
+                className={`min-h-screen text-neutral-200 flex flex-col transition-all duration-700 ${pageClassName || ''}`}
+                style={{ 
+                    background: 'var(--cp-body-background)',
+                    backgroundAttachment: 'fixed',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                }}
+            >
             
             {/* Top Navigation Bar */}
-            <div className="bg-neutral-800 border-b border-neutral-700 w-full flex items-center justify-between px-4 lg:px-8 h-16 shrink-0">
+            <div className="bg-neutral-800/80 backdrop-blur-md border-b border-neutral-700 w-full flex items-center justify-between px-4 lg:px-8 h-16 shrink-0 sticky top-0 z-40">
                 <div className="flex items-center gap-4">
                     <img src={brandImage} alt={pageData.brandName || 'CPanel'} className="w-8 h-8 rounded shrink-0" />
                     <div>

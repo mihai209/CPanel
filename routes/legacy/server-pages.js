@@ -23858,7 +23858,7 @@ app.get('/api/client/servers/:containerId', async (req, res) => {
                 return res.status(503).json({ success: false, error: 'Connector is offline' });
             }
 
-            const query = String(req.query.q || '').trim().slice(0, 120);
+            const query = String(req.query.q || req.query.query || '').trim().slice(0, 120);
             const directory = normalizeServerDirectoryInput(req.query.path || '/');
             const filterRaw = String(req.query.filter || 'all').trim().toLowerCase();
             const filterMode = (filterRaw === 'files' || filterRaw === 'folders') ? filterRaw : 'all';

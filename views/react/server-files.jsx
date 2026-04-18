@@ -108,7 +108,7 @@ function SearchModal({ isOpen, onClose, serverId, onNavigate }) {
         abortRef.current = ctrl;
         setLoading(true); setError(''); setResults(null);
         try {
-            const params = new URLSearchParams({ query: query.trim(), filter });
+            const params = new URLSearchParams({ q: query.trim(), filter });
             const res = await fetch(`/server/${serverId}/files-search?${params}`, { signal: ctrl.signal });
             const payload = await res.json();
             if (!res.ok || payload.error) throw new Error(payload.error || 'Search failed');
