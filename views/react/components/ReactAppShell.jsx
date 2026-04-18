@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { ReactRoutes, resolveBrandImage, resolveUserAvatar } from '../ReactRoutes.js';
 import ProvisioningBarrier from './ProvisioningBarrier.jsx';
 import GlobalStatusModal from './GlobalStatusModal.jsx';
@@ -8,32 +8,35 @@ import GlobalSearch from './GlobalSearch.jsx';
 import ServerNavbar from './ServerNavbar.jsx';
 import SponsorModal from './SponsorModal.jsx';
 import FooterLegalModal from './FooterLegalModal.jsx';
-import { ThemeProvider } from './ThemeContext.jsx';
+// Layout components
 
 // Import base themes
 import '../../../public/css/react-themes-base.css';
 
 function InternalTopAction({ to, icon, title }) {
+    const location = useLocation();
+    const isActive = location.pathname === to;
     return (
-        <NavLink
-            to={to}
+        <a
+            href={to}
             title={title}
-            className={({ isActive }) => `text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700 ${isActive ? 'text-neutral-100 bg-neutral-700' : ''}`}
+            className={`text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700 ${isActive ? 'text-neutral-100 bg-neutral-700' : ''}`}
         >
             <i className={`bi ${icon}`}></i>
-        </NavLink>
+        </a>
     );
 }
 
 function PrimaryNavLink({ to, label }) {
+    const location = useLocation();
+    const isActive = to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
     return (
-        <NavLink 
-            to={to} 
-            end={to === '/'}
-            className={({ isActive }) => `px-4 py-3 text-sm font-semibold transition-colors ${isActive ? 'text-white border-b-2 border-primary-500' : 'text-neutral-400 hover:text-white'}`}
+        <a 
+            href={to} 
+            className={`px-4 py-3 text-sm font-semibold transition-colors ${isActive ? 'text-white border-b-2 border-primary-500' : 'text-neutral-400 hover:text-white'}`}
         >
             {label}
-        </NavLink>
+        </a>
     );
 }
 
@@ -63,8 +66,7 @@ export default function ReactAppShell({
     const shouldBlock = isProvisioning && activeNavItem && blockedPageKeys.includes(activeNavItem.key);
 
     return (
-        <ThemeProvider pageData={pageData}>
-            <div 
+        <div 
                 className={`min-h-screen text-neutral-200 flex flex-col transition-all duration-700 ${pageClassName || ''}`}
                 style={{ 
                     background: 'var(--cp-body-background)',
@@ -140,58 +142,61 @@ export default function ReactAppShell({
                 </div>
             </div>
 
-            {/* Mobile Nav Drawer */}
-            {mobileNavOpen && (
-                <div className="md:hidden bg-neutral-800 border-b border-neutral-700 flex flex-col py-2">
-                    {shellNavItems.map((item) => (
-                        <NavLink 
-                            key={item.to} 
-                            to={item.to} 
-                            className={({ isActive }) => `px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${isActive ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}
-                        >
-                            <i className={`bi ${item.to === ReactRoutes.dashboard ? 'bi-grid-fill' : 'bi-person-fill'} text-lg`}></i>
-                            {item.label}
-                        </NavLink>
-                    ))}
+    {/* Mobile Nav Drawer */}
+    {mobileNavOpen && (
+        <div className="md:hidden bg-neutral-800 border-b border-neutral-700 flex flex-col py-2">
+            {shellNavItems.map((item) => {
+                const isActive = item.to === '/' ? window.location.pathname === '/' : window.location.pathname.startsWith(item.to);
+                return (
+                    <a 
+                        key={item.to} 
+                        href={item.to} 
+                        className={`px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${isActive ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}
+                    >
+                        <i className={`bi ${item.to === ReactRoutes.dashboard ? 'bi-grid-fill' : 'bi-person-fill'} text-lg`}></i>
+                        {item.label}
+                    </a>
+                );
+            })}
+            <div className="h-px bg-neutral-700/50 mx-5 my-1"></div>
+            <a href={ReactRoutes.themes} className={`px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${window.location.pathname === ReactRoutes.themes ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}>
+                <i className="bi bi-palette-fill text-lg"></i>
+                Themes
+            </a>
+            <a href={ReactRoutes.rewards} className={`px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${window.location.pathname === ReactRoutes.rewards ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}>
+                <i className="bi bi-coin text-lg"></i>
+                Rewards
+            </a>
+            <a href={ReactRoutes.afk} className={`px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${window.location.pathname === ReactRoutes.afk ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}>
+                <i className="bi bi-hourglass-split text-lg"></i>
+                AFK Timer
+            </a>
+            
+            <div className="h-px bg-neutral-700/50 mx-5 my-1"></div>
+            <a href={ReactRoutes.outdatedFeatures} className={`px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${window.location.pathname === ReactRoutes.outdatedFeatures ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}>
+                <i className="bi bi-sliders text-lg"></i>
+                Outdated Features
+            </a>
+            {pageData.user?.isAdmin && (
+                <>
+                    <a href={ReactRoutes.admin} className="px-5 py-3 text-sm font-bold flex items-center gap-3 text-neutral-400 hover:text-white transition-colors">
+                        <i className="bi bi-gear-fill text-lg"></i>
+                        Admin Panel
+                    </a>
+                    <a href={ReactRoutes.connectorsCheck} className={`px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${window.location.pathname === ReactRoutes.connectorsCheck ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}>
+                        <i className="bi bi-cpu text-lg"></i>
+                        Connectors Check
+                    </a>
                     <div className="h-px bg-neutral-700/50 mx-5 my-1"></div>
-                    <NavLink to={ReactRoutes.themes} className={({ isActive }) => `px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${isActive ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}>
-                        <i className="bi bi-palette-fill text-lg"></i>
-                        Themes
-                    </NavLink>
-                    <NavLink to={ReactRoutes.rewards} className={({ isActive }) => `px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${isActive ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}>
-                        <i className="bi bi-coin text-lg"></i>
-                        Rewards
-                    </NavLink>
-                    <NavLink to={ReactRoutes.afk} className={({ isActive }) => `px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${isActive ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}>
-                        <i className="bi bi-hourglass-split text-lg"></i>
-                        AFK Timer
-                    </NavLink>
-                    
-                    <div className="h-px bg-neutral-700/50 mx-5 my-1"></div>
-                    <NavLink to={ReactRoutes.outdatedFeatures} className={({ isActive }) => `px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${isActive ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}>
-                        <i className="bi bi-sliders text-lg"></i>
-                        Outdated Features
-                    </NavLink>
-                    {pageData.user?.isAdmin && (
-                        <>
-                            <a href={ReactRoutes.admin} className="px-5 py-3 text-sm font-bold flex items-center gap-3 text-neutral-400 hover:text-white transition-colors">
-                                <i className="bi bi-gear-fill text-lg"></i>
-                                Admin Panel
-                            </a>
-                            <NavLink to={ReactRoutes.connectorsCheck} className={({ isActive }) => `px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${isActive ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}>
-                                <i className="bi bi-cpu text-lg"></i>
-                                Connectors Check
-                            </NavLink>
-                            <div className="h-px bg-neutral-700/50 mx-5 my-1"></div>
-                        </>
-                    )}
-
-                    <NavLink to={ReactRoutes.changeView} className="px-5 py-3 text-sm font-bold flex items-center gap-3 text-neutral-400 hover:text-white transition-colors">
-                        <i className="bi bi-door-open text-lg"></i>
-                        Exit Beta Mode
-                    </NavLink>
-                </div>
+                </>
             )}
+
+            <a href={ReactRoutes.changeView} className="px-5 py-3 text-sm font-bold flex items-center gap-3 text-neutral-400 hover:text-white transition-colors">
+                <i className="bi bi-door-open text-lg"></i>
+                Exit Beta Mode
+            </a>
+        </div>
+    )}
 
             {/* Server Deep Navigation — delegated to ServerNavbar */}
             {serverNavItems.length > 0 && <ServerNavbar pageData={pageData} />}
@@ -264,6 +269,5 @@ export default function ReactAppShell({
                 </div>
             </footer>
         </div>
-        </ThemeProvider>
     );
 }

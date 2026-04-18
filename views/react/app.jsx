@@ -34,6 +34,7 @@ import { NotificationsPage } from './notifications.jsx';
 import { ExperimentalFeaturesPage } from './experimental-features.jsx';
 import { ChangeViewPage } from './change-view.jsx';
 import ReactAppShell from './components/ReactAppShell.jsx';
+import { ThemeProvider } from './components/ThemeContext.jsx';
 
 const initialPageData = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const root = createRoot(document.getElementById('reactRoot'));
@@ -304,7 +305,11 @@ function AppRouter() {
     );
 }
 
-root.render(<AppRouter />);
+root.render(
+    <ThemeProvider pageData={initialPageData}>
+        <AppRouter />
+    </ThemeProvider>
+);
 if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
     window.__CPANEL_REACT_BOOTED__();
 }
