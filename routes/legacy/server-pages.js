@@ -22410,8 +22410,8 @@ res.render('server/startup', {
 
             if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
                 return res.render('react/loader', {
-                    pageData: reactPageData,
-                    pageMeta: { entry: 'server-file-editor' },
+                    reactPageData,
+                    reactEntry: 'server-file-editor',
                     title: `File Editor - ${server.name}`
                 });
             }

@@ -587,10 +587,19 @@ function UploadQueue({ queue, onClear }) {
 function ContextMenu({ x, y, entry, entryPath, writeLocked, canDownload, editUrlBase, previewUrlBase, downloadUrlBase, currentPath, serverId, onClose, onRename, onChmod, onArchive, onUnarchive, onDelete, onNavigate }) {
     const ref = useRef(null);
     useEffect(() => {
-        const handle = () => onClose();
-        const delay = setTimeout(() => window.addEventListener('click', handle), 50);
-        return () => { clearTimeout(delay); window.removeEventListener('click', handle); };
-    }, []);
+        const handle = (e) => {
+            if (ref.current && !ref.current.contains(e.target)) {
+                onClose();
+            }
+        };
+        document.addEventListener('mousedown', handle, true);
+        const escHandle = (e) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', escHandle);
+        return () => {
+            document.removeEventListener('mousedown', handle, true);
+            document.removeEventListener('keydown', escHandle);
+        };
+    }, [onClose]);
 
     const style = { position: 'fixed', top: y, left: x, zIndex: 500 };
 
@@ -778,7 +787,7 @@ export function ServerFilesPage({ pageData = data }) {
     // ── Context Menu ───────────────────────────────────────────────
     const handleContextMenu = (e, entry, entryPath) => {
         e.preventDefault();
-        // keep menu inside viewport
+        e.stopPropagation(); // prevent bubbling to parent which clears the menu
         const x = Math.min(e.clientX, window.innerWidth - 220);
         const y = Math.min(e.clientY, window.innerHeight - 300);
         setContextMenu({ x, y, entry, entryPath });
@@ -867,7 +876,8 @@ export function ServerFilesPage({ pageData = data }) {
                 {/* ── File Table ─────────────────────────────────── */}
                 <div className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden relative"
                     onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
-                    onContextMenu={e => { e.preventDefault(); setContextMenu(null); }}>
+                    onContextMenu={e => { e.preventDefault(); setContextMenu(null); }}
+                    onClick={() => setContextMenu(null)}>
 
                     {isDragging && (
                         <div className="absolute inset-0 z-50 bg-primary-600/10 border-2 border-dashed border-primary-500 rounded-2xl flex items-center justify-center pointer-events-none">

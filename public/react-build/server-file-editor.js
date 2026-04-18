@@ -7280,11 +7280,11 @@
   });
 
   // views/react/server-file-editor.jsx
-  var import_react6 = __toESM(require_react());
+  var import_react7 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // views/react/components/ReactAppShell.jsx
-  var import_react5 = __toESM(require_react());
+  var import_react6 = __toESM(require_react());
 
   // node_modules/react-router-dom/dist/index.js
   var React2 = __toESM(require_react());
@@ -8514,23 +8514,148 @@
     ] });
   }
 
-  // views/react/components/ReactAppShell.jsx
+  // views/react/components/ServerNavbar.jsx
+  var import_react5 = __toESM(require_react());
   var import_jsx_runtime5 = __toESM(require_jsx_runtime());
+  var NAV_ICONS = {
+    console: "bi-terminal-fill",
+    overview: "bi-speedometer2",
+    activity: "bi-clock-history",
+    timeline: "bi-list-ul",
+    files: "bi-folder2-open",
+    backups: "bi-cloud-arrow-down",
+    dbs: "bi-database",
+    network: "bi-diagram-3",
+    users: "bi-people-fill",
+    api: "bi-key-fill",
+    schedules: "bi-calendar-event",
+    startup: "bi-play-circle",
+    mccenter: "bi-controller",
+    mcinstaller: "bi-download"
+  };
+  var NAV_GROUPS = [
+    { label: "Server", keys: ["console", "overview", "activity"] },
+    { label: "Storage", keys: ["files", "backups", "dbs"] },
+    { label: "Access", keys: ["network", "users", "api", "schedules"] },
+    { label: "Config", keys: ["startup", "timeline"] },
+    { label: "Minecraft", keys: ["mccenter", "mcinstaller"] }
+  ];
+  function NavItem({ item, isProvisioning, blockedKeys }) {
+    const isDisabled = isProvisioning && blockedKeys.includes(item.key);
+    const icon = NAV_ICONS[item.key];
+    return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+      "a",
+      {
+        href: isDisabled ? "#" : item.href,
+        onClick: isDisabled ? (e) => e.preventDefault() : void 0,
+        title: isDisabled ? `${item.label} \u2014 unavailable while server is provisioning` : item.label,
+        className: [
+          "relative flex items-center gap-2 px-3 h-full text-[11px] font-black uppercase tracking-widest",
+          "whitespace-nowrap border-b-2 transition-all duration-150 select-none",
+          isDisabled ? "text-neutral-700 border-transparent cursor-not-allowed opacity-60" : item.active ? "text-primary-400 border-primary-500 bg-primary-500/5" : "text-neutral-500 border-transparent hover:text-neutral-200 hover:border-neutral-500"
+        ].join(" "),
+        children: [
+          icon && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: `bi ${icon} text-[13px] shrink-0` }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { children: item.label }),
+          isDisabled && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: "bi bi-lock-fill text-[8px] opacity-50 ml-0.5" })
+        ]
+      }
+    );
+  }
+  function ServerNavbar({ pageData = {} }) {
+    const items = Array.isArray(pageData.serverNavItems) ? pageData.serverNavItems : [];
+    if (items.length === 0) return null;
+    const status = pageData.server?.status || "";
+    const isProvisioning = ["installing", "reinstalling"].includes(status);
+    const blockedKeys = ["files", "backups", "dbs", "network", "users", "api", "schedules", "startup", "timeline"];
+    const [mobileOpen, setMobileOpen] = (0, import_react5.useState)(false);
+    const activeGroups = NAV_GROUPS.map((group) => ({
+      ...group,
+      items: group.keys.map((k) => items.find((i) => i.key === k)).filter(Boolean)
+    })).filter((g) => g.items.length > 0);
+    const activeItem = items.find((i) => i.active);
+    return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("nav", { className: "hidden md:flex bg-neutral-900/80 backdrop-blur-sm border-b border-neutral-800 w-full h-11 items-center px-4 lg:px-8 overflow-x-auto no-scrollbar gap-1", children: [
+        activeGroups.map((group, gIdx) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_react5.default.Fragment, { children: [
+          gIdx > 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "h-4 w-px bg-neutral-700/60 mx-0.5 shrink-0" }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex items-center h-full", children: group.items.map((item) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+            NavItem,
+            {
+              item,
+              isProvisioning,
+              blockedKeys
+            },
+            item.key
+          )) })
+        ] }, group.label)),
+        pageData.server?.name && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "ml-auto pl-4 shrink-0 flex items-center gap-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: `w-2 h-2 rounded-full shrink-0 ${status === "running" ? "bg-green-500" : status === "starting" ? "bg-yellow-500 animate-pulse" : status === "stopping" ? "bg-orange-500 animate-pulse" : isProvisioning ? "bg-blue-500 animate-pulse" : "bg-neutral-600"}` }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-[10px] font-black text-neutral-500 uppercase tracking-widest max-w-[140px] truncate", children: pageData.server.name })
+        ] })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "md:hidden bg-neutral-900/90 border-b border-neutral-800", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+          "button",
+          {
+            onClick: () => setMobileOpen((v) => !v),
+            className: "w-full flex items-center justify-between px-4 py-3",
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center gap-2", children: [
+                activeItem && NAV_ICONS[activeItem.key] && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: `bi ${NAV_ICONS[activeItem.key]} text-primary-400` }),
+                /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-sm font-bold text-neutral-200", children: activeItem?.label || "Menu" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: `bi ${mobileOpen ? "bi-chevron-up" : "bi-chevron-down"} text-neutral-500 text-sm` })
+            ]
+          }
+        ),
+        mobileOpen && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "border-t border-neutral-800 pb-2", children: activeGroups.map((group) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "px-4 pt-3 pb-1 text-[9px] font-black text-neutral-600 uppercase tracking-widest", children: group.label }),
+          group.items.map((item) => {
+            const isDisabled = isProvisioning && blockedKeys.includes(item.key);
+            const icon = NAV_ICONS[item.key];
+            return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+              "a",
+              {
+                href: isDisabled ? "#" : item.href,
+                onClick: (e) => {
+                  if (isDisabled) e.preventDefault();
+                  else setMobileOpen(false);
+                },
+                className: [
+                  "flex items-center gap-3 px-5 py-2.5 text-sm font-semibold transition-colors",
+                  isDisabled ? "text-neutral-700 cursor-not-allowed" : item.active ? "text-primary-400 bg-primary-500/5 border-l-2 border-primary-500 pl-[18px]" : "text-neutral-400 hover:text-white hover:bg-neutral-800/50"
+                ].join(" "),
+                children: [
+                  icon && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: `bi ${icon} text-base shrink-0` }),
+                  /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { children: item.label }),
+                  isDisabled && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: "bi bi-lock-fill text-xs opacity-40 ml-auto" })
+                ]
+              },
+              item.key
+            );
+          })
+        ] }, group.label)) })
+      ] })
+    ] });
+  }
+
+  // views/react/components/ReactAppShell.jsx
+  var import_jsx_runtime6 = __toESM(require_jsx_runtime());
   function InternalTopAction({ to, icon, title }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
       NavLink,
       {
         to,
         title,
         className: ({ isActive }) => `text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700 ${isActive ? "text-neutral-100 bg-neutral-700" : ""}`,
-        children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: `bi ${icon}` })
+        children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: `bi ${icon}` })
       }
     );
   }
   function PrimaryNavLink({ to, label }) {
     const currentPath = window.location.pathname;
     const isActive = currentPath === to || to !== "/" && currentPath.startsWith(to);
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
       "a",
       {
         href: to,
@@ -8548,57 +8673,55 @@
   }) {
     const brandImage = resolveBrandImage(pageData);
     const userAvatar = resolveUserAvatar(pageData.user || {}, brandImage);
-    const [mobileNavOpen, setMobileNavOpen] = import_react5.default.useState(false);
+    const [mobileNavOpen, setMobileNavOpen] = import_react6.default.useState(false);
     const serverNavItems = Array.isArray(pageData.serverNavItems) ? pageData.serverNavItems : [];
     const shellNavItems = [
       { to: ReactRoutes.dashboard, label: "Dashboard" },
       { to: ReactRoutes.account, label: "Account" }
     ];
     const isProvisioning = ["installing", "reinstalling"].includes(pageData.server?.status);
-    const currentPath = window.location.pathname;
-    const isConsolePage = currentPath.endsWith("/console") || currentPath.endsWith(pageData.server?.containerId);
     const blockedPageKeys = ["files", "backups", "dbs", "network", "users", "api", "schedules", "startup", "timeline"];
     const activeNavItem = serverNavItems.find((item) => item.active);
     const shouldBlock = isProvisioning && activeNavItem && blockedPageKeys.includes(activeNavItem.key);
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: `min-h-screen bg-neutral-900 text-neutral-200 flex flex-col ${pageClassName || ""}`, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "bg-neutral-800 border-b border-neutral-700 w-full flex items-center justify-between px-4 lg:px-8 h-16 shrink-0", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center gap-4", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("img", { src: brandImage, alt: pageData.brandName || "CPanel", className: "w-8 h-8 rounded shrink-0" }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "text-lg font-bold text-neutral-100 leading-tight", children: pageData.brandName || "CPanel" }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "text-xs text-neutral-400 font-semibold", children: subtitle })
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: `min-h-screen bg-neutral-900 text-neutral-200 flex flex-col ${pageClassName || ""}`, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800 border-b border-neutral-700 w-full flex items-center justify-between px-4 lg:px-8 h-16 shrink-0", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-4", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("img", { src: brandImage, alt: pageData.brandName || "CPanel", className: "w-8 h-8 rounded shrink-0" }),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-lg font-bold text-neutral-100 leading-tight", children: pageData.brandName || "CPanel" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-xs text-neutral-400 font-semibold", children: subtitle })
           ] })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("nav", { className: "hidden md:flex items-center h-full ml-10 flex-1", children: [
-          shellNavItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(PrimaryNavLink, { to: item.to, label: item.label }, item.to)),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex-1" })
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("nav", { className: "hidden md:flex items-center h-full ml-10 flex-1", children: [
+          shellNavItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(PrimaryNavLink, { to: item.to, label: item.label }, item.to)),
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex-1" })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center gap-3 md:gap-4 shrink-0", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-3 md:gap-4 shrink-0", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
             "button",
             {
               type: "button",
               className: "md:hidden text-neutral-400 hover:text-neutral-100 p-2",
               title: "Toggle navigation",
               onClick: () => setMobileNavOpen(!mobileNavOpen),
-              children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: "bi bi-list text-2xl" })
+              children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-list text-2xl" })
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "hidden md:flex items-center gap-2", children: [
-            pageData.user?.isAdmin && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("a", { className: "text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700", href: ReactRoutes.admin, title: "Admin Area", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: "bi bi-gear-fill" }) }),
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(InternalTopAction, { to: ReactRoutes.connectorsCheck, icon: "bi-cpu", title: "Connectors Check" })
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "hidden md:flex items-center gap-2", children: [
+            pageData.user?.isAdmin && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("a", { className: "text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700", href: ReactRoutes.admin, title: "Admin Area", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-gear-fill" }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(InternalTopAction, { to: ReactRoutes.connectorsCheck, icon: "bi-cpu", title: "Connectors Check" })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "h-6 w-px bg-neutral-700 mx-1" }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(GlobalSearch, {}),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(NotificationBell, {}),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "h-6 w-px bg-neutral-700 mx-2" }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(InternalTopAction, { to: ReactRoutes.experimentalFeatures, icon: "bi-sliders", title: "Experimental Features" }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("a", { className: "text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700", href: ReactRoutes.changeView, title: "Exit Beta", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: "bi bi-door-open" }) })
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "h-6 w-px bg-neutral-700 mx-1" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(GlobalSearch, {}),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(NotificationBell, {}),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "h-6 w-px bg-neutral-700 mx-2" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(InternalTopAction, { to: ReactRoutes.experimentalFeatures, icon: "bi-sliders", title: "Experimental Features" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("a", { className: "text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700", href: ReactRoutes.changeView, title: "Exit Beta", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-door-open" }) })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center gap-3 pl-4 border-l border-neutral-700", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-sm font-semibold hidden md:block", children: pageData.user?.username || "Guest" }),
-            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-3 pl-4 border-l border-neutral-700", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-sm font-semibold hidden md:block", children: pageData.user?.username || "Guest" }),
+            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
               "img",
               {
                 src: userAvatar,
@@ -8609,8 +8732,8 @@
           ] })
         ] })
       ] }),
-      mobileNavOpen && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "md:hidden bg-neutral-800 border-b border-neutral-700 flex flex-col", children: [
-        shellNavItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+      mobileNavOpen && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "md:hidden bg-neutral-800 border-b border-neutral-700 flex flex-col", children: [
+        shellNavItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
           NavLink,
           {
             to: item.to,
@@ -8619,42 +8742,14 @@
           },
           item.to
         )),
-        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(NavLink, { to: ReactRoutes.changeView, className: "px-4 py-3 text-sm font-semibold border-l-4 border-transparent text-neutral-400 hover:text-white", children: "Exit Beta Mode" })
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(NavLink, { to: ReactRoutes.changeView, className: "px-4 py-3 text-sm font-semibold border-l-4 border-transparent text-neutral-400 hover:text-white", children: "Exit Beta Mode" })
       ] }),
-      serverNavItems.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("nav", { className: "bg-neutral-800/55 border-b border-neutral-700/50 flex flex-row overflow-x-auto no-scrollbar px-4 lg:px-8 py-0 md:py-0 w-full whitespace-nowrap scroll-smooth", children: [
-        { name: "Home", keys: ["overview", "console", "activity"] },
-        { name: "Data", keys: ["files", "backups", "dbs"] },
-        { name: "Access", keys: ["network", "users", "api", "schedules"] },
-        { name: "Special", keys: ["mccenter", "mcinstaller"] },
-        { name: "Config", keys: ["startup", "timeline"] }
-      ].map((group) => {
-        const groupItems = serverNavItems.filter((item) => group.keys.includes(item.key));
-        if (groupItems.length === 0) return null;
-        return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center group/navgroup shrink-0 h-12", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "hidden lg:block h-3 w-px bg-neutral-700 mx-1 first:hidden opacity-50" }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex items-center", children: groupItems.map((item) => {
-            const isDisabled = isProvisioning && blockedPageKeys.includes(item.key);
-            return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
-              "a",
-              {
-                href: isDisabled ? "#" : item.href,
-                onClick: isDisabled ? (e) => e.preventDefault() : void 0,
-                className: `px-3 py-4 text-[11px] font-black uppercase tracking-widest whitespace-nowrap transition-all border-b-2 flex items-center h-full ${isDisabled ? "text-neutral-700 border-transparent cursor-not-allowed grayscale" : item.active ? "text-primary-400 border-primary-500 bg-primary-500/5" : "text-neutral-500 border-transparent hover:text-neutral-300 hover:translate-y-[-1px]"}`,
-                children: [
-                  item.label,
-                  isDisabled && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: "bi bi-lock-fill ms-2 text-[8px] opacity-40" })
-                ]
-              },
-              item.href
-            );
-          }) })
-        ] }, group.name);
-      }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("main", { className: "flex-1 w-full bg-neutral-900", children: shouldBlock ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ProvisioningBarrier, { status: pageData.server.status, containerId: pageData.server.containerId }) : children }),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(GlobalStatusModal, {}),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("footer", { className: "w-full py-8 border-t border-neutral-800 bg-neutral-900 mt-auto", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "px-4 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex items-center gap-3", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-xs font-black text-neutral-100 uppercase tracking-[0.2em] opacity-80", children: "CPanel Rocky \xA9 2026" }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
+      serverNavItems.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ServerNavbar, { pageData }),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("main", { className: "flex-1 w-full bg-neutral-900", children: shouldBlock ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ProvisioningBarrier, { status: pageData.server.status, containerId: pageData.server.containerId }) : children }),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(GlobalStatusModal, {}),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("footer", { className: "w-full py-8 border-t border-neutral-800 bg-neutral-900 mt-auto", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "px-4 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex items-center gap-3", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-xs font-black text-neutral-100 uppercase tracking-[0.2em] opacity-80", children: "CPanel Rocky \xA9 2026" }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
           "a",
           {
             href: "https://github.com/mihai209",
@@ -8662,7 +8757,7 @@
             rel: "noopener noreferrer",
             className: "text-[10px] font-bold text-neutral-500 hover:text-primary-400 transition-colors uppercase tracking-[0.1em] flex items-center gap-2",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: "bi bi-github" }),
+              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-github" }),
               "mihai209(github.com/mihai209)"
             ]
           }
@@ -8672,7 +8767,7 @@
   }
 
   // views/react/server-file-editor.jsx
-  var import_jsx_runtime6 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime7 = __toESM(require_jsx_runtime());
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
   var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-file-editor";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
@@ -8752,9 +8847,9 @@
     return monacoLoadPromise;
   }
   function FileTreeItem({ item, currentPath, onFileSwitch, serverId, depth = 0 }) {
-    const [isExpanded, setIsExpanded] = (0, import_react6.useState)(false);
-    const [children, setChildren] = (0, import_react6.useState)([]);
-    const [loading, setLoading] = (0, import_react6.useState)(false);
+    const [isExpanded, setIsExpanded] = (0, import_react7.useState)(false);
+    const [children, setChildren] = (0, import_react7.useState)([]);
+    const [loading, setLoading] = (0, import_react7.useState)(false);
     const fullPath = (item.directory === "/" ? "" : item.directory) + "/" + item.name;
     const isActive = fullPath === currentPath;
     const handleClick = async () => {
@@ -8785,23 +8880,23 @@
         }
       }
     };
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
         "div",
         {
           onClick: handleClick,
           style: { paddingLeft: `${depth * 14 + 10}px` },
           className: `flex items-center gap-2 py-[5px] pr-2 cursor-pointer rounded transition-colors select-none text-[12px] ${isActive ? "bg-primary-900/30 text-primary-300 font-semibold" : "hover:bg-neutral-800/50 text-neutral-400 hover:text-neutral-200"}`,
           children: [
-            item.isDirectory ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: `bi ${isExpanded ? "bi-chevron-down text-[9px] text-neutral-500" : "bi-chevron-right text-[9px] text-neutral-500"} w-3 shrink-0` }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "w-3 shrink-0" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: `bi ${item.isDirectory ? isExpanded ? "bi-folder2-open text-amber-400/80" : "bi-folder-fill text-amber-500/70" : "bi-file-earmark-text text-neutral-500"} shrink-0` }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "truncate min-w-0 flex-1", children: item.name }),
-            loading && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-2 h-2 border border-t-primary-500 border-neutral-700 rounded-full animate-spin shrink-0" })
+            item.isDirectory ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: `bi ${isExpanded ? "bi-chevron-down text-[9px] text-neutral-500" : "bi-chevron-right text-[9px] text-neutral-500"} w-3 shrink-0` }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "w-3 shrink-0" }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: `bi ${item.isDirectory ? isExpanded ? "bi-folder2-open text-amber-400/80" : "bi-folder-fill text-amber-500/70" : "bi-file-earmark-text text-neutral-500"} shrink-0` }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "truncate min-w-0 flex-1", children: item.name }),
+            loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-2 h-2 border border-t-primary-500 border-neutral-700 rounded-full animate-spin shrink-0" })
           ]
         }
       ),
-      item.isDirectory && isExpanded && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
-        children.map((child) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+      item.isDirectory && isExpanded && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
+        children.map((child) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
           FileTreeItem,
           {
             item: { ...child, directory: fullPath },
@@ -8812,7 +8907,7 @@
           },
           `${fullPath}/${child.name}`
         )),
-        children.length === 0 && !loading && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { style: { paddingLeft: `${(depth + 1) * 14 + 23}px` }, className: "text-[10px] text-neutral-600 italic py-1", children: "empty" })
+        children.length === 0 && !loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { style: { paddingLeft: `${(depth + 1) * 14 + 23}px` }, className: "text-[10px] text-neutral-600 italic py-1", children: "empty" })
       ] })
     ] });
   }
@@ -8823,24 +8918,24 @@
     const fileName = filePath.split("/").pop() || "file";
     const parentPath = filePath.split("/").slice(0, -1).join("/") || "/";
     const language = detectLanguage(fileName);
-    const [content, setContent] = (0, import_react6.useState)("");
-    const [loading, setLoading] = (0, import_react6.useState)(true);
-    const [saving, setSaving] = (0, import_react6.useState)(false);
-    const [status, setStatus] = (0, import_react6.useState)({ type: "idle", message: "" });
-    const [isUnsaved, setIsUnsaved] = (0, import_react6.useState)(false);
-    const [editorMode, setEditorMode] = (0, import_react6.useState)("monaco");
-    const [sidebarOpen, setSidebarOpen] = (0, import_react6.useState)(true);
-    const [wordWrap, setWordWrap] = (0, import_react6.useState)(false);
-    const [rootFiles, setRootFiles] = (0, import_react6.useState)([]);
-    const [rootLoading, setRootLoading] = (0, import_react6.useState)(false);
-    const [monacoReady, setMonacoReady] = (0, import_react6.useState)(false);
-    const [cursorInfo, setCursorInfo] = (0, import_react6.useState)({ line: 1, col: 1 });
-    const editorContainerRef = (0, import_react6.useRef)(null);
-    const monacoEditorRef = (0, import_react6.useRef)(null);
-    const monacoRef = (0, import_react6.useRef)(null);
-    const contentRef = (0, import_react6.useRef)(content);
+    const [content, setContent] = (0, import_react7.useState)("");
+    const [loading, setLoading] = (0, import_react7.useState)(true);
+    const [saving, setSaving] = (0, import_react7.useState)(false);
+    const [status, setStatus] = (0, import_react7.useState)({ type: "idle", message: "" });
+    const [isUnsaved, setIsUnsaved] = (0, import_react7.useState)(false);
+    const [editorMode, setEditorMode] = (0, import_react7.useState)("monaco");
+    const [sidebarOpen, setSidebarOpen] = (0, import_react7.useState)(true);
+    const [wordWrap, setWordWrap] = (0, import_react7.useState)(false);
+    const [rootFiles, setRootFiles] = (0, import_react7.useState)([]);
+    const [rootLoading, setRootLoading] = (0, import_react7.useState)(false);
+    const [monacoReady, setMonacoReady] = (0, import_react7.useState)(false);
+    const [cursorInfo, setCursorInfo] = (0, import_react7.useState)({ line: 1, col: 1 });
+    const editorContainerRef = (0, import_react7.useRef)(null);
+    const monacoEditorRef = (0, import_react7.useRef)(null);
+    const monacoRef = (0, import_react7.useRef)(null);
+    const contentRef = (0, import_react7.useRef)(content);
     contentRef.current = content;
-    (0, import_react6.useEffect)(() => {
+    (0, import_react7.useEffect)(() => {
       let cancelled = false;
       setLoading(true);
       setStatus({ type: "idle", message: "" });
@@ -8879,7 +8974,7 @@
         cancelled = true;
       };
     }, [server.containerId, filePath]);
-    (0, import_react6.useEffect)(() => {
+    (0, import_react7.useEffect)(() => {
       if (editorMode !== "monaco" || loading) return;
       if (!editorContainerRef.current) return;
       let destroyed = false;
@@ -8933,12 +9028,12 @@
         destroyed = true;
       };
     }, [editorMode, loading]);
-    (0, import_react6.useEffect)(() => {
+    (0, import_react7.useEffect)(() => {
       if (monacoEditorRef.current) {
         monacoEditorRef.current.updateOptions({ wordWrap: wordWrap ? "on" : "off" });
       }
     }, [wordWrap]);
-    const handleSave = (0, import_react6.useCallback)(async () => {
+    const handleSave = (0, import_react7.useCallback)(async () => {
       if (saving || loading || pageData.editWriteLocked) return;
       const valueToSave = monacoEditorRef.current ? monacoEditorRef.current.getValue() : contentRef.current;
       setSaving(true);
@@ -8961,7 +9056,7 @@
         setSaving(false);
       }
     }, [saving, loading, pageData.editWriteLocked, server.containerId, filePath]);
-    const handleSaveRef = (0, import_react6.useRef)(handleSave);
+    const handleSaveRef = (0, import_react7.useRef)(handleSave);
     handleSaveRef.current = handleSave;
     const handleFileSwitch = (newPath) => {
       if (newPath === filePath) return;
@@ -8978,7 +9073,7 @@
       }
       setEditorMode(mode);
     };
-    (0, import_react6.useEffect)(() => {
+    (0, import_react7.useEffect)(() => {
       const handler = (e) => {
         if (isUnsaved) {
           e.preventDefault();
@@ -8988,7 +9083,7 @@
       window.addEventListener("beforeunload", handler);
       return () => window.removeEventListener("beforeunload", handler);
     }, [isUnsaved]);
-    (0, import_react6.useEffect)(() => {
+    (0, import_react7.useEffect)(() => {
       const handler = (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === "s") {
           e.preventDefault();
@@ -9000,42 +9095,42 @@
     }, []);
     const lineCount = content.split("\n").length;
     const charCount = content.length;
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ReactAppShell, { pageData, subtitle: `Editing ${fileName}`, children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ReactAppShell, { pageData, subtitle: `Editing ${fileName}`, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
       "div",
       {
         className: "flex flex-col bg-[#0d0f12] rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden",
         style: { height: "calc(100vh - 140px)", minHeight: "520px" },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-900/90 backdrop-blur-md px-4 py-2.5 border-b border-neutral-800 flex items-center justify-between shrink-0 gap-4 flex-wrap", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-3 min-w-0", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "bg-neutral-900/90 backdrop-blur-md px-4 py-2.5 border-b border-neutral-800 flex items-center justify-between shrink-0 gap-4 flex-wrap", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-3 min-w-0", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
                 "a",
                 {
                   href: `/server/${server.containerId}/files?path=${encodeURIComponent(parentPath)}`,
                   className: "flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors shrink-0",
                   children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-arrow-left" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-arrow-left" }),
                     " Files"
                   ]
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-px h-4 bg-neutral-800 shrink-0" }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-2 min-w-0", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-file-earmark-code text-neutral-500 shrink-0" }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-sm font-bold text-neutral-200 truncate font-mono", children: fileName }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-[10px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-500 font-mono shrink-0", children: language })
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-px h-4 bg-neutral-800 shrink-0" }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-2 min-w-0", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-file-earmark-code text-neutral-500 shrink-0" }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-sm font-bold text-neutral-200 truncate font-mono", children: fileName }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-[10px] px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-500 font-mono shrink-0", children: language })
               ] }),
-              isUnsaved && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "flex items-center gap-1 text-[10px] font-black text-amber-500 uppercase tracking-widest shrink-0", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" }),
+              isUnsaved && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "flex items-center gap-1 text-[10px] font-black text-amber-500 uppercase tracking-widest shrink-0", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" }),
                 " Unsaved"
               ] }),
-              pageData.editWriteLocked && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "flex items-center gap-1 text-[10px] font-black text-red-400 uppercase tracking-widest shrink-0", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-lock-fill" }),
+              pageData.editWriteLocked && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "flex items-center gap-1 text-[10px] font-black text-red-400 uppercase tracking-widest shrink-0", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-lock-fill" }),
                 " Read Only"
               ] })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-2 shrink-0 flex-wrap", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex items-center bg-neutral-950 border border-neutral-800 rounded-lg p-0.5 gap-0.5", children: ["monaco", "plain"].map((m) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-2 shrink-0 flex-wrap", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex items-center bg-neutral-950 border border-neutral-800 rounded-lg p-0.5 gap-0.5", children: ["monaco", "plain"].map((m) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                 "button",
                 {
                   onClick: () => switchMode(m),
@@ -9044,54 +9139,54 @@
                 },
                 m
               )) }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
                 "button",
                 {
                   onClick: () => setSidebarOpen((v) => !v),
                   className: `flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border transition-all ${sidebarOpen ? "border-primary-700/50 bg-primary-900/20 text-primary-400" : "border-neutral-800 text-neutral-500 hover:text-white hover:border-neutral-700"}`,
                   children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: `bi ${sidebarOpen ? "bi-layout-sidebar-inset" : "bi-layout-sidebar"}` }),
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: `bi ${sidebarOpen ? "bi-layout-sidebar-inset" : "bi-layout-sidebar"}` }),
                     " Tree"
                   ]
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
                 "button",
                 {
                   onClick: () => setWordWrap((v) => !v),
                   className: `flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border transition-all ${wordWrap ? "border-primary-700/50 bg-primary-900/20 text-primary-400" : "border-neutral-800 text-neutral-500 hover:text-white hover:border-neutral-700"}`,
                   children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-text-wrap" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-text-wrap" }),
                     " Wrap"
                   ]
                 }
               ),
-              status.message && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: `text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${status.type === "error" ? "text-red-400 border-red-900/30 bg-red-950/20" : "text-green-400 border-green-900/30 bg-green-950/20"}`, children: [
-                status.type === "error" ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-exclamation-triangle me-1" }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-check-circle me-1" }),
+              status.message && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: `text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${status.type === "error" ? "text-red-400 border-red-900/30 bg-red-950/20" : "text-green-400 border-green-900/30 bg-green-950/20"}`, children: [
+                status.type === "error" ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-exclamation-triangle me-1" }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-check-circle me-1" }),
                 status.message
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
                 "button",
                 {
                   onClick: handleSave,
                   disabled: saving || loading || Boolean(pageData.editWriteLocked),
                   className: `flex items-center gap-2 px-5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${saving || loading || pageData.editWriteLocked ? "bg-neutral-800 text-neutral-600 cursor-not-allowed" : "bg-primary-600 hover:bg-primary-500 text-white shadow-lg shadow-primary-900/30"}`,
                   children: [
-                    saving ? /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-cloud-arrow-up" }),
+                    saving ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-cloud-arrow-up" }),
                     saving ? "Saving\u2026" : "Save"
                   ]
                 }
               )
             ] })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1 flex overflow-hidden", children: [
-            sidebarOpen && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "w-60 bg-[#0a0c0f] border-r border-neutral-800 flex flex-col shrink-0 overflow-hidden", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "px-3 py-2.5 border-b border-neutral-800/50 flex items-center justify-between", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-[9px] font-black text-neutral-500 uppercase tracking-widest", children: "Explorer" }),
-                rootLoading && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-2.5 h-2.5 border border-t-primary-500 border-neutral-700 rounded-full animate-spin" })
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex-1 flex overflow-hidden", children: [
+            sidebarOpen && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "w-60 bg-[#0a0c0f] border-r border-neutral-800 flex flex-col shrink-0 overflow-hidden", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "px-3 py-2.5 border-b border-neutral-800/50 flex items-center justify-between", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-[9px] font-black text-neutral-500 uppercase tracking-widest", children: "Explorer" }),
+                rootLoading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-2.5 h-2.5 border border-t-primary-500 border-neutral-700 rounded-full animate-spin" })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1 overflow-y-auto py-1.5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-neutral-800", children: [
-                rootFiles.map((file) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex-1 overflow-y-auto py-1.5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-neutral-800", children: [
+                rootFiles.map((file) => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                   FileTreeItem,
                   {
                     item: { ...file, directory: "/" },
@@ -9101,16 +9196,16 @@
                   },
                   file.name
                 )),
-                rootFiles.length === 0 && !rootLoading && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "p-4 text-center text-[10px] text-neutral-600 uppercase tracking-widest", children: "No files" })
+                rootFiles.length === 0 && !rootLoading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "p-4 text-center text-[10px] text-neutral-600 uppercase tracking-widest", children: "No files" })
               ] })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1 relative overflow-hidden", children: [
-              loading && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "absolute inset-0 flex items-center justify-center bg-[#0d0f12] z-20", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-col items-center gap-4", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-12 h-12 border-4 border-neutral-800 border-t-primary-500 rounded-full animate-spin" }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-[10px] font-black text-neutral-500 uppercase tracking-widest", children: "Loading Buffer\u2026" })
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex-1 relative overflow-hidden", children: [
+              loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "absolute inset-0 flex items-center justify-center bg-[#0d0f12] z-20", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex flex-col items-center gap-4", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-12 h-12 border-4 border-neutral-800 border-t-primary-500 rounded-full animate-spin" }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-[10px] font-black text-neutral-500 uppercase tracking-widest", children: "Loading Buffer\u2026" })
               ] }) }),
-              editorMode === "monaco" && !loading && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { ref: editorContainerRef, className: "absolute inset-0" }),
-              editorMode === "plain" && !loading && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+              editorMode === "monaco" && !loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { ref: editorContainerRef, className: "absolute inset-0" }),
+              editorMode === "plain" && !loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                 "textarea",
                 {
                   value: content,
@@ -9127,31 +9222,31 @@
               )
             ] })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-900/50 px-5 py-1.5 border-t border-neutral-800 flex justify-between items-center text-[10px] font-mono text-neutral-600 shrink-0", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-4", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { children: language }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "bg-neutral-900/50 px-5 py-1.5 border-t border-neutral-800 flex justify-between items-center text-[10px] font-mono text-neutral-600 shrink-0", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-4", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { children: language }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { children: [
                 charCount.toLocaleString(),
                 " chars"
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { children: [
                 lineCount.toLocaleString(),
                 " lines"
               ] }),
-              editorMode === "monaco" && monacoReady && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { children: [
+              editorMode === "monaco" && monacoReady && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { children: [
                 "Ln ",
                 cursorInfo.line,
                 ", Col ",
                 cursorInfo.col
               ] })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-center gap-3", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { children: "UTF-8" }),
-              editorMode === "monaco" && /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("span", { className: "text-primary-600", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-3", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { children: "UTF-8" }),
+              editorMode === "monaco" && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "text-primary-600", children: [
                 "Monaco ",
                 isUnsaved ? "\u25CF" : "\u25CB"
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { children: "Ctrl+S to save" })
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { children: "Ctrl+S to save" })
             ] })
           ] })
         ]
@@ -9160,7 +9255,7 @@
   }
   var server_file_editor_default = ServerFileEditorPage;
   if (root) {
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ServerFileEditorPage, { pageData: data }));
+    root.render(/* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ServerFileEditorPage, { pageData: data }));
     if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
       window.__CPANEL_REACT_BOOTED__();
     }

@@ -5,6 +5,7 @@ import ProvisioningBarrier from './ProvisioningBarrier.jsx';
 import GlobalStatusModal from './GlobalStatusModal.jsx';
 import NotificationBell from './NotificationBell.jsx';
 import GlobalSearch from './GlobalSearch.jsx';
+import ServerNavbar from './ServerNavbar.jsx';
 
 function InternalTopAction({ to, icon, title }) {
     return (
@@ -51,10 +52,6 @@ export default function ReactAppShell({
     ];
 
     const isProvisioning = ['installing', 'reinstalling'].includes(pageData.server?.status);
-    const currentPath = window.location.pathname;
-    const isConsolePage = currentPath.endsWith('/console') || currentPath.endsWith(pageData.server?.containerId);
-    
-    // Pages that should be blocked during installation
     const blockedPageKeys = ['files', 'backups', 'dbs', 'network', 'users', 'api', 'schedules', 'startup', 'timeline'];
     const activeNavItem = serverNavItems.find(item => item.active);
     const shouldBlock = isProvisioning && activeNavItem && blockedPageKeys.includes(activeNavItem.key);
@@ -143,43 +140,8 @@ export default function ReactAppShell({
                 </div>
             )}
 
-            {/* Server Deep Navigation */}
-            {serverNavItems.length > 0 && (
-                <nav className="bg-neutral-800/55 border-b border-neutral-700/50 flex flex-row overflow-x-auto no-scrollbar px-4 lg:px-8 py-0 md:py-0 w-full whitespace-nowrap scroll-smooth">
-                    {[
-                        { name: 'Home', keys: ['overview', 'console', 'activity'] },
-                        { name: 'Data', keys: ['files', 'backups', 'dbs'] },
-                        { name: 'Access', keys: ['network', 'users', 'api', 'schedules'] },
-                        { name: 'Special', keys: ['mccenter', 'mcinstaller'] },
-                        { name: 'Config', keys: ['startup', 'timeline'] }
-                    ].map((group) => {
-                        const groupItems = serverNavItems.filter(item => group.keys.includes(item.key));
-                        if (groupItems.length === 0) return null;
-
-                        return (
-                            <div key={group.name} className="flex items-center group/navgroup shrink-0 h-12">
-                                <div className="hidden lg:block h-3 w-px bg-neutral-700 mx-1 first:hidden opacity-50"></div>
-                                <div className="flex items-center">
-                                    {groupItems.map((item) => {
-                                        const isDisabled = isProvisioning && blockedPageKeys.includes(item.key);
-                                        return (
-                                            <a 
-                                                key={item.href} 
-                                                href={isDisabled ? '#' : item.href}
-                                                onClick={isDisabled ? (e) => e.preventDefault() : undefined}
-                                                className={`px-3 py-4 text-[11px] font-black uppercase tracking-widest whitespace-nowrap transition-all border-b-2 flex items-center h-full ${isDisabled ? 'text-neutral-700 border-transparent cursor-not-allowed grayscale' : (item.active ? 'text-primary-400 border-primary-500 bg-primary-500/5' : 'text-neutral-500 border-transparent hover:text-neutral-300 hover:translate-y-[-1px]')}`}
-                                            >
-                                                {item.label}
-                                                {isDisabled && <i className="bi bi-lock-fill ms-2 text-[8px] opacity-40"></i>}
-                                            </a>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </nav>
-            )}
+            {/* Server Deep Navigation — delegated to ServerNavbar */}
+            {serverNavItems.length > 0 && <ServerNavbar pageData={pageData} />}
 
             {/* Main Content Area */}
             <main className="flex-1 w-full bg-neutral-900">
