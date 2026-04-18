@@ -7280,7 +7280,7 @@
   });
 
   // views/react/server-minecraft-admin.jsx
-  var import_react6 = __toESM(require_react());
+  var import_react7 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // node_modules/react-router-dom/dist/index.js
@@ -8332,7 +8332,7 @@
   }
 
   // views/react/components/ReactAppShell.jsx
-  var import_react4 = __toESM(require_react());
+  var import_react5 = __toESM(require_react());
 
   // views/react/ReactRoutes.js
   var ReactRoutes = {
@@ -8724,23 +8724,112 @@
     ] });
   }
 
-  // views/react/components/ReactAppShell.jsx
+  // views/react/components/GlobalSearch.jsx
+  var import_react4 = __toESM(require_react());
   var import_jsx_runtime4 = __toESM(require_jsx_runtime());
+  function GlobalSearch() {
+    const [isOpen, setIsOpen] = (0, import_react4.useState)(false);
+    const [query, setQuery] = (0, import_react4.useState)("");
+    const inputRef = (0, import_react4.useRef)(null);
+    const containerRef = (0, import_react4.useRef)(null);
+    (0, import_react4.useEffect)(() => {
+      if (window.location.pathname === "/") {
+        const params = new URLSearchParams(window.location.search);
+        const sq = params.get("search");
+        if (sq) {
+          setQuery(sq);
+          setIsOpen(true);
+        }
+      }
+    }, []);
+    (0, import_react4.useEffect)(() => {
+      if (window.location.pathname === "/") {
+        window.dispatchEvent(new CustomEvent("dashboard-search", { detail: query }));
+      }
+    }, [query]);
+    (0, import_react4.useEffect)(() => {
+      function handleClickOutside(event) {
+        if (containerRef.current && !containerRef.current.contains(event.target)) {
+          if (!query) setIsOpen(false);
+        }
+      }
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [query]);
+    const handleToggle = () => {
+      if (isOpen && !query) {
+        setIsOpen(false);
+      } else {
+        setIsOpen(true);
+        setTimeout(() => inputRef.current?.focus(), 50);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === "Enter") {
+        if (window.location.pathname !== "/") {
+          window.location.href = `/?search=${encodeURIComponent(query)}`;
+        } else {
+          inputRef.current?.blur();
+        }
+      } else if (e.key === "Escape") {
+        setQuery("");
+        setIsOpen(false);
+      }
+    };
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { ref: containerRef, className: `relative flex items-center transition-all duration-300 ease-in-out ${isOpen ? "w-48 sm:w-64" : "w-10"}`, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        "button",
+        {
+          type: "button",
+          onClick: handleToggle,
+          className: `absolute left-0 z-10 w-10 h-10 flex items-center justify-center transition-colors ${isOpen ? "text-primary-400" : "text-neutral-400 hover:text-neutral-100 hover:bg-neutral-700/50 rounded-full"}`,
+          children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("i", { className: "bi bi-search" })
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        "input",
+        {
+          ref: inputRef,
+          type: "text",
+          placeholder: "Search servers...",
+          value: query,
+          onChange: (e) => setQuery(e.target.value),
+          onKeyDown: handleKeyDown,
+          className: `w-full bg-neutral-800 border transition-all duration-300 h-10 py-2 pl-10 pr-4 text-sm text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 ${isOpen ? "border-neutral-700 rounded-xl opacity-100" : "border-transparent rounded-full opacity-0 pointer-events-none bg-transparent"}`
+        }
+      ),
+      isOpen && query && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        "button",
+        {
+          type: "button",
+          onClick: () => {
+            setQuery("");
+            inputRef.current?.focus();
+          },
+          className: "absolute right-3 text-neutral-500 hover:text-neutral-300",
+          children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("i", { className: "bi bi-x-circle-fill text-[11px]" })
+        }
+      )
+    ] });
+  }
+
+  // views/react/components/ReactAppShell.jsx
+  var import_jsx_runtime5 = __toESM(require_jsx_runtime());
   function InternalTopAction({ to, icon, title }) {
-    return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
       NavLink,
       {
         to,
         title,
         className: ({ isActive }) => `text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700 ${isActive ? "text-neutral-100 bg-neutral-700" : ""}`,
-        children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("i", { className: `bi ${icon}` })
+        children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: `bi ${icon}` })
       }
     );
   }
   function PrimaryNavLink({ to, label }) {
     const currentPath = window.location.pathname;
     const isActive = currentPath === to || to !== "/" && currentPath.startsWith(to);
-    return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
       "a",
       {
         href: to,
@@ -8758,7 +8847,7 @@
   }) {
     const brandImage = resolveBrandImage(pageData);
     const userAvatar = resolveUserAvatar(pageData.user || {}, brandImage);
-    const [mobileNavOpen, setMobileNavOpen] = import_react4.default.useState(false);
+    const [mobileNavOpen, setMobileNavOpen] = import_react5.default.useState(false);
     const serverNavItems = Array.isArray(pageData.serverNavItems) ? pageData.serverNavItems : [];
     const shellNavItems = [
       { to: ReactRoutes.dashboard, label: "Dashboard" },
@@ -8770,43 +8859,45 @@
     const blockedPageKeys = ["files", "backups", "dbs", "network", "users", "api", "schedules", "startup", "timeline"];
     const activeNavItem = serverNavItems.find((item) => item.active);
     const shouldBlock = isProvisioning && activeNavItem && blockedPageKeys.includes(activeNavItem.key);
-    return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: `min-h-screen bg-neutral-900 text-neutral-200 flex flex-col ${pageClassName || ""}`, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "bg-neutral-800 border-b border-neutral-700 w-full flex items-center justify-between px-4 lg:px-8 h-16 shrink-0", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "flex items-center gap-4", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("img", { src: brandImage, alt: pageData.brandName || "CPanel", className: "w-8 h-8 rounded shrink-0" }),
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "text-lg font-bold text-neutral-100 leading-tight", children: pageData.brandName || "CPanel" }),
-            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "text-xs text-neutral-400 font-semibold", children: subtitle })
+    return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: `min-h-screen bg-neutral-900 text-neutral-200 flex flex-col ${pageClassName || ""}`, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "bg-neutral-800 border-b border-neutral-700 w-full flex items-center justify-between px-4 lg:px-8 h-16 shrink-0", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center gap-4", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("img", { src: brandImage, alt: pageData.brandName || "CPanel", className: "w-8 h-8 rounded shrink-0" }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "text-lg font-bold text-neutral-100 leading-tight", children: pageData.brandName || "CPanel" }),
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "text-xs text-neutral-400 font-semibold", children: subtitle })
           ] })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("nav", { className: "hidden md:flex items-center h-full ml-10 flex-1", children: [
-          shellNavItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(PrimaryNavLink, { to: item.to, label: item.label }, item.to)),
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "flex-1" })
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("nav", { className: "hidden md:flex items-center h-full ml-10 flex-1", children: [
+          shellNavItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(PrimaryNavLink, { to: item.to, label: item.label }, item.to)),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex-1" })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "flex items-center gap-3 md:gap-4 shrink-0", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center gap-3 md:gap-4 shrink-0", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
             "button",
             {
               type: "button",
               className: "md:hidden text-neutral-400 hover:text-neutral-100 p-2",
               title: "Toggle navigation",
               onClick: () => setMobileNavOpen(!mobileNavOpen),
-              children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("i", { className: "bi bi-list text-2xl" })
+              children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: "bi bi-list text-2xl" })
             }
           ),
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "hidden md:flex items-center gap-2", children: [
-            pageData.user?.isAdmin && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("a", { className: "text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700", href: ReactRoutes.admin, title: "Admin Area", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("i", { className: "bi bi-gear-fill" }) }),
-              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(InternalTopAction, { to: ReactRoutes.connectorsCheck, icon: "bi-cpu", title: "Connectors Check" })
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "hidden md:flex items-center gap-2", children: [
+            pageData.user?.isAdmin && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("a", { className: "text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700", href: ReactRoutes.admin, title: "Admin Area", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: "bi bi-gear-fill" }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(InternalTopAction, { to: ReactRoutes.connectorsCheck, icon: "bi-cpu", title: "Connectors Check" })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(NotificationBell, {}),
-            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "h-6 w-px bg-neutral-700 mx-2" }),
-            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(InternalTopAction, { to: ReactRoutes.experimentalFeatures, icon: "bi-sliders", title: "Experimental Features" }),
-            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("a", { className: "text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700", href: ReactRoutes.changeView, title: "Exit Beta", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("i", { className: "bi bi-door-open" }) })
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "h-6 w-px bg-neutral-700 mx-1" }),
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(GlobalSearch, {}),
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(NotificationBell, {}),
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "h-6 w-px bg-neutral-700 mx-2" }),
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(InternalTopAction, { to: ReactRoutes.experimentalFeatures, icon: "bi-sliders", title: "Experimental Features" }),
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("a", { className: "text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700", href: ReactRoutes.changeView, title: "Exit Beta", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: "bi bi-door-open" }) })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "flex items-center gap-3 pl-4 border-l border-neutral-700", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "text-sm font-semibold hidden md:block", children: pageData.user?.username || "Guest" }),
-            /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center gap-3 pl-4 border-l border-neutral-700", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-sm font-semibold hidden md:block", children: pageData.user?.username || "Guest" }),
+            /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
               "img",
               {
                 src: userAvatar,
@@ -8817,8 +8908,8 @@
           ] })
         ] })
       ] }),
-      mobileNavOpen && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "md:hidden bg-neutral-800 border-b border-neutral-700 flex flex-col", children: [
-        shellNavItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
+      mobileNavOpen && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "md:hidden bg-neutral-800 border-b border-neutral-700 flex flex-col", children: [
+        shellNavItems.map((item) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
           NavLink,
           {
             to: item.to,
@@ -8827,9 +8918,9 @@
           },
           item.to
         )),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(NavLink, { to: ReactRoutes.changeView, className: "px-4 py-3 text-sm font-semibold border-l-4 border-transparent text-neutral-400 hover:text-white", children: "Exit Beta Mode" })
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(NavLink, { to: ReactRoutes.changeView, className: "px-4 py-3 text-sm font-semibold border-l-4 border-transparent text-neutral-400 hover:text-white", children: "Exit Beta Mode" })
       ] }),
-      serverNavItems.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("nav", { className: "bg-neutral-800/55 border-b border-neutral-700/50 flex flex-row overflow-x-auto no-scrollbar px-4 lg:px-8 py-0 md:py-0 w-full whitespace-nowrap scroll-smooth", children: [
+      serverNavItems.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("nav", { className: "bg-neutral-800/55 border-b border-neutral-700/50 flex flex-row overflow-x-auto no-scrollbar px-4 lg:px-8 py-0 md:py-0 w-full whitespace-nowrap scroll-smooth", children: [
         { name: "Home", keys: ["overview", "console", "activity"] },
         { name: "Data", keys: ["files", "backups", "dbs"] },
         { name: "Access", keys: ["network", "users", "api", "schedules"] },
@@ -8838,11 +8929,11 @@
       ].map((group) => {
         const groupItems = serverNavItems.filter((item) => group.keys.includes(item.key));
         if (groupItems.length === 0) return null;
-        return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "flex items-center group/navgroup shrink-0 h-12", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "hidden lg:block h-3 w-px bg-neutral-700 mx-1 first:hidden opacity-50" }),
-          /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "flex items-center", children: groupItems.map((item) => {
+        return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center group/navgroup shrink-0 h-12", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "hidden lg:block h-3 w-px bg-neutral-700 mx-1 first:hidden opacity-50" }),
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex items-center", children: groupItems.map((item) => {
             const isDisabled = isProvisioning && blockedPageKeys.includes(item.key);
-            return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+            return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
               "a",
               {
                 href: isDisabled ? "#" : item.href,
@@ -8850,7 +8941,7 @@
                 className: `px-3 py-4 text-[11px] font-black uppercase tracking-widest whitespace-nowrap transition-all border-b-2 flex items-center h-full ${isDisabled ? "text-neutral-700 border-transparent cursor-not-allowed grayscale" : item.active ? "text-primary-400 border-primary-500 bg-primary-500/5" : "text-neutral-500 border-transparent hover:text-neutral-300 hover:translate-y-[-1px]"}`,
                 children: [
                   item.label,
-                  isDisabled && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("i", { className: "bi bi-lock-fill ms-2 text-[8px] opacity-40" })
+                  isDisabled && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: "bi bi-lock-fill ms-2 text-[8px] opacity-40" })
                 ]
               },
               item.href
@@ -8858,11 +8949,11 @@
           }) })
         ] }, group.name);
       }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("main", { className: "flex-1 w-full bg-neutral-900", children: shouldBlock ? /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(ProvisioningBarrier, { status: pageData.server.status, containerId: pageData.server.containerId }) : children }),
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(GlobalStatusModal, {}),
-      /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("footer", { className: "w-full py-8 border-t border-neutral-800 bg-neutral-900 mt-auto", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "px-4 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "flex items-center gap-3", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("span", { className: "text-xs font-black text-neutral-100 uppercase tracking-[0.2em] opacity-80", children: "CPanel Rocky \xA9 2026" }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("main", { className: "flex-1 w-full bg-neutral-900", children: shouldBlock ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(ProvisioningBarrier, { status: pageData.server.status, containerId: pageData.server.containerId }) : children }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(GlobalStatusModal, {}),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("footer", { className: "w-full py-8 border-t border-neutral-800 bg-neutral-900 mt-auto", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "px-4 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex items-center gap-3", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-xs font-black text-neutral-100 uppercase tracking-[0.2em] opacity-80", children: "CPanel Rocky \xA9 2026" }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { children: /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(
           "a",
           {
             href: "https://github.com/mihai209",
@@ -8870,7 +8961,7 @@
             rel: "noopener noreferrer",
             className: "text-[10px] font-bold text-neutral-500 hover:text-primary-400 transition-colors uppercase tracking-[0.1em] flex items-center gap-2",
             children: [
-              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("i", { className: "bi bi-github" }),
+              /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: "bi bi-github" }),
               "mihai209(github.com/mihai209)"
             ]
           }
@@ -8880,22 +8971,22 @@
   }
 
   // views/react/components/PageContentBlock.jsx
-  var import_react5 = __toESM(require_react());
-  var import_jsx_runtime5 = __toESM(require_jsx_runtime());
+  var import_react6 = __toESM(require_react());
+  var import_jsx_runtime6 = __toESM(require_jsx_runtime());
   function PageContentBlock({ title, children, className = "" }) {
-    import_react5.default.useEffect(() => {
+    import_react6.default.useEffect(() => {
       if (title) {
         document.title = `${title} - CPanel`;
       }
     }, [title]);
-    return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: `w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 ${className}`, children: [
-      title && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "mb-6 flex justify-between items-center", children: /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("h1", { className: "text-2xl font-bold text-neutral-100", children: title }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "w-full", children })
+    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: `w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 ${className}`, children: [
+      title && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "mb-6 flex justify-between items-center", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h1", { className: "text-2xl font-bold text-neutral-100", children: title }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-full", children })
     ] });
   }
 
   // views/react/server-minecraft-admin.jsx
-  var import_jsx_runtime6 = __toESM(require_jsx_runtime());
+  var import_jsx_runtime7 = __toESM(require_jsx_runtime());
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
   var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-minecraft-admin";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
@@ -8905,26 +8996,26 @@
       minecraftAdminPermissions = {},
       minecraftAdminRecentEvents = []
     } = pageData;
-    const [searchQuery, setSearchQuery] = (0, import_react6.useState)("");
-    const [selectedPlayer, setSelectedPlayer] = (0, import_react6.useState)(null);
+    const [searchQuery, setSearchQuery] = (0, import_react7.useState)("");
+    const [selectedPlayer, setSelectedPlayer] = (0, import_react7.useState)(null);
     const players = [
       { name: "Notch", uuid: "069a79f4-44e9-4726-a5be-fca90e38aaf5", isOnline: true },
       { name: "Jeb_", uuid: "853c80ef-3c37-49fd-aa49-938b674adae6", isOnline: false }
     ];
     const filteredPlayers = players.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ReactAppShell, { pageData, subtitle: "Admin & Control", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ReactAppShell, { pageData, subtitle: "Admin & Control", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
       PageContentBlock,
       {
         title: "Admin & Control",
         description: "Live player directory, administrative actions, and instance metrics.",
         eyebrow: "Moderation",
-        children: /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "grid grid-cols-1 xl:grid-cols-12 gap-8", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "xl:col-span-4 flex flex-col h-[800px] bg-neutral-900/60 backdrop-blur-xl border border-neutral-800 rounded-[2rem] shadow-2xl overflow-hidden", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "p-6 border-b border-neutral-800", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h3", { className: "text-sm font-black text-white uppercase tracking-[0.2em] mb-4", children: "Player Directory" }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "relative", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "grid grid-cols-1 xl:grid-cols-12 gap-8", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "xl:col-span-4 flex flex-col h-[800px] bg-neutral-900/60 backdrop-blur-xl border border-neutral-800 rounded-[2rem] shadow-2xl overflow-hidden", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "p-6 border-b border-neutral-800", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h3", { className: "text-sm font-black text-white uppercase tracking-[0.2em] mb-4", children: "Player Directory" }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "relative", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                   "input",
                   {
                     type: "text",
@@ -8936,84 +9027,84 @@
                 )
               ] })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex-1 overflow-y-auto p-4 space-y-2", children: filteredPlayers.map((p) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex-1 overflow-y-auto p-4 space-y-2", children: filteredPlayers.map((p) => /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
               "button",
               {
                 onClick: () => setSelectedPlayer(p),
                 className: `w-full flex items-center gap-4 p-3 rounded-xl transition-all border text-left ${selectedPlayer?.name === p.name ? "bg-primary-600/10 border-primary-500/50" : "bg-transparent border-transparent hover:bg-neutral-800 hover:border-neutral-700"}`,
                 children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("img", { src: `https://mc-heads.net/avatar/${p.uuid}/100.png`, alt: p.name, className: "w-10 h-10 rounded-lg shadow-sm" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1 min-w-0", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "font-bold text-sm text-white truncate", children: p.name }),
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-[10px] text-neutral-500 font-bold uppercase tracking-widest truncate", children: p.uuid })
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("img", { src: `https://mc-heads.net/avatar/${p.uuid}/100.png`, alt: p.name, className: "w-10 h-10 rounded-lg shadow-sm" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex-1 min-w-0", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "font-bold text-sm text-white truncate", children: p.name }),
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-[10px] text-neutral-500 font-bold uppercase tracking-widest truncate", children: p.uuid })
                   ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `w-2 h-2 rounded-full ${p.isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-neutral-600"}` })
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: `w-2 h-2 rounded-full ${p.isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-neutral-600"}` })
                 ]
               },
               p.name
             )) })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "xl:col-span-8 flex flex-col h-[800px]", children: !selectedPlayer ? /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1 flex flex-col items-center justify-center border-2 border-dashed border-neutral-800 rounded-[2rem] text-center p-8", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-person-badge text-6xl text-neutral-800 mb-6" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h3", { className: "text-lg font-black text-white uppercase tracking-widest mb-2", children: "Select a Player" }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-sm text-neutral-500 font-bold max-w-sm leading-relaxed", children: "Choose a player from the directory to inspect their inventory, execute commands, or manage moderation tools." })
-          ] }) : /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1 bg-neutral-900/60 backdrop-blur-xl border border-neutral-800 rounded-[2rem] shadow-2xl p-8 overflow-y-auto", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex items-start gap-6 border-b border-neutral-800 pb-8 mb-8", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("img", { src: `https://mc-heads.net/avatar/${selectedPlayer.uuid}/200.png`, alt: selectedPlayer.name, className: "w-24 h-24 rounded-2xl shadow-xl ring-1 ring-white/10" }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex-1", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h2", { className: "text-2xl font-black text-white tracking-tight mb-1", children: selectedPlayer.name }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("p", { className: "text-xs text-neutral-400 font-mono mb-4 bg-neutral-800 inline-block px-3 py-1 rounded-md", children: selectedPlayer.uuid }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex flex-wrap gap-2", children: [
-                  minecraftAdminPermissions.kick && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { className: "px-5 py-2 bg-neutral-800 hover:bg-rose-600/20 hover:text-rose-400 text-neutral-300 rounded-lg text-xs font-black uppercase tracking-widest transition-all", children: "Kick" }),
-                  minecraftAdminPermissions.ban && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { className: "px-5 py-2 bg-rose-600/10 text-rose-500 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-black uppercase tracking-widest transition-all border border-rose-600/20", children: "Ban" }),
-                  minecraftAdminPermissions.op && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("button", { className: "px-5 py-2 bg-primary-600/10 text-primary-500 hover:bg-primary-600 hover:text-white rounded-lg text-xs font-black uppercase tracking-widest transition-all border border-primary-600/20", children: "Make Operator" })
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "xl:col-span-8 flex flex-col h-[800px]", children: !selectedPlayer ? /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex-1 flex flex-col items-center justify-center border-2 border-dashed border-neutral-800 rounded-[2rem] text-center p-8", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-person-badge text-6xl text-neutral-800 mb-6" }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h3", { className: "text-lg font-black text-white uppercase tracking-widest mb-2", children: "Select a Player" }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-sm text-neutral-500 font-bold max-w-sm leading-relaxed", children: "Choose a player from the directory to inspect their inventory, execute commands, or manage moderation tools." })
+          ] }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex-1 bg-neutral-900/60 backdrop-blur-xl border border-neutral-800 rounded-[2rem] shadow-2xl p-8 overflow-y-auto", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-start gap-6 border-b border-neutral-800 pb-8 mb-8", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("img", { src: `https://mc-heads.net/avatar/${selectedPlayer.uuid}/200.png`, alt: selectedPlayer.name, className: "w-24 h-24 rounded-2xl shadow-xl ring-1 ring-white/10" }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex-1", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h2", { className: "text-2xl font-black text-white tracking-tight mb-1", children: selectedPlayer.name }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("p", { className: "text-xs text-neutral-400 font-mono mb-4 bg-neutral-800 inline-block px-3 py-1 rounded-md", children: selectedPlayer.uuid }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex flex-wrap gap-2", children: [
+                  minecraftAdminPermissions.kick && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { className: "px-5 py-2 bg-neutral-800 hover:bg-rose-600/20 hover:text-rose-400 text-neutral-300 rounded-lg text-xs font-black uppercase tracking-widest transition-all", children: "Kick" }),
+                  minecraftAdminPermissions.ban && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { className: "px-5 py-2 bg-rose-600/10 text-rose-500 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-black uppercase tracking-widest transition-all border border-rose-600/20", children: "Ban" }),
+                  minecraftAdminPermissions.op && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { className: "px-5 py-2 bg-primary-600/10 text-primary-500 hover:bg-primary-600 hover:text-white rounded-lg text-xs font-black uppercase tracking-widest transition-all border border-primary-600/20", children: "Make Operator" })
                 ] })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: `px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${selectedPlayer.isOnline ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-neutral-800 text-neutral-400 border-neutral-700"}`, children: selectedPlayer.isOnline ? "Online Now" : "Offline" })
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: `px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${selectedPlayer.isOnline ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-neutral-800 text-neutral-400 border-neutral-700"}`, children: selectedPlayer.isOnline ? "Online Now" : "Offline" })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-6", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800/40 rounded-2xl p-6 border border-neutral-800", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("h4", { className: "text-xs font-black text-neutral-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-heart-pulse" }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-6", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "bg-neutral-800/40 rounded-2xl p-6 border border-neutral-800", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("h4", { className: "text-xs font-black text-neutral-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-heart-pulse" }),
                   " Vitals"
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "space-y-4", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between text-xs font-bold mb-1", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-rose-400", children: "Health" }),
-                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-white", children: "20/20" })
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "space-y-4", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-between text-xs font-bold mb-1", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-rose-400", children: "Health" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-white", children: "20/20" })
                     ] }),
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "h-2 rounded-full bg-neutral-900 border border-neutral-800 overflow-hidden", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "h-full bg-rose-500 w-full" }) })
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "h-2 rounded-full bg-neutral-900 border border-neutral-800 overflow-hidden", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "h-full bg-rose-500 w-full" }) })
                   ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between text-xs font-bold mb-1", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-amber-400", children: "Food" }),
-                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-white", children: "20/20" })
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-between text-xs font-bold mb-1", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-amber-400", children: "Food" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-white", children: "20/20" })
                     ] }),
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "h-2 rounded-full bg-neutral-900 border border-neutral-800 overflow-hidden", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "h-full bg-amber-500 w-full" }) })
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "h-2 rounded-full bg-neutral-900 border border-neutral-800 overflow-hidden", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "h-full bg-amber-500 w-full" }) })
                   ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "flex justify-between text-xs font-bold mb-1", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-green-400", children: "Experience Level" }),
-                      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-white", children: "12" })
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-between text-xs font-bold mb-1", children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-green-400", children: "Experience Level" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-white", children: "12" })
                     ] }),
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "h-2 rounded-full bg-neutral-900 border border-neutral-800 overflow-hidden", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "h-full bg-green-500 w-[45%]" }) })
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "h-2 rounded-full bg-neutral-900 border border-neutral-800 overflow-hidden", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "h-full bg-green-500 w-[45%]" }) })
                   ] })
                 ] })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "bg-neutral-800/40 rounded-2xl p-6 border border-neutral-800", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("h4", { className: "text-xs font-black text-neutral-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("i", { className: "bi bi-geo-alt" }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "bg-neutral-800/40 rounded-2xl p-6 border border-neutral-800", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("h4", { className: "text-xs font-black text-neutral-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-geo-alt" }),
                   " Location"
                 ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: "grid grid-cols-2 gap-4", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-[10px] uppercase font-black text-neutral-500 mb-1", children: "World" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-sm font-bold text-white bg-neutral-900 px-3 py-2 rounded-lg border border-neutral-800", children: "world" })
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "grid grid-cols-2 gap-4", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-[10px] uppercase font-black text-neutral-500 mb-1", children: "World" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-sm font-bold text-white bg-neutral-900 px-3 py-2 rounded-lg border border-neutral-800", children: "world" })
                   ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-[10px] uppercase font-black text-neutral-500 mb-1", children: "Coordinates" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "text-sm font-bold text-white bg-neutral-900 px-3 py-2 rounded-lg border border-neutral-800 font-mono", children: "142, 64, -89" })
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-[10px] uppercase font-black text-neutral-500 mb-1", children: "Coordinates" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-sm font-bold text-white bg-neutral-900 px-3 py-2 rounded-lg border border-neutral-800 font-mono", children: "142, 64, -89" })
                   ] })
                 ] })
               ] })
@@ -9026,7 +9117,7 @@
   var server_minecraft_admin_default = ServerMinecraftAdminPage;
   if (root) {
     root.render(
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(BrowserRouter, { children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(ServerMinecraftAdminPage, { pageData: data }) })
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(BrowserRouter, { children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ServerMinecraftAdminPage, { pageData: data }) })
     );
     if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
       window.__CPANEL_REACT_BOOTED__();

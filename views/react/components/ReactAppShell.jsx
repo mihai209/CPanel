@@ -4,6 +4,7 @@ import { ReactRoutes, resolveBrandImage, resolveUserAvatar } from '../ReactRoute
 import ProvisioningBarrier from './ProvisioningBarrier.jsx';
 import GlobalStatusModal from './GlobalStatusModal.jsx';
 import NotificationBell from './NotificationBell.jsx';
+import GlobalSearch from './GlobalSearch.jsx';
 
 function InternalTopAction({ to, icon, title }) {
     return (
@@ -101,6 +102,8 @@ export default function ReactAppShell({
                                 <InternalTopAction to={ReactRoutes.connectorsCheck} icon="bi-cpu" title="Connectors Check" />
                             </>
                         )}
+                        <div className="h-6 w-px bg-neutral-700 mx-1"></div>
+                        <GlobalSearch />
                         <NotificationBell />
                         <div className="h-6 w-px bg-neutral-700 mx-2"></div>
                         <InternalTopAction to={ReactRoutes.experimentalFeatures} icon="bi-sliders" title="Experimental Features" />

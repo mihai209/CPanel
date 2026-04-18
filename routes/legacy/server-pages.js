@@ -22391,6 +22391,7 @@ res.render('server/startup', {
             }
 
             const reactPageData = {
+                routePath: `/server/${server.containerId}/files/edit`,
                 server,
                 user: req.session.user,
                 wsToken,

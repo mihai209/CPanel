@@ -2,6 +2,8 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
+import { CreateFolderModal, CreateFileModal, RenameModal, PermissionsModal } from './components/ServerFileModals.jsx';
+
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'server-files';
@@ -57,6 +59,7 @@ export function ServerFilesPage({ pageData = data }) {
     const [isDragging, setIsDragging] = React.useState(false);
     const [fileQueue, setFileQueue] = React.useState([]);
     const [isQueueExpanded, setIsQueueExpanded] = React.useState(true);
+    const [activeModal, setActiveModal] = React.useState({ type: null, target: null, extra: null });
 
     const reloadFiles = React.useCallback(() => {
         setLoading(true);
@@ -259,14 +262,68 @@ export function ServerFilesPage({ pageData = data }) {
                 description="Browse container files, jump into the editor, or fall back to the legacy manager for advanced actions." 
                 eyebrow="Server Workspace"
             >
-                <div className="flex justify-end gap-3 mb-6">
-                    {manager.webUploadEnabled ? (
-                        <span className="text-sm text-neutral-400 self-center mr-2">{`Uploads enabled up to ${manager.webUploadMaxMb} MB`}</span>
-                    ) : null}
-                    <a href={`${manager.legacyUrl}?legacy=1`} className="bg-neutral-700 hover:bg-neutral-600 text-white font-semibold flex-shrink-0 py-2 px-4 rounded transition-colors text-sm shadow-sm flex items-center gap-2">
-                        <i className="bi bi-box-arrow-up-right"></i> Open Legacy View
-                    </a>
+                <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+                    <div className="flex flex-wrap gap-2">
+                        {!permissions.filesWriteLocked && (
+                            <>
+                                <button onClick={() => setActiveModal({ type: 'createFile' })} className="bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 font-semibold py-2 px-4 rounded-lg transition-colors text-sm shadow-sm flex items-center gap-2">
+                                    <i className="bi bi-file-earmark-plus"></i> New File
+                                </button>
+                                <button onClick={() => setActiveModal({ type: 'createFolder' })} className="bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 font-semibold py-2 px-4 rounded-lg transition-colors text-sm shadow-sm flex items-center gap-2">
+                                    <i className="bi bi-folder-plus"></i> New Folder
+                                </button>
+                                {manager.webUploadEnabled && (
+                                    <button onClick={() => document.getElementById('hiddenFileInput').click()} className="bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm shadow-sm flex items-center gap-2">
+                                        <i className="bi bi-upload"></i> Upload
+                                    </button>
+                                )}
+                            </>
+                        )}
+                        <input type="file" id="hiddenFileInput" multiple className="hidden" onChange={(e) => handleDrop({ preventDefault: ()=>{}, dataTransfer: { files: e.target.files } })} />
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {manager.webUploadEnabled ? (
+                            <span className="text-xs text-neutral-500 hidden sm:inline-block">{`Max ${manager.webUploadMaxMb}MB/file`}</span>
+                        ) : null}
+                        <a href={`${manager.legacyUrl}?legacy=1`} className="bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 font-semibold flex-shrink-0 py-2 px-4 rounded-lg transition-colors text-sm shadow-sm flex items-center gap-2">
+                            <i className="bi bi-box-arrow-up-right text-xs"></i> Legacy View
+                        </a>
+                    </div>
                 </div>
+
+                <CreateFolderModal 
+                    isOpen={activeModal.type === 'createFolder'} 
+                    onClose={() => setActiveModal({ type: null })} 
+                    currentPath={currentPath} 
+                    serverId={pageData.server?.containerId}
+                    onComplete={reloadFiles}
+                />
+                
+                <CreateFileModal 
+                    isOpen={activeModal.type === 'createFile'} 
+                    onClose={() => setActiveModal({ type: null })} 
+                    currentPath={currentPath}
+                    onComplete={(path) => { window.location.href = `${manager.editUrlBase}?path=${encodeURIComponent(path)}`; }}
+                />
+
+                <RenameModal 
+                    isOpen={activeModal.type === 'rename'}
+                    onClose={() => setActiveModal({ type: null })}
+                    currentPath={currentPath}
+                    serverId={pageData.server?.containerId}
+                    targetItem={activeModal.target}
+                    onComplete={reloadFiles}
+                />
+
+                <PermissionsModal 
+                    isOpen={activeModal.type === 'chmod'}
+                    onClose={() => setActiveModal({ type: null })}
+                    currentPath={currentPath}
+                    serverId={pageData.server?.containerId}
+                    targetItem={activeModal.target}
+                    currentPerms={activeModal.extra}
+                    onComplete={reloadFiles}
+                />
 
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
                     
@@ -516,9 +573,23 @@ export function ServerFilesPage({ pageData = data }) {
                                                             </>
                                                         )}
                                                         
-                                                        {/* Archive Actions */}
+                                                        {/* Context Modals & Actions */}
                                                         {!permissions.filesWriteLocked && (
                                                             <div className="mt-1 pt-1 border-t border-neutral-800/50">
+                                                                <button 
+                                                                    type="button"
+                                                                    className="w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-3 transition-colors"
+                                                                    onClick={() => { setActiveModal({ type: 'rename', target: entry.name }); setMenuPath(''); }}
+                                                                >
+                                                                    <i className="bi bi-input-cursor-text"></i> Rename
+                                                                </button>
+                                                                <button 
+                                                                    type="button"
+                                                                    className="w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-3 transition-colors"
+                                                                    onClick={() => { setActiveModal({ type: 'chmod', target: entry.name, extra: entry.permissions }); setMenuPath(''); }}
+                                                                >
+                                                                    <i className="bi bi-shield-check"></i> Permissions
+                                                                </button>
                                                                 <button 
                                                                     type="button"
                                                                     className="w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-3 transition-colors"
