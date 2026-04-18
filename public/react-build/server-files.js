@@ -7280,7 +7280,7 @@
   });
 
   // views/react/server-files.jsx
-  var import_react8 = __toESM(require_react());
+  var import_react7 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // views/react/components/ReactAppShell.jsx
@@ -8674,22 +8674,561 @@
   // views/react/components/PageContentBlock.jsx
   var import_react6 = __toESM(require_react());
   var import_jsx_runtime6 = __toESM(require_jsx_runtime());
-  function PageContentBlock({ title, children, className = "" }) {
-    import_react6.default.useEffect(() => {
-      if (title) {
-        document.title = `${title} - CPanel`;
+
+  // views/react/server-files.jsx
+  var import_jsx_runtime7 = __toESM(require_jsx_runtime());
+  var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
+  var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-files";
+  var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
+  function normalizePath(v) {
+    const r = String(v || "/").trim().replace(/\\/g, "/");
+    if (!r || r === "/") return "/";
+    const n = r.startsWith("/") ? r : `/${r}`;
+    return n.replace(/\/+/g, "/").replace(/\/$/, "") || "/";
+  }
+  function formatBytes(v) {
+    const b = Math.max(0, Number(v) || 0);
+    if (!b) return "0 B";
+    const u = ["B", "KB", "MB", "GB", "TB"];
+    let c = b, i = 0;
+    while (c >= 1024 && i < u.length - 1) {
+      c /= 1024;
+      i++;
+    }
+    return `${c >= 100 || i === 0 ? c.toFixed(0) : c.toFixed(2)} ${u[i]}`;
+  }
+  function formatDate(v) {
+    if (!v) return "\u2014";
+    const d = new Date(v);
+    return isNaN(d) ? "\u2014" : d.toLocaleString();
+  }
+  function buildBreadcrumbs(path) {
+    const n = normalizePath(path);
+    if (n === "/") return [{ label: "", path: "/", icon: true }];
+    const parts = n.split("/").filter(Boolean);
+    const segs = [{ label: "", path: "/", icon: true }];
+    let cur = "";
+    parts.forEach((p) => {
+      cur += `/${p}`;
+      segs.push({ label: p, path: cur });
+    });
+    return segs;
+  }
+  function getFileIcon(entry) {
+    if (entry.isDirectory) return "bi-folder-fill text-amber-400";
+    const ext = (entry.name || "").split(".").pop().toLowerCase();
+    const map = {
+      js: "bi-filetype-js text-yellow-400",
+      ts: "bi-filetype-ts text-blue-400",
+      json: "bi-filetype-json text-green-400",
+      yml: "bi-filetype-yml text-orange-400",
+      yaml: "bi-filetype-yml text-orange-400",
+      xml: "bi-filetype-xml text-orange-300",
+      html: "bi-filetype-html text-orange-500",
+      css: "bi-filetype-css text-blue-500",
+      py: "bi-filetype-py text-green-500",
+      php: "bi-filetype-php text-purple-400",
+      sh: "bi-terminal text-green-300",
+      md: "bi-filetype-md text-neutral-300",
+      txt: "bi-file-earmark-text text-neutral-400",
+      zip: "bi-file-zip text-yellow-500",
+      tar: "bi-file-zip text-yellow-500",
+      gz: "bi-file-zip text-yellow-500",
+      jar: "bi-file-zip-fill text-red-400",
+      png: "bi-file-earmark-image text-pink-400",
+      jpg: "bi-file-earmark-image text-pink-400",
+      jpeg: "bi-file-earmark-image text-pink-400",
+      gif: "bi-file-earmark-image text-pink-400",
+      mp4: "bi-file-earmark-play text-red-400",
+      mp3: "bi-file-earmark-music text-purple-400",
+      db: "bi-database text-blue-300",
+      sqlite: "bi-database text-blue-300",
+      sql: "bi-database-fill text-blue-300",
+      log: "bi-file-earmark-text text-neutral-400",
+      conf: "bi-gear text-neutral-400",
+      cfg: "bi-gear text-neutral-400",
+      ini: "bi-gear text-neutral-400",
+      properties: "bi-gear text-neutral-400"
+    };
+    return map[ext] || "bi-file-earmark text-neutral-500";
+  }
+  var ARCHIVE_EXTS = [".zip", ".tar", ".tar.gz", ".tgz", ".gz", ".rar", ".7z"];
+  function isArchive(name) {
+    return ARCHIVE_EXTS.some((e) => name.toLowerCase().endsWith(e));
+  }
+  var MEDIA_IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"];
+  var MEDIA_VIDEO_EXTS = [".mp4", ".webm", ".mov", ".ogg"];
+  function mediaKind(name) {
+    const n = name.toLowerCase();
+    if (MEDIA_IMAGE_EXTS.some((e) => n.endsWith(e))) return "image";
+    if (MEDIA_VIDEO_EXTS.some((e) => n.endsWith(e))) return "video";
+    return null;
+  }
+  function Modal({ isOpen, onClose, title, children, maxW = "max-w-md" }) {
+    (0, import_react7.useEffect)(() => {
+      if (!isOpen) return;
+      const handle = (e) => {
+        if (e.key === "Escape") onClose();
+      };
+      window.addEventListener("keydown", handle);
+      return () => window.removeEventListener("keydown", handle);
+    }, [isOpen, onClose]);
+    if (!isOpen) return null;
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm", onClick: (e) => {
+      if (e.target === e.currentTarget) onClose();
+    }, children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: `bg-[#0f1115] border border-neutral-800 rounded-2xl w-full ${maxW} shadow-2xl overflow-hidden`, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "px-6 py-4 border-b border-neutral-800 flex justify-between items-center", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h3", { className: "text-base font-bold text-white", children: title }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: onClose, className: "w-7 h-7 rounded flex items-center justify-center text-neutral-500 hover:text-white hover:bg-neutral-800 transition-colors", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-x-lg text-sm" }) })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "p-6", children })
+    ] }) });
+  }
+  function SearchModal({ isOpen, onClose, serverId, onNavigate }) {
+    const [query, setQuery] = (0, import_react7.useState)("");
+    const [filter, setFilter] = (0, import_react7.useState)("all");
+    const [results, setResults] = (0, import_react7.useState)(null);
+    const [loading, setLoading] = (0, import_react7.useState)(false);
+    const [error, setError] = (0, import_react7.useState)("");
+    const abortRef = (0, import_react7.useRef)(null);
+    const doSearch = (0, import_react7.useCallback)(async () => {
+      if (!query.trim()) return;
+      if (abortRef.current) abortRef.current.abort();
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+      setLoading(true);
+      setError("");
+      setResults(null);
+      try {
+        const params = new URLSearchParams({ query: query.trim(), filter });
+        const res = await fetch(`/server/${serverId}/files-search?${params}`, { signal: ctrl.signal });
+        const payload = await res.json();
+        if (!res.ok || payload.error) throw new Error(payload.error || "Search failed");
+        setResults(payload.results || []);
+      } catch (e) {
+        if (e.name !== "AbortError") setError(e.message);
+      } finally {
+        setLoading(false);
       }
-    }, [title]);
-    return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("div", { className: `w-full max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6 ${className}`, children: [
-      title && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "mb-6 flex justify-between items-center", children: /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("h1", { className: "text-2xl font-bold text-neutral-100", children: title }) }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "w-full", children })
+    }, [query, filter, serverId]);
+    (0, import_react7.useEffect)(() => {
+      if (!isOpen) {
+        setQuery("");
+        setResults(null);
+        setError("");
+      }
+    }, [isOpen]);
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(Modal, { isOpen, onClose, title: "Search Files", maxW: "max-w-2xl", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex gap-2 mb-4", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          "input",
+          {
+            autoFocus: true,
+            type: "text",
+            value: query,
+            onChange: (e) => setQuery(e.target.value),
+            onKeyDown: (e) => e.key === "Enter" && doSearch(),
+            className: "flex-1 bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2 text-sm text-neutral-200 focus:outline-none focus:border-primary-500",
+            placeholder: "Search filename or path\u2026"
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+          "select",
+          {
+            value: filter,
+            onChange: (e) => setFilter(e.target.value),
+            className: "bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-neutral-300 focus:outline-none",
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("option", { value: "all", children: "All" }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("option", { value: "files", children: "Files only" }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("option", { value: "folders", children: "Folders only" })
+            ]
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: doSearch, disabled: loading || !query.trim(), className: "bg-primary-600 hover:bg-primary-500 disabled:bg-neutral-700 text-white rounded-lg px-4 py-2 text-sm font-bold transition-colors flex items-center gap-2", children: [
+          loading ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-search" }),
+          "Search"
+        ] })
+      ] }),
+      error && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-sm text-red-400 mb-3", children: error }),
+      results && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "max-h-80 overflow-y-auto rounded-lg border border-neutral-800 divide-y divide-neutral-800/50", children: [
+        results.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "p-8 text-center text-neutral-500 text-sm", children: "No results found." }),
+        results.map((r, i) => {
+          const parent = r.path.split("/").slice(0, -1).join("/") || "/";
+          return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "px-4 py-3 hover:bg-neutral-800/40 transition-colors", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-2 min-w-0", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: `bi ${r.isDirectory ? "bi-folder-fill text-amber-400" : "bi-file-earmark text-neutral-400"} shrink-0` }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-sm font-semibold text-neutral-200 truncate", children: r.name }),
+              r.isDirectory ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: () => {
+                onNavigate(r.path);
+                onClose();
+              }, className: "ml-auto shrink-0 text-xs text-primary-400 hover:underline", children: "Open" }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("a", { href: `/server/${serverId}/files/edit?path=${encodeURIComponent(r.path)}`, className: "ml-auto shrink-0 text-xs text-primary-400 hover:underline", children: "Edit" })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: () => {
+              onNavigate(parent);
+              onClose();
+            }, className: "text-xs text-neutral-500 hover:text-neutral-300 mt-0.5 truncate text-left", children: r.path })
+          ] }, i);
+        })
+      ] })
     ] });
   }
-
-  // views/react/components/ServerFileModals.jsx
-  var import_react7 = __toESM(require_react());
-  var import_jsx_runtime7 = __toESM(require_jsx_runtime());
-  function CreateFolderModal({ isOpen, onClose, currentPath, serverId, onComplete }) {
+  function SftpModal({ isOpen, onClose, sftpDetails }) {
+    const d = sftpDetails || {};
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(Modal, { isOpen, onClose, title: "SFTP Details", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "space-y-3 mb-6", children: [
+        [["Host", d.host || "\u2014"], ["Port", d.port || "\u2014"], ["Username", d.username || "\u2014"]].map(([label, val]) => /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-800 pb-3", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest", children: label }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-sm font-mono text-neutral-200", children: val })
+        ] }, label)),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-between items-start", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest", children: "Password" }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-xs text-neutral-400", children: d.passwordHint || "Use your panel password" })
+        ] })
+      ] }),
+      d.host && d.port && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "bg-neutral-950 rounded-lg p-3 font-mono text-xs text-neutral-400 break-all select-all", children: [
+        "sftp://",
+        d.username,
+        "@",
+        d.host,
+        ":",
+        d.port
+      ] })
+    ] });
+  }
+  function BulkBar({ selected, writeLocked, onBulkDelete, onBulkRename, onBulkChmod, onBulkArchive, onClear }) {
+    if (selected.size === 0) return null;
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "sticky top-0 z-30 bg-primary-950/90 backdrop-blur-md border border-primary-800/50 rounded-xl px-4 py-3 mb-4 flex items-center gap-3 flex-wrap shadow-xl shadow-primary-900/20", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "text-sm font-black text-primary-300", children: [
+        selected.size,
+        " selected"
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex-1 h-px bg-primary-800/30" }),
+      !writeLocked && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: onBulkRename, className: "flex items-center gap-2 text-xs font-bold text-neutral-300 hover:text-white bg-neutral-800/80 hover:bg-neutral-700 px-3 py-1.5 rounded-lg transition-colors", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-input-cursor-text" }),
+          " Rename"
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: onBulkChmod, className: "flex items-center gap-2 text-xs font-bold text-neutral-300 hover:text-white bg-neutral-800/80 hover:bg-neutral-700 px-3 py-1.5 rounded-lg transition-colors", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-shield-check" }),
+          " CHMOD"
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: onBulkArchive, className: "flex items-center gap-2 text-xs font-bold text-neutral-300 hover:text-white bg-neutral-800/80 hover:bg-neutral-700 px-3 py-1.5 rounded-lg transition-colors", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-file-zip text-yellow-400" }),
+          " Archive"
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: onBulkDelete, className: "flex items-center gap-2 text-xs font-bold text-red-400 hover:text-white bg-red-900/20 hover:bg-red-900/40 px-3 py-1.5 rounded-lg transition-colors border border-red-900/30", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-trash3" }),
+          " Delete ",
+          selected.size
+        ] })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: onClear, className: "text-xs text-neutral-500 hover:text-white transition-colors ml-auto", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-x-lg" }) })
+    ] });
+  }
+  function BulkRenameModal({ isOpen, onClose, serverId, currentPath, selectedNames, onComplete }) {
+    const [prefix, setPrefix] = (0, import_react7.useState)("");
+    const [suffix, setSuffix] = (0, import_react7.useState)("");
+    const [loading, setLoading] = (0, import_react7.useState)(false);
+    const [error, setError] = (0, import_react7.useState)("");
+    (0, import_react7.useEffect)(() => {
+      if (isOpen) {
+        setPrefix("");
+        setSuffix("");
+        setError("");
+      }
+    }, [isOpen]);
+    const doRename = async () => {
+      if (!prefix && !suffix) return;
+      setLoading(true);
+      setError("");
+      const files = [...selectedNames].map((n) => ({ from: n, to: `${prefix}${n}${suffix}` }));
+      try {
+        const res = await fetch(`/api/client/servers/${serverId}/files/rename`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ directory: currentPath, files })
+        });
+        const p = await res.json();
+        if (!res.ok || p.error) throw new Error(p.error || "Rename failed");
+        onComplete();
+        onClose();
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(Modal, { isOpen, onClose, title: `Bulk Rename (${selectedNames.size} items)`, children: [
+      error && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-sm text-red-400 mb-4", children: error }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "space-y-4 mb-6", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("label", { className: "block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-1.5", children: "Add Prefix" }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("input", { type: "text", value: prefix, onChange: (e) => setPrefix(e.target.value), placeholder: "e.g. backup_", className: "w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2 text-sm text-neutral-200 focus:outline-none focus:border-primary-500" })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("label", { className: "block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-1.5", children: "Add Suffix" }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("input", { type: "text", value: suffix, onChange: (e) => setSuffix(e.target.value), placeholder: "e.g. .bak", className: "w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2 text-sm text-neutral-200 focus:outline-none focus:border-primary-500" })
+        ] }),
+        [...selectedNames].slice(0, 3).map((n) => /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-xs font-mono text-neutral-500", children: [
+          n,
+          " ",
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-neutral-600", children: "\u2192" }),
+          " ",
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "text-primary-400", children: [
+            prefix,
+            n,
+            suffix
+          ] })
+        ] }, n)),
+        selectedNames.size > 3 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-xs text-neutral-600", children: [
+          "\u2026and ",
+          selectedNames.size - 3,
+          " more"
+        ] })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-end gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: onClose, className: "text-sm text-neutral-500 hover:text-white px-4", children: "Cancel" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: doRename, disabled: loading || !prefix && !suffix, className: "bg-primary-600 hover:bg-primary-500 disabled:bg-neutral-700 text-white text-sm font-bold px-5 py-2 rounded-lg transition-colors flex items-center gap-2", children: [
+          loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" }),
+          "Apply"
+        ] })
+      ] })
+    ] });
+  }
+  function BulkChmodModal({ isOpen, onClose, serverId, currentPath, selectedNames, onComplete }) {
+    const [mode, setMode] = (0, import_react7.useState)("755");
+    const [loading, setLoading] = (0, import_react7.useState)(false);
+    const [error, setError] = (0, import_react7.useState)("");
+    (0, import_react7.useEffect)(() => {
+      if (isOpen) {
+        setMode("755");
+        setError("");
+      }
+    }, [isOpen]);
+    const doChmod = async () => {
+      setLoading(true);
+      setError("");
+      const files = [...selectedNames].map((n) => ({ file: n, mode }));
+      try {
+        const res = await fetch(`/api/client/servers/${serverId}/files/chmod`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ directory: currentPath, files })
+        });
+        const p = await res.json();
+        if (!res.ok || p.error) throw new Error(p.error || "CHMOD failed");
+        onComplete();
+        onClose();
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(Modal, { isOpen, onClose, title: `Bulk CHMOD (${selectedNames.size} items)`, maxW: "max-w-sm", children: [
+      error && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-sm text-red-400 mb-4", children: error }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "mb-6", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("label", { className: "block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-2", children: "Octal Mode" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("input", { autoFocus: true, type: "text", value: mode, onChange: (e) => setMode(e.target.value.replace(/[^0-7]/g, "").slice(0, 4)), placeholder: "755", className: "w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2.5 font-mono text-neutral-200 focus:outline-none focus:border-primary-500" })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-end gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: onClose, className: "text-sm text-neutral-500 hover:text-white px-4", children: "Cancel" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: doChmod, disabled: loading, className: "bg-primary-600 hover:bg-primary-500 disabled:bg-neutral-700 text-white text-sm font-bold px-5 py-2 rounded-lg transition-colors flex items-center gap-2", children: [
+          loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" }),
+          "Apply to ",
+          selectedNames.size
+        ] })
+      ] })
+    ] });
+  }
+  function ArchiveModal({ isOpen, onClose, serverId, currentPath, targetNames, onComplete }) {
+    const [name, setName] = (0, import_react7.useState)("");
+    const [loading, setLoading] = (0, import_react7.useState)(false);
+    const [error, setError] = (0, import_react7.useState)("");
+    (0, import_react7.useEffect)(() => {
+      if (isOpen) {
+        const base = [...targetNames][0] || "archive";
+        setName(targetNames.size === 1 ? `${base}.zip` : "archive.zip");
+        setError("");
+      }
+    }, [isOpen, targetNames]);
+    const doArchive = async () => {
+      if (!name.trim()) return;
+      setLoading(true);
+      setError("");
+      try {
+        const res = await fetch(`/api/client/servers/${serverId}/files/archive`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ directory: currentPath, files: [...targetNames], name: name.trim() })
+        });
+        const p = await res.json();
+        if (!res.ok || p.error) throw new Error(p.error || "Archive failed");
+        onComplete();
+        onClose();
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(Modal, { isOpen, onClose, title: "Create Archive", maxW: "max-w-sm", children: [
+      error && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-sm text-red-400 mb-4", children: error }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "mb-6", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("label", { className: "block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-2", children: "Archive Name" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("input", { autoFocus: true, type: "text", value: name, onChange: (e) => setName(e.target.value), placeholder: "archive.zip", className: "w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2.5 text-neutral-200 focus:outline-none focus:border-primary-500" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-xs text-neutral-600 mt-2", children: [
+          targetNames.size,
+          " item(s) \u2192 ",
+          name || "archive.zip"
+        ] })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-end gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: onClose, className: "text-sm text-neutral-500 hover:text-white px-4", children: "Cancel" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: doArchive, disabled: loading || !name.trim(), className: "bg-primary-600 hover:bg-primary-500 disabled:bg-neutral-700 text-white text-sm font-bold px-5 py-2 rounded-lg transition-colors flex items-center gap-2", children: [
+          loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" }),
+          "Create"
+        ] })
+      ] })
+    ] });
+  }
+  function DeleteModal({ isOpen, onClose, serverId, currentPath, targetNames, onComplete }) {
+    const [loading, setLoading] = (0, import_react7.useState)(false);
+    const [error, setError] = (0, import_react7.useState)("");
+    (0, import_react7.useEffect)(() => {
+      if (isOpen) setError("");
+    }, [isOpen]);
+    const doDelete = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await fetch(`/api/client/servers/${serverId}/files/delete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ directory: currentPath, files: [...targetNames] })
+        });
+        const p = await res.json();
+        if (!res.ok || p.error) throw new Error(p.error || "Delete failed");
+        onComplete();
+        onClose();
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(Modal, { isOpen, onClose, title: "Confirm Delete", maxW: "max-w-sm", children: [
+      error && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-sm text-red-400 mb-4", children: error }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "bg-red-950/20 border border-red-900/30 rounded-xl px-4 py-3 mb-6 text-sm text-red-300", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-exclamation-triangle-fill mr-2 text-red-500" }),
+        "This action is ",
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("strong", { children: "permanent" }),
+        " and cannot be undone.",
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "mt-2 font-mono text-xs text-red-400/80", children: [
+          [...targetNames].slice(0, 5).join(", "),
+          targetNames.size > 5 ? ` \u2026+${targetNames.size - 5} more` : ""
+        ] })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-end gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: onClose, className: "text-sm text-neutral-500 hover:text-white px-4", children: "Cancel" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: doDelete, disabled: loading, className: "bg-red-600 hover:bg-red-500 disabled:bg-neutral-700 text-white text-sm font-bold px-5 py-2 rounded-lg transition-colors flex items-center gap-2", children: [
+          loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" }),
+          "Delete ",
+          targetNames.size,
+          " ",
+          targetNames.size === 1 ? "item" : "items"
+        ] })
+      ] })
+    ] });
+  }
+  function RenameModal({ isOpen, onClose, serverId, currentPath, targetName, onComplete }) {
+    const [val, setVal] = (0, import_react7.useState)("");
+    const [loading, setLoading] = (0, import_react7.useState)(false);
+    const [error, setError] = (0, import_react7.useState)("");
+    (0, import_react7.useEffect)(() => {
+      if (isOpen) {
+        setVal(targetName || "");
+        setError("");
+      }
+    }, [isOpen, targetName]);
+    const doRename = async () => {
+      if (!val.trim() || val === targetName) return;
+      setLoading(true);
+      setError("");
+      try {
+        const res = await fetch(`/api/client/servers/${serverId}/files/rename`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ directory: currentPath, files: [{ from: targetName, to: val.trim() }] })
+        });
+        const p = await res.json();
+        if (!res.ok || p.error) throw new Error(p.error || "Rename failed");
+        onComplete();
+        onClose();
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(Modal, { isOpen, onClose, title: "Rename", maxW: "max-w-sm", children: [
+      error && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-sm text-red-400 mb-4", children: error }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("input", { autoFocus: true, type: "text", value: val, onChange: (e) => setVal(e.target.value), onKeyDown: (e) => e.key === "Enter" && doRename(), className: "w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2.5 text-neutral-200 mb-6 focus:outline-none focus:border-primary-500" }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-end gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: onClose, className: "text-sm text-neutral-500 hover:text-white px-4", children: "Cancel" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: doRename, disabled: loading || !val.trim() || val === targetName, className: "bg-primary-600 hover:bg-primary-500 disabled:bg-neutral-700 text-white text-sm font-bold px-5 py-2 rounded-lg transition-colors flex items-center gap-2", children: [
+          loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" }),
+          "Rename"
+        ] })
+      ] })
+    ] });
+  }
+  function ChmodModal({ isOpen, onClose, serverId, currentPath, targetName, currentPerms, onComplete }) {
+    const [mode, setMode] = (0, import_react7.useState)("");
+    const [loading, setLoading] = (0, import_react7.useState)(false);
+    const [error, setError] = (0, import_react7.useState)("");
+    (0, import_react7.useEffect)(() => {
+      if (isOpen) {
+        setMode(currentPerms || "755");
+        setError("");
+      }
+    }, [isOpen, currentPerms]);
+    const doChmod = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await fetch(`/api/client/servers/${serverId}/files/chmod`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ directory: currentPath, files: [{ file: targetName, mode }] })
+        });
+        const p = await res.json();
+        if (!res.ok || p.error) throw new Error(p.error || "CHMOD failed");
+        onComplete();
+        onClose();
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(Modal, { isOpen, onClose, title: "Change Permissions", maxW: "max-w-xs", children: [
+      error && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-sm text-red-400 mb-4", children: error }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "mb-2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-xs text-neutral-500 font-mono truncate mb-3", children: targetName }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("input", { autoFocus: true, type: "text", value: mode, onChange: (e) => setMode(e.target.value.replace(/[^0-7]/g, "").slice(0, 4)), onKeyDown: (e) => e.key === "Enter" && doChmod(), placeholder: "755", className: "w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2.5 font-mono text-neutral-200 mb-6 focus:outline-none focus:border-primary-500" })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-end gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: onClose, className: "text-sm text-neutral-500 hover:text-white px-4", children: "Cancel" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: doChmod, disabled: loading, className: "bg-primary-600 hover:bg-primary-500 disabled:bg-neutral-700 text-white text-sm font-bold px-5 py-2 rounded-lg transition-colors flex items-center gap-2", children: [
+          loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" }),
+          "Apply"
+        ] })
+      ] })
+    ] });
+  }
+  function CreateFolderModal({ isOpen, onClose, serverId, currentPath, onComplete }) {
     const [name, setName] = (0, import_react7.useState)("");
     const [loading, setLoading] = (0, import_react7.useState)(false);
     const [error, setError] = (0, import_react7.useState)("");
@@ -8699,9 +9238,7 @@
         setError("");
       }
     }, [isOpen]);
-    if (!isOpen) return null;
-    const handleSubmit = async (e) => {
-      e.preventDefault();
+    const doCreate = async () => {
       if (!name.trim()) return;
       setLoading(true);
       setError("");
@@ -8711,825 +9248,641 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ directory: currentPath, name: name.trim() })
         });
-        const payload = await res.json();
-        if (!res.ok || payload.error) throw new Error(payload.error || "Failed to create folder");
+        const p = await res.json();
+        if (!res.ok || p.error) throw new Error(p.error || "Failed");
         onComplete();
         onClose();
-      } catch (err) {
-        setError(err.message);
+      } catch (e) {
+        setError(e.message);
       } finally {
         setLoading(false);
       }
     };
-    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in-up", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "px-6 py-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h3", { className: "text-lg font-bold text-white", children: "Create Folder" }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: onClose, className: "text-neutral-500 hover:text-white transition-colors", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-x-lg" }) })
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(Modal, { isOpen, onClose, title: "Create Folder", maxW: "max-w-sm", children: [
+      error && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-sm text-red-400 mb-4", children: error }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("input", { autoFocus: true, type: "text", value: name, onChange: (e) => setName(e.target.value), onKeyDown: (e) => e.key === "Enter" && doCreate(), placeholder: "folder-name", className: "w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2.5 text-neutral-200 mb-2 focus:outline-none focus:border-primary-500" }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-xs text-neutral-600 mb-6", children: [
+        "Will be created in ",
+        currentPath
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("form", { onSubmit: handleSubmit, className: "p-6", children: [
-        error && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "mb-4 p-3 bg-red-900/20 border border-red-900/50 text-red-400 rounded text-sm", children: error }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "mb-6", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("label", { className: "block text-xs font-bold text-neutral-400 uppercase tracking-widest mb-2", children: "Folder Name" }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
-            "input",
-            {
-              type: "text",
-              autoFocus: true,
-              value: name,
-              onChange: (e) => setName(e.target.value),
-              className: "w-full bg-neutral-950 border border-neutral-700 rounded-lg py-2.5 px-4 text-neutral-200 focus:outline-none focus:border-primary-500",
-              placeholder: "e.g. plugins or config/essentials"
-            }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-[10px] text-neutral-500 mt-2", children: [
-            "Folder will be created in ",
-            currentPath
-          ] })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-end gap-3", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", onClick: onClose, className: "px-5 py-2 text-sm font-bold text-neutral-400 hover:text-white", children: "Cancel" }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { type: "submit", disabled: loading || !name.trim(), className: "px-5 py-2 text-sm font-bold bg-primary-600 hover:bg-primary-500 disabled:bg-neutral-700 text-white rounded-lg transition-colors flex items-center gap-2", children: [
-            loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-arrow-repeat animate-spin" }),
-            "Create Folder"
-          ] })
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-end gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: onClose, className: "text-sm text-neutral-500 hover:text-white px-4", children: "Cancel" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: doCreate, disabled: loading || !name.trim(), className: "bg-primary-600 hover:bg-primary-500 disabled:bg-neutral-700 text-white text-sm font-bold px-5 py-2 rounded-lg transition-colors flex items-center gap-2", children: [
+          loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" }),
+          "Create"
         ] })
       ] })
-    ] }) });
+    ] });
   }
-  function CreateFileModal({ isOpen, onClose, currentPath, onComplete }) {
+  function CreateFileModal({ isOpen, onClose, currentPath, editUrlBase }) {
     const [name, setName] = (0, import_react7.useState)("");
     (0, import_react7.useEffect)(() => {
       if (isOpen) setName("");
     }, [isOpen]);
-    if (!isOpen) return null;
-    const handleSubmit = (e) => {
-      e.preventDefault();
+    const doCreate = () => {
       if (!name.trim()) return;
-      const normalized = (currentPath === "/" ? "" : currentPath) + "/" + name.trim();
-      onComplete(normalized);
+      const p = (currentPath === "/" ? "" : currentPath) + "/" + name.trim();
+      window.location.href = `${editUrlBase}?path=${encodeURIComponent(p)}`;
+    };
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(Modal, { isOpen, onClose, title: "Create File", maxW: "max-w-sm", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("input", { autoFocus: true, type: "text", value: name, onChange: (e) => setName(e.target.value), onKeyDown: (e) => e.key === "Enter" && doCreate(), placeholder: "filename.yml", className: "w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2.5 text-neutral-200 mb-2 focus:outline-none focus:border-primary-500" }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-xs text-neutral-600 mb-6", children: "Opens in editor instantly after creation." }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-end gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: onClose, className: "text-sm text-neutral-500 hover:text-white px-4", children: "Cancel" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: doCreate, disabled: !name.trim(), className: "bg-primary-600 hover:bg-primary-500 disabled:bg-neutral-700 text-white text-sm font-bold px-5 py-2 rounded-lg transition-colors", children: "Open in Editor" })
+      ] })
+    ] });
+  }
+  function MediaViewer({ isOpen, onClose, src, fileName, kind, serverId }) {
+    if (!isOpen) return null;
+    const downloadUrl = src;
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "fixed inset-0 z-[300] bg-black/90 backdrop-blur-md flex flex-col", onClick: (e) => {
+      if (e.target === e.currentTarget) onClose();
+    }, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center justify-between px-6 py-4 border-b border-neutral-800 shrink-0", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-3", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: `bi ${kind === "video" ? "bi-play-btn" : "bi-image"} text-neutral-400` }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-sm font-bold text-neutral-200 font-mono", children: fileName })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-3", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("a", { href: downloadUrl, download: fileName, className: "text-xs text-neutral-400 hover:text-white border border-neutral-700 rounded px-3 py-1.5 transition-colors", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-download mr-1" }),
+            "Download"
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: onClose, className: "w-8 h-8 flex items-center justify-center rounded text-neutral-400 hover:text-white hover:bg-neutral-800", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-x-lg" }) })
+        ] })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex-1 flex items-center justify-center p-8 overflow-auto", children: kind === "image" ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("img", { src, alt: fileName, className: "max-w-full max-h-full object-contain rounded-xl shadow-2xl" }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("video", { src, controls: true, autoPlay: true, className: "max-w-full max-h-full rounded-xl shadow-2xl" }) })
+    ] });
+  }
+  function UploadQueue({ queue, onClear }) {
+    const [collapsed, setCollapsed] = (0, import_react7.useState)(false);
+    if (queue.length === 0) return null;
+    const done = queue.filter((f) => f.status === "done").length;
+    const uploading = queue.filter((f) => f.status === "uploading").length;
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "fixed bottom-6 right-6 z-[100] w-80 bg-neutral-900 border border-neutral-700 rounded-2xl shadow-2xl overflow-hidden", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "px-4 py-3 border-b border-neutral-800 flex items-center justify-between cursor-pointer hover:bg-neutral-800/50 transition-colors", onClick: () => setCollapsed((c) => !c), children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-2.5", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "relative", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-cloud-arrow-up text-lg text-primary-500" }),
+            uploading > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "absolute -top-1 -right-1 w-2.5 h-2.5 bg-primary-500 rounded-full animate-ping" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-[9px] font-black text-neutral-500 uppercase tracking-widest leading-none mb-0.5", children: "Upload Queue" }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-xs font-bold text-white leading-none", children: [
+              done,
+              "/",
+              queue.length,
+              " uploaded"
+            ] })
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-3", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: `bi ${collapsed ? "bi-chevron-up" : "bi-chevron-down"} text-neutral-500 text-xs` }),
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: (e) => {
+            e.stopPropagation();
+            onClear();
+          }, className: "text-neutral-500 hover:text-white transition-colors text-xs", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-x-lg" }) })
+        ] })
+      ] }),
+      !collapsed && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "max-h-60 overflow-y-auto divide-y divide-neutral-800/50", children: queue.map((item) => /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "px-4 py-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-between items-start gap-2 mb-1.5", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-xs font-bold text-neutral-200 truncate flex-1", children: item.name }),
+          item.status === "done" && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-check-circle-fill text-green-500 shrink-0" }),
+          item.status === "error" && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-exclamation-circle-fill text-red-500 shrink-0" }),
+          item.status === "uploading" && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "text-[10px] font-black text-primary-500 shrink-0", children: [
+            item.progress,
+            "%"
+          ] })
+        ] }),
+        item.status === "uploading" && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "h-1 w-full bg-neutral-800 rounded-full overflow-hidden", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "h-full bg-primary-500 transition-all rounded-full", style: { width: `${item.progress}%` } }) }),
+        item.status === "error" && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-[10px] text-red-400 truncate", children: item.error })
+      ] }, item.id)) })
+    ] });
+  }
+  function ContextMenu({ x, y, entry, entryPath, writeLocked, canDownload, editUrlBase, previewUrlBase, downloadUrlBase, currentPath, serverId, onClose, onRename, onChmod, onArchive, onUnarchive, onDelete, onNavigate }) {
+    const ref = (0, import_react7.useRef)(null);
+    (0, import_react7.useEffect)(() => {
+      const handle = () => onClose();
+      const delay = setTimeout(() => window.addEventListener("click", handle), 50);
+      return () => {
+        clearTimeout(delay);
+        window.removeEventListener("click", handle);
+      };
+    }, []);
+    const style = { position: "fixed", top: y, left: x, zIndex: 500 };
+    const Item = ({ icon, label, onClick, danger, iconClass }) => /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: () => {
+      onClick();
       onClose();
-    };
-    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in-up", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "px-6 py-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h3", { className: "text-lg font-bold text-white", children: "Create File" }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: onClose, className: "text-neutral-500 hover:text-white transition-colors", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-x-lg" }) })
+    }, className: `w-full text-left flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg transition-colors ${danger ? "text-red-400 hover:bg-red-900/20 hover:text-red-300" : "text-neutral-300 hover:bg-neutral-800 hover:text-white"}`, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: `bi ${icon} text-sm ${iconClass || ""}` }),
+      " ",
+      label
+    ] });
+    const Sep = () => /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "my-1 h-px bg-neutral-800" });
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { ref, style, className: "w-52 bg-neutral-950/95 backdrop-blur-xl border border-neutral-800 rounded-xl shadow-2xl py-1.5 px-1", children: [
+      entry.isDirectory ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Item, { icon: "bi-folder-symlink", label: "Open Folder", onClick: () => onNavigate(entryPath), iconClass: "text-amber-400" }) : /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Item, { icon: "bi-pencil", label: "Edit File", onClick: () => {
+          window.location.href = `${editUrlBase}?path=${encodeURIComponent(entryPath)}`;
+        } }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Item, { icon: "bi-eye", label: "Preview", onClick: () => {
+          window.location.href = `${previewUrlBase}?path=${encodeURIComponent(entryPath)}`;
+        } }),
+        canDownload && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Item, { icon: "bi-cloud-arrow-down", label: "Download", onClick: () => {
+          window.open(`${downloadUrlBase}?path=${encodeURIComponent(entryPath)}`);
+        }, iconClass: "text-blue-400" })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("form", { onSubmit: handleSubmit, className: "p-6", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "mb-6", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("label", { className: "block text-xs font-bold text-neutral-400 uppercase tracking-widest mb-2", children: "File Name" }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
-            "input",
-            {
-              type: "text",
-              autoFocus: true,
-              value: name,
-              onChange: (e) => setName(e.target.value),
-              className: "w-full bg-neutral-950 border border-neutral-700 rounded-lg py-2.5 px-4 text-neutral-200 focus:outline-none focus:border-primary-500",
-              placeholder: "e.g. config.yml or script.js"
-            }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-[10px] text-neutral-500 mt-2", children: "Will open in editor immediately." })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-end gap-3", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", onClick: onClose, className: "px-5 py-2 text-sm font-bold text-neutral-400 hover:text-white", children: "Cancel" }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "submit", disabled: !name.trim(), className: "px-5 py-2 text-sm font-bold bg-primary-600 hover:bg-primary-500 disabled:bg-neutral-700 text-white rounded-lg transition-colors", children: "Continue to Editor" })
-        ] })
+      !writeLocked && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Sep, {}),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Item, { icon: "bi-input-cursor-text", label: "Rename", onClick: () => onRename(entry.name) }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Item, { icon: "bi-shield-check", label: "Permissions", onClick: () => onChmod(entry.name, entry.permissions) }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Item, { icon: "bi-file-zip", label: "Archive", onClick: () => onArchive(/* @__PURE__ */ new Set([entry.name])), iconClass: "text-yellow-400" }),
+        !entry.isDirectory && isArchive(entry.name) && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Item, { icon: "bi-file-earmark-zip", label: "Unarchive", onClick: () => onUnarchive(entry.name), iconClass: "text-green-400" }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Sep, {}),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(Item, { icon: "bi-trash3", label: `Delete ${entry.isDirectory ? "Folder" : "File"}`, onClick: () => onDelete(/* @__PURE__ */ new Set([entry.name])), danger: true })
       ] })
-    ] }) });
-  }
-  function RenameModal({ isOpen, onClose, currentPath, serverId, targetItem, onComplete }) {
-    const [name, setName] = (0, import_react7.useState)("");
-    const [loading, setLoading] = (0, import_react7.useState)(false);
-    const [error, setError] = (0, import_react7.useState)("");
-    (0, import_react7.useEffect)(() => {
-      if (isOpen && targetItem) {
-        setName(targetItem);
-        setError("");
-      }
-    }, [isOpen, targetItem]);
-    if (!isOpen) return null;
-    const handleSubmit = async (e) => {
-      e.preventDefault();
-      if (!name.trim() || name === targetItem) return;
-      setLoading(true);
-      setError("");
-      try {
-        const res = await fetch(`/api/client/servers/${serverId}/files/rename`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ directory: currentPath, files: [{ from: targetItem, to: name.trim() }] })
-        });
-        const payload = await res.json();
-        if (!res.ok || payload.error) throw new Error(payload.error || "Failed to rename item");
-        onComplete();
-        onClose();
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in-up", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "px-6 py-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h3", { className: "text-lg font-bold text-white", children: "Rename Item" }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: onClose, className: "text-neutral-500 hover:text-white transition-colors", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-x-lg" }) })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("form", { onSubmit: handleSubmit, className: "p-6", children: [
-        error && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "mb-4 p-3 bg-red-900/20 border border-red-900/50 text-red-400 rounded text-sm", children: error }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "mb-6", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("label", { className: "block text-xs font-bold text-neutral-400 uppercase tracking-widest mb-2", children: "New Name" }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
-            "input",
-            {
-              type: "text",
-              autoFocus: true,
-              value: name,
-              onChange: (e) => setName(e.target.value),
-              className: "w-full bg-neutral-950 border border-neutral-700 rounded-lg py-2.5 px-4 text-neutral-200 focus:outline-none focus:border-primary-500"
-            }
-          )
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-end gap-3", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", onClick: onClose, className: "px-5 py-2 text-sm font-bold text-neutral-400 hover:text-white", children: "Cancel" }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { type: "submit", disabled: loading || !name.trim() || name === targetItem, className: "px-5 py-2 text-sm font-bold bg-primary-600 hover:bg-primary-500 disabled:bg-neutral-700 text-white rounded-lg transition-colors flex items-center gap-2", children: [
-            loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-arrow-repeat animate-spin" }),
-            "Rename"
-          ] })
-        ] })
-      ] })
-    ] }) });
-  }
-  function PermissionsModal({ isOpen, onClose, currentPath, serverId, targetItem, currentPerms, onComplete }) {
-    const [perms, setPerms] = (0, import_react7.useState)("");
-    const [loading, setLoading] = (0, import_react7.useState)(false);
-    const [error, setError] = (0, import_react7.useState)("");
-    (0, import_react7.useEffect)(() => {
-      if (isOpen && targetItem) {
-        setPerms(String(currentPerms).match(/[a-zA-Z]/) ? "755" : currentPerms);
-        setError("");
-      }
-    }, [isOpen, targetItem, currentPerms]);
-    if (!isOpen) return null;
-    const handleSubmit = async (e) => {
-      e.preventDefault();
-      const cleanPerms = String(perms).trim();
-      if (!cleanPerms) return;
-      setLoading(true);
-      setError("");
-      try {
-        const res = await fetch(`/api/client/servers/${serverId}/files/chmod`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ directory: currentPath, files: [{ file: targetItem, mode: cleanPerms }] })
-        });
-        const payload = await res.json();
-        if (!res.ok || payload.error) throw new Error(payload.error || "Failed to change permissions");
-        onComplete();
-        onClose();
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    return /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-fade-in-up", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "px-6 py-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("h3", { className: "text-lg font-bold text-white", children: "Chmod" }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: onClose, className: "text-neutral-500 hover:text-white transition-colors", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-x-lg" }) })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("form", { onSubmit: handleSubmit, className: "p-6", children: [
-        error && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "mb-4 p-3 bg-red-900/20 border border-red-900/50 text-red-400 rounded text-sm", children: error }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "mb-6", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("label", { className: "block text-xs font-bold text-neutral-400 uppercase tracking-widest mb-2", children: "Octal Mode" }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
-            "input",
-            {
-              type: "text",
-              autoFocus: true,
-              value: perms,
-              onChange: (e) => setPerms(e.target.value.replace(/[^0-9]/g, "")),
-              maxLength: 4,
-              className: "w-full bg-neutral-950 border border-neutral-700 rounded-lg py-2.5 px-4 text-neutral-200 font-mono focus:outline-none focus:border-primary-500",
-              placeholder: "755"
-            }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-[10px] text-neutral-500 mt-2 font-mono break-all", children: targetItem })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex justify-end gap-3", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { type: "button", onClick: onClose, className: "px-5 py-2 text-sm font-bold text-neutral-400 hover:text-white", children: "Cancel" }),
-          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { type: "submit", disabled: loading, className: "px-5 py-2 text-sm font-bold bg-primary-600 hover:bg-primary-500 disabled:bg-neutral-700 text-white rounded-lg transition-colors flex items-center gap-2", children: [
-            loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-arrow-repeat animate-spin" }),
-            "Apply"
-          ] })
-        ] })
-      ] })
-    ] }) });
-  }
-
-  // views/react/server-files.jsx
-  var import_jsx_runtime8 = __toESM(require_jsx_runtime());
-  var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
-  var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-files";
-  var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
-  function normalizePath(value) {
-    const raw = String(value || "/").trim().replace(/\\/g, "/");
-    if (!raw || raw === "/") return "/";
-    const normalized = raw.startsWith("/") ? raw : `/${raw}`;
-    return normalized.replace(/\/+/g, "/").replace(/\/$/, "") || "/";
-  }
-  function formatBytes(value) {
-    const bytes = Math.max(0, Number(value) || 0);
-    if (!bytes) return "0 B";
-    const units = ["B", "KB", "MB", "GB", "TB"];
-    let current = bytes;
-    let index = 0;
-    while (current >= 1024 && index < units.length - 1) {
-      current /= 1024;
-      index += 1;
-    }
-    return `${current >= 100 || index === 0 ? current.toFixed(0) : current.toFixed(2)} ${units[index]}`;
-  }
-  function formatDate(value) {
-    if (!value) return "-";
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString();
-  }
-  function buildSegments(pathname) {
-    const normalized = normalizePath(pathname);
-    if (normalized === "/") return [{ label: "home", path: "/" }];
-    const parts = normalized.split("/").filter(Boolean);
-    const segments = [{ label: "home", path: "/" }];
-    let current = "";
-    parts.forEach((part) => {
-      current += `/${part}`;
-      segments.push({ label: part, path: current });
-    });
-    return segments;
+    ] });
   }
   function ServerFilesPage({ pageData = data }) {
     const manager = pageData.fileManager || {};
     const permissions = pageData.permissions || {};
-    const [currentPath, setCurrentPath] = import_react8.default.useState(() => normalizePath(pageData.initialPath || "/"));
-    const [entries, setEntries] = import_react8.default.useState([]);
-    const [loading, setLoading] = import_react8.default.useState(true);
-    const [error, setError] = import_react8.default.useState(pageData.error || "");
-    const [menuPath, setMenuPath] = import_react8.default.useState("");
-    const [isDragging, setIsDragging] = import_react8.default.useState(false);
-    const [fileQueue, setFileQueue] = import_react8.default.useState([]);
-    const [isQueueExpanded, setIsQueueExpanded] = import_react8.default.useState(true);
-    const [activeModal, setActiveModal] = import_react8.default.useState({ type: null, target: null, extra: null });
-    const reloadFiles = import_react8.default.useCallback(() => {
-      setLoading(true);
-      setError("");
-      fetch(`${manager.fetchUrlBase}?path=${encodeURIComponent(currentPath)}`, {
-        credentials: "same-origin",
-        headers: { Accept: "application/json" }
-      }).then(async (response) => {
-        const payload = await response.json().catch(() => ({}));
-        const nextEntries = Array.isArray(payload.files) ? payload.files : [];
-        nextEntries.sort((left, right) => {
-          if (left.isDirectory && !right.isDirectory) return -1;
-          if (!left.isDirectory && right.isDirectory) return 1;
-          return String(left.name || "").localeCompare(String(right.name || ""), void 0, { numeric: true, sensitivity: "base" });
-        });
-        setEntries(nextEntries);
-        setLoading(false);
-      }).catch(() => {
-        setLoading(false);
-        setError("Failed to refresh files.");
-      });
-    }, [currentPath, manager.fetchUrlBase]);
-    const uploadFile = (file, queueId) => {
-      return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        const url = `${manager.uploadUrlBase || `/server/${pageData.server?.containerId}/files/upload`}?path=${encodeURIComponent(currentPath)}&name=${encodeURIComponent(file.name)}`;
-        xhr.upload.addEventListener("progress", (e) => {
-          if (e.lengthComputable) {
-            const percent = Math.round(e.loaded / e.total * 100);
-            setFileQueue((prev) => prev.map((item) => item.id === queueId ? { ...item, progress: percent } : item));
-          }
-        });
-        xhr.addEventListener("load", () => {
-          try {
-            const payload = JSON.parse(xhr.responseText);
-            if (xhr.status >= 200 && xhr.status < 300 && !payload.error) {
-              setFileQueue((prev) => prev.map((item) => item.id === queueId ? { ...item, status: "done", progress: 100 } : item));
-              resolve();
-            } else {
-              throw new Error(payload.error || "Upload failed");
-            }
-          } catch (err) {
-            setFileQueue((prev) => prev.map((item) => item.id === queueId ? { ...item, status: "error", error: err.message } : item));
-            reject(err);
-          }
-        });
-        xhr.addEventListener("error", () => {
-          setFileQueue((prev) => prev.map((item) => item.id === queueId ? { ...item, status: "error", error: "Network error" } : item));
-          reject(new Error("Network error"));
-        });
-        xhr.open("POST", url, true);
-        xhr.setRequestHeader("x-file-name", file.name);
-        xhr.withCredentials = true;
-        xhr.send(file);
-      });
-    };
-    const handleDrop = async (e) => {
-      e.preventDefault();
-      setIsDragging(false);
-      if (permissions.filesWriteLocked) return;
-      const droppedFiles = Array.from(e.dataTransfer.files);
-      if (droppedFiles.length === 0) return;
-      const newEntries = droppedFiles.map((f) => ({
-        id: Math.random().toString(36).substring(7),
-        name: f.name,
-        size: f.size,
-        progress: 0,
-        status: "uploading"
-      }));
-      setFileQueue((prev) => [...newEntries, ...prev]);
-      setIsQueueExpanded(true);
-      await Promise.allSettled(droppedFiles.map((file, idx) => uploadFile(file, newEntries[idx].id)));
-      reloadFiles();
-    };
-    const handleArchive = async (fileName) => {
-      if (!fileName) return;
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/client/servers/${pageData.server?.containerId}/files/archive`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ directory: currentPath, files: [fileName], name: `${fileName}.zip` })
-        });
-        const payload = await response.json();
-        if (!response.ok || payload.error) throw new Error(payload.error || "Archive failed");
-        reloadFiles();
-      } catch (err) {
-        setError(err.message);
-        setLoading(false);
-      }
-    };
-    const handleUnarchive = async (fileName) => {
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/client/servers/${pageData.server?.containerId}/files/unarchive`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ directory: currentPath, name: fileName })
-        });
-        const payload = await response.json();
-        if (!response.ok || payload.error) throw new Error(payload.error || "Extraction failed");
-        reloadFiles();
-      } catch (err) {
-        setError(err.message);
-        setLoading(false);
-      }
-    };
-    const handleDelete = async (fileName) => {
-      if (!window.confirm(`Are you sure you want to delete "${fileName}"? This action is permanent and cannot be undone.`)) {
-        return;
-      }
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/client/servers/${pageData.server?.containerId}/files/delete`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ directory: currentPath, files: [fileName] })
-        });
-        const payload = await response.json();
-        if (!response.ok || payload.error) throw new Error(payload.error || "Delete failed");
-        reloadFiles();
-      } catch (err) {
-        setError(err.message);
-        setLoading(false);
-      }
-    };
-    const handleDragOver = (e) => {
-      e.preventDefault();
-      if (!permissions.filesWriteLocked) setIsDragging(true);
-    };
-    const handleDragLeave = (e) => {
-      e.preventDefault();
-      if (!e.currentTarget.contains(e.relatedTarget)) {
-        setIsDragging(false);
-      }
-    };
-    import_react8.default.useEffect(() => {
+    const sftpDetails = pageData.sftpDetails || {};
+    const [currentPath, setCurrentPath] = (0, import_react7.useState)(() => normalizePath(pageData.initialPath || "/"));
+    const [entries, setEntries] = (0, import_react7.useState)([]);
+    const [loading, setLoading] = (0, import_react7.useState)(true);
+    const [error, setError] = (0, import_react7.useState)("");
+    const [selected, setSelected] = (0, import_react7.useState)(/* @__PURE__ */ new Set());
+    const [isDragging, setIsDragging] = (0, import_react7.useState)(false);
+    const [uploadQueue, setUploadQueue] = (0, import_react7.useState)([]);
+    const [contextMenu, setContextMenu] = (0, import_react7.useState)(null);
+    const [mediaViewer, setMediaViewer] = (0, import_react7.useState)(null);
+    const [modal, setModal] = (0, import_react7.useState)({ type: null, target: null, extra: null });
+    const openModal = (type, target = null, extra = null) => setModal({ type, target, extra });
+    const closeModal = () => setModal({ type: null, target: null, extra: null });
+    const loadDir = (0, import_react7.useCallback)(() => {
       let cancelled = false;
       setLoading(true);
       setError("");
+      setSelected(/* @__PURE__ */ new Set());
       fetch(`${manager.fetchUrlBase}?path=${encodeURIComponent(currentPath)}`, {
         credentials: "same-origin",
         headers: { Accept: "application/json" }
-      }).then(async (response) => {
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok || payload.error) {
-          throw new Error(payload.error || `Failed to load ${currentPath}`);
-        }
+      }).then((r) => r.json()).then((payload) => {
         if (cancelled) return;
-        const nextEntries = Array.isArray(payload.files) ? payload.files : [];
-        nextEntries.sort((left, right) => {
-          if (left.isDirectory && !right.isDirectory) return -1;
-          if (!left.isDirectory && right.isDirectory) return 1;
-          return String(left.name || "").localeCompare(String(right.name || ""), void 0, { numeric: true, sensitivity: "base" });
+        if (payload.error) throw new Error(payload.error);
+        const list = (Array.isArray(payload.files) ? payload.files : []).sort((a, b) => {
+          if (a.isDirectory && !b.isDirectory) return -1;
+          if (!a.isDirectory && b.isDirectory) return 1;
+          return String(a.name || "").localeCompare(String(b.name || ""), void 0, { numeric: true, sensitivity: "base" });
         });
-        setEntries(nextEntries);
+        setEntries(list);
         setLoading(false);
-      }).catch((requestError) => {
-        if (cancelled) return;
-        setEntries([]);
-        setLoading(false);
-        setError(requestError && requestError.message ? requestError.message : "Failed to load files.");
+      }).catch((e) => {
+        if (!cancelled) {
+          setEntries([]);
+          setLoading(false);
+          setError(e.message || "Failed to load files.");
+        }
       });
       return () => {
         cancelled = true;
       };
     }, [currentPath, manager.fetchUrlBase]);
-    const breadcrumbs = buildSegments(currentPath);
+    (0, import_react7.useEffect)(() => loadDir(), [loadDir]);
+    (0, import_react7.useEffect)(() => {
+      const handle = (e) => {
+        if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+        if (e.ctrlKey || e.metaKey) {
+          if (e.key === "f") {
+            e.preventDefault();
+            openModal("search");
+          }
+          if (e.key === "r") {
+            e.preventDefault();
+            loadDir();
+          }
+          if (e.key === "n" && !e.shiftKey) {
+            e.preventDefault();
+            openModal("createFile");
+          }
+          if (e.key === "n" && e.shiftKey) {
+            e.preventDefault();
+            openModal("createFolder");
+          }
+          if (e.key === "a") {
+            e.preventDefault();
+            setSelected(new Set(entries.map((e2) => e2.name)));
+          }
+        }
+        if (e.key === "Escape") {
+          setSelected(/* @__PURE__ */ new Set());
+          setContextMenu(null);
+        }
+      };
+      window.addEventListener("keydown", handle);
+      return () => window.removeEventListener("keydown", handle);
+    }, [entries, loadDir]);
+    const uploadFile = (0, import_react7.useCallback)((file, queueId) => {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const url = `${manager.uploadUrlBase || `/server/${pageData.server?.containerId}/files/upload`}?path=${encodeURIComponent(currentPath)}&name=${encodeURIComponent(file.name)}`;
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round(e.loaded / e.total * 100);
+            setUploadQueue((prev) => prev.map((i) => i.id === queueId ? { ...i, progress: pct } : i));
+          }
+        };
+        xhr.onreadystatechange = () => {
+          if (xhr.readyState !== 4) return;
+          try {
+            const p = JSON.parse(xhr.responseText || "{}");
+            if (xhr.status >= 200 && xhr.status < 300 && !p.error) {
+              setUploadQueue((prev) => prev.map((i) => i.id === queueId ? { ...i, status: "done", progress: 100 } : i));
+              resolve();
+            } else throw new Error(p.error || "Upload failed");
+          } catch (err) {
+            setUploadQueue((prev) => prev.map((i) => i.id === queueId ? { ...i, status: "error", error: err.message } : i));
+            reject(err);
+          }
+        };
+        xhr.open("POST", url, true);
+        xhr.setRequestHeader("Content-Type", "application/octet-stream");
+        xhr.setRequestHeader("x-file-name", file.name);
+        xhr.withCredentials = true;
+        xhr.send(file);
+      });
+    }, [currentPath, manager.uploadUrlBase, pageData.server?.containerId]);
+    const handleFiles = (0, import_react7.useCallback)(async (files) => {
+      if (permissions.filesWriteLocked) return;
+      const arr = Array.from(files);
+      if (arr.length === 0) return;
+      const newItems = arr.map((f) => ({ id: Math.random().toString(36).slice(2), name: f.name, size: f.size, progress: 0, status: "uploading" }));
+      setUploadQueue((prev) => [...newItems, ...prev]);
+      await Promise.allSettled(arr.map((f, i) => uploadFile(f, newItems[i].id)));
+      loadDir();
+    }, [permissions.filesWriteLocked, uploadFile, loadDir]);
+    const handleDragOver = (e) => {
+      e.preventDefault();
+      if (!permissions.filesWriteLocked) setIsDragging(true);
+    };
+    const handleDragLeave = (e) => {
+      if (!e.currentTarget.contains(e.relatedTarget)) setIsDragging(false);
+    };
+    const handleDrop = (e) => {
+      e.preventDefault();
+      setIsDragging(false);
+      handleFiles(e.dataTransfer.files);
+    };
+    const handleUnarchive = async (name) => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/client/servers/${pageData.server?.containerId}/files/unarchive`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ directory: currentPath, name })
+        });
+        const p = await res.json();
+        if (!res.ok || p.error) throw new Error(p.error || "Extraction failed");
+        loadDir();
+      } catch (e) {
+        setError(e.message);
+        setLoading(false);
+      }
+    };
+    const handleEntryClick = (entry, entryPath) => {
+      if (entry.isDirectory) {
+        setCurrentPath(entryPath);
+        return;
+      }
+      const mk = mediaKind(entry.name);
+      if (mk) {
+        setMediaViewer({ src: `${manager.downloadUrlBase}?path=${encodeURIComponent(entryPath)}`, fileName: entry.name, kind: mk });
+        return;
+      }
+      window.location.href = `${manager.editUrlBase}?path=${encodeURIComponent(entryPath)}`;
+    };
+    const toggleSelect = (name, e) => {
+      e.stopPropagation();
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(name)) next.delete(name);
+        else next.add(name);
+        return next;
+      });
+    };
+    const toggleAll = () => {
+      setSelected((prev) => prev.size === entries.length ? /* @__PURE__ */ new Set() : new Set(entries.map((e) => e.name)));
+    };
+    const handleContextMenu = (e, entry, entryPath) => {
+      e.preventDefault();
+      const x = Math.min(e.clientX, window.innerWidth - 220);
+      const y = Math.min(e.clientY, window.innerHeight - 300);
+      setContextMenu({ x, y, entry, entryPath });
+    };
+    const breadcrumbs = buildBreadcrumbs(currentPath);
     const activeServer = pageData.server || {};
-    return /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(ReactAppShell, { pageData, subtitle: "File manager", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-      PageContentBlock,
-      {
-        title: "File Manager",
-        description: "Browse container files, jump into the editor, or fall back to the legacy manager for advanced actions.",
-        eyebrow: "Server Workspace",
-        children: [
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex flex-wrap justify-between items-center gap-4 mb-6", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex flex-wrap gap-2", children: [
-              !permissions.filesWriteLocked && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(import_jsx_runtime8.Fragment, { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("button", { onClick: () => setActiveModal({ type: "createFile" }), className: "bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 font-semibold py-2 px-4 rounded-lg transition-colors text-sm shadow-sm flex items-center gap-2", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-file-earmark-plus" }),
-                  " New File"
-                ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("button", { onClick: () => setActiveModal({ type: "createFolder" }), className: "bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 font-semibold py-2 px-4 rounded-lg transition-colors text-sm shadow-sm flex items-center gap-2", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-folder-plus" }),
-                  " New Folder"
-                ] }),
-                manager.webUploadEnabled && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("button", { onClick: () => document.getElementById("hiddenFileInput").click(), className: "bg-primary-600 hover:bg-primary-500 text-white font-semibold py-2 px-4 rounded-lg transition-colors text-sm shadow-sm flex items-center gap-2", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-upload" }),
-                  " Upload"
-                ] })
+    const allSelected = entries.length > 0 && selected.size === entries.length;
+    return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(ReactAppShell, { pageData, subtitle: "File Manager", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "max-w-7xl mx-auto px-0 sm:px-4", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex flex-wrap items-center justify-between gap-3 mb-5", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex flex-wrap gap-2", children: [
+            !permissions.filesWriteLocked && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_jsx_runtime7.Fragment, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: () => openModal("createFile"), className: "flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 text-sm font-semibold px-4 py-2 rounded-lg transition-colors", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-file-earmark-plus" }),
+                " New File"
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("input", { type: "file", id: "hiddenFileInput", multiple: true, className: "hidden", onChange: (e) => handleDrop({ preventDefault: () => {
-              }, dataTransfer: { files: e.target.files } }) })
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: () => openModal("createFolder"), className: "flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 text-sm font-semibold px-4 py-2 rounded-lg transition-colors", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-folder-plus" }),
+                " New Folder"
+              ] }),
+              manager.webUploadEnabled && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: () => document.getElementById("_hiddenUpload").click(), className: "flex items-center gap-2 bg-primary-600 hover:bg-primary-500 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-cloud-upload" }),
+                " Upload"
+              ] }),
+              permissions.canFixPermissions && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("form", { method: "POST", action: `/server/${activeServer.containerId}/fix-permissions`, className: "inline-flex", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { type: "submit", className: "flex items-center gap-2 bg-amber-900/20 hover:bg-amber-900/30 border border-amber-800/40 text-amber-300 text-sm font-semibold px-4 py-2 rounded-lg transition-colors", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-tools" }),
+                " Fix Perms"
+              ] }) })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center gap-3", children: [
-              manager.webUploadEnabled ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "text-xs text-neutral-500 hidden sm:inline-block", children: `Max ${manager.webUploadMaxMb}MB/file` }) : null,
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("a", { href: `${manager.legacyUrl}?legacy=1`, className: "bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 font-semibold flex-shrink-0 py-2 px-4 rounded-lg transition-colors text-sm shadow-sm flex items-center gap-2", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-box-arrow-up-right text-xs" }),
-                " Legacy View"
-              ] })
-            ] })
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("input", { type: "file", id: "_hiddenUpload", multiple: true, className: "hidden", onChange: (e) => handleFiles(e.target.files) })
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-            CreateFolderModal,
-            {
-              isOpen: activeModal.type === "createFolder",
-              onClose: () => setActiveModal({ type: null }),
-              currentPath,
-              serverId: pageData.server?.containerId,
-              onComplete: reloadFiles
-            }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-            CreateFileModal,
-            {
-              isOpen: activeModal.type === "createFile",
-              onClose: () => setActiveModal({ type: null }),
-              currentPath,
-              onComplete: (path) => {
-                window.location.href = `${manager.editUrlBase}?path=${encodeURIComponent(path)}`;
-              }
-            }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-            RenameModal,
-            {
-              isOpen: activeModal.type === "rename",
-              onClose: () => setActiveModal({ type: null }),
-              currentPath,
-              serverId: pageData.server?.containerId,
-              targetItem: activeModal.target,
-              onComplete: reloadFiles
-            }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-            PermissionsModal,
-            {
-              isOpen: activeModal.type === "chmod",
-              onClose: () => setActiveModal({ type: null }),
-              currentPath,
-              serverId: pageData.server?.containerId,
-              targetItem: activeModal.target,
-              currentPerms: activeModal.extra,
-              onComplete: reloadFiles
-            }
-          ),
-          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-4 gap-6 items-start", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "lg:col-span-1 flex flex-col gap-6", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-6", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("h2", { className: "text-lg font-bold text-white mb-4", children: "Storage Access" }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex flex-col gap-3", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-2", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Server" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { className: "text-neutral-200", children: activeServer.name || "Server" })
-                ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-2", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Status" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { className: "text-neutral-200 capitalize", children: activeServer.status || "unknown" })
-                ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-2", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Writable" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { className: permissions.canWriteFiles && !permissions.filesWriteLocked ? "text-green-400" : "text-red-400", children: permissions.canWriteFiles && !permissions.filesWriteLocked ? "Yes" : "Read only" })
-                ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex justify-between items-center", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "SFTP" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { className: "text-neutral-200", children: pageData.sftpDetails && pageData.sftpDetails.available ? "Available" : "Unavailable" })
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex items-center gap-2", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: () => openModal("search"), className: "flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-300 text-sm px-3 py-2 rounded-lg transition-colors", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-search" }),
+              " ",
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "hidden sm:inline", children: "Search" })
+            ] }),
+            sftpDetails.available && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("button", { onClick: () => openModal("sftp"), className: "flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-300 text-sm px-3 py-2 rounded-lg transition-colors", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-hdd-network" }),
+              " ",
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "hidden sm:inline", children: "SFTP" })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("button", { onClick: loadDir, className: "flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-300 text-sm px-3 py-2 rounded-lg transition-colors", title: "Refresh (Ctrl+R)", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-arrow-clockwise" }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("a", { href: `${manager.legacyUrl}?legacy=1`, className: "flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-400 text-xs px-3 py-2 rounded-lg transition-colors", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-box-arrow-up-right" }),
+              " Legacy"
+            ] })
+          ] })
+        ] }),
+        permissions.filesWriteLocked && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "mb-4 flex items-center gap-2 px-4 py-3 bg-amber-900/10 border border-amber-800/30 text-amber-200 rounded-xl text-sm", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-shield-lock-fill text-amber-500" }),
+          "File writes are locked by policy. Read-only mode."
+        ] }),
+        !permissions.filesWriteLocked && (pageData.policyReadOnlyPatterns || []).length > 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "mb-4 flex items-center gap-2 px-4 py-3 bg-blue-900/10 border border-blue-800/30 text-blue-200 rounded-xl text-sm", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-shield-lock text-blue-400" }),
+          "Read-only pattern policy is active for ",
+          pageData.policyReadOnlyPatterns.length,
+          " path(s)."
+        ] }),
+        manager.webUploadEnabled && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-xs text-neutral-600 mb-3", children: [
+          "Max upload: ",
+          manager.webUploadMaxMb,
+          " MB per file \xB7 Drag & drop anywhere below"
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+          BulkBar,
+          {
+            selected,
+            writeLocked: permissions.filesWriteLocked,
+            onClear: () => setSelected(/* @__PURE__ */ new Set()),
+            onBulkDelete: () => openModal("bulkDelete", null, selected),
+            onBulkRename: () => openModal("bulkRename", null, selected),
+            onBulkChmod: () => openModal("bulkChmod", null, selected),
+            onBulkArchive: () => openModal("archive", null, selected)
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+          "div",
+          {
+            className: "bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden relative",
+            onDragOver: handleDragOver,
+            onDragLeave: handleDragLeave,
+            onDrop: handleDrop,
+            onContextMenu: (e) => {
+              e.preventDefault();
+              setContextMenu(null);
+            },
+            children: [
+              isDragging && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "absolute inset-0 z-50 bg-primary-600/10 border-2 border-dashed border-primary-500 rounded-2xl flex items-center justify-center pointer-events-none", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "bg-neutral-950 rounded-2xl px-12 py-10 shadow-2xl border border-neutral-700 flex flex-col items-center", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-cloud-arrow-up text-5xl text-primary-500 mb-3" }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-xl font-black text-white uppercase tracking-wider", children: "Drop to Upload" }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { className: "text-xs text-neutral-500 mt-2", children: [
+                  "into ",
+                  currentPath
                 ] })
+              ] }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "px-5 py-3 border-b border-neutral-800 bg-neutral-900/60 flex items-center flex-wrap gap-1", children: breadcrumbs.map((seg, idx) => /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(import_react7.default.Fragment, { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                  "button",
+                  {
+                    type: "button",
+                    onClick: () => idx !== breadcrumbs.length - 1 && setCurrentPath(seg.path),
+                    className: `flex items-center gap-1 text-sm font-semibold transition-colors px-1 ${idx === breadcrumbs.length - 1 ? "text-neutral-200 cursor-default" : "text-neutral-500 hover:text-white"}`,
+                    children: seg.icon ? /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-house-door-fill text-base" }) : seg.label
+                  }
+                ),
+                idx < breadcrumbs.length - 1 && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-neutral-700 font-bold", children: "/" })
+              ] }, seg.path)) }),
+              error && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "px-5 py-3 border-b border-red-900/30 bg-red-900/10 text-red-300 text-sm flex items-center gap-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-exclamation-triangle-fill text-red-500" }),
+                " ",
+                error
               ] }),
-              permissions.filesWriteLocked ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "mt-6 bg-yellow-900/20 border border-yellow-500/30 text-yellow-200 p-3 rounded text-sm flex items-start gap-2", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-shield-lock text-yellow-500 mt-0.5" }),
-                "File writes are locked by policy. Use editor and downloads in read-only mode."
-              ] }) : null
-            ] }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-              "div",
-              {
-                className: "lg:col-span-3 relative",
-                onDragOver: handleDragOver,
-                onDragLeave: handleDragLeave,
-                onDrop: handleDrop,
-                children: [
-                  isDragging && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "absolute inset-0 z-50 bg-primary-600/20 backdrop-blur-[2px] border-2 border-dashed border-primary-500 rounded-lg flex items-center justify-center pointer-events-none transition-all duration-300", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "bg-neutral-900 px-8 py-10 rounded-2xl shadow-2xl border border-neutral-700 flex flex-col items-center animate-bounce", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-cloud-arrow-up text-5xl text-primary-500 mb-4" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "text-xl font-black text-white uppercase tracking-widest", children: "Drop to Upload" }),
-                    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "text-sm text-neutral-400 mt-2", children: [
-                      "File(s) will be uploaded to ",
-                      currentPath
-                    ] })
-                  ] }) }),
-                  fileQueue.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: `fixed bottom-6 right-6 z-[60] w-80 bg-neutral-900 border border-neutral-700 rounded-2xl shadow-2xl transition-all duration-300 ${isQueueExpanded ? "translate-y-0 opacity-100" : "translate-y-[calc(100%-50px)]"}`, children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-                      "div",
-                      {
-                        className: "p-4 border-b border-neutral-800 flex items-center justify-between cursor-pointer hover:bg-neutral-800/50 transition-colors rounded-t-2xl",
-                        onClick: () => setIsQueueExpanded(!isQueueExpanded),
-                        children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center gap-3", children: [
-                            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "relative", children: [
-                              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-cloud-arrow-up text-xl text-primary-500" }),
-                              fileQueue.filter((f) => f.status === "uploading").length > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "absolute -top-1 -right-1 flex h-3 w-3", children: [
-                                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75" }),
-                                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "relative inline-flex rounded-full h-3 w-3 bg-primary-500" })
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "grid grid-cols-12 px-4 py-2.5 border-b border-neutral-800 bg-neutral-950/40 text-[10px] font-black text-neutral-500 uppercase tracking-widest", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "col-span-1 flex items-center justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                  "input",
+                  {
+                    type: "checkbox",
+                    checked: allSelected,
+                    onChange: toggleAll,
+                    className: "w-4 h-4 rounded border-neutral-700 bg-neutral-900 accent-primary-500 cursor-pointer"
+                  }
+                ) }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "col-span-6", children: "Name" }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "hidden md:block col-span-2", children: "Permissions" }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "hidden md:block col-span-2 text-right", children: "Size" }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "col-span-5 md:col-span-1 text-right", children: "Actions" })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "min-h-[300px]", children: [
+                loading && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "flex justify-center items-center py-20", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex flex-col items-center gap-4", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "w-10 h-10 border-4 border-neutral-800 border-t-primary-500 rounded-full animate-spin" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-xs text-neutral-500 uppercase tracking-widest font-bold", children: "Loading\u2026" })
+                ] }) }),
+                !loading && entries.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "flex flex-col items-center justify-center py-20 text-neutral-600", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-folder2-open text-4xl mb-3" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-sm", children: "This directory is empty" })
+                ] }),
+                !loading && entries.map((entry) => {
+                  const entryPath = normalizePath(`${currentPath === "/" ? "" : currentPath}/${entry.name}`);
+                  const isSelected = selected.has(entry.name);
+                  const icon = getFileIcon(entry);
+                  const mk = !entry.isDirectory ? mediaKind(entry.name) : null;
+                  return /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+                    "div",
+                    {
+                      onContextMenu: (e) => handleContextMenu(e, entry, entryPath),
+                      className: `grid grid-cols-12 items-center px-4 py-2.5 border-b border-neutral-800/40 transition-colors group relative ${isSelected ? "bg-primary-900/10 border-primary-900/20" : "hover:bg-neutral-800/30"}`,
+                      children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "col-span-1 flex justify-center", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                          "input",
+                          {
+                            type: "checkbox",
+                            checked: isSelected,
+                            onClick: (e) => toggleSelect(entry.name, e),
+                            onChange: () => {
+                            },
+                            className: "w-4 h-4 rounded border-neutral-700 bg-neutral-900 accent-primary-500 cursor-pointer"
+                          }
+                        ) }),
+                        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "col-span-6 flex items-center min-w-0", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)(
+                          "button",
+                          {
+                            type: "button",
+                            onClick: () => handleEntryClick(entry, entryPath),
+                            className: "flex items-center gap-3 text-left min-w-0 flex-1 py-1.5 group/name",
+                            children: [
+                              /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: `bi ${icon} text-xl shrink-0` }),
+                              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "min-w-0", children: [
+                                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "text-sm font-semibold text-neutral-200 group-hover/name:text-white truncate transition-colors", children: entry.name }),
+                                entry.isDirectory && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-[10px] text-neutral-600", children: [
+                                  "Folder \xB7 ",
+                                  formatDate(entry.modified)
+                                ] }),
+                                !entry.isDirectory && /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "text-[10px] text-neutral-600 md:hidden", children: [
+                                  formatBytes(entry.size),
+                                  " \xB7 ",
+                                  entry.permissions || ""
+                                ] })
                               ] })
-                            ] }),
-                            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { children: [
-                              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "text-[10px] font-black text-neutral-500 uppercase tracking-widest leading-none mb-1", children: "Queue Manager" }),
-                              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "text-xs font-bold text-white leading-none", children: [
-                                fileQueue.filter((f) => f.status === "done").length,
-                                " of ",
-                                fileQueue.length,
-                                " files uploaded"
-                              ] })
-                            ] })
-                          ] }),
-                          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex items-center gap-4", children: [
-                            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: `bi ${isQueueExpanded ? "bi-chevron-down" : "bi-chevron-up"} text-neutral-500` }),
-                            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                              "button",
-                              {
-                                className: "text-neutral-500 hover:text-white transition-colors",
-                                onClick: (e) => {
-                                  e.stopPropagation();
-                                  setFileQueue([]);
-                                },
-                                children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-x-lg text-xs" })
-                              }
-                            )
-                          ] })
-                        ]
-                      }
-                    ),
-                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: `overflow-y-auto max-h-64 flex flex-col divide-y divide-neutral-800 transition-all ${isQueueExpanded ? "opacity-100" : "opacity-0 h-0 pointer-events-none"}`, children: fileQueue.map((item) => /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "p-4 hover:bg-white/[0.02] transition-colors", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex justify-between items-start mb-2 gap-3", children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "min-w-0", children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "text-xs font-bold text-neutral-200 truncate", children: item.name }),
-                          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "text-[10px] text-neutral-500 font-mono mt-0.5", children: formatBytes(item.size) })
-                        ] }),
-                        item.status === "done" ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-check-circle-fill text-green-500" }) : item.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-exclamation-circle-fill text-red-500" }) : /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("span", { className: "text-[10px] font-black text-primary-500", children: [
-                          item.progress,
-                          "%"
-                        ] })
-                      ] }),
-                      item.status === "uploading" && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "h-1 w-full bg-neutral-800 rounded-full overflow-hidden", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                        "div",
-                        {
-                          className: "h-full bg-primary-500 transition-all duration-300 ease-out",
-                          style: { width: `${item.progress}%` }
-                        }
-                      ) }),
-                      item.status === "error" && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "text-[10px] text-red-500 mt-1 truncate", children: item.error })
-                    ] }, item.id)) })
-                  ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg overflow-hidden flex flex-col", children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "px-5 py-4 border-b border-neutral-700/70 bg-neutral-800 flex items-center flex-wrap gap-2", children: breadcrumbs.map((segment, index) => /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(import_react8.default.Fragment, { children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                        "button",
-                        {
-                          type: "button",
-                          className: `font-semibold hover:text-white transition-colors ${index === breadcrumbs.length - 1 ? "text-neutral-100 cursor-default" : "text-neutral-400"}`,
-                          onClick: () => index !== breadcrumbs.length - 1 && setCurrentPath(segment.path),
-                          children: segment.label === "home" ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-house-door-fill text-lg relative top-[1px]" }) : segment.label
-                        }
-                      ),
-                      index < breadcrumbs.length - 1 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "text-neutral-600 font-bold mx-1", children: "/" })
-                    ] }, segment.path)) }),
-                    error && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "bg-red-600/20 border-b border-red-600/50 text-red-100 p-3 px-5 text-sm flex items-center gap-2", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-exclamation-triangle-fill text-red-500" }),
-                      " ",
-                      error
-                    ] }),
-                    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "grid grid-cols-12 gap-4 px-6 py-3 border-b border-neutral-700/50 bg-neutral-900/30 text-xs font-bold text-neutral-400 uppercase tracking-widest hidden sm:grid", children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "col-span-6", children: "Name" }),
-                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "col-span-3", children: "Modified" }),
-                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "col-span-2 text-right", children: "Size" }),
-                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "col-span-1 text-right", children: "Actions" })
-                    ] }),
-                    /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex flex-col min-h-[400px]", children: [
-                      loading && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "flex-1 flex justify-center items-center py-16", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex flex-col items-center justify-center space-y-4", children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "w-10 h-10 border-4 border-neutral-600 border-t-primary-500 rounded-full animate-spin" }),
-                        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "text-neutral-400 text-sm", children: "Loading directory..." })
-                      ] }) }),
-                      !loading && entries.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "flex-1 flex justify-center items-center py-16", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "text-center", children: [
-                        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-folder2-open text-4xl text-neutral-600 block mb-3" }),
-                        /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "text-neutral-400 text-sm block", children: "This directory is empty." })
-                      ] }) }),
-                      !loading && entries.map((entry) => {
-                        const entryPath = normalizePath(`${currentPath === "/" ? "" : currentPath}/${entry.name || ""}`);
-                        const isMenuOpen = menuPath === entryPath;
-                        return /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "grid sm:grid-cols-12 gap-0 sm:gap-4 px-0 sm:px-6 py-0 border-b border-neutral-700/30 hover:bg-neutral-700/20 transition-colors group relative", children: [
-                          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "sm:col-span-6 flex items-center", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                            ]
+                          }
+                        ) }),
+                        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "hidden md:flex col-span-2 items-center", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-xs font-mono text-neutral-500", children: entry.permissions || "\u2014" }) }),
+                        /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("div", { className: "hidden md:flex col-span-2 items-center justify-end", children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "text-xs font-mono text-neutral-500", children: entry.isDirectory ? "\u2014" : formatBytes(entry.size) }) }),
+                        /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "col-span-5 md:col-span-1 flex items-center justify-end gap-1", children: [
+                          mk && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
                             "button",
                             {
-                              type: "button",
-                              className: "w-full text-left px-5 sm:px-0 py-4 flex items-center gap-4 hover:text-white transition-colors",
-                              onClick: () => {
-                                setMenuPath("");
-                                if (entry.isDirectory) {
-                                  setCurrentPath(entryPath);
-                                } else {
-                                  window.location.href = `${manager.editUrlBase}?path=${encodeURIComponent(entryPath)}`;
-                                }
-                              },
-                              children: [
-                                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: `text-2xl ${entry.isDirectory ? "bi bi-folder-fill text-primary-400 group-hover:text-primary-300" : "bi bi-file-earmark-text text-neutral-400 group-hover:text-neutral-300"}` }),
-                                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "overflow-hidden", children: [
-                                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("strong", { className: "block text-neutral-200 text-sm truncate font-semibold", children: entry.name || "Unnamed item" }),
-                                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("span", { className: "block text-xs text-neutral-500 sm:hidden mt-0.5", children: entry.isDirectory ? "Folder" : entry.permissions || "File" })
-                                ] })
-                              ]
+                              onClick: () => setMediaViewer({ src: `${manager.downloadUrlBase}?path=${encodeURIComponent(entryPath)}`, fileName: entry.name, kind: mk }),
+                              className: "w-7 h-7 flex items-center justify-center rounded text-neutral-600 hover:text-purple-400 hover:bg-purple-900/20 transition-colors opacity-0 group-hover:opacity-100",
+                              title: "Preview",
+                              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-play-circle text-sm" })
                             }
-                          ) }),
-                          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "hidden sm:flex col-span-3 items-center", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "text-sm text-neutral-400 truncate", children: formatDate(entry.modified) }) }),
-                          /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "hidden sm:flex col-span-2 items-center justify-end", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "text-sm text-neutral-400 font-mono", children: entry.isDirectory ? "Folder" : formatBytes(entry.size) }) }),
-                          /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "flex sm:col-span-1 items-center justify-end px-4 sm:px-0 py-2 sm:py-0", children: [
-                            /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                              "button",
-                              {
-                                type: "button",
-                                className: "w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg sm:rounded text-neutral-400 hover:text-white hover:bg-neutral-700 sm:hover:bg-neutral-600 transition-colors border border-neutral-700 sm:border-0",
-                                onClick: (e) => {
-                                  e.stopPropagation();
-                                  setMenuPath(isMenuOpen ? "" : entryPath);
-                                },
-                                children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-three-dots" })
-                              }
-                            ),
-                            isMenuOpen && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "absolute right-4 sm:right-6 top-14 sm:top-12 z-50 w-56 bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl py-2 transform origin-top-right transition-all overflow-hidden ring-1 ring-black/50", children: [
-                              entry.isDirectory ? /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-                                "button",
-                                {
-                                  type: "button",
-                                  className: "w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-3 transition-colors",
-                                  onClick: () => {
-                                    setCurrentPath(entryPath);
-                                    setMenuPath("");
-                                  },
-                                  children: [
-                                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-folder-symlink text-primary-400" }),
-                                    " Open Folder"
-                                  ]
-                                }
-                              ) : /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(import_jsx_runtime8.Fragment, { children: [
-                                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("a", { className: "flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors", href: `${manager.editUrlBase}?path=${encodeURIComponent(entryPath)}`, children: [
-                                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-pencil text-neutral-400" }),
-                                  " Edit File"
-                                ] }),
-                                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("a", { className: "flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors", href: `${manager.previewUrlBase}?path=${encodeURIComponent(entryPath)}`, children: [
-                                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-eye text-neutral-400" }),
-                                  " Preview"
-                                ] }),
-                                permissions.canDownloadFiles && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("a", { className: "flex items-center gap-3 px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 mt-1 border-t border-neutral-800/50 pt-2 transition-colors", href: `${manager.downloadUrlBase}?path=${encodeURIComponent(entryPath)}`, children: [
-                                  /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-cloud-arrow-down text-blue-400" }),
-                                  " Download"
-                                ] })
-                              ] }),
-                              !permissions.filesWriteLocked && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "mt-1 pt-1 border-t border-neutral-800/50", children: [
-                                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-                                  "button",
-                                  {
-                                    type: "button",
-                                    className: "w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-3 transition-colors",
-                                    onClick: () => {
-                                      setActiveModal({ type: "rename", target: entry.name });
-                                      setMenuPath("");
-                                    },
-                                    children: [
-                                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-input-cursor-text" }),
-                                      " Rename"
-                                    ]
-                                  }
-                                ),
-                                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-                                  "button",
-                                  {
-                                    type: "button",
-                                    className: "w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-3 transition-colors",
-                                    onClick: () => {
-                                      setActiveModal({ type: "chmod", target: entry.name, extra: entry.permissions });
-                                      setMenuPath("");
-                                    },
-                                    children: [
-                                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-shield-check" }),
-                                      " Permissions"
-                                    ]
-                                  }
-                                ),
-                                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-                                  "button",
-                                  {
-                                    type: "button",
-                                    className: "w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-3 transition-colors",
-                                    onClick: () => {
-                                      handleArchive(entry.name);
-                                      setMenuPath("");
-                                    },
-                                    children: [
-                                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-file-zip text-yellow-400" }),
-                                      " Archive"
-                                    ]
-                                  }
-                                ),
-                                !entry.isDirectory && (entry.name.endsWith(".zip") || entry.name.endsWith(".tar.gz") || entry.name.endsWith(".tar")) && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-                                  "button",
-                                  {
-                                    type: "button",
-                                    className: "w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:text-white hover:bg-neutral-800 flex items-center gap-3 transition-colors",
-                                    onClick: () => {
-                                      handleUnarchive(entry.name);
-                                      setMenuPath("");
-                                    },
-                                    children: [
-                                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-file-earmark-zip text-green-400" }),
-                                      " Unarchive"
-                                    ]
-                                  }
-                                ),
-                                /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
-                                  "button",
-                                  {
-                                    type: "button",
-                                    className: "w-full text-left px-4 py-2.5 text-sm text-red-400 hover:text-white hover:bg-red-500/10 flex items-center gap-3 transition-colors",
-                                    onClick: () => {
-                                      handleDelete(entry.name);
-                                      setMenuPath("");
-                                    },
-                                    children: [
-                                      /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-trash3 text-red-500" }),
-                                      " Delete"
-                                    ]
-                                  }
-                                )
-                              ] }),
-                              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "border-t border-neutral-800/50 mt-1 pt-1", children: /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("a", { className: "flex items-center gap-3 px-4 py-2.5 text-xs text-neutral-500 hover:text-white hover:bg-neutral-800 transition-colors", href: `${manager.legacyUrl}?legacy=1&path=${encodeURIComponent(currentPath)}`, children: [
-                                /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-box-arrow-up-right" }),
-                                " Legacy Mode"
-                              ] }) })
-                            ] })
-                          ] })
-                        ] }, entryPath);
-                      })
-                    ] })
-                  ] })
-                ]
-              }
-            )
-          ] })
-        ]
-      }
-    ) });
+                          ),
+                          !entry.isDirectory && permissions.canDownloadFiles && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                            "a",
+                            {
+                              href: `${manager.downloadUrlBase}?path=${encodeURIComponent(entryPath)}`,
+                              className: "w-7 h-7 flex items-center justify-center rounded text-neutral-600 hover:text-blue-400 hover:bg-blue-900/20 transition-colors opacity-0 group-hover:opacity-100",
+                              title: "Download",
+                              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-cloud-arrow-down text-sm" })
+                            }
+                          ),
+                          !permissions.filesWriteLocked && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                            "button",
+                            {
+                              onClick: () => openModal("rename", entry.name),
+                              className: "w-7 h-7 flex items-center justify-center rounded text-neutral-600 hover:text-amber-400 hover:bg-amber-900/20 transition-colors opacity-0 group-hover:opacity-100",
+                              title: "Rename",
+                              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-input-cursor-text text-sm" })
+                            }
+                          ),
+                          !permissions.filesWriteLocked && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                            "button",
+                            {
+                              onClick: () => openModal("delete", null, /* @__PURE__ */ new Set([entry.name])),
+                              className: "w-7 h-7 flex items-center justify-center rounded text-neutral-600 hover:text-red-400 hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100",
+                              title: "Delete",
+                              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-trash3 text-sm" })
+                            }
+                          ),
+                          /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+                            "button",
+                            {
+                              onClick: (e) => {
+                                e.stopPropagation();
+                                handleContextMenu(e, entry, entryPath);
+                              },
+                              className: "w-7 h-7 flex items-center justify-center rounded text-neutral-500 hover:text-white hover:bg-neutral-700 transition-colors border border-neutral-700 md:border-0",
+                              title: "More",
+                              children: /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("i", { className: "bi bi-three-dots text-sm" })
+                            }
+                          )
+                        ] })
+                      ]
+                    },
+                    entryPath
+                  );
+                })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("div", { className: "px-5 py-2.5 border-t border-neutral-800 bg-neutral-950/30 flex justify-between items-center text-[10px] text-neutral-600 font-mono", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsxs)("span", { children: [
+                  entries.length,
+                  " item",
+                  entries.length !== 1 ? "s" : ""
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime7.jsx)("span", { className: "hidden sm:inline", children: "Ctrl+F search \xB7 Ctrl+A select all \xB7 Right-click for options" })
+              ] })
+            ]
+          }
+        )
+      ] }),
+      contextMenu && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+        ContextMenu,
+        {
+          x: contextMenu.x,
+          y: contextMenu.y,
+          entry: contextMenu.entry,
+          entryPath: contextMenu.entryPath,
+          writeLocked: permissions.filesWriteLocked,
+          canDownload: permissions.canDownloadFiles,
+          editUrlBase: manager.editUrlBase,
+          previewUrlBase: manager.previewUrlBase,
+          downloadUrlBase: manager.downloadUrlBase,
+          currentPath,
+          serverId: activeServer.containerId,
+          onClose: () => setContextMenu(null),
+          onRename: (name) => openModal("rename", name),
+          onChmod: (name, perms) => openModal("chmod", name, perms),
+          onArchive: (names) => openModal("archive", null, names),
+          onUnarchive: (name) => handleUnarchive(name),
+          onDelete: (names) => openModal("delete", null, names),
+          onNavigate: (path) => setCurrentPath(path)
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(SearchModal, { isOpen: modal.type === "search", onClose: closeModal, serverId: activeServer.containerId, onNavigate: setCurrentPath }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(SftpModal, { isOpen: modal.type === "sftp", onClose: closeModal, sftpDetails }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(CreateFileModal, { isOpen: modal.type === "createFile", onClose: closeModal, currentPath, editUrlBase: manager.editUrlBase }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(CreateFolderModal, { isOpen: modal.type === "createFolder", onClose: closeModal, serverId: activeServer.containerId, currentPath, onComplete: loadDir }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(RenameModal, { isOpen: modal.type === "rename", onClose: closeModal, serverId: activeServer.containerId, currentPath, targetName: modal.target, onComplete: loadDir }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ChmodModal, { isOpen: modal.type === "chmod", onClose: closeModal, serverId: activeServer.containerId, currentPath, targetName: modal.target, currentPerms: modal.extra, onComplete: loadDir }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(DeleteModal, { isOpen: modal.type === "delete", onClose: closeModal, serverId: activeServer.containerId, currentPath, targetNames: modal.extra || /* @__PURE__ */ new Set(), onComplete: loadDir }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ArchiveModal, { isOpen: modal.type === "archive", onClose: closeModal, serverId: activeServer.containerId, currentPath, targetNames: modal.extra || /* @__PURE__ */ new Set(), onComplete: loadDir }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(BulkRenameModal, { isOpen: modal.type === "bulkRename", onClose: closeModal, serverId: activeServer.containerId, currentPath, selectedNames: modal.extra || /* @__PURE__ */ new Set(), onComplete: () => {
+        loadDir();
+        setSelected(/* @__PURE__ */ new Set());
+      } }),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(BulkChmodModal, { isOpen: modal.type === "bulkChmod", onClose: closeModal, serverId: activeServer.containerId, currentPath, selectedNames: modal.extra || /* @__PURE__ */ new Set(), onComplete: () => {
+        loadDir();
+        setSelected(/* @__PURE__ */ new Set());
+      } }),
+      mediaViewer && /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(
+        MediaViewer,
+        {
+          isOpen: true,
+          onClose: () => setMediaViewer(null),
+          src: mediaViewer.src,
+          fileName: mediaViewer.fileName,
+          kind: mediaViewer.kind,
+          serverId: activeServer.containerId
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime7.jsx)(UploadQueue, { queue: uploadQueue, onClear: () => setUploadQueue([]) })
+    ] });
   }
   var server_files_default = ServerFilesPage;
   if (root) {
-    root.render(/* @__PURE__ */ (0, import_jsx_runtime8.jsx)(ServerFilesPage, { pageData: data }));
+    root.render(/* @__PURE__ */ (0, import_jsx_runtime7.jsx)(ServerFilesPage, { pageData: data }));
     if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
       window.__CPANEL_REACT_BOOTED__();
     }

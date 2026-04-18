@@ -17893,7 +17893,7 @@ return res.render('server/users', {
                 return res.json(reactPageData);
             }
 
-            if (Number(req.session.user.experimentalViewMode) === 1) {
+            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
                 return res.render('react/loader', {
                     reactPageData,
                     reactEntry: 'server-minecraft-addons',
@@ -22408,7 +22408,7 @@ res.render('server/startup', {
                 return res.json(reactPageData);
             }
 
-            if (Number(req.session.user.experimentalViewMode) === 1) {
+            if (!wantsLegacyReactBypass(req) && String(req.session && req.session.user ? req.session.user.experimentalViewMode || 'ejs' : 'ejs').trim().toLowerCase() === 'react') {
                 return res.render('react/loader', {
                     pageData: reactPageData,
                     pageMeta: { entry: 'server-file-editor' },
