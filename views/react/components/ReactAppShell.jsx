@@ -11,7 +11,7 @@ import FooterLegalModal from './FooterLegalModal.jsx';
 import { ThemeProvider } from './ThemeContext.jsx';
 
 // Import base themes
-import '../../public/css/react-themes-base.css';
+import '../../../public/css/react-themes-base.css';
 
 function InternalTopAction({ to, icon, title }) {
     return (
