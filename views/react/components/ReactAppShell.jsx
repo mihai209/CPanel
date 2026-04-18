@@ -94,7 +94,12 @@ export default function ReactAppShell({
                     
                     <div className="hidden md:flex items-center gap-2">
                         {pageData.user?.isAdmin && (
-                            <InternalTopAction to={ReactRoutes.connectorsCheck} icon="bi-cpu" title="Connectors Check" />
+                            <>
+                                <a className="text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700" href={ReactRoutes.admin} title="Admin Area">
+                                    <i className="bi bi-gear-fill"></i>
+                                </a>
+                                <InternalTopAction to={ReactRoutes.connectorsCheck} icon="bi-cpu" title="Connectors Check" />
+                            </>
                         )}
                         <NotificationBell />
                         <div className="h-6 w-px bg-neutral-700 mx-2"></div>

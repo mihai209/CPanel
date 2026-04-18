@@ -17588,12 +17588,12 @@ return res.render('server/users', {
 
             const minecraftAdminRecentEvents = await loadMinecraftAdminRecentEvents(server.id, 18).catch(() => []);
 
-            return res.render('server/minecraft-admin', {
+            const reactPageData = {
                 server,
                 user: req.session.user,
                 title: `Minecraft Admin ${server.name}`,
-                path: '/servers',
-                active: 'mccenter',
+                serverNavItems: buildReactServerNavItems(server, access, 'mccenter'),
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
                 minecraftAdminPlayer: String(req.query.player || '').trim(),
                 minecraftAdminPermissions: {
                     inspect: hasServerPermission(access, 'minecraft.inspect'),
@@ -17610,6 +17610,16 @@ return res.render('server/users', {
                     playerData: hasServerPermission(access, 'minecraft.inspect')
                 },
                 minecraftAdminRecentEvents
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
+            return res.render('react/loader', {
+                reactPageData,
+                reactEntry: 'server-minecraft-admin',
+                title: reactPageData.title
             });
         } catch (err) {
             console.error('Error loading Minecraft admin:', err);
@@ -18039,11 +18049,12 @@ return res.render('server/users', {
             const resourcePackPrompt = minecraftProperties['resource-pack-prompt'] || '';
             const motdPresets = await getUserMotdPresets(req.session.user && req.session.user.id);
 
-            return res.render('server/minecraft-configs', {
+            const reactPageData = {
                 server,
                 user: req.session.user,
                 title: `Minecraft Control ${server.name}`,
-                path: '/servers',
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                serverNavItems: buildReactServerNavItems(server, access, 'mccenter'),
                 minecraftStatusAddress: statusAddress,
                 minecraftStatusPreview: statusPreview,
                 minecraftBedrockMode: bedrockMode,
@@ -18057,13 +18068,19 @@ return res.render('server/users', {
                     required: resourcePackRequired,
                     prompt: resourcePackPrompt
                 },
-                motdPresets,
-                minecraftPropertiesError,
-                commandMacros,
-                canUseMacros: hasServerPermission(access, 'server.macros'),
-                canRunConsole: hasServerPermission(access, 'server.console'),
-                success: req.query.success || null,
-                error: req.query.error || null
+                minecraftMotdPresets: motdPresets,
+                minecraftCommandMacros: commandMacros,
+                minecraftPropertiesError
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
+            return res.render('react/loader', {
+                reactPageData,
+                reactEntry: 'server-minecraft-configs',
+                title: reactPageData.title
             });
         } catch (err) {
             console.error('Error loading minecraft control center:', err);

@@ -13,7 +13,8 @@ const root = standaloneEntry ? createRoot(document.getElementById('reactRoot')) 
 
 export function DashboardPage({ pageData = data }) {
     const [servers, setServers] = React.useState(Array.isArray(pageData.servers) ? pageData.servers : null);
-    
+    const [searchQuery, setSearchQuery] = React.useState('');
+    const [selectedUser, setSelectedUser] = React.useState('');
     // Simulate loading for purely visual feedback if pageData loaded quickly
     React.useEffect(() => {
         if (!pageData.servers) {
@@ -26,6 +27,37 @@ export function DashboardPage({ pageData = data }) {
 
     const isViewingAllServers = Boolean(pageData.showOthersServers);
     const userIsAdmin = Boolean(pageData.isAdminDashboard);
+
+    const uniqueUsers = React.useMemo(() => {
+        if (!servers || !isViewingAllServers) return [];
+        const users = new Set();
+        servers.forEach(s => {
+            if (s.owner && s.owner.username) {
+                users.add(s.owner.username);
+            }
+        });
+        return Array.from(users).sort();
+    }, [servers, isViewingAllServers]);
+
+    const filteredServers = React.useMemo(() => {
+        if (!servers) return null;
+        let filtered = servers;
+        
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(s => 
+                (s.name && s.name.toLowerCase().includes(query)) ||
+                (s.containerId && s.containerId.toLowerCase().includes(query)) ||
+                (s.owner && s.owner.username && s.owner.username.toLowerCase().includes(query))
+            );
+        }
+
+        if (isViewingAllServers && selectedUser) {
+            filtered = filtered.filter(s => s.owner && s.owner.username === selectedUser);
+        }
+
+        return filtered;
+    }, [servers, searchQuery, selectedUser, isViewingAllServers]);
 
     return (
         <ReactAppShell pageData={pageData} subtitle="React view beta">
@@ -62,12 +94,52 @@ export function DashboardPage({ pageData = data }) {
                         </div>
                     </div>
                 )}
+
+                {/* Filter Controls */}
+                {servers && servers.length > 0 && (
+                    <div className="mb-6 flex flex-col sm:flex-row gap-4">
+                        <div className="relative flex-1">
+                            <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500"></i>
+                            <input 
+                                type="text"
+                                placeholder="Search by name, ID, or user..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full bg-neutral-900/50 backdrop-blur-md border border-neutral-800/80 rounded-2xl py-3 pl-12 pr-4 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 transition-all shadow-inner"
+                            />
+                            {searchQuery && (
+                                <button 
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors"
+                                >
+                                    <i className="bi bi-x-circle-fill"></i>
+                                </button>
+                            )}
+                        </div>
+                        {isViewingAllServers && uniqueUsers.length > 0 && (
+                            <div className="sm:w-64 shrink-0 relative flex items-center">
+                                <i className="bi bi-funnel absolute left-4 text-neutral-500 pointer-events-none"></i>
+                                <select
+                                    value={selectedUser}
+                                    onChange={(e) => setSelectedUser(e.target.value)}
+                                    className="w-full bg-neutral-900/50 backdrop-blur-md border border-neutral-800/80 rounded-2xl py-3 pl-10 pr-10 text-sm text-neutral-200 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 transition-all appearance-none cursor-pointer"
+                                >
+                                    <option value="">All Users</option>
+                                    {uniqueUsers.map(u => (
+                                        <option key={u} value={u}>{u}</option>
+                                    ))}
+                                </select>
+                                <i className="bi bi-chevron-down absolute right-4 text-neutral-600 pointer-events-none text-xs"></i>
+                            </div>
+                        )}
+                    </div>
+                )}
                 
                 {!servers ? (
                     <Spinner centered size="large" />
-                ) : servers.length > 0 ? (
+                ) : filteredServers.length > 0 ? (
                     <div className="flex flex-col gap-2">
-                        {servers.map((server) => (
+                        {filteredServers.map((server) => (
                             <ServerRow
                                 key={server.id || server.containerId}
                                 server={server}
@@ -77,10 +149,18 @@ export function DashboardPage({ pageData = data }) {
                     </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center py-24 bg-neutral-900/30 border border-neutral-800/50 border-dashed rounded-3xl">
-                        <i className="bi bi-stack text-4xl text-neutral-800 mb-4"></i>
+                        <i className="bi bi-search text-4xl text-neutral-800 mb-4"></i>
                         <p className="text-center text-sm font-bold text-neutral-500 uppercase tracking-widest">
-                            {isViewingAllServers ? 'No servers found in the system.' : 'You do not have any active servers.'}
+                            No servers match your filters.
                         </p>
+                        {(searchQuery || selectedUser) && (
+                            <button 
+                                onClick={() => { setSearchQuery(''); setSelectedUser(''); }}
+                                className="mt-6 px-6 py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl text-xs font-black uppercase tracking-widest transition-colors"
+                            >
+                                Clear Filters
+                            </button>
+                        )}
                     </div>
                 )}
             </PageContentBlock>

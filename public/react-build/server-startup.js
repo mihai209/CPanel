@@ -8052,6 +8052,8 @@
     serverMinecraftWorldCenterPattern: "/server/:containerId/minecraft/world-center",
     serverMinecraftAddonsPattern: "/server/:containerId/minecraft/addons",
     serverMinecraftInstallerPattern: "/server/:containerId/minecraft/installer",
+    serverMinecraftAdminPattern: "/server/:containerId/minecraft/admin",
+    serverMinecraftConfigsPattern: "/server/:containerId/minecraft/configs",
     serverOverviewPattern: "/server/:containerId/overview",
     serverActivityPattern: "/server/:containerId/activity",
     serverTimelinePattern: "/server/:containerId/timeline",
@@ -8064,7 +8066,8 @@
     experimentalFeatures: "/experimental-features",
     changeView: "/experimental/change-view",
     connectorsCheck: "/connectors-check",
-    notifications: "/notifications"
+    notifications: "/notifications",
+    admin: "/admin"
   };
   function resolveBrandImage(pageData = {}) {
     return pageData.faviconUrl || "/assets/rocky.png";
@@ -8493,7 +8496,10 @@
             }
           ),
           /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { className: "hidden md:flex items-center gap-2", children: [
-            pageData.user?.isAdmin && /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(InternalTopAction, { to: ReactRoutes.connectorsCheck, icon: "bi-cpu", title: "Connectors Check" }),
+            pageData.user?.isAdmin && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(import_jsx_runtime4.Fragment, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("a", { className: "text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700", href: ReactRoutes.admin, title: "Admin Area", children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("i", { className: "bi bi-gear-fill" }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(InternalTopAction, { to: ReactRoutes.connectorsCheck, icon: "bi-cpu", title: "Connectors Check" })
+            ] }),
             /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(NotificationBell, {}),
             /* @__PURE__ */ (0, import_jsx_runtime4.jsx)("div", { className: "h-6 w-px bg-neutral-700 mx-2" }),
             /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(InternalTopAction, { to: ReactRoutes.experimentalFeatures, icon: "bi-sliders", title: "Experimental Features" }),

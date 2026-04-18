@@ -14,6 +14,8 @@ export const ReactRoutes = {
     serverMinecraftWorldCenterPattern: '/server/:containerId/minecraft/world-center',
     serverMinecraftAddonsPattern: '/server/:containerId/minecraft/addons',
     serverMinecraftInstallerPattern: '/server/:containerId/minecraft/installer',
+    serverMinecraftAdminPattern: '/server/:containerId/minecraft/admin',
+    serverMinecraftConfigsPattern: '/server/:containerId/minecraft/configs',
     serverOverviewPattern: '/server/:containerId/overview',
     serverActivityPattern: '/server/:containerId/activity',
     serverTimelinePattern: '/server/:containerId/timeline',
@@ -26,7 +28,8 @@ export const ReactRoutes = {
     experimentalFeatures: '/experimental-features',
     changeView: '/experimental/change-view',
     connectorsCheck: '/connectors-check',
-    notifications: '/notifications'
+    notifications: '/notifications',
+    admin: '/admin'
 };
 
 const RESERVED_SERVER_SEGMENTS = new Set(['notfound', 'no-permissions', 'suspended']);
@@ -67,7 +70,7 @@ export function buildServerApiRoute(containerId = '') {
 
 function parseServerRoute(pathname = '') {
     const normalized = String(pathname || '').trim().replace(/\/+$/, '') || '/';
-    const match = normalized.match(/^\/server\/([^/]+)(?:\/(minecraft-center|minecraft\/world-center|minecraft\/addons|files\/edit|files|backups|network|api|databases|users|schedules|startup|overview|activity|timeline|notfound|no-permissions|suspended))?$/);
+    const match = normalized.match(/^\/server\/([^/]+)(?:\/(minecraft-center|minecraft\/world-center|minecraft\/addons|minecraft\/installer|minecraft\/admin|minecraft\/configs|files\/edit|files|backups|network|api|databases|users|schedules|startup|overview|activity|timeline|notfound|no-permissions|suspended))?$/);
     if (!match) return null;
     let containerId = '';
     try {
