@@ -36,7 +36,7 @@ function NavItem({ item, isProvisioning, blockedKeys }) {
             onClick={isDisabled ? (e) => e.preventDefault() : undefined}
             title={isDisabled ? `${item.label} — unavailable while server is provisioning` : item.label}
             className={[
-                'relative flex items-center gap-2 px-3 h-full text-[11px] font-black uppercase tracking-widest',
+                'relative flex items-center gap-2.5 px-4 h-full text-[12.5px] font-black uppercase tracking-widest',
                 'whitespace-nowrap border-b-2 transition-all duration-150 select-none',
                 isDisabled
                     ? 'text-neutral-700 border-transparent cursor-not-allowed opacity-60'
@@ -45,7 +45,7 @@ function NavItem({ item, isProvisioning, blockedKeys }) {
                         : 'text-neutral-500 border-transparent hover:text-neutral-200 hover:border-neutral-500',
             ].join(' ')}
         >
-            {icon && <i className={`bi ${icon} text-[13px] shrink-0`}></i>}
+            {icon && <i className={`bi ${icon} text-[16px] shrink-0`}></i>}
             <span>{item.label}</span>
             {isDisabled && <i className="bi bi-lock-fill text-[8px] opacity-50 ml-0.5"></i>}
         </a>
@@ -81,12 +81,12 @@ export default function ServerNavbar({ pageData = {} }) {
     return (
         <>
             {/* ── Desktop Tab Bar ─────────────────────────────────────── */}
-            <nav className="hidden md:flex bg-neutral-900/80 backdrop-blur-sm border-b border-neutral-800 w-full h-11 items-center px-4 lg:px-8 overflow-x-auto no-scrollbar gap-1">
+            <nav className="hidden md:flex bg-neutral-900/80 backdrop-blur-sm border-b border-neutral-800 w-full h-14 items-center px-6 lg:px-10 overflow-x-auto no-scrollbar gap-1.5">
                 {activeGroups.map((group, gIdx) => (
                     <React.Fragment key={group.label}>
                         {/* Group separator */}
                         {gIdx > 0 && (
-                            <div className="h-4 w-px bg-neutral-700/60 mx-0.5 shrink-0"></div>
+                            <div className="h-6 w-px bg-neutral-700/60 mx-1 shrink-0"></div>
                         )}
                         <div className="flex items-center h-full">
                             {group.items.map(item => (
@@ -111,7 +111,7 @@ export default function ServerNavbar({ pageData = {} }) {
                             isProvisioning ? 'bg-blue-500 animate-pulse' :
                             'bg-neutral-600'
                         }`}></span>
-                        <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest max-w-[140px] truncate">
+                        <span className="text-[11px] font-black text-neutral-500 uppercase tracking-widest max-w-[180px] truncate">
                             {pageData.server.name}
                         </span>
                     </div>
@@ -127,7 +127,7 @@ export default function ServerNavbar({ pageData = {} }) {
                 >
                     <div className="flex items-center gap-2">
                         {activeItem && NAV_ICONS[activeItem.key] && (
-                            <i className={`bi ${NAV_ICONS[activeItem.key]} text-primary-400`}></i>
+                            <i className={`bi ${NAV_ICONS[activeItem.key]} text-primary-400 text-[16px]`}></i>
                         )}
                         <span className="text-sm font-bold text-neutral-200">
                             {activeItem?.label || 'Menu'}

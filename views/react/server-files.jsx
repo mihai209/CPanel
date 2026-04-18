@@ -1076,10 +1076,16 @@ export function ServerFilesPage({ pageData = data }) {
     );
 }
 
+import { BrowserRouter } from 'react-router-dom';
+
 export default ServerFilesPage;
 
 if (root) {
-    root.render(<ServerFilesPage pageData={data} />);
+    root.render(
+        <BrowserRouter>
+            <ServerFilesPage pageData={data} />
+        </BrowserRouter>
+    );
     if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
         window.__CPANEL_REACT_BOOTED__();
     }

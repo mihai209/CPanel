@@ -9408,12 +9408,12 @@
         onClick: isDisabled ? (e) => e.preventDefault() : void 0,
         title: isDisabled ? `${item.label} \u2014 unavailable while server is provisioning` : item.label,
         className: [
-          "relative flex items-center gap-2 px-3 h-full text-[11px] font-black uppercase tracking-widest",
+          "relative flex items-center gap-2.5 px-4 h-full text-[12.5px] font-black uppercase tracking-widest",
           "whitespace-nowrap border-b-2 transition-all duration-150 select-none",
           isDisabled ? "text-neutral-700 border-transparent cursor-not-allowed opacity-60" : item.active ? "text-primary-400 border-primary-500 bg-primary-500/5" : "text-neutral-500 border-transparent hover:text-neutral-200 hover:border-neutral-500"
         ].join(" "),
         children: [
-          icon && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: `bi ${icon} text-[13px] shrink-0` }),
+          icon && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: `bi ${icon} text-[16px] shrink-0` }),
           /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { children: item.label }),
           isDisabled && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: "bi bi-lock-fill text-[8px] opacity-50 ml-0.5" })
         ]
@@ -9433,9 +9433,9 @@
     })).filter((g) => g.items.length > 0);
     const activeItem = items.find((i) => i.active);
     return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_jsx_runtime5.Fragment, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("nav", { className: "hidden md:flex bg-neutral-900/80 backdrop-blur-sm border-b border-neutral-800 w-full h-11 items-center px-4 lg:px-8 overflow-x-auto no-scrollbar gap-1", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("nav", { className: "hidden md:flex bg-neutral-900/80 backdrop-blur-sm border-b border-neutral-800 w-full h-14 items-center px-6 lg:px-10 overflow-x-auto no-scrollbar gap-1.5", children: [
         activeGroups.map((group, gIdx) => /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)(import_react5.default.Fragment, { children: [
-          gIdx > 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "h-4 w-px bg-neutral-700/60 mx-0.5 shrink-0" }),
+          gIdx > 0 && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "h-6 w-px bg-neutral-700/60 mx-1 shrink-0" }),
           /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { className: "flex items-center h-full", children: group.items.map((item) => /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
             NavItem,
             {
@@ -9448,7 +9448,7 @@
         ] }, group.label)),
         pageData.server?.name && /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "ml-auto pl-4 shrink-0 flex items-center gap-2", children: [
           /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: `w-2 h-2 rounded-full shrink-0 ${status === "running" ? "bg-green-500" : status === "starting" ? "bg-yellow-500 animate-pulse" : status === "stopping" ? "bg-orange-500 animate-pulse" : isProvisioning ? "bg-blue-500 animate-pulse" : "bg-neutral-600"}` }),
-          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-[10px] font-black text-neutral-500 uppercase tracking-widest max-w-[140px] truncate", children: pageData.server.name })
+          /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-[11px] font-black text-neutral-500 uppercase tracking-widest max-w-[180px] truncate", children: pageData.server.name })
         ] })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "md:hidden bg-neutral-900/90 border-b border-neutral-800", children: [
@@ -9459,7 +9459,7 @@
             className: "w-full flex items-center justify-between px-4 py-3",
             children: [
               /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { className: "flex items-center gap-2", children: [
-                activeItem && NAV_ICONS[activeItem.key] && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: `bi ${NAV_ICONS[activeItem.key]} text-primary-400` }),
+                activeItem && NAV_ICONS[activeItem.key] && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: `bi ${NAV_ICONS[activeItem.key]} text-primary-400 text-[16px]` }),
                 /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { className: "text-sm font-bold text-neutral-200", children: activeItem?.label || "Menu" })
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("i", { className: `bi ${mobileOpen ? "bi-chevron-up" : "bi-chevron-down"} text-neutral-500 text-sm` })
@@ -11867,7 +11867,9 @@
     ] });
   }
   if (root3) {
-    root3.render(/* @__PURE__ */ (0, import_jsx_runtime12.jsx)(ServerFilesPage, { pageData: data3 }));
+    root3.render(
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(BrowserRouter, { children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(ServerFilesPage, { pageData: data3 }) })
+    );
     if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
       window.__CPANEL_REACT_BOOTED__();
     }
@@ -13667,7 +13669,9 @@
     ) });
   }
   if (root11) {
-    root11.render(/* @__PURE__ */ (0, import_jsx_runtime20.jsx)(ServerFileEditorPage, { pageData: data11 }));
+    root11.render(
+      /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(BrowserRouter, { children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(ServerFileEditorPage, { pageData: data11 }) })
+    );
     if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
       window.__CPANEL_REACT_BOOTED__();
     }

@@ -474,10 +474,16 @@ export function ServerFileEditorPage({ pageData = data }) {
     );
 }
 
+import { BrowserRouter } from 'react-router-dom';
+
 export default ServerFileEditorPage;
 
 if (root) {
-    root.render(<ServerFileEditorPage pageData={data} />);
+    root.render(
+        <BrowserRouter>
+            <ServerFileEditorPage pageData={data} />
+        </BrowserRouter>
+    );
     if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
         window.__CPANEL_REACT_BOOTED__();
     }
