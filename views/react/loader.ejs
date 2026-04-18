@@ -113,6 +113,16 @@
         };
     })();
     </script>
-    <script src="/react-build/<%= reactEntry %>.js?v=<%= Date.now() %>" onerror="window.__CPANEL_REACT_BUNDLE_ERROR__ && window.__CPANEL_REACT_BUNDLE_ERROR__()"></script>
+    <script id="main-react-script" src="/react-build/<%= reactEntry %>.js?v=<%= Date.now() %>"></script>
+    <script>
+    (() => {
+        const script = document.getElementById('main-react-script');
+        if (script) {
+            script.addEventListener('error', () => {
+                if (window.__CPANEL_REACT_BUNDLE_ERROR__) window.__CPANEL_REACT_BUNDLE_ERROR__();
+            });
+        }
+    })();
+    </script>
 </body>
 </html>

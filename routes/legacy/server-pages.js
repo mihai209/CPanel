@@ -2806,7 +2806,16 @@ function registerServerPagesRoutes(ctx) {
         const parsedBearer = typeof parseServerApiBearerToken === 'function'
             ? parseServerApiBearerToken(req.headers.authorization || '')
             : null;
+
         if (!parsedBearer || !parsedBearer.token) {
+            // FALLBACK: If no bearer token, check if we have a valid browser session
+            if (req.session && req.session.user) {
+                const access = await resolveServerAccess(server, req.session.user);
+                if (hasServerPermission(access, requiredPermission)) {
+                    return { ok: true, server, access, user: req.session.user };
+                }
+                return { ok: false, status: 403, error: `Unauthorized: Missing required permission '${requiredPermission}'` };
+            }
             return { ok: false, status: 401, error: 'Missing or invalid bearer token.' };
         }
 
