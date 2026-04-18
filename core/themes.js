@@ -78,7 +78,7 @@ const THEME_PREVIEWS = Object.freeze({
     'm-bunicii': {
         eyebrow: 'Nature',
         summary: 'Wood, moss, and gold wrapped around a custom backdrop.',
-        background: 'linear-gradient(145deg, #1f3d2b 0%, #314f39 100%)',
+        background: "linear-gradient(rgba(31, 61, 43, 0.82), rgba(31, 61, 43, 0.82)), url('/themes/m-bunicii/m-bunicii.png'), linear-gradient(145deg, #1f3d2b 0%, #314f39 100%)",
         swatches: ['#4caf50', '#6b4f2a', '#f5c542']
     },
     minecraft: {

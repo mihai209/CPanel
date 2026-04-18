@@ -14,7 +14,7 @@ function registerServerPagesRoutes(ctx) {
         parseScopes,
         hasGoogleDriveScope
     } = require('../../core/backups/google-drive');
-    const { getUserThemeId } = require('../../core/themes');
+    const { getUserThemeId, getUserCustomTheme } = require('../../core/themes');
     const { recordServerChange } = require('../../core/server-change-log');
     const { pickSmartAllocation } = require('../../core/helpers/smart-allocation');
     const { getPanelVersionStatus } = require('../../core/helpers/version-checker');
@@ -1046,6 +1046,8 @@ function registerServerPagesRoutes(ctx) {
                 brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
                 faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
                 user: req.session.user,
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
                 versionStatus,
                 servers: orderedServers.map((server) => ({
                     id: server.id,
@@ -8124,6 +8126,9 @@ function registerServerPagesRoutes(ctx) {
             req.session.user.coins = Number.isFinite(Number(account.coins)) ? Number(account.coins) : 0;
 
             const reactPageData = {
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
+
                 routePath: '/afk',
                 brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
                 faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
@@ -8283,6 +8288,9 @@ function registerServerPagesRoutes(ctx) {
             req.session.user.coins = Number.isFinite(Number(account.coins)) ? Number(account.coins) : 0;
 
             const reactPageData = {
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
+
                 routePath: '/rewards',
                 brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
                 faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
@@ -10895,6 +10903,9 @@ function registerServerPagesRoutes(ctx) {
     // Server Error Pages
     app.get('/server/notfound', (req, res) => {
         const reactPageData = {
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
+
 
             routePath: '/server/notfound',
 
@@ -10935,6 +10946,9 @@ function registerServerPagesRoutes(ctx) {
 
     app.get('/server/no-permissions', (req, res) => {
         const reactPageData = {
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
+
 
             routePath: '/server/no-permissions',
 
@@ -11103,6 +11117,8 @@ function registerServerPagesRoutes(ctx) {
                     uptime_seconds: 0
                 },
                 user: reactUser,
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
                 server: {
                     id: server.id,
                     containerId: server.containerId,
@@ -11691,6 +11707,8 @@ function registerServerPagesRoutes(ctx) {
                 faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
 
                 user: buildReactUserSummary(req.session.user),
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
 
                 server: server.toJSON()
 
@@ -11825,6 +11843,8 @@ function registerServerPagesRoutes(ctx) {
         success: req.query.success || null,
         error: req.query.error || null,
         user: buildReactUserSummary(req.session.user),
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
         server: { ...server.toJSON(), folder: normalizeServerFolderName(server.folder), tags: normalizeServerTags(server.tags) },
         serverNavItems: buildReactServerNavItems(server, access, 'overview'),
         wsToken,
@@ -12076,6 +12096,8 @@ success: req.query.success || null,
 error: req.query.error || null,
 
 user: buildReactUserSummary(req.session.user),
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
 
 server: {
 
@@ -12333,6 +12355,8 @@ return res.render('server/users', {
                 success: req.query.success || null,
                 error: req.query.error || null,
                 user: buildReactUserSummary(req.session.user),
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
                 server: {
                     id: server.id,
                     containerId: server.containerId,
@@ -12615,6 +12639,8 @@ return res.render('server/users', {
         success: req.query.success || null,
         error: req.query.error || null,
         user: buildReactUserSummary(req.session.user),
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
         server: server.toJSON(),
         serverNavItems: buildReactServerNavItems(server, access, 'activity'),
         permissions: Array.from(access.permissions || []),
@@ -12809,6 +12835,8 @@ return res.render('server/users', {
         success: req.query.success || null,
         error: req.query.error || null,
         user: buildReactUserSummary(req.session.user),
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
         server: server.toJSON(),
         serverNavItems: buildReactServerNavItems(server, access, 'timeline'),
         wsToken,
@@ -14079,6 +14107,8 @@ return res.render('server/users', {
                 success: req.query.success || null,
                 error: req.query.error || null,
                 user: buildReactUserSummary(req.session.user),
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
                 server: {
                     id: server.id,
                     containerId: server.containerId,
@@ -14550,6 +14580,8 @@ return res.render('server/users', {
                 success: req.query.success || null,
                 error: req.query.error || null,
                 user: buildReactUserSummary(req.session.user),
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
                 server: {
                     id: server.id,
                     containerId: server.containerId,
@@ -15813,6 +15845,8 @@ return res.render('server/users', {
                 error: req.query.error || null,
 
                 user: buildReactUserSummary(req.session.user),
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
 
                 server: {
 
@@ -16759,6 +16793,8 @@ return res.render('server/users', {
                 error: req.query.error || null,
 
                 user: buildReactUserSummary(req.session.user),
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
 
                 server: {
 
@@ -17403,6 +17439,8 @@ return res.render('server/users', {
                 success: req.query.success || null,
                 error: req.query.error || null,
                 user: buildReactUserSummary(req.session.user),
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
                 server: {
                     id: server.id,
                     containerId: server.containerId,
@@ -17492,6 +17530,8 @@ return res.render('server/users', {
             const reactPageData = {
                 server,
                 user: req.session.user,
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
                 title: `Minecraft Center ${server.name}`,
                 serverNavItems: buildReactServerNavItems(server, access, 'mccenter'),
                 brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel'
@@ -17530,6 +17570,8 @@ return res.render('server/users', {
             const reactPageData = {
                 server: context.server,
                 user: req.session.user,
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
                 title: `World Center ${context.server.name}`,
                 serverNavItems: buildReactServerNavItems(context.server, context.access, 'mccenter'),
                 worldData: inventory,
@@ -17852,6 +17894,8 @@ return res.render('server/users', {
             const reactPageData = {
                 server,
                 user: req.session.user,
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
                 title: `Minecraft Admin ${server.name}`,
                 serverNavItems: buildReactServerNavItems(server, access, 'mccenter'),
                 brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
@@ -17920,6 +17964,9 @@ return res.render('server/users', {
                 waterfall: loadWaterfallCatalog()
             };
             const reactPageData = {
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
+
                 routePath: `/server/${server.containerId}/minecraft/installer`,
                 brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
                 faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
@@ -18154,6 +18201,8 @@ return res.render('server/users', {
             const reactPageData = {
                 server,
                 user: req.session.user,
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
                 title: `Minecraft Addons ${server.name}`,
                 serverNavItems: buildReactServerNavItems(server, access, 'mccenter'),
                 minecraftDefaults: {
@@ -18313,6 +18362,8 @@ return res.render('server/users', {
             const reactPageData = {
                 server,
                 user: req.session.user,
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
                 title: `Minecraft Control ${server.name}`,
                 brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
                 serverNavItems: buildReactServerNavItems(server, access, 'mccenter'),
@@ -21940,6 +21991,8 @@ success: req.query.success || null,
 error: req.query.error || null,
 
 user: buildReactUserSummary(req.session.user),
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
 
 server: {
 
@@ -22748,6 +22801,8 @@ res.render('server/startup', {
                 routePath: `/server/${server.containerId}/files/edit`,
                 server,
                 user: req.session.user,
+                activeTheme: getUserThemeId(req.session.user),
+                customTheme: getUserCustomTheme(req.session.user),
                 wsToken,
                 filePath,
                 parentPath,
