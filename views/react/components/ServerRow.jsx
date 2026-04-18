@@ -7,7 +7,7 @@ function formatLimit(mb) {
     return `${mb} MB`;
 }
 
-export default function ServerRow({ server, isAdminDashboard }) {
+export default function ServerRow({ server, isAdminDashboard, showResourcePills = true }) {
     const rawStatus = String(server.status || 'unknown').toLowerCase();
     
     let statusColor = 'bg-neutral-600 text-neutral-200';
@@ -52,20 +52,24 @@ export default function ServerRow({ server, isAdminDashboard }) {
             </div>
 
             <div className="mt-6 lg:mt-0 flex flex-wrap sm:flex-nowrap items-center gap-6 lg:ml-8 shrink-0">
-                <div className="flex-1 sm:flex-none">
-                    <div className="text-[10px] text-neutral-500 uppercase font-black tracking-widest mb-1 opacity-60">CPU Usage</div>
-                    <div className="text-sm font-black text-neutral-200 tabular-nums">{server.cpu ? `${server.cpu}%` : '0%'}</div>
-                </div>
-                <div className="w-px h-8 bg-neutral-800 hidden sm:block"></div>
-                <div className="flex-1 sm:flex-none">
-                    <div className="text-[10px] text-neutral-500 uppercase font-black tracking-widest mb-1 opacity-60">Memory</div>
-                    <div className="text-sm font-black text-neutral-200 tabular-nums">{formatLimit(server.memory)}</div>
-                </div>
-                <div className="w-px h-8 bg-neutral-800 hidden sm:block"></div>
-                <div className="flex-1 sm:flex-none">
-                    <div className="text-[10px] text-neutral-500 uppercase font-black tracking-widest mb-1 opacity-60">Storage</div>
-                    <div className="text-sm font-black text-neutral-200 tabular-nums">{formatLimit(server.disk)}</div>
-                </div>
+                {showResourcePills && (
+                    <>
+                        <div className="flex-1 sm:flex-none">
+                            <div className="text-[10px] text-neutral-500 uppercase font-black tracking-widest mb-1 opacity-60">CPU Usage</div>
+                            <div className="text-sm font-black text-neutral-200 tabular-nums">{server.cpu ? `${server.cpu}%` : '0%'}</div>
+                        </div>
+                        <div className="w-px h-8 bg-neutral-800 hidden sm:block"></div>
+                        <div className="flex-1 sm:flex-none">
+                            <div className="text-[10px] text-neutral-500 uppercase font-black tracking-widest mb-1 opacity-60">Memory</div>
+                            <div className="text-sm font-black text-neutral-200 tabular-nums">{formatLimit(server.memory)}</div>
+                        </div>
+                        <div className="w-px h-8 bg-neutral-800 hidden sm:block"></div>
+                        <div className="flex-1 sm:flex-none">
+                            <div className="text-[10px] text-neutral-500 uppercase font-black tracking-widest mb-1 opacity-60">Storage</div>
+                            <div className="text-sm font-black text-neutral-200 tabular-nums">{formatLimit(server.disk)}</div>
+                        </div>
+                    </>
+                )}
                 
                 <div className="w-full sm:w-auto mt-4 sm:mt-0 sm:ml-4">
                     <a href={`/server/${server.containerId}`} className="flex items-center justify-center gap-2 bg-neutral-800 hover:bg-primary-600 text-neutral-100 hover:text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all duration-300 shadow-xl shadow-black/20 hover:shadow-primary-900/20 active:scale-95">

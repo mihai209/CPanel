@@ -172,6 +172,12 @@ export function DashboardPage({ pageData = data }) {
     const [selectedTag, setSelectedTag] = React.useState('');
     const [sortMode, setSortMode] = React.useState('latest'); // latest, alphabetical, custom
     const [layout, setLayout] = React.useState(() => {
+        if (typeof window !== 'undefined') {
+            try {
+                const saved = localStorage.getItem('cpanel_dashboard_layout');
+                if (saved) return JSON.parse(saved);
+            } catch(e) {}
+        }
         const raw = pageData.dashboardLayout || {};
         return {
             metrics: raw.metrics !== false,
@@ -182,6 +188,13 @@ export function DashboardPage({ pageData = data }) {
         };
     });
     const [showCustomize, setShowCustomize] = React.useState(false);
+
+    React.useEffect(() => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('cpanel_dashboard_layout', JSON.stringify(layout));
+        }
+    }, [layout]);
+
 
     React.useEffect(() => {
         const handleSearch = (e) => {
@@ -443,6 +456,7 @@ export function DashboardPage({ pageData = data }) {
                                 key={server.id || server.containerId}
                                 server={server}
                                 isAdminDashboard={isViewingAllServers}
+                                showResourcePills={layout.resourcePills}
                             />
                         ))}
                     </div>
@@ -486,12 +500,12 @@ export function DashboardPage({ pageData = data }) {
                                 { id: 'filters', label: 'Advanced Filter Controls', desc: 'Enable folder, tag, and custom sorting dropdowns.' },
                                 { id: 'resourcePills', label: 'Internal Resource Data', desc: 'Show CPU/RAM usage directly on the server cards.' }
                             ].map(item => (
-                                <div key={item.id} className="flex items-center justify-between gap-6 group">
+                                <label key={item.id} className="flex items-center justify-between gap-6 group cursor-pointer">
                                     <div className="flex-1">
-                                        <label htmlFor={item.id} className="block text-sm font-bold text-neutral-200 group-hover:text-primary-400 transition-colors cursor-pointer">{item.label}</label>
+                                        <div className="block text-sm font-bold text-neutral-200 group-hover:text-primary-400 transition-colors">{item.label}</div>
                                         <p className="text-xs text-neutral-500 mt-1">{item.desc}</p>
                                     </div>
-                                    <div className="relative inline-flex items-center cursor-pointer">
+                                    <div className="relative inline-flex items-center">
                                         <input 
                                             type="checkbox" 
                                             id={item.id}
@@ -501,7 +515,7 @@ export function DashboardPage({ pageData = data }) {
                                         />
                                         <div className="w-12 h-6 bg-neutral-800 rounded-full peer peer-checked:bg-primary-600 after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-6 border border-neutral-700 peer-checked:border-primary-500 transition-colors"></div>
                                     </div>
-                                </div>
+                                </label>
                             ))}
                         </div>
                         <div className="p-8 bg-neutral-800/50 flex justify-between items-center">
