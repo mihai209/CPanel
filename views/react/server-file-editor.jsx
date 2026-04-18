@@ -478,14 +478,17 @@ export function ServerFileEditorPage({ pageData = data }) {
 }
 
 import { BrowserRouter } from 'react-router-dom';
+import ThemeProvider from './components/ThemeContext.jsx';
 
 export default ServerFileEditorPage;
 
 if (root) {
     root.render(
-        <BrowserRouter>
+        <ThemeProvider pageData={data}>
+            <BrowserRouter>
             <ServerFileEditorPage pageData={data} />
         </BrowserRouter>
+        </ThemeProvider>
     );
     if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
         window.__CPANEL_REACT_BOOTED__();

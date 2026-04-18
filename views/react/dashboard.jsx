@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Link } from 'react-router-dom';
 import { ReactRoutes } from './ReactRoutes.js';
+import ThemeProvider from './components/ThemeContext.jsx';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
 import ServerRow from './components/ServerRow.jsx';
@@ -543,9 +544,11 @@ export default DashboardPage;
 
 if (root) {
     root.render(
-        <BrowserRouter>
-            <DashboardPage pageData={data} />
-        </BrowserRouter>
+        <ThemeProvider pageData={data}>
+            <BrowserRouter>
+                <DashboardPage pageData={data} />
+            </BrowserRouter>
+        </ThemeProvider>
     );
     if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
         window.__CPANEL_REACT_BOOTED__();

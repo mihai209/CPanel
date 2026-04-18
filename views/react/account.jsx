@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { Link } from 'react-router-dom';
 import { ReactRoutes, resolveBrandImage, resolveUserAvatar } from './ReactRoutes.js';
+import ThemeProvider from './components/ThemeContext.jsx';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
 
@@ -467,7 +468,11 @@ export function AccountPage({ pageData = data }) {
 export default AccountPage;
 
 if (root) {
-    root.render(<AccountPage pageData={data} />);
+    root.render(
+        <ThemeProvider pageData={data}>
+            <AccountPage pageData={data} />
+        </ThemeProvider>
+    );
     if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
         window.__CPANEL_REACT_BOOTED__();
     }

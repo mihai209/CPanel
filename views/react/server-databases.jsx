@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
+import ThemeProvider from './components/ThemeContext.jsx';
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'server-databases';
@@ -201,7 +202,11 @@ export function ServerDatabasesPage({ pageData = data }) {
 export default ServerDatabasesPage;
 
 if (root) {
-    root.render(<ServerDatabasesPage pageData={data} />);
+    root.render(
+        <ThemeProvider pageData={data}>
+            <ServerDatabasesPage pageData={data} />
+        </ThemeProvider>
+    );
     if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
         window.__CPANEL_REACT_BOOTED__();
     }

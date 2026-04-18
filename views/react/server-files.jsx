@@ -1082,9 +1082,11 @@ export default ServerFilesPage;
 
 if (root) {
     root.render(
-        <BrowserRouter>
-            <ServerFilesPage pageData={data} />
-        </BrowserRouter>
+        <ThemeProvider pageData={data}>
+            <BrowserRouter>
+                <ServerFilesPage pageData={data} />
+            </BrowserRouter>
+        </ThemeProvider>
     );
     if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
         window.__CPANEL_REACT_BOOTED__();

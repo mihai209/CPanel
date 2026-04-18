@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { Link } from 'react-router-dom';
 import { ReactRoutes } from './ReactRoutes.js';
+import ThemeProvider from './components/ThemeContext.jsx';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
 
@@ -1072,7 +1073,11 @@ export function ServerConsolePage({ pageData = data }) {
 export default ServerConsolePage;
 
 if (root) {
-    root.render(<ServerConsolePage pageData={data} />);
+    root.render(
+        <ThemeProvider pageData={data}>
+            <ServerConsolePage pageData={data} />
+        </ThemeProvider>
+    );
     if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
         window.__CPANEL_REACT_BOOTED__();
     }

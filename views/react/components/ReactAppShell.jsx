@@ -74,7 +74,7 @@ export default function ReactAppShell({
         >
             
             {/* Top Navigation Bar */}
-            <div className="bg-neutral-800/80 backdrop-blur-md border-b border-neutral-700 w-full flex items-center justify-between px-4 lg:px-8 h-16 shrink-0 sticky top-0 z-40">
+            <div className="bg-neutral-800 border-b border-neutral-700 w-full flex items-center justify-between px-4 lg:px-8 h-16 shrink-0 sticky top-0 z-40 shadow-md">
                 <div className="flex items-center gap-4">
                     <img src={brandImage} alt={pageData.brandName || 'CPanel'} className="w-8 h-8 rounded shrink-0" />
                     <div>

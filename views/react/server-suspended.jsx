@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import ThemeProvider from './components/ThemeContext.jsx';
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'server-suspended';
@@ -74,5 +75,9 @@ export function ServerSuspendedPage({ pageData = data }) {
 export default ServerSuspendedPage;
 
 if (root) {
-    root.render(<ServerSuspendedPage pageData={data} />);
+    root.render(
+        <ThemeProvider pageData={data}>
+            <ServerSuspendedPage pageData={data} />
+        </ThemeProvider>
+    );
 }

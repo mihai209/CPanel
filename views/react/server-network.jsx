@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
+import ThemeProvider from './components/ThemeContext.jsx';
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'server-network';
@@ -153,7 +154,11 @@ export function ServerNetworkPage({ pageData = data }) {
 export default ServerNetworkPage;
 
 if (root) {
-    root.render(<ServerNetworkPage pageData={data} />);
+    root.render(
+        <ThemeProvider pageData={data}>
+            <ServerNetworkPage pageData={data} />
+        </ThemeProvider>
+    );
     if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
         window.__CPANEL_REACT_BOOTED__();
     }

@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import ThemeProvider from './components/ThemeContext.jsx';
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'server-not-found';
@@ -48,5 +49,9 @@ export function ServerNotFoundPage({ pageData = data }) {
 export default ServerNotFoundPage;
 
 if (root) {
-    root.render(<ServerNotFoundPage pageData={data} />);
+    root.render(
+        <ThemeProvider pageData={data}>
+            <ServerNotFoundPage pageData={data} />
+        </ThemeProvider>
+    );
 }

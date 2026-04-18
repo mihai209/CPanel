@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import ThemeProvider from './components/ThemeContext.jsx';
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'server-no-permissions';
@@ -51,5 +52,9 @@ export function ServerNoPermissionsPage({ pageData = data }) {
 export default ServerNoPermissionsPage;
 
 if (root) {
-    root.render(<ServerNoPermissionsPage pageData={data} />);
+    root.render(
+        <ThemeProvider pageData={data}>
+            <ServerNoPermissionsPage pageData={data} />
+        </ThemeProvider>
+    );
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
+import ThemeProvider from './components/ThemeContext.jsx';
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'server-timeline';
@@ -215,5 +216,9 @@ export function ServerTimelinePage({ pageData = data }) {
 export default ServerTimelinePage;
 
 if (root) {
-    root.render(<ServerTimelinePage pageData={data} />);
+    root.render(
+        <ThemeProvider pageData={data}>
+            <ServerTimelinePage pageData={data} />
+        </ThemeProvider>
+    );
 }

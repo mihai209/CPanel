@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
 import GlobalStatusModal from './components/GlobalStatusModal.jsx';
+import ThemeProvider from './components/ThemeContext.jsx';
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'notifications';
@@ -177,9 +178,11 @@ export default NotificationsPage;
 
 if (root) {
     root.render(
-        <BrowserRouter>
+        <ThemeProvider pageData={data}>
+            <BrowserRouter>
             <NotificationsPage pageData={data} />
         </BrowserRouter>
+        </ThemeProvider>
     );
     if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
         window.__CPANEL_REACT_BOOTED__();

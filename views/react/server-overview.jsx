@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
+import ThemeProvider from './components/ThemeContext.jsx';
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'server-overview';
@@ -330,5 +331,9 @@ export function ServerOverviewPage({ pageData = data }) {
 export default ServerOverviewPage;
 
 if (root) {
-    root.render(<ServerOverviewPage pageData={data} />);
+    root.render(
+        <ThemeProvider pageData={data}>
+            <ServerOverviewPage pageData={data} />
+        </ThemeProvider>
+    );
 }

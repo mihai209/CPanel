@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
+import ThemeProvider from './components/ThemeContext.jsx';
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'server-backups';
@@ -273,7 +274,11 @@ export function ServerBackupsPage({ pageData = data }) {
 export default ServerBackupsPage;
 
 if (root) {
-    root.render(<ServerBackupsPage pageData={data} />);
+    root.render(
+        <ThemeProvider pageData={data}>
+            <ServerBackupsPage pageData={data} />
+        </ThemeProvider>
+    );
     if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
         window.__CPANEL_REACT_BOOTED__();
     }

@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
+import ThemeProvider from './components/ThemeContext.jsx';
 
 const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
 const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'server-activity';
@@ -230,5 +231,9 @@ export function ServerActivityPage({ pageData = data }) {
 export default ServerActivityPage;
 
 if (root) {
-    root.render(<ServerActivityPage pageData={data} />);
+    root.render(
+        <ThemeProvider pageData={data}>
+            <ServerActivityPage pageData={data} />
+        </ThemeProvider>
+    );
 }
