@@ -9037,36 +9037,27 @@
               )
             ] })
           ] }),
-          servers && servers.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "mb-6 flex flex-col sm:flex-row gap-4", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "relative flex-1", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" }),
-              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                "input",
-                {
-                  type: "text",
-                  placeholder: "Search by name, ID, or user...",
-                  value: searchQuery,
-                  onChange: (e) => setSearchQuery(e.target.value),
-                  className: "w-full bg-neutral-900/50 backdrop-blur-md border border-neutral-800/80 rounded-2xl py-3 pl-12 pr-4 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 transition-all shadow-inner"
-                }
-              ),
-              searchQuery && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
-                "button",
-                {
-                  onClick: () => setSearchQuery(""),
-                  className: "absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors",
-                  children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-x-circle-fill" })
-                }
-              )
-            ] }),
-            isViewingAllServers && uniqueUsers.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "sm:w-64 shrink-0 relative flex items-center", children: [
+          servers && servers.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "mb-6 flex flex-col sm:flex-row justify-end items-end sm:items-center gap-4", children: [
+            isViewingAllServers && uniqueUsers.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: "sm:w-64 shrink-0 relative flex items-center w-full sm:w-auto", children: [
               /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-funnel absolute left-4 text-neutral-500 pointer-events-none" }),
               /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
                 "select",
                 {
                   value: selectedUser,
                   onChange: (e) => setSelectedUser(e.target.value),
-                  className: "w-full bg-neutral-900/50 backdrop-blur-md border border-neutral-800/80 rounded-2xl py-3 pl-10 pr-10 text-sm text-neutral-200 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 transition-all appearance-none cursor-pointer",
+                  className: "w-full bg-neutral-900/50 backdrop-blur-md border border-neutral-800/80 rounded-2xl py-3 pl-10 pr-10 text-sm text-neutral-200 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 transition-all appearance-none cursor-pointer hidden sm:block",
+                  children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: "", children: "All Users" }),
+                    uniqueUsers.map((u) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: u, children: u }, u))
+                  ]
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)(
+                "select",
+                {
+                  value: selectedUser,
+                  onChange: (e) => setSelectedUser(e.target.value),
+                  className: "w-full bg-neutral-900/50 backdrop-blur-md border border-neutral-800/80 rounded-full py-3 pl-10 pr-10 text-sm text-neutral-200 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 transition-all appearance-none cursor-pointer sm:hidden",
                   children: [
                     /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: "", children: "All Users" }),
                     uniqueUsers.map((u) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("option", { value: u, children: u }, u))
@@ -9074,6 +9065,27 @@
                 }
               ),
               /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-chevron-down absolute right-4 text-neutral-600 pointer-events-none text-xs" })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime8.jsxs)("div", { className: `relative transition-all duration-300 ease-in-out shrink-0 group right-0 overflow-hidden ${searchQuery ? "w-full sm:w-80" : "w-12 hover:w-full sm:hover:w-64 focus-within:w-full sm:focus-within:w-80"}`, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: `bi bi-search absolute left-0 w-12 h-12 flex items-center justify-center top-0 transition-colors pointer-events-none z-10 ${searchQuery ? "text-primary-500" : "text-neutral-500 group-hover:text-primary-400"}` }),
+              /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                "input",
+                {
+                  type: "text",
+                  placeholder: "Search servers...",
+                  value: searchQuery,
+                  onChange: (e) => setSearchQuery(e.target.value),
+                  className: `w-full bg-neutral-900/50 backdrop-blur-md border border-neutral-800/80 h-12 pl-12 pr-10 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 transition-all shadow-inner cursor-pointer focus:cursor-text group-hover:cursor-text ${searchQuery ? "rounded-2xl" : "rounded-full"}`
+                }
+              ),
+              searchQuery && /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(
+                "button",
+                {
+                  onClick: () => setSearchQuery(""),
+                  className: "absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors z-10",
+                  children: /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("i", { className: "bi bi-x-circle-fill" })
+                }
+              )
             ] })
           ] }),
           !servers ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(Spinner, { centered: true, size: "large" }) : filteredServers.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime8.jsx)("div", { className: "flex flex-col gap-2", children: filteredServers.map((server) => /* @__PURE__ */ (0, import_jsx_runtime8.jsx)(

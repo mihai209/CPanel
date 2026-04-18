@@ -97,32 +97,24 @@ export function DashboardPage({ pageData = data }) {
 
                 {/* Filter Controls */}
                 {servers && servers.length > 0 && (
-                    <div className="mb-6 flex flex-col sm:flex-row gap-4">
-                        <div className="relative flex-1">
-                            <i className="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500"></i>
-                            <input 
-                                type="text"
-                                placeholder="Search by name, ID, or user..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-neutral-900/50 backdrop-blur-md border border-neutral-800/80 rounded-2xl py-3 pl-12 pr-4 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 transition-all shadow-inner"
-                            />
-                            {searchQuery && (
-                                <button 
-                                    onClick={() => setSearchQuery('')}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors"
-                                >
-                                    <i className="bi bi-x-circle-fill"></i>
-                                </button>
-                            )}
-                        </div>
+                    <div className="mb-6 flex flex-col sm:flex-row justify-end items-end sm:items-center gap-4">
                         {isViewingAllServers && uniqueUsers.length > 0 && (
-                            <div className="sm:w-64 shrink-0 relative flex items-center">
+                            <div className="sm:w-64 shrink-0 relative flex items-center w-full sm:w-auto">
                                 <i className="bi bi-funnel absolute left-4 text-neutral-500 pointer-events-none"></i>
                                 <select
                                     value={selectedUser}
                                     onChange={(e) => setSelectedUser(e.target.value)}
-                                    className="w-full bg-neutral-900/50 backdrop-blur-md border border-neutral-800/80 rounded-2xl py-3 pl-10 pr-10 text-sm text-neutral-200 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 transition-all appearance-none cursor-pointer"
+                                    className="w-full bg-neutral-900/50 backdrop-blur-md border border-neutral-800/80 rounded-2xl py-3 pl-10 pr-10 text-sm text-neutral-200 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 transition-all appearance-none cursor-pointer hidden sm:block"
+                                >
+                                    <option value="">All Users</option>
+                                    {uniqueUsers.map(u => (
+                                        <option key={u} value={u}>{u}</option>
+                                    ))}
+                                </select>
+                                <select
+                                    value={selectedUser}
+                                    onChange={(e) => setSelectedUser(e.target.value)}
+                                    className="w-full bg-neutral-900/50 backdrop-blur-md border border-neutral-800/80 rounded-full py-3 pl-10 pr-10 text-sm text-neutral-200 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 transition-all appearance-none cursor-pointer sm:hidden"
                                 >
                                     <option value="">All Users</option>
                                     {uniqueUsers.map(u => (
@@ -132,6 +124,24 @@ export function DashboardPage({ pageData = data }) {
                                 <i className="bi bi-chevron-down absolute right-4 text-neutral-600 pointer-events-none text-xs"></i>
                             </div>
                         )}
+                        <div className={`relative transition-all duration-300 ease-in-out shrink-0 group right-0 overflow-hidden ${searchQuery ? 'w-full sm:w-80' : 'w-12 hover:w-full sm:hover:w-64 focus-within:w-full sm:focus-within:w-80'}`}>
+                            <i className={`bi bi-search absolute left-0 w-12 h-12 flex items-center justify-center top-0 transition-colors pointer-events-none z-10 ${searchQuery ? 'text-primary-500' : 'text-neutral-500 group-hover:text-primary-400'}`}></i>
+                            <input 
+                                type="text"
+                                placeholder="Search servers..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className={`w-full bg-neutral-900/50 backdrop-blur-md border border-neutral-800/80 h-12 pl-12 pr-10 text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/50 transition-all shadow-inner cursor-pointer focus:cursor-text group-hover:cursor-text ${searchQuery ? 'rounded-2xl' : 'rounded-full'}`}
+                            />
+                            {searchQuery && (
+                                <button 
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors z-10"
+                                >
+                                    <i className="bi bi-x-circle-fill"></i>
+                                </button>
+                            )}
+                        </div>
                     </div>
                 )}
                 

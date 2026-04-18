@@ -17213,20 +17213,10 @@ return res.render('server/users', {
                 return res.json(reactPageData);
             }
 
-            if (Number(req.session.user.experimentalViewMode) === 1) {
-                return res.render('react/loader', {
-                    reactPageData,
-                    reactEntry: 'server-minecraft-center',
-                    title: reactPageData.title
-                });
-            }
-
-            return res.render('server/minecraft-center', {
-                server,
-                user: req.session.user,
-                title: `Minecraft Center ${server.name}`,
-                path: '/servers',
-                active: 'mccenter'
+            return res.render('react/loader', {
+                reactPageData,
+                reactEntry: 'server-minecraft-center',
+                title: reactPageData.title
             });
         } catch (err) {
             console.error('Error loading Minecraft center:', err);
@@ -17268,27 +17258,10 @@ return res.render('server/users', {
                 return res.json(reactPageData);
             }
 
-            if (Number(req.session.user.experimentalViewMode) === 1) {
-                return res.render('react/loader', {
-                    reactPageData,
-                    reactEntry: 'server-minecraft-world-center',
-                    title: reactPageData.title
-                });
-            }
-
-            return res.render('server/minecraft-world-center', {
-                server: context.server,
-                user: req.session.user,
-                title: `World Center ${context.server.name}`,
-                path: '/servers',
-                active: 'mccenter',
-                worldData: inventory,
-                feedback: {
-                    success: String(req.query.success || '').trim(),
-                    error: String(req.query.error || '').trim(),
-                    warning: String(req.query.warning || '').trim(),
-                    exportFile: String(req.query.exportFile || '').trim()
-                }
+            return res.render('react/loader', {
+                reactPageData,
+                reactEntry: 'server-minecraft-world-center',
+                title: reactPageData.title
             });
         } catch (err) {
             console.error('Error loading Minecraft world center:', err);
