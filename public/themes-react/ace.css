@@ -1,0 +1,12 @@
+:root {
+    --neutral-900: #0d1326;
+    --neutral-800: #141c35;
+    --neutral-700: #1d2847;
+    --neutral-100: #eef4ff;
+    --neutral-400: #5d85ff;
+    --primary-500: #ffd666;
+    --cp-body-background: linear-gradient(145deg, #0d1326 0%, #141c35 46%, #1d2847 100%);
+    --cp-panel-bg: var(--neutral-900);
+    --cp-sidebar-bg: var(--neutral-800);
+    --cp-accent-color: var(--primary-500);
+}

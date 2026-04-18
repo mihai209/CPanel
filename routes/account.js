@@ -47,7 +47,8 @@ function registerAccountRoutes({
     };
 
     const normalizeExperimentalViewMode = (value) => {
-        return String(value || '').trim().toLowerCase() === 'react' ? 'react' : 'ejs';
+        const val = String(value || '').trim().toLowerCase();
+        return val === 'ejs' ? 'ejs' : 'react';
     };
 
     const wantsReactPageData = (req) => {
@@ -316,6 +317,37 @@ function registerAccountRoutes({
             const data = await getThemeViewData(req.session.user.id);
             if (!data) return res.redirect('/login');
             updateSessionThemeState(req, data.activeTheme, data.customTheme);
+
+            const reactPageData = {
+                routePath: '/themes',
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                user: {
+                    username: data.userData.username,
+                    avatarUrl: data.userData.avatarUrl || '',
+                    avatarProvider: data.userData.avatarProvider || 'gravatar',
+                    gravatarHash: data.userData.gravatarHash || md5(String(data.userData.email || '').trim().toLowerCase()),
+                },
+                activeTheme: data.activeTheme,
+                customTheme: data.customTheme,
+                themeCatalog: data.themeCatalog,
+                initialThemeHref: (res.locals.settings && res.locals.settings.initialThemeHref) || '/themes/default/index.css',
+                success: req.query.success || null,
+                error: req.query.error || null
+            };
+
+            if (wantsReactPageData(req)) {
+                return res.json(reactPageData);
+            }
+
+            if (normalizeExperimentalViewMode(data.userData.experimentalViewMode) === 'react') {
+                return res.render('react/loader', {
+                    title: 'Themes',
+                    reactEntry: 'themes',
+                    reactPageData
+                });
+            }
+
             return res.render('themes', {
                 user: data.userData,
                 title: 'Themes',
@@ -332,14 +364,14 @@ function registerAccountRoutes({
         }
     });
 
-    app.get('/experimental-features', requireAuth, async (req, res) => {
+    app.get('/instable/outdated', requireAuth, async (req, res) => {
         try {
             const user = await User.findByPk(req.session.user.id);
             if (!user) return res.redirect('/login');
             updateSessionExperimentalState(req, user);
             const featureModel = await buildExperimentalFeaturesViewModel(user);
             const reactPageData = {
-                routePath: '/experimental-features',
+                routePath: '/instable/outdated',
                 brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
                 faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
                 user: {
@@ -369,8 +401,8 @@ function registerAccountRoutes({
             }
             return res.render('experimental/features', {
                 user: user.toJSON(),
-                title: 'Experimental Features',
-                path: '/experimental-features',
+                title: 'Outdated Features',
+                path: '/instable/outdated',
                 currentViewMode: normalizeExperimentalViewMode(user.experimentalViewMode),
                 ...featureModel,
                 success: req.query.success || null,
@@ -383,10 +415,10 @@ function registerAccountRoutes({
     });
 
     app.get('/experimental/ai', requireAuth, async (req, res) => {
-        return res.redirect('/experimental-features');
+        return res.redirect('/instable/outdated');
     });
 
-    app.post('/experimental-features/ai', requireAuth, async (req, res) => {
+    app.post('/instable/outdated/ai', requireAuth, async (req, res) => {
         try {
             const user = await User.findByPk(req.session.user.id);
             if (!user) return res.redirect('/login');
@@ -395,20 +427,20 @@ function registerAccountRoutes({
                 ? aiAdminConfig.providers.some((p) => p && p.enabled && p.apiKey)
                 : false;
             if (!aiAdminConfig.enabled || !providerReady) {
-                return res.redirect('/experimental-features?error=' + encodeURIComponent('AI agents are not enabled by admin.'));
+                return res.redirect('/instable/outdated?error=' + encodeURIComponent('AI agents are not enabled by admin.'));
             }
             const enabled = parseToggle(req.body && req.body.enabled);
             await user.update({ experimentalAiEnabled: enabled });
             updateSessionExperimentalState(req, { experimentalAiEnabled: enabled });
-            return res.redirect('/experimental-features?success=' + encodeURIComponent('Experimental AI setting updated.'));
+            return res.redirect('/instable/outdated?success=' + encodeURIComponent('Experimental AI setting updated.'));
         } catch (err) {
             console.error('Failed to update experimental AI setting:', err);
-            return res.redirect('/experimental-features?error=' + encodeURIComponent('Failed to update setting.'));
+            return res.redirect('/instable/outdated?error=' + encodeURIComponent('Failed to update setting.'));
         }
     });
 
     app.post('/experimental/ai', requireAuth, async (req, res) => {
-        return res.redirect(307, '/experimental-features/ai');
+        return res.redirect(307, '/instable/outdated/ai');
     });
 
     app.get('/experimental/change-view', requireAuth, async (req, res) => {

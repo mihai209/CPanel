@@ -119,6 +119,47 @@ export function AccountPage({ pageData = data }) {
         }
     };
 
+    const [browserNotifyEnabled, setBrowserNotifyEnabled] = React.useState(pageData.browserSubscriptionCount > 0);
+    const [notifyLoading, setNotifyLoading] = React.useState(false);
+
+    const toggleBrowserNotifications = async (enable) => {
+        setNotifyLoading(true);
+        try {
+            if (enable) {
+                if (!('Notification' in window)) {
+                    throw new Error('This browser does not support desktop notifications.');
+                }
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    throw new Error('Notification permission was not granted.');
+                }
+                const response = await fetch('/api/account/browser-notifications/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        permission,
+                        endpoint: `browser:${navigator.userAgent}:${window.location.host}`,
+                        keys: {}
+                    })
+                });
+                if (!response.ok) throw new Error('Failed to subscribe.');
+                setBrowserNotifyEnabled(true);
+            } else {
+                const response = await fetch('/api/account/browser-notifications/unsubscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                if (!response.ok) throw new Error('Failed to unsubscribe.');
+                setBrowserNotifyEnabled(false);
+            }
+        } catch (error) {
+            alert(error.message || 'Action failed.');
+        } finally {
+            setNotifyLoading(false);
+        }
+    };
+
     const inputClass = "w-full bg-neutral-900 border border-neutral-700/50 rounded p-2.5 text-sm text-neutral-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-shadow";
     const labelClass = "block text-xs font-bold text-neutral-400 uppercase tracking-wide mb-1.5";
 
@@ -339,6 +380,65 @@ export function AccountPage({ pageData = data }) {
                                     {!setupState.qrCodeUrl && setupState.error && <p className="text-red-400 text-sm mt-4 font-bold">{setupState.error}</p>}
                                 </div>
                             )}
+                        </div>
+
+                        {/* Notifications */}
+                        <div className="bg-neutral-800 border border-neutral-700 rounded-lg p-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-lg font-bold text-neutral-100">Notifications Settings</h2>
+                                <Link to={ReactRoutes.notifications} className="text-xs font-bold text-primary-400 hover:text-primary-300 uppercase tracking-wider">
+                                    History <i className="bi bi-arrow-right ml-1"></i>
+                                </Link>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div>
+                                    <p className="text-sm text-neutral-400 mb-4">Live notifications deliver system alerts, server status changes, and account activity directly to your browser.</p>
+                                    <div className="flex flex-col gap-2">
+                                        {browserNotifyEnabled ? (
+                                            <button 
+                                                onClick={() => toggleBrowserNotifications(false)}
+                                                disabled={notifyLoading}
+                                                className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-600/20 font-semibold py-2 px-4 rounded transition-colors text-sm flex items-center justify-center gap-2"
+                                            >
+                                                {notifyLoading ? <span className="w-4 h-4 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin"></span> : <i className="bi bi-bell-slash"></i>}
+                                                Disable Browser Delivery
+                                            </button>
+                                        ) : (
+                                            <button 
+                                                onClick={() => toggleBrowserNotifications(true)}
+                                                disabled={notifyLoading}
+                                                className="w-full bg-primary-600/10 hover:bg-primary-600/20 text-primary-500 border border-primary-600/20 font-semibold py-2 px-4 rounded transition-colors text-sm flex items-center justify-center gap-2"
+                                            >
+                                                {notifyLoading ? <span className="w-4 h-4 border-2 border-primary-500/30 border-t-primary-500 rounded-full animate-spin"></span> : <i className="bi bi-bell"></i>}
+                                                Enable Browser Delivery
+                                            </button>
+                                        )}
+                                        <div className="text-[11px] text-neutral-500 text-center uppercase tracking-widest font-black">
+                                            Status: <span className={browserNotifyEnabled ? 'text-green-500' : 'text-neutral-600'}>{browserNotifyEnabled ? 'Active' : 'Inactive'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-neutral-900/50 rounded-lg p-4 border border-neutral-700/30">
+                                    <span className="block text-[10px] font-black text-neutral-500 uppercase tracking-[0.2em] mb-3">Recent Activity</span>
+                                    {Array.isArray(pageData.recentNotifications) && pageData.recentNotifications.length > 0 ? (
+                                        <div className="flex flex-col gap-3">
+                                            {pageData.recentNotifications.slice(0, 3).map((n) => (
+                                                <div key={n.id} className="flex flex-col gap-1 border-b border-neutral-700/50 pb-2 last:border-0 last:pb-0">
+                                                    <div className="flex items-center justify-between">
+                                                        <strong className="text-xs text-neutral-200 truncate pr-4">{n.title}</strong>
+                                                        <span className="text-[10px] text-neutral-500 shrink-0 font-mono">{new Date(n.createdAt).toLocaleDateString()}</span>
+                                                    </div>
+                                                    <p className="text-[11px] text-neutral-400 line-clamp-1">{n.message}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-xs text-neutral-600 py-4 text-center italic">No recent notifications.</div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
                     </div>

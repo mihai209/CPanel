@@ -181,6 +181,14 @@ function buildWsUrl(wsToken, containerId) {
 }
 
 export function ServerConsolePage({ pageData = data }) {
+    const [isPopout, setIsPopout] = React.useState(false);
+    
+    React.useEffect(() => {
+        if (typeof window !== 'undefined') {
+            setIsPopout(new URLSearchParams(window.location.search).get('popout') === 'true');
+        }
+    }, []);
+
     const server = pageData.server || {};
     const limits = server.limits || {};
     const historyStorageKey = React.useMemo(
@@ -240,6 +248,7 @@ export function ServerConsolePage({ pageData = data }) {
     const [followOutput, setFollowOutput] = React.useState(true);
     const [terminalError, setTerminalError] = React.useState('');
     const [terminalBooted, setTerminalBooted] = React.useState(false);
+    const [showShortcuts, setShowShortcuts] = React.useState(false);
     
     // Minecraft Player List Hook
     const [players, setPlayers] = React.useState([]);
@@ -623,6 +632,8 @@ export function ServerConsolePage({ pageData = data }) {
     }, [sendPayload]);
 
     const isProvisioning = ['installing', 'reinstalling', 'starting'].includes(status);
+    const isRestrictedProvisioningViewer = !pageData.user?.isAdmin && ['installing', 'reinstalling', 'starting'].includes(status);
+    
     const startDisabled = !connectorOnline || isProvisioning || ['running', 'error'].includes(status);
     const restartDisabled = !connectorOnline || status !== 'running';
     const stopDisabled = !connectorOnline || status !== 'running';
@@ -640,8 +651,19 @@ export function ServerConsolePage({ pageData = data }) {
         ? `Cooldown until ${new Date(cooldownUntil).toLocaleString()}${runtimeMeta.crashLoopCount ? ` · loop count ${runtimeMeta.crashLoopCount}` : ''}`
         : (runtimeMeta.crashLoopCount ? `Crash loop count tracked: ${runtimeMeta.crashLoopCount}` : 'No crash cooldown is active.');
 
-    return (
-        <ReactAppShell pageData={pageData} subtitle="React server console">
+    const consoleShortcuts = [
+        { action: 'Focus command input', keys: 'Ctrl + K' },
+        { action: 'Send command', keys: 'Ctrl + Enter' },
+        { action: 'Clear console output', keys: 'Ctrl + L' },
+        { action: 'Search console', keys: 'Ctrl + F' },
+        { action: 'Toggle auto-copy selection', keys: 'Ctrl + Shift + C' },
+        { action: 'Browse command history', keys: 'Arrow Up / Arrow Down' },
+        { action: 'Restart server', keys: 'Ctrl + Shift + R' },
+        { action: 'Start/Stop server', keys: 'Ctrl + Shift + S' }
+    ];
+
+    const content = (
+        <>
             {pageData.success && (
                 <div className="bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm mx-4 lg:mx-8 mt-6">
                     {pageData.success}
@@ -658,13 +680,13 @@ export function ServerConsolePage({ pageData = data }) {
                 </div>
             )}
 
-            <div className="p-4 lg:p-8 grid grid-cols-1 xl:grid-cols-4 gap-6">
+            <div className={`p-4 lg:p-8 grid grid-cols-1 ${isPopout ? '' : 'xl:grid-cols-4'} gap-6`}>
                 
                 {/* Main Console Surface */}
-                <div className="xl:col-span-3 flex flex-col gap-6 relative">
+                <div className={isPopout ? '' : 'xl:col-span-3 flex flex-col gap-6 relative'}>
                     
                     {/* Header + Power Row */}
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                         <div className="flex items-center gap-4">
                             <div className={`w-3 h-3 rounded-full shrink-0 ${getToneColorClass(statusTone(status))}`}></div>
                             <div>
@@ -709,62 +731,74 @@ export function ServerConsolePage({ pageData = data }) {
                     </div>
                     
                     {/* Quick Actions Bar */}
-                    {macros.length > 0 && (
-                        <div className="flex flex-wrap gap-2 items-center bg-neutral-900 border border-neutral-800 p-4 rounded-2xl shadow-inner shadow-black/40">
-                            <span className="text-[10px] font-black text-neutral-600 uppercase tracking-widest mr-2 flex items-center gap-1">
-                                <i className="bi bi-lightning-fill text-yellow-500"></i> Macros
-                            </span>
-                            {macros.map(m => (
-                                <button 
-                                    key={m.id}
-                                    onClick={() => runMacro(m.id)}
-                                    className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 hover:border-neutral-500 rounded-xl text-[10px] font-black text-neutral-300 uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
-                                >
-                                    {m.name}
-                                </button>
-                            ))}
-                        </div>
-                    )}
+                    <div className="flex flex-wrap gap-2 items-center bg-neutral-900 border border-neutral-800 p-4 rounded-2xl shadow-inner shadow-black/40 mb-6">
+                        <span className="text-[10px] font-black text-neutral-600 uppercase tracking-widest mr-2 flex items-center gap-1">
+                            <i className="bi bi-lightning-fill text-yellow-500"></i> Actions
+                        </span>
+                        {macros.map(m => (
+                            <button 
+                                key={m.id}
+                                onClick={() => runMacro(m.id)}
+                                className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 hover:border-neutral-500 rounded-xl text-[10px] font-black text-neutral-300 uppercase tracking-widest transition-all hover:scale-105 active:scale-95"
+                            >
+                                {m.name}
+                            </button>
+                        ))}
+                        <div className="flex-1"></div>
+                        <button 
+                            onClick={() => setShowShortcuts(true)}
+                            className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded-xl text-[10px] font-black text-neutral-400 hover:text-neutral-200 uppercase tracking-widest transition-all"
+                        >
+                            <i className="bi bi-keyboard me-2"></i> Shortcuts
+                        </button>
+                    </div>
 
                     {/* Terminal Block */}
-                    <div className="bg-neutral-900 border border-neutral-700 rounded-lg flex flex-col overflow-hidden shadow-lg h-[600px] relative">
+                    <div className={`bg-neutral-900 border border-neutral-700 rounded-lg flex flex-col overflow-hidden shadow-lg relative ${isPopout ? 'h-[calc(100vh-280px)]' : 'h-[600px]'}`}>
                         
                         {/* Provisioning Overlay Map */}
                         {isProvisioning && (
-                            <div className="absolute inset-0 bg-neutral-900/90 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-                                <div className="bg-neutral-800 border border-neutral-700 p-8 rounded-xl max-w-md w-full shadow-2xl flex flex-col items-center text-center">
-                                    <div className="w-16 h-16 rounded-full border-4 border-neutral-700 border-t-primary-500 animate-spin mb-6"></div>
-                                    <h2 className="text-xl font-bold text-white mb-2">
-                                        {status === 'starting' ? 'Starting Server' : 'Running Installer'}
+                            <div className="absolute inset-0 bg-neutral-900/90 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center">
+                                <div className="max-w-md w-full">
+                                    <div className="w-12 h-12 rounded-full border-4 border-neutral-700 border-t-primary-500 animate-spin mb-6 mx-auto"></div>
+                                    <h2 className="text-lg font-bold text-white mb-2 uppercase tracking-wide">
+                                        Server Busy
                                     </h2>
-                                    <p className="text-sm text-neutral-400 mb-6">
-                                        {status === 'starting' 
-                                            ? 'Your server is booting up. Most actions stay locked until the runtime is ready.' 
-                                            : 'Your server is being created and configured. This usually finishes in under a minute.'}
+                                    <p className="text-xs text-neutral-500 mb-6 font-bold uppercase tracking-widest">
+                                        Current State: {status}
                                     </p>
-                                    <div className="flex items-center gap-2 bg-neutral-900 px-4 py-2 rounded border border-neutral-700">
-                                        <i className="bi bi-hourglass-split text-primary-400"></i>
-                                        <span className="text-sm font-bold tracking-widest uppercase text-neutral-300">{status}</span>
-                                    </div>
+                                    {isRestrictedProvisioningViewer ? (
+                                        <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-red-400 text-xs font-black uppercase tracking-widest leading-relaxed">
+                                            <i className="bi bi-shield-lock me-2 text-sm"></i>
+                                            Interaction is restricted during provisioning for security.
+                                        </div>
+                                    ) : (
+                                        <div className="bg-neutral-800/50 p-4 rounded-xl text-neutral-400 text-xs font-bold uppercase tracking-widest italic">
+                                            Admin access: Interaction enabled despite provisioning state.
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
 
                         {/* Terminal Header */}
                         <div className="bg-neutral-800 border-b border-neutral-700 px-4 py-3 flex justify-between items-center z-10 shrink-0">
-                            <div>
-                                <strong className="text-neutral-100 font-bold block">Console</strong>
-                                <span className="text-xs text-neutral-500">Interactive server stream</span>
+                            <div className="flex items-center gap-3">
+                                <span className="flex h-2 w-2 rounded-full bg-primary-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></span>
+                                <div>
+                                    <strong className="text-neutral-100 font-bold block text-sm">Interactive Console</strong>
+                                    <span className="text-[10px] text-neutral-500 font-black uppercase tracking-widest">Live Runtime Link</span>
+                                </div>
                             </div>
-                            <div className="flex bg-neutral-900 rounded overflow-hidden border border-neutral-700">
+                            <div className="flex bg-neutral-900 rounded-xl overflow-hidden border border-neutral-700 p-1 gap-1">
                                 <button 
-                                    className={`px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors border-r border-neutral-700 ${followOutput ? 'bg-primary-600 text-white' : 'text-neutral-400 hover:text-white hover:bg-neutral-700'}`}
+                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${followOutput ? 'bg-primary-600 text-white shadow-lg' : 'text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800'}`}
                                     onClick={() => setFollowOutput((current) => !current)}
                                 >
                                     Follow
                                 </button>
                                 <button 
-                                    className="px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-neutral-400 hover:text-white hover:bg-neutral-700 transition-colors"
+                                    className="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800 transition-all"
                                     onClick={() => {
                                         const term = terminalInstanceRef.current;
                                         if (term) term.clear();
@@ -780,9 +814,9 @@ export function ServerConsolePage({ pageData = data }) {
                             <div className="w-full h-full" ref={terminalHostRef}></div>
                         </div>
                         {!terminalBooted && !terminalError && !isProvisioning && (
-                            <div className="absolute inset-x-0 bottom-16 top-16 flex items-center justify-center flex-col gap-4 text-neutral-500">
-                                <div className="w-8 h-8 border-4 border-neutral-600 border-t-primary-500 rounded-full animate-spin"></div>
-                                <span>Booting xterm runtime...</span>
+                            <div className="absolute inset-x-0 bottom-16 top-16 flex items-center justify-center flex-col gap-4 text-neutral-500 bg-neutral-900/50 backdrop-blur-sm z-30">
+                                <div className="w-8 h-8 border-4 border-neutral-700 border-t-primary-500 rounded-full animate-spin"></div>
+                                <span className="text-[10px] font-black uppercase tracking-widest">Initializing Xterm...</span>
                             </div>
                         )}
 
@@ -792,7 +826,7 @@ export function ServerConsolePage({ pageData = data }) {
                                 <span className="text-neutral-500 pl-4 font-mono font-bold">$</span>
                                 <input
                                     type="text"
-                                    className="w-full bg-transparent border-none text-neutral-200 text-sm font-mono px-3 py-3.5 focus:ring-0 shadow-none outline-none"
+                                    className="w-full bg-transparent border-none text-neutral-200 text-sm font-mono px-3 py-4 focus:ring-0 shadow-none outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                     value={commandValue}
                                     onChange={(event) => setCommandValue(event.target.value)}
                                     onKeyDown={(event) => {
@@ -815,136 +849,185 @@ export function ServerConsolePage({ pageData = data }) {
                                             setCommandValue(historyIndexRef.current >= 0 ? (history[historyIndexRef.current] || '') : '');
                                         }
                                     }}
-                                    placeholder={connectorOnline ? 'Type a command and press Enter...' : 'Connector offline'}
-                                    disabled={!connectorOnline}
+                                    placeholder={isRestrictedProvisioningViewer ? 'Input locked during provisioning' : (connectorOnline ? 'Type a command and press Enter...' : 'Connector offline')}
+                                    disabled={!connectorOnline || isRestrictedProvisioningViewer}
                                 />
                             </div>
                             
                             {/* Actions Group */}
-                            <div className="flex items-center w-full md:w-auto border-t md:border-t-0 md:border-l border-neutral-700">
+                            <div className="flex items-center w-full md:w-auto border-t md:border-t-0 md:border-l border-neutral-700 h-full">
                                 <button 
-                                    className="flex-1 md:flex-none px-8 py-3.5 bg-primary-600 hover:bg-primary-500 font-black text-white text-[10px] uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+                                    className="px-10 py-4 bg-primary-600 hover:bg-primary-500 font-black text-white text-[10px] uppercase tracking-[0.2em] transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 flex items-center justify-center gap-2 h-full"
                                     onClick={sendCommand} 
-                                    disabled={!connectorOnline || !String(commandValue || '').trim()}
+                                    disabled={!connectorOnline || !String(commandValue || '').trim() || isRestrictedProvisioningViewer}
                                 >
-                                    Send
+                                    Execute <i className="bi bi-terminal-fill"></i>
                                 </button>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Sidebar details */}
-                <aside className="xl:col-span-1 flex flex-col gap-4">
-                    
-                    {/* Connection Status Card */}
-                    <div className="bg-neutral-800 border border-neutral-700 rounded-2xl p-5 shadow-lg">
-                        <div className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <i className="bi bi-broadcast text-primary-400"></i> Connectivity
-                        </div>
-                        <div className="space-y-4">
-                            <div className={`p-4 rounded-xl border flex flex-col gap-1 ${connectorOnline ? 'bg-green-500/5 border-green-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Daemon Status</span>
-                                    <div className={`w-2 h-2 rounded-full ${connectorOnline ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'bg-red-500'}`}></div>
-                                </div>
-                                <span className={`text-sm font-black uppercase tracking-widest ${connectorOnline ? 'text-green-400' : 'text-red-400'}`}>
-                                    {connectionState}
-                                </span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <Link to={ReactRoutes.changeView} className="bg-neutral-900 border border-neutral-700 hover:border-neutral-500 text-neutral-300 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl text-center transition-all">
-                                    View Mode
-                                </Link>
-                                <a href={`/server/${server.containerId}?popout=true`} className="bg-neutral-900 border border-neutral-700 hover:border-neutral-500 text-neutral-300 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl text-center transition-all">
-                                    Popout
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Minecraft Player View (if valid) */}
-                    {isMinecraft && (
-                        <div className="bg-neutral-800 border border-neutral-700 rounded-2xl p-5 shadow-lg flex flex-col max-h-[400px]">
-                            <div className="flex justify-between items-center mb-4">
-                                <div className="text-[10px] font-black text-neutral-500 uppercase tracking-widest flex items-center gap-2">
-                                    <i className="bi bi-people text-primary-400"></i> Players
-                                </div>
-                                <span className="text-[10px] font-black bg-neutral-900 border border-neutral-700 px-2 py-0.5 rounded-lg text-neutral-400">
-                                    {players.length} Active
-                                </span>
-                            </div>
-                            <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
-                                {playersLoading ? (
-                                    <div className="text-[10px] font-black text-neutral-600 uppercase tracking-widest text-center py-8">Syncing...</div>
-                                ) : playersError ? (
-                                    <div className="text-[10px] font-black text-red-500 uppercase tracking-widest text-center py-8">{playersError}</div>
-                                ) : players.length === 0 ? (
-                                    <div className="text-[10px] font-black text-neutral-600 uppercase tracking-widest text-center py-8">Void Empty</div>
-                                ) : (
-                                    <div className="flex flex-col gap-2">
-                                        {players.map(p => (
-                                            <div key={p.name} className="bg-neutral-900 border border-neutral-700/30 p-2 rounded-xl flex items-center justify-between group transition-colors hover:border-neutral-600">
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <img 
-                                                        src={p.headUrl} 
-                                                        className="w-6 h-6 rounded shadow-sm grayscale group-hover:grayscale-0 transition-all" 
-                                                        alt={p.name} 
-                                                        onError={(e) => { e.target.src = 'https://minotar.net/avatar/Steve/40' }}
-                                                    />
-                                                    <span className="text-xs font-bold text-neutral-300 truncate">{p.name}</span>
-                                                </div>
-                                                
-                                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button 
-                                                        onClick={() => handleMcAction('kick', p.name)} 
-                                                        disabled={!mcPerms.canKick}
-                                                        className="w-6 h-6 flex items-center justify-center bg-neutral-800 hover:bg-red-900/40 text-neutral-400 hover:text-red-400 rounded-lg transition-colors"
-                                                        title="Kick"
-                                                    >
-                                                        <i className="bi bi-door-open-fill text-[10px]"></i>
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleMcAction('ban', p.name)} 
-                                                        disabled={!mcPerms.canBan}
-                                                        className="w-6 h-6 flex items-center justify-center bg-neutral-800 hover:bg-red-900 text-neutral-400 hover:text-white rounded-lg transition-colors"
-                                                        title="Ban"
-                                                    >
-                                                        <i className="bi bi-hammer text-[10px]"></i>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
+                    {showShortcuts && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                            <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowShortcuts(false)}></div>
+                            <div className="relative w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-[2.5rem] shadow-2xl overflow-hidden ring-1 ring-white/10">
+                                <div className="p-8 border-b border-neutral-800 flex justify-between items-center">
+                                    <div>
+                                        <h2 className="text-xl font-bold text-white tracking-tight">Console Shortcuts</h2>
+                                        <p className="text-xs text-neutral-500 font-bold uppercase tracking-widest mt-1">Boost your terminal workflow</p>
                                     </div>
-                                )}
+                                    <button onClick={() => setShowShortcuts(false)} className="w-10 h-10 flex items-center justify-center rounded-xl bg-neutral-800 text-neutral-400 hover:text-white transition-colors">
+                                        <i className="bi bi-x-lg"></i>
+                                    </button>
+                                </div>
+                                <div className="p-8 space-y-4">
+                                    {consoleShortcuts.map((sc, i) => (
+                                        <div key={i} className="flex justify-between items-center group">
+                                            <span className="text-sm font-bold text-neutral-400 group-hover:text-neutral-200 transition-colors">{sc.action}</span>
+                                            <kbd className="px-3 py-1 bg-neutral-800 border border-neutral-700 rounded-lg text-[10px] font-black text-primary-400 font-mono scale-110 shadow-lg shadow-black/20">{sc.keys}</kbd>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="p-8 bg-neutral-800/50 flex justify-center">
+                                    <button 
+                                        onClick={() => setShowShortcuts(false)}
+                                        className="px-8 py-3 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 border border-neutral-700 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all"
+                                    >
+                                        Close Reference
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
+                </div>
 
-                    {/* System & Guards Card */}
-                    <div className="bg-neutral-800 border border-neutral-700 rounded-2xl p-5 shadow-lg">
-                        <div className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                            <i className="bi bi-cpu text-primary-400"></i> Vital Metrics
-                        </div>
-                        <div className="space-y-1">
-                            <InlineMetric title="Core Load" value={`${stats.cpu.toFixed(1)}%`} note={limits.cpu ? `${limits.cpu}% cap` : 'No cap'} tone="primary" />
-                            <InlineMetric title="Memory Buffer" value={`${Math.round(stats.memory)} MB`} note={`${memoryPercent.toFixed(0)}% used`} tone="success" />
-                            <InlineMetric title="Disk Index" value={`${Math.round(stats.disk)} MB`} note={`${diskPercent.toFixed(0)}% used`} tone="warning" />
-                            <InlineMetric title="Session Time" value={formatDuration(stats.uptimeSeconds)} note="Current runtime session" />
-                            
-                            <div className="h-px bg-neutral-700/50 my-4"></div>
-                            
+                {/* Sidebar details */}
+                {!isPopout && (
+                    <aside className="xl:col-span-1 flex flex-col gap-4">
+                        
+                        {/* Connection Status Card */}
+                        <div className="bg-neutral-800 border border-neutral-700 rounded-2xl p-5 shadow-lg">
                             <div className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <i className="bi bi-shield-check text-primary-400"></i> Guard System
+                                <i className="bi bi-broadcast text-primary-400"></i> Connectivity
                             </div>
-                            <InlineMetric title="Last Trigger" value={formatRuntimeSource(runtimeMeta.lastSource)} note={runtimeMeta.lastReason || 'Stable state.'} />
-                            <InlineMetric title="Cooldown" value={cooldownValue} note={cooldownNote} tone={cooldownActive ? 'warning' : 'primary'} />
-                            <InlineMetric title="Exit Trace" value={lastExitValue} note={lastExitNote} tone={exitInfo.oomKilled ? 'danger' : 'primary'} />
+                            <div className="space-y-4">
+                                <div className={`p-4 rounded-xl border flex flex-col gap-1 ${connectorOnline ? 'bg-green-500/5 border-green-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Daemon Status</span>
+                                        <div className={`w-2 h-2 rounded-full ${connectorOnline ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'bg-red-500'}`}></div>
+                                    </div>
+                                    <span className={`text-sm font-black uppercase tracking-widest ${connectorOnline ? 'text-green-400' : 'text-red-400'}`}>
+                                        {connectionState}
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Link to={ReactRoutes.changeView} className="bg-neutral-900 border border-neutral-700 hover:border-neutral-500 text-neutral-300 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl text-center transition-all">
+                                        View Mode
+                                    </Link>
+                                    <a href={`/server/${server.containerId}?popout=true`} target="_blank" rel="noopener noreferrer" className="bg-neutral-900 border border-neutral-700 hover:border-neutral-500 text-neutral-300 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl text-center transition-all">
+                                        Popout
+                                    </a>
+                                </div>
+                            </div>
                         </div>
-                    </div>
 
-                </aside>
+                        {/* Minecraft Player View (if valid) */}
+                        {isMinecraft && (
+                            <div className="bg-neutral-800 border border-neutral-700 rounded-2xl p-5 shadow-lg flex flex-col max-h-[400px]">
+                                <div className="flex justify-between items-center mb-4">
+                                    <div className="text-[10px] font-black text-neutral-500 uppercase tracking-widest flex items-center gap-2">
+                                        <i className="bi bi-people text-primary-400"></i> Players
+                                    </div>
+                                    <span className="text-[10px] font-black bg-neutral-900 border border-neutral-700 px-2 py-0.5 rounded-lg text-neutral-400">
+                                        {players.length} Active
+                                    </span>
+                                </div>
+                                <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+                                    {playersLoading ? (
+                                        <div className="text-[10px] font-black text-neutral-600 uppercase tracking-widest text-center py-8">Syncing...</div>
+                                    ) : playersError ? (
+                                        <div className="text-[10px] font-black text-red-500 uppercase tracking-widest text-center py-8">{playersError}</div>
+                                    ) : players.length === 0 ? (
+                                        <div className="text-[10px] font-black text-neutral-600 uppercase tracking-widest text-center py-8">Void Empty</div>
+                                    ) : (
+                                        <div className="flex flex-col gap-2">
+                                            {players.map(p => (
+                                                <div key={p.name} className="bg-neutral-900 border border-neutral-700/30 p-2 rounded-xl flex items-center justify-between group transition-colors hover:border-neutral-600">
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <img 
+                                                            src={p.headUrl} 
+                                                            className="w-6 h-6 rounded shadow-sm grayscale group-hover:grayscale-0 transition-all" 
+                                                            alt={p.name} 
+                                                            onError={(e) => { e.target.src = 'https://minotar.net/avatar/Steve/40' }}
+                                                        />
+                                                        <span className="text-xs font-bold text-neutral-300 truncate">{p.name}</span>
+                                                    </div>
+                                                    
+                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button 
+                                                            onClick={() => handleMcAction('kick', p.name)} 
+                                                            disabled={!mcPerms.canKick}
+                                                            className="w-6 h-6 flex items-center justify-center bg-neutral-800 hover:bg-red-900/40 text-neutral-400 hover:text-red-400 rounded-lg transition-colors"
+                                                            title="Kick"
+                                                        >
+                                                            <i className="bi bi-door-open-fill text-[10px]"></i>
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleMcAction('ban', p.name)} 
+                                                            disabled={!mcPerms.canBan}
+                                                            className="w-6 h-6 flex items-center justify-center bg-neutral-800 hover:bg-red-900 text-neutral-400 hover:text-white rounded-lg transition-colors"
+                                                            title="Ban"
+                                                        >
+                                                            <i className="bi bi-hammer text-[10px]"></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* System & Guards Card */}
+                        <div className="bg-neutral-800 border border-neutral-700 rounded-2xl p-5 shadow-lg">
+                            <div className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <i className="bi bi-cpu text-primary-400"></i> Vital Metrics
+                            </div>
+                            <div className="space-y-1">
+                                <InlineMetric title="Core Load" value={`${stats.cpu.toFixed(1)}%`} note={limits.cpu ? `${limits.cpu}% cap` : 'No cap'} tone="primary" />
+                                <InlineMetric title="Memory Buffer" value={`${Math.round(stats.memory)} MB`} note={`${memoryPercent.toFixed(0)}% used`} tone="success" />
+                                <InlineMetric title="Disk Index" value={`${Math.round(stats.disk)} MB`} note={`${diskPercent.toFixed(0)}% used`} tone="warning" />
+                                <InlineMetric title="Session Time" value={formatDuration(stats.uptimeSeconds)} note="Current runtime session" />
+                                
+                                <div className="h-px bg-neutral-700/50 my-4"></div>
+                                
+                                <div className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                    <i className="bi bi-shield-check text-primary-400"></i> Guard System
+                                </div>
+                                <InlineMetric title="Last Trigger" value={formatRuntimeSource(runtimeMeta.lastSource)} note={runtimeMeta.lastReason || 'Stable state.'} />
+                                <InlineMetric title="Cooldown" value={cooldownValue} note={cooldownNote} tone={cooldownActive ? 'warning' : 'primary'} />
+                                <InlineMetric title="Exit Trace" value={lastExitValue} note={lastExitNote} tone={exitInfo.oomKilled ? 'danger' : 'primary'} />
+                            </div>
+                        </div>
+
+                    </aside>
+                )}
             </div>
+        </>
+    );
+
+    if (isPopout) {
+        return (
+            <div className="min-h-screen bg-neutral-900 text-neutral-200">
+                {content}
+            </div>
+        );
+    }
+
+    return (
+        <ReactAppShell pageData={pageData} subtitle="React server console">
+            {content}
         </ReactAppShell>
     );
 }

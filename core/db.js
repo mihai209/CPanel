@@ -60,7 +60,7 @@ const User = sequelize.define('User', {
     oauthProvider: { type: DataTypes.STRING, allowNull: true, defaultValue: null },
     oauthId: { type: DataTypes.STRING, allowNull: true, defaultValue: null },
     experimentalAiEnabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
-    experimentalViewMode: { type: DataTypes.STRING(16), allowNull: false, defaultValue: 'ejs' },
+    experimentalViewMode: { type: DataTypes.STRING(16), allowNull: false, defaultValue: 'react' },
     aiDailyQuotaOverride: { type: DataTypes.INTEGER, allowNull: true }
 });
 

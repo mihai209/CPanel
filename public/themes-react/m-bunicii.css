@@ -1,0 +1,12 @@
+:root {
+    --neutral-900: #1f3d2b;
+    --neutral-800: #1f3d2b;
+    --neutral-700: #e74c3c;
+    --neutral-100: #eef6e6;
+    --neutral-400: #b8ccb7;
+    --primary-500: #e74c3c;
+    --cp-body-background: linear-gradient(rgba(31, 61, 43, 0.82), rgba(31, 61, 43, 0.82)), url('/themes/m-bunicii/m-bunicii.png'), linear-gradient(145deg, #1f3d2b 0%, #314f39 100%);
+    --cp-panel-bg: var(--neutral-900);
+    --cp-sidebar-bg: var(--neutral-800);
+    --cp-accent-color: var(--primary-500);
+}

@@ -26,8 +26,15 @@ export function ExperimentalFeaturesPage({ pageData = data }) {
     const aiAvailable = Boolean(pageData.aiAdminEnabled && pageData.aiProviderReady);
 
     return (
-        <ReactAppShell pageData={pageData} subtitle="Experimental features">
-            <PageContentBlock title="Beta Features">
+        <ReactAppShell pageData={pageData} subtitle="Outdated features">
+            <PageContentBlock title="Outdated Features">
+                <div className="bg-red-600/20 border border-red-600/50 text-red-100 p-4 rounded-lg mb-6 shadow-sm flex items-center gap-3">
+                    <i className="bi bi-info-circle text-xl"></i>
+                    <div>
+                        <strong className="block">Notice</strong>
+                        <p className="text-sm">Sorry but features that were added here will still be working but wont be updated anymore</p>
+                    </div>
+                </div>
                 {pageData.success && (
                     <div className="bg-green-600/20 border border-green-600/50 text-green-100 p-4 rounded-lg mb-6 shadow-sm">
                         {pageData.success}
@@ -69,7 +76,7 @@ export function ExperimentalFeaturesPage({ pageData = data }) {
                                 <MetricItem title="Daily quota" value={`${pageData.quotaUsed || 0}/${pageData.quotaLimit || 100}`} active={true} note="Usage resets daily." />
                             </div>
                         </div>
-                        <form method="POST" action="/experimental-features/ai" className="mt-auto border-t border-neutral-700 pt-5">
+                        <form method="POST" action="/instable/outdated/ai" className="mt-auto border-t border-neutral-700 pt-5">
                             <label className={`flex items-start gap-3 cursor-pointer ${!aiAvailable ? 'opacity-50' : ''}`}>
                                 <input
                                     type="checkbox"

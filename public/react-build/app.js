@@ -9378,6 +9378,8 @@
   var NAV_ICONS = {
     console: "bi-terminal-fill",
     overview: "bi-speedometer2",
+    performance: "bi-cpu-fill",
+    smartalerts: "bi-bell-fill",
     activity: "bi-clock-history",
     timeline: "bi-list-ul",
     files: "bi-folder2-open",
@@ -9389,7 +9391,10 @@
     schedules: "bi-calendar-event",
     startup: "bi-play-circle",
     mccenter: "bi-controller",
-    mcinstaller: "bi-download"
+    mcinstaller: "bi-download",
+    mounts: "bi-hdd-stack-fill",
+    scaling: "bi-graph-up-arrow",
+    policy: "bi-shield-lock-fill"
   };
   var NAV_GROUPS = [
     { label: "Server", keys: ["console", "overview", "activity"] },
@@ -13454,10 +13459,13 @@
       setSaving(true);
       setStatus({ type: "idle", message: "" });
       try {
-        const response = await fetch(`/api/client/servers/${server.containerId}/files/write?path=${encodeURIComponent(filePath)}`, {
+        const response = await fetch(`/api/client/servers/${server.containerId}/files/write`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: valueToSave }),
+          body: JSON.stringify({
+            path: filePath,
+            content: valueToSave
+          }),
           credentials: "same-origin"
         });
         const payload = await response.json();

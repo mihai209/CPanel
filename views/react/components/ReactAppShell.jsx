@@ -6,6 +6,10 @@ import GlobalStatusModal from './GlobalStatusModal.jsx';
 import NotificationBell from './NotificationBell.jsx';
 import GlobalSearch from './GlobalSearch.jsx';
 import ServerNavbar from './ServerNavbar.jsx';
+import { ThemeProvider } from './ThemeContext.jsx';
+
+// Import base themes
+import '../../public/css/react-themes-base.css';
 
 function InternalTopAction({ to, icon, title }) {
     return (
@@ -57,7 +61,8 @@ export default function ReactAppShell({
     const shouldBlock = isProvisioning && activeNavItem && blockedPageKeys.includes(activeNavItem.key);
 
     return (
-        <div className={`min-h-screen bg-neutral-900 text-neutral-200 flex flex-col ${pageClassName || ''}`}>
+        <ThemeProvider pageData={pageData}>
+            <div className={`min-h-screen bg-neutral-900 text-neutral-200 flex flex-col ${pageClassName || ''}`}>
             
             {/* Top Navigation Bar */}
             <div className="bg-neutral-800 border-b border-neutral-700 w-full flex items-center justify-between px-4 lg:px-8 h-16 shrink-0">
@@ -101,9 +106,12 @@ export default function ReactAppShell({
                         )}
                         <div className="h-6 w-px bg-neutral-700 mx-1"></div>
                         <GlobalSearch />
+                        <InternalTopAction to={ReactRoutes.themes} icon="bi-palette-fill" title="Themes" />
+                        <InternalTopAction to={ReactRoutes.rewards} icon="bi-coin" title="Rewards" />
+                        <InternalTopAction to={ReactRoutes.afk} icon="bi-hourglass-split" title="AFK Timer" />
                         <NotificationBell />
                         <div className="h-6 w-px bg-neutral-700 mx-2"></div>
-                        <InternalTopAction to={ReactRoutes.experimentalFeatures} icon="bi-sliders" title="Experimental Features" />
+                        <InternalTopAction to={ReactRoutes.outdatedFeatures} icon="bi-sliders" title="Outdated Features" />
                         <a className="text-neutral-400 hover:text-neutral-100 transition-colors p-2 rounded-full hover:bg-neutral-700" href={ReactRoutes.changeView} title="Exit Beta">
                             <i className="bi bi-door-open"></i>
                         </a>
@@ -124,17 +132,52 @@ export default function ReactAppShell({
 
             {/* Mobile Nav Drawer */}
             {mobileNavOpen && (
-                <div className="md:hidden bg-neutral-800 border-b border-neutral-700 flex flex-col">
+                <div className="md:hidden bg-neutral-800 border-b border-neutral-700 flex flex-col py-2">
                     {shellNavItems.map((item) => (
                         <NavLink 
                             key={item.to} 
                             to={item.to} 
-                            className={({ isActive }) => `px-4 py-3 text-sm font-semibold border-l-4 ${isActive ? 'text-white border-primary-500 bg-neutral-700/50' : 'text-neutral-400 font-medium border-transparent hover:text-white'}`}
+                            className={({ isActive }) => `px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${isActive ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}
                         >
+                            <i className={`bi ${item.to === ReactRoutes.dashboard ? 'bi-grid-fill' : 'bi-person-fill'} text-lg`}></i>
                             {item.label}
                         </NavLink>
                     ))}
-                    <NavLink to={ReactRoutes.changeView} className="px-4 py-3 text-sm font-semibold border-l-4 border-transparent text-neutral-400 hover:text-white">
+                    <div className="h-px bg-neutral-700/50 mx-5 my-1"></div>
+                    <NavLink to={ReactRoutes.themes} className={({ isActive }) => `px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${isActive ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}>
+                        <i className="bi bi-palette-fill text-lg"></i>
+                        Themes
+                    </NavLink>
+                    <NavLink to={ReactRoutes.rewards} className={({ isActive }) => `px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${isActive ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}>
+                        <i className="bi bi-coin text-lg"></i>
+                        Rewards
+                    </NavLink>
+                    <NavLink to={ReactRoutes.afk} className={({ isActive }) => `px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${isActive ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}>
+                        <i className="bi bi-hourglass-split text-lg"></i>
+                        AFK Timer
+                    </NavLink>
+                    
+                    <div className="h-px bg-neutral-700/50 mx-5 my-1"></div>
+                    <NavLink to={ReactRoutes.outdatedFeatures} className={({ isActive }) => `px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${isActive ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}>
+                        <i className="bi bi-sliders text-lg"></i>
+                        Outdated Features
+                    </NavLink>
+                    {pageData.user?.isAdmin && (
+                        <>
+                            <a href={ReactRoutes.admin} className="px-5 py-3 text-sm font-bold flex items-center gap-3 text-neutral-400 hover:text-white transition-colors">
+                                <i className="bi bi-gear-fill text-lg"></i>
+                                Admin Panel
+                            </a>
+                            <NavLink to={ReactRoutes.connectorsCheck} className={({ isActive }) => `px-5 py-3 text-sm font-bold flex items-center gap-3 transition-colors ${isActive ? 'text-primary-400 bg-primary-500/5' : 'text-neutral-400 hover:text-white'}`}>
+                                <i className="bi bi-cpu text-lg"></i>
+                                Connectors Check
+                            </NavLink>
+                            <div className="h-px bg-neutral-700/50 mx-5 my-1"></div>
+                        </>
+                    )}
+
+                    <NavLink to={ReactRoutes.changeView} className="px-5 py-3 text-sm font-bold flex items-center gap-3 text-neutral-400 hover:text-white transition-colors">
+                        <i className="bi bi-door-open text-lg"></i>
                         Exit Beta Mode
                     </NavLink>
                 </div>
@@ -177,5 +220,6 @@ export default function ReactAppShell({
                 </div>
             </footer>
         </div>
+        </ThemeProvider>
     );
 }

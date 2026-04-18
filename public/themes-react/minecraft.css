@@ -1,0 +1,12 @@
+:root {
+    --neutral-900: #0b180b;
+    --neutral-800: #102010;
+    --neutral-700: rgba(114, 179, 82, 0.42);
+    --neutral-100: #e9fbe2;
+    --neutral-400: #b8d8ae;
+    --primary-500: #9ce45f;
+    --cp-body-background: linear-gradient(rgba(11, 24, 11, 0.82), rgba(11, 24, 11, 0.82)), url('https://images2.alphacoders.com/137/thumb-1920-1370592.jpeg'), linear-gradient(145deg, #183320 0%, #355f32 100%);
+    --cp-panel-bg: var(--neutral-900);
+    --cp-sidebar-bg: var(--neutral-800);
+    --cp-accent-color: var(--primary-500);
+}

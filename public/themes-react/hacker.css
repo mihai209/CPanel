@@ -1,0 +1,12 @@
+:root {
+    --neutral-900: #030807;
+    --neutral-800: #07110e;
+    --neutral-700: #0b1b13;
+    --neutral-100: #dfffee;
+    --neutral-400: #8ab1c4;
+    --primary-500: #3bff9a;
+    --cp-body-background: linear-gradient(rgba(3, 8, 7, 0.82), rgba(3, 8, 7, 0.82)), url('/themes/hacker/hacker.png'), linear-gradient(180deg, #030807 0%, #07110e 38%, #081511 100%);
+    --cp-panel-bg: var(--neutral-900);
+    --cp-sidebar-bg: var(--neutral-800);
+    --cp-accent-color: var(--primary-500);
+}

@@ -269,10 +269,13 @@ export function ServerFileEditorPage({ pageData = data }) {
         setSaving(true);
         setStatus({ type: 'idle', message: '' });
         try {
-            const response = await fetch(`/api/client/servers/${server.containerId}/files/write?path=${encodeURIComponent(filePath)}`, {
+            const response = await fetch(`/api/client/servers/${server.containerId}/files/write`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: valueToSave }),
+                body: JSON.stringify({ 
+                    path: filePath,
+                    content: valueToSave 
+                }),
                 credentials: 'same-origin'
             });
             const payload = await response.json();

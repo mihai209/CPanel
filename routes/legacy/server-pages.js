@@ -128,6 +128,9 @@ function registerServerPagesRoutes(ctx) {
         const containerId = server.containerId;
         return [
             { key: 'console', label: 'Console', href: `/server/${containerId}`, active: activeKey === 'console' },
+            hasServerPermission(access, 'server.view')
+                ? { key: 'overview', label: 'Overview', href: `/server/${containerId}/overview`, active: activeKey === 'overview' }
+                : null,
             hasServerPermission(access, 'server.files')
                 ? { key: 'files', label: 'File Manager', href: `/server/${containerId}/files`, active: activeKey === 'files' }
                 : null,
@@ -152,14 +155,50 @@ function registerServerPagesRoutes(ctx) {
             hasServerPermission(access, 'server.startup')
                 ? { key: 'startup', label: 'Startup', href: `/server/${containerId}/startup`, active: activeKey === 'startup' }
                 : null,
+            hasServerPermission(access, 'server.mounts')
+                ? { key: 'mounts', label: 'Mounts', href: `/server/${containerId}/mounts`, active: activeKey === 'mounts' }
+                : null,
+            hasServerPermission(access, 'server.scaling')
+                ? { key: 'scaling', label: 'Scaling', href: `/server/${containerId}/scaling`, active: activeKey === 'scaling' }
+                : null,
+            hasServerPermission(access, 'server.policy')
+                ? { key: 'policy', label: 'Policy', href: `/server/${containerId}/policy`, active: activeKey === 'policy' }
+                : null,
+            hasServerPermission(access, 'server.performance.view')
+                ? { key: 'performance', label: 'Performance', href: `/server/${containerId}/performance`, active: activeKey === 'performance' }
+                : null,
             (isServerLikelyMinecraft(server) && (hasServerPermission(access, 'server.view') || hasServerPermission(access, 'server.files')))
                 ? { key: 'mccenter', label: 'MC Center', href: `/server/${containerId}/minecraft-center`, active: activeKey === 'mccenter' }
                 : null,
             (isServerLikelyMinecraft(server) && (hasServerPermission(access, 'server.view') || hasServerPermission(access, 'server.files')))
                 ? { key: 'mcinstaller', label: 'MC Installer', href: `/server/${containerId}/minecraft/installer`, active: activeKey === 'mcinstaller' }
                 : null,
+            hasServerPermission(access, 'server.view')
+                ? { key: 'smartalerts', label: 'Smart Alerts', href: `/server/${containerId}/smartalerts`, active: activeKey === 'smartalerts' }
+                : null,
             hasServerPermission(access, 'server.activity.view')
                 ? { key: 'activity', label: 'Activity', href: `/server/${containerId}/activity`, active: activeKey === 'activity' }
+                : null,
+            (isServerLikelyMinecraft(server) && (hasServerPermission(access, 'server.view') || hasServerPermission(access, 'server.files')))
+                ? { key: 'metrics', label: 'Metrics', href: `/server/${containerId}/status-metrics`, active: activeKey === 'metrics' }
+                : null,
+            (hasServerPermission(access, 'server.console') || hasServerPermission(access, 'server.activity.view'))
+                ? { key: 'debuglogs', label: 'Debug Logs', href: `/server/${containerId}/debug-logs`, active: activeKey === 'debuglogs' }
+                : null,
+            (hasServerPermission(access, 'server.audit.read') || hasServerPermission(access, 'server.activity.view'))
+                ? { key: 'auditconsole', label: 'Audit Console', href: `/server/${containerId}/audit-console`, active: activeKey === 'auditconsole' }
+                : null,
+            hasServerPermission(access, 'server.recovery')
+                ? { key: 'recovery', label: 'Recovery', href: `/server/${containerId}/recovery`, active: activeKey === 'recovery' }
+                : null,
+            (access.isOwner || access.isAdmin || hasServerPermission(access, 'server.ai.manage'))
+                ? { key: 'ai', label: 'AI Manage', href: `/server/${containerId}/ai-manage`, active: activeKey === 'ai' }
+                : null,
+            (isServerLikelyMinecraft(server) && (hasServerPermission(access, 'server.view') || hasServerPermission(access, 'server.files')))
+                ? { key: 'proxy-network', label: 'Proxy Network', href: `/server/${containerId}/proxy-network`, active: activeKey === 'proxy-network' }
+                : null,
+            (hasServerPermission(access, 'server.macros.view') || hasServerPermission(access, 'server.view'))
+                ? { key: 'macros', label: 'Command Macros', href: `/server/${containerId}/macros`, active: activeKey === 'macros' }
                 : null
         ].filter(Boolean);
     }
@@ -8053,7 +8092,7 @@ function registerServerPagesRoutes(ctx) {
     app.get('/afk', requireAuth, async (req, res) => {
         try {
             const account = await User.findByPk(req.session.user.id, {
-                attributes: ['id', 'username', 'coins', 'isSuspended']
+                attributes: ['id', 'username', 'coins', 'isSuspended', 'experimentalViewMode', 'avatarUrl', 'avatarProvider', 'email']
             });
             if (!account) {
                 req.session.destroy(() => { });
@@ -8078,6 +8117,39 @@ function registerServerPagesRoutes(ctx) {
             }
 
             req.session.user.coins = Number.isFinite(Number(account.coins)) ? Number(account.coins) : 0;
+
+            const reactPageData = {
+                routePath: '/afk',
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                user: {
+                    id: account.id,
+                    username: account.username,
+                    coins: req.session.user.coins,
+                    avatarUrl: account.avatarUrl,
+                    avatarProvider: account.avatarProvider || 'gravatar',
+                    gravatarHash: md5(String(account.email || '').trim().toLowerCase())
+                },
+                afkTimerEnabled,
+                afkTimerCoins,
+                afkTimerCooldownSeconds,
+                afkRemainingSeconds,
+                economyUnit,
+                success: req.query.success || null,
+                error: req.query.error || null
+            };
+
+            if (String(req.query.__reactData || '').trim() === '1') {
+                return res.json(reactPageData);
+            }
+
+            if (String(account.experimentalViewMode || '').trim().toLowerCase() === 'react') {
+                return res.render('react/loader', {
+                    title: 'AFK Timer',
+                    reactEntry: 'afk',
+                    reactPageData
+                });
+            }
 
             return res.render('afk', {
                 user: req.session.user,
@@ -8167,7 +8239,7 @@ function registerServerPagesRoutes(ctx) {
     app.get('/rewards', requireAuth, async (req, res) => {
         try {
             const account = await User.findByPk(req.session.user.id, {
-                attributes: ['id', 'username', 'coins', 'isSuspended']
+                attributes: ['id', 'username', 'coins', 'isSuspended', 'experimentalViewMode', 'avatarUrl', 'avatarProvider', 'email']
             });
             if (!account) {
                 req.session.destroy(() => { });
@@ -8189,7 +8261,6 @@ function registerServerPagesRoutes(ctx) {
             if (resetByInactivity) {
                 await setUserClaimState(account.id, claimState);
             } else {
-                // Persist activity timestamp for 24h inactivity streak reset tracking.
                 await setUserClaimState(account.id, claimState);
             }
 
@@ -8203,7 +8274,45 @@ function registerServerPagesRoutes(ctx) {
                 claimRemainingByPeriod[period] = getCountdownFromTimestamp(claimState.lastClaimAtByPeriod[period], AFK_PERIOD_SECONDS[period], nowMs);
             });
 
+            const economyUnit = normalizeEconomyUnit(featureFlags.economyUnit);
             req.session.user.coins = Number.isFinite(Number(account.coins)) ? Number(account.coins) : 0;
+
+            const reactPageData = {
+                routePath: '/rewards',
+                brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
+                faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
+                user: {
+                    id: account.id,
+                    username: account.username,
+                    coins: req.session.user.coins,
+                    avatarUrl: account.avatarUrl,
+                    avatarProvider: account.avatarProvider || 'gravatar',
+                    gravatarHash: md5(String(account.email || '').trim().toLowerCase())
+                },
+                claimRewardsEnabled,
+                rewardsMap,
+                selectedClaimPeriod,
+                claimRemainingByPeriod,
+                dailyStreak: claimState.dailyStreak || 0,
+                claimDailyStreakBonusCoins: clampInteger(featureFlags.claimDailyStreakBonusCoins, 5, 0, 1000000),
+                claimDailyStreakMax: clampInteger(featureFlags.claimDailyStreakMax, 30, 1, 365),
+                streakResetSeconds: getStreakResetRemainingSeconds(claimState, nowMs),
+                economyUnit,
+                success: req.query.success || null,
+                error: req.query.error || null
+            };
+
+            if (String(req.query.__reactData || '').trim() === '1') {
+                return res.json(reactPageData);
+            }
+
+            if (String(account.experimentalViewMode || '').trim().toLowerCase() === 'react') {
+                return res.render('react/loader', {
+                    title: 'Rewards',
+                    reactEntry: 'rewards',
+                    reactPageData
+                });
+            }
 
             return res.render('rewards', {
                 user: req.session.user,
@@ -8217,7 +8326,7 @@ function registerServerPagesRoutes(ctx) {
                 claimDailyStreakBonusCoins: clampInteger(featureFlags.claimDailyStreakBonusCoins, 5, 0, 1000000),
                 claimDailyStreakMax: clampInteger(featureFlags.claimDailyStreakMax, 30, 1, 365),
                 streakResetSeconds: getStreakResetRemainingSeconds(claimState, nowMs),
-                economyUnit: normalizeEconomyUnit(featureFlags.economyUnit),
+                economyUnit,
                 success: req.query.success || null,
                 error: req.query.error || null
             });
@@ -11077,6 +11186,21 @@ function registerServerPagesRoutes(ctx) {
             const aiAdminConfig = await getAiAdminConfig();
             const aiPolicy = normalizeAiPolicy(server.aiPolicy);
 
+            if (req.query.experimentalViewMode === 'react' || req.session.user.experimentalViewMode === 'react') {
+                return res.render('react/loader', {
+                    server,
+                    user: req.session.user,
+                    title: `AI Controls · ${server.name}`,
+                    reactEntry: 'server-ai',
+                    reactPageData: {
+                        server,
+                        aiPolicy,
+                        aiAdminEnabled: Boolean(aiAdminConfig.enabled),
+                        serverNavItems: buildReactServerNavItems(server, access, 'ai')
+                    }
+                });
+            }
+
             return res.render('server/ai-manage', {
                 server,
                 user: req.session.user,
@@ -12569,6 +12693,20 @@ return res.render('server/users', {
                 limit: 350
             });
 
+            if (req.query.experimentalViewMode === 'react' || req.session.user.experimentalViewMode === 'react') {
+                return res.render('react/loader', {
+                    server,
+                    user: req.session.user,
+                    title: `Audit Console ${server.name}`,
+                    reactEntry: 'server-audit-console',
+                    reactPageData: {
+                        server,
+                        logs,
+                        serverNavItems: buildReactServerNavItems(server, access, 'auditconsole')
+                    }
+                });
+            }
+
             return res.render('server/audit-console', {
                 server,
                 user: req.session.user,
@@ -12781,6 +12919,25 @@ return res.render('server/users', {
             performanceRows = performanceRows.slice(0, 20);
             performanceStats.totalSizeMb = Number(performanceStats.totalSizeMb.toFixed(2));
 
+            if (req.query.experimentalViewMode === 'react' || req.session.user.experimentalViewMode === 'react') {
+                return res.render('react/loader', {
+                    server,
+                    user: req.session.user,
+                    title: `Performance Insights ${server.name}`,
+                    reactEntry: 'server-performance',
+                    reactPageData: {
+                        server,
+                        performanceRows,
+                        performanceStats,
+                        performanceReportUrl,
+                        success: req.query.success || null,
+                        error: req.query.error || null,
+                        canRunCommands: hasServerPermission(access, 'server.console'),
+                        serverNavItems: buildReactServerNavItems(server, access, 'performance')
+                    }
+                });
+            }
+
             return res.render('server/performance', {
                 server,
                 user: req.session.user,
@@ -12915,6 +13072,22 @@ return res.render('server/users', {
                         flowSummary: summarizeMacroFlow(flowConfig)
                     };
                 });
+
+            if (req.query.experimentalViewMode === 'react' || req.session.user.experimentalViewMode === 'react') {
+                return res.render('react/loader', {
+                    server,
+                    user: req.session.user,
+                    title: `Command Macros ${server.name}`,
+                    reactEntry: 'server-macros',
+                    reactPageData: {
+                        server,
+                        macros,
+                        canRunCommands: hasServerPermission(access, 'server.console'),
+                        canManageVisibility: Boolean(access.isAdmin || access.isOwner),
+                        serverNavItems: buildReactServerNavItems(server, access, 'macros')
+                    }
+                });
+            }
 
             return res.render('server/macros', {
                 server,
@@ -13394,6 +13567,26 @@ return res.render('server/users', {
 
             const connectorOnline = Boolean(server.allocation && connectorConnections.has(server.allocation.connectorId));
 
+            if (req.query.experimentalViewMode === 'react' || req.session.user.experimentalViewMode === 'react') {
+                return res.render('react/loader', {
+                    server,
+                    user: req.session.user,
+                    title: `Recovery Assistant ${server.name}`,
+                    reactEntry: 'server-recovery',
+                    reactPageData: {
+                        server,
+                        debugEvents,
+                        latestDebug,
+                        latestMeta,
+                        issueHint,
+                        connectorOnline,
+                        canPower: hasServerPermission(access, 'server.power'),
+                        canConsole: hasServerPermission(access, 'server.console'),
+                        serverNavItems: buildReactServerNavItems(server, access, 'recovery')
+                    }
+                });
+            }
+
             return res.render('server/recovery', {
                 server,
                 user: req.session.user,
@@ -13541,6 +13734,23 @@ return res.render('server/users', {
                     logTail
                 };
             });
+
+            if (req.query.experimentalViewMode === 'react' || req.session.user.experimentalViewMode === 'react') {
+                return res.render('react/loader', {
+                    server,
+                    user: req.session.user,
+                    title: `Debug Logs ${server.name}`,
+                    reactEntry: 'server-debug-logs',
+                    reactPageData: {
+                        server,
+                        logs,
+                        canFixPermissions: hasServerPermission(access, 'server.files.write') || hasServerPermission(access, 'server.startup'),
+                        success: req.query.success || null,
+                        error: req.query.error || null,
+                        serverNavItems: buildReactServerNavItems(server, access, 'debuglogs')
+                    }
+                });
+            }
 
             return res.render('server/debug-logs', {
                 server,
@@ -14709,6 +14919,24 @@ return res.render('server/users', {
                     readOnly: Boolean(mount.readOnly)
                 }));
 
+            if (req.query.experimentalViewMode === 'react' || req.session.user.experimentalViewMode === 'react') {
+                return res.render('react/loader', {
+                    server,
+                    user: req.session.user,
+                    title: `Mounts ${server.name}`,
+                    reactEntry: 'server-mounts',
+                    reactPageData: {
+                        server,
+                        assignedMounts,
+                        availableMounts,
+                        canManageMounts: hasServerPermission(access, 'server.mounts'),
+                        success: req.query.success || null,
+                        error: req.query.error || null,
+                        serverNavItems: buildReactServerNavItems(server, access, 'mounts')
+                    }
+                });
+            }
+
             res.render('server/mounts', {
                 server,
                 user: req.session.user,
@@ -15758,6 +15986,33 @@ return res.render('server/users', {
             const managerStateKey = resolveDatabaseManagerStateKey(state.server.id, entry.id);
             const queryPreview = getDatabaseManagerPreview(req, managerStateKey);
 
+            if (req.query.experimentalViewMode === 'react' || req.session.user.experimentalViewMode === 'react') {
+                return res.render('react/loader', {
+                    server: state.server,
+                    user: req.session.user,
+                    title: `Database Manager ${state.server.name}`,
+                    reactEntry: 'server-database-manager',
+                    reactPageData: {
+                        server: state.server,
+                        entry,
+                        tables,
+                        selectedTable,
+                        tableColumns,
+                        tableColumnMeta,
+                        primaryKeyColumns,
+                        tableRowCriteria,
+                        tableRows,
+                        totalRows,
+                        totalPages,
+                        currentPage,
+                        pageSize,
+                        dbInspectError,
+                        queryPreview,
+                        serverNavItems: buildReactServerNavItems(state.server, access, 'dbs')
+                    }
+                });
+            }
+
             return res.render('server/database-manager', {
                 server: state.server,
                 user: req.session.user,
@@ -16718,6 +16973,25 @@ return res.render('server/users', {
             const ownerInventory = inventoryEnabled
                 ? await getUserInventoryState(server.ownerId)
                 : defaultUserInventoryState();
+            if (req.query.experimentalViewMode === 'react' || req.session.user.experimentalViewMode === 'react') {
+                return res.render('react/loader', {
+                    server,
+                    user: req.session.user,
+                    title: `Scaling ${server.name}`,
+                    reactEntry: 'server-scaling',
+                    reactPageData: {
+                        server,
+                        scalingConfig,
+                        inventoryEnabled,
+                        ownerInventory,
+                        canManageScaling: hasServerPermission(access, 'server.startup'),
+                        success: req.query.success || null,
+                        error: req.query.error || null,
+                        serverNavItems: buildReactServerNavItems(server, access, 'scaling')
+                    }
+                });
+            }
+
             return res.render('server/scaling', {
                 server,
                 user: req.session.user,
@@ -18265,6 +18539,20 @@ return res.render('server/users', {
                 return res.redirect('/server/no-permissions');
             }
 
+            if (req.query.experimentalViewMode === 'react' || req.session.user.experimentalViewMode === 'react') {
+                return res.render('react/loader', {
+                    server,
+                    user: req.session.user,
+                    title: `Status & Metrics ${server.name}`,
+                    reactEntry: 'server-status-metrics',
+                    reactPageData: {
+                        server,
+                        isMinecraft: isServerLikelyMinecraft(server),
+                        serverNavItems: buildReactServerNavItems(server, access, 'metrics')
+                    }
+                });
+            }
+
             return res.render('server/status-metrics', {
                 server,
                 user: req.session.user,
@@ -18545,6 +18833,24 @@ return res.render('server/users', {
                 order: [['name', 'ASC']],
                 limit: 250
             }).catch(() => []);
+
+            if (req.query.experimentalViewMode === 'react' || req.session.user.experimentalViewMode === 'react') {
+                return res.render('react/loader', {
+                    server,
+                    user: req.session.user,
+                    title: `Proxy Network ${server.name}`,
+                    reactEntry: 'server-proxy-network',
+                    reactPageData: {
+                        server,
+                        proxyMode,
+                        proxySnapshot: snapshot,
+                        proxyGroupedBackends: groupedBackends,
+                        proxyUngroupedBackends: ungroupedBackends,
+                        proxyLinkableServers: Array.isArray(linkableServers) ? linkableServers : [],
+                        serverNavItems: buildReactServerNavItems(server, access, 'proxy-network')
+                    }
+                });
+            }
 
             return res.render('server/proxy-network', {
                 server,
@@ -22036,7 +22342,23 @@ res.render('server/startup', {
 
             const smartAlerts = await getServerSmartAlertsConfig(server.id);
 
-            res.render('server/smartalerts', {
+            if (req.query.experimentalViewMode === 'react' || req.session.user.experimentalViewMode === 'react') {
+                return res.render('react/loader', {
+                    server,
+                    user: req.session.user,
+                    title: `Smart Alerts ${server.name}`,
+                    reactEntry: 'server-smartalerts',
+                    reactPageData: {
+                        server,
+                        smartAlerts,
+                        success: req.query.success || null,
+                        error: req.query.error || null,
+                        serverNavItems: buildReactServerNavItems(server, access, 'smartalerts')
+                    }
+                });
+            }
+
+            return res.render('server/smartalerts', {
                 server,
                 user: req.session.user,
                 title: `Smart Alerts ${server.name}`,
@@ -22143,6 +22465,24 @@ res.render('server/startup', {
                 return res.redirect(`/server/${server.containerId}/overview?error=${encodeURIComponent('Policy engine is disabled by admin.')}`);
             }
             const policyConfig = await getServerPolicyEngineConfig(server.id);
+
+            if (req.query.experimentalViewMode === 'react' || req.session.user.experimentalViewMode === 'react') {
+                return res.render('react/loader', {
+                    server,
+                    user: req.session.user,
+                    title: `Policy Engine ${server.name}`,
+                    reactEntry: 'server-policy',
+                    reactPageData: {
+                        server,
+                        policyConfig,
+                        canQueueRestart: hasServerPermission(access, 'server.power'),
+                        playbooksFeatureEnabled: Boolean(featureFlags.playbooksAutomationEnabled),
+                        success: req.query.success || null,
+                        error: req.query.error || null,
+                        serverNavItems: buildReactServerNavItems(server, access, 'policy')
+                    }
+                });
+            }
 
             return res.render('server/policy', {
                 server,
@@ -22685,9 +23025,9 @@ app.get('/api/client/servers/:containerId', async (req, res) => {
                 return res.status(auth.status).json({ success: false, error: auth.error });
             }
 
-            const filePathRaw = String(req.body.file || req.body.path || '').trim();
+            const filePathRaw = String(req.body.file || req.body.path || req.query.file || req.query.path || '').trim();
             if (!filePathRaw) {
-                return res.status(400).json({ success: false, error: 'Field "file" is required.' });
+                return res.status(400).json({ success: false, error: 'Field "file" or "path" is required in body or query.' });
             }
             const filePath = filePathRaw.startsWith('/') ? filePathRaw : `/${filePathRaw}`;
             if (isProtectedServerRuntimePath(filePath)) {

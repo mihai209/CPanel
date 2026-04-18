@@ -1,0 +1,12 @@
+:root {
+    --neutral-900: #140b13;
+    --neutral-800: #1a1019;
+    --neutral-700: rgba(147, 102, 174, 0.42);
+    --neutral-100: #f5eafb;
+    --neutral-400: #cfb6df;
+    --primary-500: #d7a3ff;
+    --cp-body-background: linear-gradient(rgba(20, 11, 19, 0.82), rgba(20, 11, 19, 0.82)), url('https://t4.ftcdn.net/jpg/02/00/99/09/360_F_200990953_ZUQhJDEQGCmJ10H9mLq8XjEckDQQjau9.jpg'), linear-gradient(145deg, #120b12 0%, #26111d 100%);
+    --cp-panel-bg: var(--neutral-900);
+    --cp-sidebar-bg: var(--neutral-800);
+    --cp-accent-color: var(--primary-500);
+}

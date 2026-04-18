@@ -1,0 +1,12 @@
+:root {
+    --neutral-900: #ffe6f4;
+    --neutral-800: #ffeef8;
+    --neutral-700: #ffd9ef;
+    --neutral-100: #623a4f;
+    --neutral-400: #ff9ecf;
+    --primary-500: #ff9ecf;
+    --cp-body-background: linear-gradient(rgba(255, 230, 244, 0.82), rgba(255, 230, 244, 0.82)), url('/themes/easter/easter.png'), linear-gradient(145deg, #ffe6f4 0%, #dff6ff 52%, #fff7d9 100%);
+    --cp-panel-bg: var(--neutral-900);
+    --cp-sidebar-bg: var(--neutral-800);
+    --cp-accent-color: var(--primary-500);
+}

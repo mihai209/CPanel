@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 const NAV_ICONS = {
     console:    'bi-terminal-fill',
     overview:   'bi-speedometer2',
+    performance:  'bi-cpu-fill',
+    smartalerts:  'bi-bell-fill',
     activity:   'bi-clock-history',
     timeline:   'bi-list-ul',
     files:      'bi-folder2-open',
@@ -15,6 +17,16 @@ const NAV_ICONS = {
     startup:    'bi-play-circle',
     mccenter:   'bi-controller',
     mcinstaller:'bi-download',
+    mounts:     'bi-hdd-stack-fill',
+    scaling:    'bi-graph-up-arrow',
+    policy:     'bi-shield-lock-fill',
+    metrics:    'bi-bar-chart-fill',
+    debuglogs:  'bi-bug-fill',
+    auditconsole:'bi-shield-shaded',
+    recovery:    'bi-life-preserver',
+    ai:          'bi-robot',
+    'proxy-network': 'bi-hdd-network-fill',
+    macros:      'bi-command',
 };
 
 // Nav groups — order matters for display
@@ -22,7 +34,8 @@ const NAV_GROUPS = [
     { label: 'Server',    keys: ['console', 'overview', 'activity'] },
     { label: 'Storage',   keys: ['files', 'backups', 'dbs'] },
     { label: 'Access',    keys: ['network', 'users', 'api', 'schedules'] },
-    { label: 'Config',    keys: ['startup', 'timeline'] },
+    { label: 'Config',    keys: ['startup', 'timeline', 'mounts', 'scaling', 'policy', 'macros'] },
+    { label: 'Diagnostics', keys: ['metrics', 'debuglogs', 'auditconsole', 'performance', 'smartalerts', 'recovery', 'ai', 'proxy-network'] },
     { label: 'Minecraft', keys: ['mccenter', 'mcinstaller'] },
 ];
 
@@ -118,59 +131,41 @@ export default function ServerNavbar({ pageData = {} }) {
                 )}
             </nav>
 
-            {/* ── Mobile Compact Bar ──────────────────────────────────── */}
-            <div className="md:hidden bg-neutral-900/90 border-b border-neutral-800">
-                {/* Current page indicator + toggle */}
-                <button
-                    onClick={() => setMobileOpen(v => !v)}
-                    className="w-full flex items-center justify-between px-4 py-3"
-                >
-                    <div className="flex items-center gap-2">
-                        {activeItem && NAV_ICONS[activeItem.key] && (
-                            <i className={`bi ${NAV_ICONS[activeItem.key]} text-primary-400 text-[16px]`}></i>
+            {/* ── Mobile Scrolling Bar ──────────────────────────────────── */}
+            <div className="md:hidden bg-neutral-900 border-b border-neutral-800 w-full h-12 flex items-center px-4 overflow-x-auto no-scrollbar gap-1 relative">
+                {activeGroups.map((group, gIdx) => (
+                    <React.Fragment key={group.label}>
+                        {/* Tiny separator between groups */}
+                        {gIdx > 0 && (
+                            <div className="h-4 w-px bg-neutral-800 mx-1 shrink-0"></div>
                         )}
-                        <span className="text-sm font-bold text-neutral-200">
-                            {activeItem?.label || 'Menu'}
-                        </span>
-                    </div>
-                    <i className={`bi ${mobileOpen ? 'bi-chevron-up' : 'bi-chevron-down'} text-neutral-500 text-sm`}></i>
-                </button>
-
-                {/* Dropdown drawer */}
-                {mobileOpen && (
-                    <div className="border-t border-neutral-800 pb-2">
-                        {activeGroups.map((group) => (
-                            <div key={group.label}>
-                                <div className="px-4 pt-3 pb-1 text-[9px] font-black text-neutral-600 uppercase tracking-widest">
-                                    {group.label}
-                                </div>
-                                {group.items.map(item => {
-                                    const isDisabled = isProvisioning && blockedKeys.includes(item.key);
-                                    const icon = NAV_ICONS[item.key];
-                                    return (
-                                        <a
-                                            key={item.key}
-                                            href={isDisabled ? '#' : item.href}
-                                            onClick={e => { if (isDisabled) e.preventDefault(); else setMobileOpen(false); }}
-                                            className={[
-                                                'flex items-center gap-3 px-5 py-2.5 text-sm font-semibold transition-colors',
-                                                isDisabled
-                                                    ? 'text-neutral-700 cursor-not-allowed'
-                                                    : item.active
-                                                        ? 'text-primary-400 bg-primary-500/5 border-l-2 border-primary-500 pl-[18px]'
-                                                        : 'text-neutral-400 hover:text-white hover:bg-neutral-800/50',
-                                            ].join(' ')}
-                                        >
-                                            {icon && <i className={`bi ${icon} text-base shrink-0`}></i>}
-                                            <span>{item.label}</span>
-                                            {isDisabled && <i className="bi bi-lock-fill text-xs opacity-40 ml-auto"></i>}
-                                        </a>
-                                    );
-                                })}
-                            </div>
-                        ))}
-                    </div>
-                )}
+                        <div className="flex items-center h-full">
+                            {group.items.map(item => {
+                                const isDisabled = isProvisioning && blockedKeys.includes(item.key);
+                                const icon = NAV_ICONS[item.key];
+                                return (
+                                    <a
+                                        key={item.key}
+                                        href={isDisabled ? '#' : item.href}
+                                        onClick={isDisabled ? (e) => e.preventDefault() : undefined}
+                                        className={[
+                                            'relative flex items-center gap-2 px-3 h-full text-[10px] font-black uppercase tracking-widest',
+                                            'whitespace-nowrap transition-all duration-150 select-none border-b-2',
+                                            isDisabled
+                                                ? 'text-neutral-700 border-transparent cursor-not-allowed opacity-60'
+                                                : item.active
+                                                    ? 'text-primary-400 border-primary-500 bg-primary-500/5'
+                                                    : 'text-neutral-500 border-transparent hover:text-neutral-300',
+                                        ].join(' ')}
+                                    >
+                                        {icon && <i className={`bi ${icon} text-[14px] shrink-0`}></i>}
+                                        <span>{item.label}</span>
+                                    </a>
+                                );
+                            })}
+                        </div>
+                    </React.Fragment>
+                ))}
             </div>
         </>
     );

@@ -1,0 +1,58 @@
+:root {
+    /* Tailwind Color Mappings */
+    --neutral-900: #131517;
+    --neutral-800: #1f2023;
+    --neutral-700: #2e3036;
+    --neutral-600: #3f3f46;
+    --neutral-500: #52525b;
+    --neutral-400: #9ca3af;
+    --neutral-300: #d1d5db;
+    --neutral-200: #e5e7eb;
+    --neutral-100: #f3f4f6;
+    --neutral-50: #f9fafb;
+
+    --primary-600: #2563eb;
+    --primary-500: #3b82f6;
+    --primary-400: #60a5fa;
+
+    /* Semantic Layout Variables */
+    --cp-panel-bg: var(--neutral-900);
+    --cp-sidebar-bg: var(--neutral-800);
+    --cp-border-color: var(--neutral-700);
+    --cp-text-primary: var(--neutral-100);
+    --cp-text-muted: var(--neutral-400);
+    --cp-accent-color: var(--primary-500);
+    
+    /* Surface and Card Depth */
+    --cp-card-bg: var(--neutral-800);
+    --cp-card-border: var(--neutral-700);
+    --cp-input-bg: var(--neutral-900);
+
+    /* Background Layering System */
+    --cp-body-background: var(--cp-panel-bg);
+}
+
+/* Global resets for the React shell to ensure variables are respected */
+body {
+    background: var(--cp-body-background) !important;
+    background-attachment: fixed !important;
+    background-size: cover !important;
+    background-position: center !important;
+    color: var(--cp-text-primary) !important;
+}
+
+/* Scrollbar styling using variables */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: var(--neutral-900);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--neutral-700);
+    border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--neutral-600);
+}

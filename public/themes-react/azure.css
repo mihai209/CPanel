@@ -1,0 +1,12 @@
+:root {
+    --neutral-900: #082038;
+    --neutral-800: #0b2a44;
+    --neutral-700: rgba(107, 185, 255, 0.36);
+    --neutral-100: #e5f6ff;
+    --neutral-400: #a8cde4;
+    --primary-500: #77d0ff;
+    --cp-body-background: linear-gradient(rgba(8, 32, 56, 0.82), rgba(8, 32, 56, 0.82)), url('https://wallpapers.com/images/featured/azure-dw6cswed15qk49l2.jpg'), linear-gradient(145deg, #0a1630 0%, #123a7a 100%);
+    --cp-panel-bg: var(--neutral-900);
+    --cp-sidebar-bg: var(--neutral-800);
+    --cp-accent-color: var(--primary-500);
+}

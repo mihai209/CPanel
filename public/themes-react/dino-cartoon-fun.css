@@ -1,0 +1,12 @@
+:root {
+    --neutral-900: #153146;
+    --neutral-800: #1a3f58;
+    --neutral-700: rgba(120, 219, 115, 0.4);
+    --neutral-100: #efffff;
+    --neutral-400: #b0cfe1;
+    --primary-500: #83e3ff;
+    --cp-body-background: linear-gradient(rgba(21, 49, 70, 0.82), rgba(21, 49, 70, 0.82)), url('https://images.unsplash.com/photo-1578926375605-eaf7559b1458?auto=format&fit=crop&w=1280&q=60&fm=webp'), linear-gradient(145deg, #13281d 0%, #355d2d 100%);
+    --cp-panel-bg: var(--neutral-900);
+    --cp-sidebar-bg: var(--neutral-800);
+    --cp-accent-color: var(--primary-500);
+}

@@ -8819,6 +8819,8 @@
   var NAV_ICONS = {
     console: "bi-terminal-fill",
     overview: "bi-speedometer2",
+    performance: "bi-cpu-fill",
+    smartalerts: "bi-bell-fill",
     activity: "bi-clock-history",
     timeline: "bi-list-ul",
     files: "bi-folder2-open",
@@ -8830,7 +8832,10 @@
     schedules: "bi-calendar-event",
     startup: "bi-play-circle",
     mccenter: "bi-controller",
-    mcinstaller: "bi-download"
+    mcinstaller: "bi-download",
+    mounts: "bi-hdd-stack-fill",
+    scaling: "bi-graph-up-arrow",
+    policy: "bi-shield-lock-fill"
   };
   var NAV_GROUPS = [
     { label: "Server", keys: ["console", "overview", "activity"] },
