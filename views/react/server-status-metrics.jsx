@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import ThemeProvider from './components/ThemeContext.jsx';
 import ReactAppShell from './components/ReactAppShell';
+
+const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
+const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'server-status-metrics';
+const root = standaloneEntry ? createRoot(document.getElementById('reactRoot')) : null;
 
 const TPS_COLOR = '#22c55e';
 const MSPT_COLOR = '#3b82f6';
@@ -303,4 +310,17 @@ export default function ServerStatusMetricsPage({ pageData = {} }) {
             </div>
         </ReactAppShell>
     );
+}
+
+if (root) {
+    root.render(
+        <ThemeProvider pageData={data}>
+            <BrowserRouter>
+                <ServerStatusMetricsPage pageData={data} />
+            </BrowserRouter>
+        </ThemeProvider>
+    );
+    if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
+        window.__CPANEL_REACT_BOOTED__();
+    }
 }

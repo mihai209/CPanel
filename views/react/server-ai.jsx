@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import ThemeProvider from './components/ThemeContext.jsx';
 import ReactAppShell from './components/ReactAppShell';
+
+const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
+const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'server-ai';
+const root = standaloneEntry ? createRoot(document.getElementById('reactRoot')) : null;
 
 export default function ServerAiPage({ pageData = {} }) {
     const { server = {}, aiPolicy: policy = {}, aiAdminEnabled = false } = pageData;
@@ -160,4 +167,17 @@ export default function ServerAiPage({ pageData = {} }) {
             </form>
         </ReactAppShell>
     );
+}
+
+if (root) {
+    root.render(
+        <ThemeProvider pageData={data}>
+            <BrowserRouter>
+                <ServerAiPage pageData={data} />
+            </BrowserRouter>
+        </ThemeProvider>
+    );
+    if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
+        window.__CPANEL_REACT_BOOTED__();
+    }
 }

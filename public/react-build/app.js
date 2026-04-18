@@ -16533,7 +16533,11 @@
             const preview = theme.preview || {};
             const swatches = Array.isArray(preview.swatches) ? preview.swatches : ["#3b82f6", "#2e3036", "#ffffff"];
             return /* @__PURE__ */ (0, import_jsx_runtime38.jsxs)("div", { className: `group bg-neutral-800 border rounded-2xl overflow-hidden transition-all duration-300 hover:translate-y-[-4px] hover:shadow-xl ${isCurrent ? "border-primary-500 ring-1 ring-primary-500/20" : "border-neutral-700"}`, children: [
-              /* @__PURE__ */ (0, import_jsx_runtime38.jsxs)("div", { className: "h-40 relative p-6 flex flex-col justify-end overflow-hidden", style: { background: preview.background || "linear-gradient(145deg, #1a1a20 0%, #0b0b0d 100%)" }, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime38.jsxs)("div", { className: "h-40 relative p-6 flex flex-col justify-end overflow-hidden", style: {
+                background: preview.background || "linear-gradient(145deg, #1a1a20 0%, #0b0b0d 100%)",
+                backgroundSize: "cover",
+                backgroundPosition: "center"
+              }, children: [
                 /* @__PURE__ */ (0, import_jsx_runtime38.jsx)("div", { className: "absolute top-0 right-0 p-4 opacity-20 group-hover:scale-110 transition-transform", children: /* @__PURE__ */ (0, import_jsx_runtime38.jsx)("i", { className: "bi bi-palette2 text-8xl text-white" }) }),
                 /* @__PURE__ */ (0, import_jsx_runtime38.jsxs)("div", { className: "relative z-10 flex flex-col gap-1", children: [
                   /* @__PURE__ */ (0, import_jsx_runtime38.jsx)("span", { className: "text-[10px] font-black text-white/50 uppercase tracking-widest", children: preview.eyebrow || "PRESET" }),

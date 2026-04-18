@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import ThemeProvider from './components/ThemeContext.jsx';
 import ReactAppShell from './components/ReactAppShell';
+
+const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
+const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'server-mounts';
+const root = standaloneEntry ? createRoot(document.getElementById('reactRoot')) : null;
 
 export default function ServerMountsPage({ pageData = {} }) {
     const { server = {}, assignedMounts = [], availableMounts = [], canManageMounts = false } = pageData;
@@ -248,4 +255,17 @@ export default function ServerMountsPage({ pageData = {} }) {
             </div>
         </ReactAppShell>
     );
+}
+
+if (root) {
+    root.render(
+        <ThemeProvider pageData={data}>
+            <BrowserRouter>
+                <ServerMountsPage pageData={data} />
+            </BrowserRouter>
+        </ThemeProvider>
+    );
+    if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
+        window.__CPANEL_REACT_BOOTED__();
+    }
 }

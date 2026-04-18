@@ -125,7 +125,11 @@ export function ThemesPage({ pageData = data }) {
                         return (
                             <div key={theme.id} className={`group bg-neutral-800 border rounded-2xl overflow-hidden transition-all duration-300 hover:translate-y-[-4px] hover:shadow-xl ${isCurrent ? 'border-primary-500 ring-1 ring-primary-500/20' : 'border-neutral-700'}`}>
                                 {/* Card Header / Showcase */}
-                                <div className="h-40 relative p-6 flex flex-col justify-end overflow-hidden" style={{ background: preview.background || 'linear-gradient(145deg, #1a1a20 0%, #0b0b0d 100%)' }}>
+                                <div className="h-40 relative p-6 flex flex-col justify-end overflow-hidden" style={{ 
+                                    background: preview.background || 'linear-gradient(145deg, #1a1a20 0%, #0b0b0d 100%)',
+                                    backgroundSize: 'cover',
+                                    backgroundPosition: 'center'
+                                }}>
                                     <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:scale-110 transition-transform">
                                         <i className="bi bi-palette2 text-8xl text-white"></i>
                                     </div>

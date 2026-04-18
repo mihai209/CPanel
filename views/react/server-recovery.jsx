@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import ThemeProvider from './components/ThemeContext.jsx';
 import ReactAppShell from './components/ReactAppShell';
+
+const data = window.__CPANEL_REACT_PAGE_DATA__ || {};
+const standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || '').trim() === 'server-recovery';
+const root = standaloneEntry ? createRoot(document.getElementById('reactRoot')) : null;
 
 export default function ServerRecoveryPage({ pageData = {} }) {
     const { server = {}, debugEvents = [], latestDebug = null, latestMeta = {}, issueHint = '', connectorOnline = false, canPower = false, canConsole = false } = pageData;
@@ -195,4 +202,17 @@ export default function ServerRecoveryPage({ pageData = {} }) {
             </div>
         </ReactAppShell>
     );
+}
+
+if (root) {
+    root.render(
+        <ThemeProvider pageData={data}>
+            <BrowserRouter>
+                <ServerRecoveryPage pageData={data} />
+            </BrowserRouter>
+        </ThemeProvider>
+    );
+    if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
+        window.__CPANEL_REACT_BOOTED__();
+    }
 }
