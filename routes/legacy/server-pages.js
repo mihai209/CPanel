@@ -17,6 +17,8 @@ function registerServerPagesRoutes(ctx) {
     const { getUserThemeId } = require('../../core/themes');
     const { recordServerChange } = require('../../core/server-change-log');
     const { pickSmartAllocation } = require('../../core/helpers/smart-allocation');
+    const { getPanelVersionStatus } = require('../../core/helpers/version-checker');
+
     const {
         STORE_DEALS_SETTING_KEY,
         normalizeStoreDealsCatalog,
@@ -1020,6 +1022,7 @@ function registerServerPagesRoutes(ctx) {
             const pendingMaintenance = maintenanceEnabled ? maintenanceRaw.filter((entry) => !entry.completed).slice(0, 8) : [];
             const openSecurityAlerts = securityEnabled ? securityRaw.filter((entry) => entry.status !== 'resolved').slice(0, 8) : [];
 
+            const versionStatus = await getPanelVersionStatus();
             const dashboardViewData = {
                 user: req.session.user,
                 servers: orderedServers,
@@ -1028,6 +1031,7 @@ function registerServerPagesRoutes(ctx) {
                 openIncidents,
                 pendingMaintenance,
                 openSecurityAlerts,
+                versionStatus,
                 dashboardSortMode: dashboardServerOrderPreference.mode,
                 dashboardCustomOrderIds: dashboardServerOrderPreference.customIds,
                 dashboardLatestOrderIds,
@@ -1042,6 +1046,7 @@ function registerServerPagesRoutes(ctx) {
                 brandName: (res.locals.settings && res.locals.settings.brandName) || 'CPanel',
                 faviconUrl: (res.locals.settings && res.locals.settings.faviconUrl) || '/assets/rocky.png',
                 user: req.session.user,
+                versionStatus,
                 servers: orderedServers.map((server) => ({
                     id: server.id,
                     containerId: server.containerId,

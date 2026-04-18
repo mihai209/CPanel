@@ -69,7 +69,66 @@ function MetricCard({ label, value, icon, tone = 'neutral' }) {
     );
 }
 
+function VersionStatusBanner({ status }) {
+    if (!status || !status.message) return null;
+
+    const configs = {
+        success: {
+            icon: 'bi-check-circle-fill',
+            bg: 'bg-green-500/10',
+            border: 'border-green-500/20',
+            text: 'text-green-400',
+            accent: 'bg-green-500'
+        },
+        warning: {
+            icon: 'bi-exclamation-triangle-fill',
+            bg: 'bg-yellow-500/10',
+            border: 'border-yellow-500/20',
+            text: 'text-yellow-400',
+            accent: 'bg-yellow-500'
+        },
+        error: {
+            icon: 'bi-x-circle-fill',
+            bg: 'bg-red-500/10',
+            border: 'border-red-500/20',
+            text: 'text-red-400',
+            accent: 'bg-red-500'
+        }
+    };
+
+    const conf = configs[status.type] || configs.success;
+
+    return (
+        <div className={`mb-8 p-5 rounded-[2rem] border backdrop-blur-md shadow-2xl transition-all duration-500 hover:shadow-primary-900/10 ${conf.bg} ${conf.border}`}>
+            <div className="flex items-center gap-4">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${conf.accent} text-white`}>
+                    <i className={`bi ${conf.icon} text-lg`}></i>
+                </div>
+                <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-0.5">
+                        <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${conf.text}`}>System Update Status</span>
+                        <span className="w-1 h-1 rounded-full bg-neutral-600"></span>
+                        <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">{status.currentVersion}</span>
+                    </div>
+                    <p className="text-sm text-neutral-200 font-medium leading-relaxed">
+                        {status.message}
+                    </p>
+                </div>
+                {status.type === 'warning' && (
+                    <a 
+                        href="/admin/system" 
+                        className="px-6 py-2.5 bg-neutral-900/80 hover:bg-neutral-800 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] border border-neutral-700/50 transition-all active:scale-95 whitespace-nowrap"
+                    >
+                        View Updates
+                    </a>
+                )}
+            </div>
+        </div>
+    );
+}
+
 function OpsFeedItem({ entry, tone = 'neutral', type = 'incident' }) {
+
     const severityColors = {
         critical: 'bg-red-500 text-white',
         warning:  'bg-yellow-500 text-neutral-900',
@@ -198,6 +257,10 @@ export function DashboardPage({ pageData = data }) {
                 description={isViewingAllServers ? "Viewing all active servers across the system." : "Individual overview of your servers and instances."}
             >
                 {layout.announcements && <Announcer settings={pageData.settings} />}
+                
+                {pageData.versionStatus && pageData.isAdminDashboard && (
+                    <VersionStatusBanner status={pageData.versionStatus} />
+                )}
 
                 {layout.metrics && (
                     <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">

@@ -1,5 +1,7 @@
 const fs = require('fs');
 const pathLib = require('path');
+const { getPanelVersionStatus } = require('../../core/helpers/version-checker');
+
 const nodeCrypto = require('node:crypto');
 
 const WEB_SERVER_TEMPLATE_FILES = Object.freeze({
@@ -1250,29 +1252,8 @@ app.get('/admin/overview', requireAuth, requireAdmin, async (req, res) => {
         });
         const redisPrompt = stats.nodes > 0 && hasOnlineConnector && !(redisInfo && redisInfo.ready);
 
-        const currentVersion = require('../../package.json').version;
-        let versionStatus = {
-            message: `Panel up to date v${currentVersion}`,
-            type: 'success'
-        };
+        const versionStatus = await getPanelVersionStatus();
 
-        try {
-            const versionResponse = await axios.get('https://cpanel-rocky.netlify.app/version.json', { timeout: 5000 });
-            const remoteVersion = versionResponse.data.version;
-
-            if (currentVersion !== remoteVersion) {
-                versionStatus = {
-                    message: `Your panel is not up-to-date, you are running v${currentVersion}, and the latest version is v${remoteVersion}`,
-                    type: 'warning'
-                };
-            }
-        } catch (error) {
-            console.error("Error fetching remote version:", error.message);
-            versionStatus = {
-                message: "Sorry seems like Rocky crashed the website while he was playing with the backend code, please try again later",
-                type: 'error'
-            };
-        }
 
         res.render('admin/overview', {
             user: req.session.user,

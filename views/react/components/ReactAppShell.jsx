@@ -6,6 +6,8 @@ import GlobalStatusModal from './GlobalStatusModal.jsx';
 import NotificationBell from './NotificationBell.jsx';
 import GlobalSearch from './GlobalSearch.jsx';
 import ServerNavbar from './ServerNavbar.jsx';
+import SponsorModal from './SponsorModal.jsx';
+import FooterLegalModal from './FooterLegalModal.jsx';
 import { ThemeProvider } from './ThemeContext.jsx';
 
 // Import base themes
@@ -47,6 +49,8 @@ export default function ReactAppShell({
     const brandImage = resolveBrandImage(pageData);
     const userAvatar = resolveUserAvatar(pageData.user || {}, brandImage);
     const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
+    const [sponsorModalOpen, setSponsorModalOpen] = React.useState(false);
+    const [legalModalOpen, setLegalModalOpen] = React.useState(false);
     const serverNavItems = Array.isArray(pageData.serverNavItems) ? pageData.serverNavItems : [];
     
     // Mimic the tabs used by pterodactyl
@@ -197,25 +201,59 @@ export default function ReactAppShell({
 
             {/* Global Modals & Toasts */}
             <GlobalStatusModal />
+            <SponsorModal isOpen={sponsorModalOpen} onClose={() => setSponsorModalOpen(false)} />
+            <FooterLegalModal isOpen={legalModalOpen} onClose={() => setLegalModalOpen(false)} />
 
             {/* Global Footer */}
-            <footer className="w-full py-8 border-t border-neutral-800 bg-neutral-900 mt-auto">
-                <div className="px-4 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
-                    <div className="flex items-center gap-3">
-                        <span className="text-xs font-black text-neutral-100 uppercase tracking-[0.2em] opacity-80">
-                            CPanel Rocky &copy; 2026
-                        </span>
+            <footer className="w-full py-12 border-t border-neutral-800 bg-neutral-900 mt-auto overflow-hidden relative">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-px bg-gradient-to-r from-transparent via-neutral-700/50 to-transparent"></div>
+                
+                <div className="px-4 lg:px-8 max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-10">
+                    <div className="flex flex-col items-center md:items-start gap-4">
+                        <div className="flex items-center gap-4">
+                            <img src={brandImage} alt="Brand" className="w-6 h-6 grayscale opacity-30" />
+                            <span className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.3em]">
+                                CPanel Rocky &copy; 2026
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <a 
+                                href="https://github.com/mihai209" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="px-4 py-2 rounded-xl bg-neutral-800/50 hover:bg-neutral-800 text-[10px] font-bold text-neutral-500 hover:text-white transition-all border border-neutral-700/30 flex items-center gap-2"
+                            >
+                                <i className="bi bi-github"></i>
+                                Mihai209
+                            </a>
+                            <a 
+                                href="https://cpanel-rocky.netlify.app/" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="px-4 py-2 rounded-xl bg-neutral-800/50 hover:bg-neutral-800 text-[10px] font-bold text-neutral-500 hover:text-white transition-all border border-neutral-700/30 flex items-center gap-2"
+                            >
+                                <i className="bi bi-globe"></i>
+                                Project Website
+                            </a>
+                        </div>
                     </div>
-                    <div>
-                        <a 
-                            href="https://github.com/mihai209" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-[10px] font-bold text-neutral-500 hover:text-primary-400 transition-colors uppercase tracking-[0.1em] flex items-center gap-2"
+
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setSponsorModalOpen(true)}
+                            className="group flex items-center gap-3 px-6 py-3 rounded-2xl bg-primary-600/10 hover:bg-primary-600 text-primary-400 hover:text-white transition-all duration-300 border border-primary-500/20 active:scale-95"
                         >
-                            <i className="bi bi-github"></i>
-                            mihai209(github.com/mihai209)
-                        </a>
+                            <i className="bi bi-heart-fill animate-pulse group-hover:animate-none"></i>
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Sponsor Project</span>
+                        </button>
+
+                        <button
+                            onClick={() => setLegalModalOpen(true)}
+                            className="p-3 rounded-2xl bg-neutral-800/50 hover:bg-neutral-800 text-neutral-500 hover:text-white transition-all border border-neutral-700/30 active:scale-95"
+                            title="Licensing & Support Policy"
+                        >
+                            <i className="bi bi-info-circle-fill text-lg"></i>
+                        </button>
                     </div>
                 </div>
             </footer>
