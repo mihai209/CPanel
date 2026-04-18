@@ -13,6 +13,12 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="/css/react-view.css">
+    <% 
+        const themeId = (typeof reactPageData !== 'undefined' && reactPageData && reactPageData.activeTheme) 
+            ? String(reactPageData.activeTheme).toLowerCase() 
+            : 'default';
+    %>
+    <link id="cpanel-theme-css" rel="stylesheet" href="/themes-react/<%= themeId %>.css">
 </head>
 <body class="react-view-body">
     <div id="reactRoot"></div>

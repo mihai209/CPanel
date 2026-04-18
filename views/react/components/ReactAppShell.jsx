@@ -67,14 +67,11 @@ export default function ReactAppShell({
 
     return (
         <div 
-                className={`min-h-screen text-neutral-200 flex flex-col transition-all duration-700 ${pageClassName || ''}`}
-                style={{ 
-                    background: 'var(--cp-body-background)',
-                    backgroundAttachment: 'fixed',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
-                }}
-            >
+            className={`min-h-screen text-neutral-200 flex flex-col transition-all duration-700 ${pageClassName || ''}`}
+            style={{ 
+                background: 'transparent'
+            }}
+        >
             
             {/* Top Navigation Bar */}
             <div className="bg-neutral-800/80 backdrop-blur-md border-b border-neutral-700 w-full flex items-center justify-between px-4 lg:px-8 h-16 shrink-0 sticky top-0 z-40">
