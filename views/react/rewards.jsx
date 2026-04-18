@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { Link } from 'react-router-dom';
+import { BrowserRouter, Link } from 'react-router-dom';
 import { ReactRoutes } from './ReactRoutes.js';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
@@ -204,7 +204,11 @@ export function RewardsPage({ pageData = data }) {
 export default RewardsPage;
 
 if (root) {
-    root.render(<RewardsPage pageData={data} />);
+    root.render(
+        <BrowserRouter>
+            <RewardsPage pageData={data} />
+        </BrowserRouter>
+    );
     if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
         window.__CPANEL_REACT_BOOTED__();
     }

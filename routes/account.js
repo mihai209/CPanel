@@ -364,6 +364,10 @@ function registerAccountRoutes({
         }
     });
 
+    app.get('/experimental-features', requireAuth, (req, res) => {
+        return res.redirect('/instable/outdated');
+    });
+
     app.get('/instable/outdated', requireAuth, async (req, res) => {
         try {
             const user = await User.findByPk(req.session.user.id);

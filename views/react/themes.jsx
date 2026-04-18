@@ -1,7 +1,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { Link } from 'react-router-dom';
+import { BrowserRouter, Link } from 'react-router-dom';
 import { ReactRoutes } from './ReactRoutes.js';
+import { ThemeProvider } from './components/ThemeContext.jsx';
 import ReactAppShell from './components/ReactAppShell.jsx';
 import PageContentBlock from './components/PageContentBlock.jsx';
 import { useTheme } from './components/ThemeContext.jsx';
@@ -177,7 +178,13 @@ export function ThemesPage({ pageData = data }) {
 export default ThemesPage;
 
 if (root) {
-    root.render(<ThemesPage pageData={data} />);
+    root.render(
+        <BrowserRouter>
+            <ThemeProvider pageData={data}>
+                <ThemesPage pageData={data} />
+            </ThemeProvider>
+        </BrowserRouter>
+    );
     if (typeof window.__CPANEL_REACT_BOOTED__ === 'function') {
         window.__CPANEL_REACT_BOOTED__();
     }
