@@ -9452,7 +9452,7 @@
     })).filter((g) => g.items.length > 0);
     const activeItem = items.find((i) => i.active);
     return /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_jsx_runtime6.Fragment, { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("nav", { className: "hidden md:flex bg-neutral-900 border-b border-neutral-800 w-full h-14 items-center px-6 lg:px-10 overflow-x-auto no-scrollbar gap-1.5", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)("nav", { className: "hidden md:flex bg-neutral-900/80 backdrop-blur-md border-b border-neutral-800 w-full h-14 items-center px-6 lg:px-10 overflow-x-auto no-scrollbar gap-1.5", children: [
         activeGroups.map((group, gIdx) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_react6.default.Fragment, { children: [
           gIdx > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "h-6 w-px bg-neutral-700/60 mx-1 shrink-0" }),
           /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex items-center h-full", children: group.items.map((item) => /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
@@ -9470,7 +9470,7 @@
           /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("span", { className: "text-[11px] font-black text-neutral-500 uppercase tracking-widest max-w-[180px] truncate", children: pageData.server.name })
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "md:hidden bg-neutral-900 border-b border-neutral-800 w-full h-12 flex items-center px-4 overflow-x-auto no-scrollbar gap-1 relative", children: activeGroups.map((group, gIdx) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_react6.default.Fragment, { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "md:hidden bg-neutral-900/80 backdrop-blur-md border-b border-neutral-800 w-full h-12 flex items-center px-4 overflow-x-auto no-scrollbar gap-1 relative", children: activeGroups.map((group, gIdx) => /* @__PURE__ */ (0, import_jsx_runtime6.jsxs)(import_react6.default.Fragment, { children: [
         gIdx > 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "h-4 w-px bg-neutral-800 mx-1 shrink-0" }),
         /* @__PURE__ */ (0, import_jsx_runtime6.jsx)("div", { className: "flex items-center h-full", children: group.items.map((item) => {
           const isDisabled = isProvisioning && blockedKeys.includes(item.key);
@@ -9713,7 +9713,7 @@
           background: "transparent"
         },
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "bg-neutral-800 border-b border-neutral-700 w-full flex items-center justify-between px-4 lg:px-8 h-16 shrink-0 sticky top-0 z-40 shadow-md", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "bg-neutral-800/80 backdrop-blur-md border-b border-neutral-700 w-full flex items-center justify-between px-4 lg:px-8 h-16 shrink-0 sticky top-0 z-40 shadow-md", children: [
             /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex items-center gap-4", children: [
               /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("img", { src: brandImage, alt: pageData.brandName || "CPanel", className: "w-8 h-8 rounded shrink-0" }),
               /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { children: [
@@ -9815,11 +9815,11 @@
             ] })
           ] }),
           serverNavItems.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ServerNavbar, { pageData }),
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("main", { className: "flex-1 w-full bg-neutral-900", children: shouldBlock ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ProvisioningBarrier, { status: pageData.server.status, containerId: pageData.server.containerId }) : children }),
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("main", { className: "flex-1 w-full bg-transparent", children: shouldBlock ? /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(ProvisioningBarrier, { status: pageData.server.status, containerId: pageData.server.containerId }) : children }),
           /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(GlobalStatusModal, {}),
           /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(SponsorModal, { isOpen: sponsorModalOpen, onClose: () => setSponsorModalOpen(false) }),
           /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(FooterLegalModal, { isOpen: legalModalOpen, onClose: () => setLegalModalOpen(false) }),
-          /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("footer", { className: "w-full py-12 border-t border-neutral-800 bg-neutral-900 mt-auto overflow-hidden relative", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("footer", { className: "w-full py-12 border-t border-neutral-800 bg-neutral-900/50 backdrop-blur-sm mt-auto overflow-hidden relative", children: [
             /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-px bg-gradient-to-r from-transparent via-neutral-700/50 to-transparent" }),
             /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "px-4 lg:px-8 max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-10", children: [
               /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex flex-col items-center md:items-start gap-4", children: [

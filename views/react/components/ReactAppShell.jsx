@@ -74,7 +74,7 @@ export default function ReactAppShell({
         >
             
             {/* Top Navigation Bar */}
-            <div className="bg-neutral-800 border-b border-neutral-700 w-full flex items-center justify-between px-4 lg:px-8 h-16 shrink-0 sticky top-0 z-40 shadow-md">
+            <div className="bg-neutral-800/80 backdrop-blur-md border-b border-neutral-700 w-full flex items-center justify-between px-4 lg:px-8 h-16 shrink-0 sticky top-0 z-40 shadow-md">
                 <div className="flex items-center gap-4">
                     <img src={brandImage} alt={pageData.brandName || 'CPanel'} className="w-8 h-8 rounded shrink-0" />
                     <div>
@@ -199,7 +199,7 @@ export default function ReactAppShell({
             {serverNavItems.length > 0 && <ServerNavbar pageData={pageData} />}
 
             {/* Main Content Area */}
-            <main className="flex-1 w-full bg-neutral-900">
+            <main className="flex-1 w-full bg-transparent">
                 {shouldBlock ? (
                     <ProvisioningBarrier status={pageData.server.status} containerId={pageData.server.containerId} />
                 ) : (
@@ -213,7 +213,7 @@ export default function ReactAppShell({
             <FooterLegalModal isOpen={legalModalOpen} onClose={() => setLegalModalOpen(false)} />
 
             {/* Global Footer */}
-            <footer className="w-full py-12 border-t border-neutral-800 bg-neutral-900 mt-auto overflow-hidden relative">
+            <footer className="w-full py-12 border-t border-neutral-800 bg-neutral-900/50 backdrop-blur-sm mt-auto overflow-hidden relative">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-px bg-gradient-to-r from-transparent via-neutral-700/50 to-transparent"></div>
                 
                 <div className="px-4 lg:px-8 max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-10">

@@ -94,7 +94,7 @@ export default function ServerNavbar({ pageData = {} }) {
     return (
         <>
             {/* ── Desktop Tab Bar ─────────────────────────────────────── */}
-            <nav className="hidden md:flex bg-neutral-900 border-b border-neutral-800 w-full h-14 items-center px-6 lg:px-10 overflow-x-auto no-scrollbar gap-1.5">
+            <nav className="hidden md:flex bg-neutral-900/80 backdrop-blur-md border-b border-neutral-800 w-full h-14 items-center px-6 lg:px-10 overflow-x-auto no-scrollbar gap-1.5">
                 {activeGroups.map((group, gIdx) => (
                     <React.Fragment key={group.label}>
                         {/* Group separator */}
@@ -132,7 +132,7 @@ export default function ServerNavbar({ pageData = {} }) {
             </nav>
 
             {/* ── Mobile Scrolling Bar ──────────────────────────────────── */}
-            <div className="md:hidden bg-neutral-900 border-b border-neutral-800 w-full h-12 flex items-center px-4 overflow-x-auto no-scrollbar gap-1 relative">
+            <div className="md:hidden bg-neutral-900/80 backdrop-blur-md border-b border-neutral-800 w-full h-12 flex items-center px-4 overflow-x-auto no-scrollbar gap-1 relative">
                 {activeGroups.map((group, gIdx) => (
                     <React.Fragment key={group.label}>
                         {/* Tiny separator between groups */}
