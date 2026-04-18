@@ -123,16 +123,25 @@ export function AccountPage({ pageData = data }) {
     const [notifyLoading, setNotifyLoading] = React.useState(false);
 
     const toggleBrowserNotifications = async (enable) => {
-        setNotifyLoading(true);
-        try {
-            if (enable) {
-                if (!('Notification' in window)) {
-                    throw new Error('This browser does not support desktop notifications.');
-                }
-                const permission = await Notification.requestPermission();
-                if (permission !== 'granted') {
-                    throw new Error('Notification permission was not granted.');
-                }
+        if (enable) {
+            if (!('Notification' in window)) {
+                alert('This browser does not support desktop notifications.');
+                return;
+            }
+
+            // Request permission IMMEDIATELY on click to preserve user gesture
+            let permission = Notification.permission;
+            if (permission === 'default') {
+                permission = await Notification.requestPermission();
+            }
+
+            if (permission !== 'granted') {
+                alert('Notification permission was not granted. Please enable it in your browser settings.');
+                return;
+            }
+
+            setNotifyLoading(true);
+            try {
                 const response = await fetch('/api/account/browser-notifications/subscribe', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -144,7 +153,14 @@ export function AccountPage({ pageData = data }) {
                 });
                 if (!response.ok) throw new Error('Failed to subscribe.');
                 setBrowserNotifyEnabled(true);
-            } else {
+            } catch (error) {
+                alert(error.message || 'Action failed.');
+            } finally {
+                setNotifyLoading(false);
+            }
+        } else {
+            setNotifyLoading(true);
+            try {
                 const response = await fetch('/api/account/browser-notifications/unsubscribe', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -152,11 +168,11 @@ export function AccountPage({ pageData = data }) {
                 });
                 if (!response.ok) throw new Error('Failed to unsubscribe.');
                 setBrowserNotifyEnabled(false);
+            } catch (error) {
+                alert(error.message || 'Action failed.');
+            } finally {
+                setNotifyLoading(false);
             }
-        } catch (error) {
-            alert(error.message || 'Action failed.');
-        } finally {
-            setNotifyLoading(false);
         }
     };
 

@@ -27,7 +27,7 @@ export const ReactRoutes = {
     themes: '/themes',
     rewards: '/rewards',
     afk: '/afk',
-    outdatedFeatures: '/instable/outdated',
+    experimentalFeatures: '/instable/outdated',
     changeView: '/experimental/change-view',
     connectorsCheck: '/connectors-check',
     notifications: '/notifications',

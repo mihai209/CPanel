@@ -8,7 +8,35 @@ export function ThemeProvider({ children, pageData = {} }) {
     const [customTheme, setCustomTheme] = useState(pageData.customTheme || { enabled: false });
 
     const applyTheme = (themeId, isPreview = false) => {
-        const themeToApply = isPreview ? themeId : (themeId || activeTheme);
+        if (isPreview) {
+            setPreviewTheme(themeId);
+        } else {
+            setActiveTheme(themeId || activeTheme);
+            setPreviewTheme(null);
+        }
+    };
+
+    const toggleCustomTheme = (enabled) => {
+        setCustomTheme(prev => ({ ...prev, enabled }));
+    };
+
+    const restoreTheme = () => {
+        setPreviewTheme(null);
+    };
+
+    // Reflect server-provided state on mount or pageData change
+    useEffect(() => {
+        if (pageData.activeTheme) {
+            setActiveTheme(pageData.activeTheme);
+        }
+        if (pageData.customTheme) {
+            setCustomTheme(pageData.customTheme);
+        }
+    }, [pageData]);
+
+    // Apply theme to document whenever state changes
+    useEffect(() => {
+        const themeToApply = previewTheme || activeTheme;
         
         // Dynamically manage the React theme stylesheet
         let themeLink = document.getElementById('cpanel-react-theme-css');
@@ -19,42 +47,17 @@ export function ThemeProvider({ children, pageData = {} }) {
             document.head.appendChild(themeLink);
         }
 
-        // Load the React-specific theme stylesheet
-        themeLink.setAttribute('href', `/themes-react/${themeToApply}.css`);
+        const href = `/themes-react/${themeToApply}.css`;
+        if (themeLink.getAttribute('href') !== href) {
+            themeLink.setAttribute('href', href);
+        }
 
         document.documentElement.setAttribute('data-theme', themeToApply);
         
         // Handle custom theme overrides
-        const customEnabled = isPreview ? false : customTheme.enabled;
+        const customEnabled = previewTheme ? false : customTheme.enabled;
         document.documentElement.setAttribute('data-user-custom-theme', customEnabled ? 'on' : 'off');
-        
-        if (isPreview) {
-            setPreviewTheme(themeId);
-        } else {
-            setActiveTheme(themeId);
-            setPreviewTheme(null);
-        }
-    };
-
-    const toggleCustomTheme = (enabled) => {
-        setCustomTheme(prev => ({ ...prev, enabled }));
-        document.documentElement.setAttribute('data-user-custom-theme', enabled ? 'on' : 'off');
-    };
-
-    const restoreTheme = () => {
-        applyTheme(activeTheme, false);
-        setPreviewTheme(null);
-    };
-
-    // Reflect server-provided state on mount
-    useEffect(() => {
-        if (pageData.activeTheme) {
-            setActiveTheme(pageData.activeTheme);
-        }
-        if (pageData.customTheme) {
-            setCustomTheme(pageData.customTheme);
-        }
-    }, [pageData]);
+    }, [activeTheme, previewTheme, customTheme]);
 
     const value = {
         activeTheme,
