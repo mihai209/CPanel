@@ -16,7 +16,6 @@ import { ServerFileEditorPage } from './server-file-editor.jsx';
 import { ServerMinecraftCenterPage } from './server-minecraft-center.jsx';
 import { ServerMinecraftAddonsPage } from './server-minecraft-addons.jsx';
 import { ServerMinecraftInstallerPage } from './server-minecraft-installer.jsx';
-import { ServerMinecraftConfigsPage } from './server-minecraft-configs.jsx';
 import { ServerMinecraftProxyPage } from './server-minecraft-proxy.jsx';
 import { ServerOverviewPage } from './server-overview.jsx';
 import { ServerActivityPage } from './server-activity.jsx';
@@ -63,7 +62,6 @@ function resolveComponentForPath(pathname) {
         if (serverRoute.page === 'minecraft-center') return ServerMinecraftCenterPage;
         if (serverRoute.page === 'minecraft/addons') return ServerMinecraftAddonsPage;
         if (serverRoute.page === 'minecraft/installer') return ServerMinecraftInstallerPage;
-        if (serverRoute.page === 'minecraft/configs') return ServerMinecraftConfigsPage;
         if (serverRoute.page === 'minecraft/proxy') return ServerMinecraftProxyPage;
         if (serverRoute.page === 'overview') return ServerOverviewPage;
         if (serverRoute.page === 'activity') return ServerActivityPage;
@@ -280,7 +278,6 @@ function AppRouter() {
                 <Route path={ReactRoutes.serverMinecraftCenterPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverMinecraftAddonsPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverMinecraftInstallerPattern} element={<RoutedPage />} />
-                <Route path={ReactRoutes.serverMinecraftConfigsPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverMinecraftProxyPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverOverviewPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverActivityPattern} element={<RoutedPage />} />

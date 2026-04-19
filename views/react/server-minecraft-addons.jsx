@@ -113,11 +113,6 @@ export function ServerMinecraftAddonsPage({ pageData = data }) {
     const [mcVersion, setMcVersion] = useState(defaults.version || '');
     const [targetDir, setTargetDir] = useState(defaults.targetDirectory || (kind === 'plugin' ? 'plugins' : 'mods'));
 
-    // Direct Download State
-    const [directUrl, setDirectUrl] = useState('');
-    const [directName, setDirectName] = useState('');
-    const [directExtract, setDirectExtract] = useState(false);
-
     const loaderOptions = useMemo(() => {
         const key = kind === 'plugin' ? 'plugins' : (kind === 'mod' ? 'mods' : (kind === 'datapack' ? 'datapacks' : (kind === 'resourcepack' ? 'resourcepacks' : 'worlds')));
         return catalog[key] || [];
@@ -143,7 +138,7 @@ export function ServerMinecraftAddonsPage({ pageData = data }) {
                 .then(payload => {
                     if (cancelled) return;
                     if (payload.success) {
-                        setResults(payload.projects || []);
+                        setResults(payload.results || []);
                     } else {
                         throw new Error(payload.error || 'Failed to search modrinth');
                     }
@@ -169,7 +164,7 @@ export function ServerMinecraftAddonsPage({ pageData = data }) {
             .then(res => res.json())
             .then(payload => {
                 if (payload.success) {
-                    setInstalled(payload.items || []);
+                    setInstalled(payload.installed || []);
                 }
                 setLoadingInstalled(false);
             })
@@ -195,29 +190,6 @@ export function ServerMinecraftAddonsPage({ pageData = data }) {
         }
     };
 
-    const handleDirectDownload = () => {
-        if (!directUrl) return;
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/server/${server.containerId}/minecraft/addons/download-url`;
-        
-        const inputs = {
-            url: directUrl,
-            fileName: directName,
-            targetDirectory: targetDir,
-            extract: directExtract ? 'true' : 'false'
-        };
-        
-        Object.entries(inputs).forEach(([k, v]) => {
-            const input = document.createElement('input');
-            input.name = k;
-            input.value = v;
-            form.appendChild(input);
-        });
-        
-        document.body.appendChild(form);
-        form.submit();
-    };
 
     const handleAction = (action, item) => {
         if (action === 'delete') {
@@ -337,59 +309,6 @@ export function ServerMinecraftAddonsPage({ pageData = data }) {
                                 )}
                             </div>
                         )}
-
-                        <div className="mt-24 border-t border-neutral-800 pt-16">
-                            <h3 className="text-lg font-black text-white uppercase tracking-tight mb-2 flex items-center gap-3">
-                                <i className="bi bi-cloud-download text-primary-500 text-2xl"></i> Direct URL Download
-                            </h3>
-                            <p className="text-sm text-neutral-500 font-medium mb-8">Install custom archives or specific builds by providing a direct link.</p>
-                            
-                            <div className="bg-neutral-900 border border-neutral-800 rounded-[2.5rem] p-8 shadow-2xl shadow-black/20">
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end">
-                                    <div className="lg:col-span-5">
-                                        <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3 ml-1">Resource URL</label>
-                                        <input 
-                                            type="text" 
-                                            placeholder="https://example.com/mod.jar" 
-                                            value={directUrl}
-                                            onChange={(e) => setDirectUrl(e.target.value)}
-                                            className="w-full bg-neutral-950 border border-neutral-800 rounded-2xl py-3 px-4 text-sm text-white focus:outline-none focus:border-primary-500/50 transition-all font-mono" 
-                                        />
-                                    </div>
-                                    <div className="lg:col-span-3">
-                                        <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3 ml-1">Custom Name (Opt.)</label>
-                                        <input 
-                                            type="text" 
-                                            placeholder="world.zip" 
-                                            value={directName}
-                                            onChange={(e) => setDirectName(e.target.value)}
-                                            className="w-full bg-neutral-950 border border-neutral-800 rounded-2xl py-3 px-4 text-sm text-white focus:outline-none focus:border-primary-500/50 transition-all font-medium" 
-                                        />
-                                    </div>
-                                    <div className="lg:col-span-2">
-                                        <label className="block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-4 ml-1">Post Actions</label>
-                                        <label className="flex items-center gap-3 cursor-pointer group">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={directExtract}
-                                                onChange={(e) => setDirectExtract(e.target.checked)}
-                                                className="w-5 h-5 rounded-lg bg-neutral-950 border-neutral-800 checked:bg-primary-600" 
-                                            />
-                                            <span className="text-[10px] font-black text-neutral-600 uppercase tracking-widest group-hover:text-neutral-400 transition-colors">Extract</span>
-                                        </label>
-                                    </div>
-                                    <div className="lg:col-span-2">
-                                        <button 
-                                            onClick={handleDirectDownload}
-                                            disabled={!directUrl}
-                                            className={`w-full py-3 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl active:scale-95 ${!directUrl ? 'bg-neutral-800 text-neutral-600' : 'bg-primary-600 hover:bg-primary-500 text-white shadow-primary-900/20'}`}
-                                        >
-                                            Fetch File
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </>
                 ) : (
                     <div className="animate-in fade-in slide-in-from-left-4 duration-500">
