@@ -87,6 +87,10 @@ function BackendRow({ backend, groups, serverId, onAction }) {
 }
 
 export function ServerMinecraftProxyPage({ pageData = data }) {
+    const server = pageData.server || {};
+    const [snapshot, setSnapshot] = useState(pageData.proxySnapshot || {});
+    const [linkableServers, setLinkableServers] = useState(pageData.proxyLinkableServers || []);
+    
     const [loading, setLoading] = useState(false);
     const [proxyMode, setProxyMode] = useState(pageData.proxyMode || '');
     const [setupMode, setSetupMode] = useState('bungeecord');

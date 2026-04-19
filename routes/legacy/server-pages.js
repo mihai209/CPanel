@@ -18288,7 +18288,7 @@ return res.render('server/users', {
 
             const proxyMode = await getServerProxyMode(server.id);
             if (!proxyMode) {
-                return res.status(409).json({ success: false, error: 'Proxy mode is not enabled for this server.' });
+                return res.json({ success: true, snapshot: null, message: 'Proxy mode disabled.' });
             }
             const networkConfig = await getServerProxyNetworkConfig(server.id);
             const snapshot = await buildProxyNetworkStatusSnapshot(server, proxyMode, networkConfig, res.locals.settings || {});

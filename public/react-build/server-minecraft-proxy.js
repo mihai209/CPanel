@@ -8927,6 +8927,9 @@
     ] });
   }
   function ServerMinecraftProxyPage({ pageData = data }) {
+    const server = pageData.server || {};
+    const [snapshot, setSnapshot] = (0, import_react11.useState)(pageData.proxySnapshot || {});
+    const [linkableServers, setLinkableServers] = (0, import_react11.useState)(pageData.proxyLinkableServers || []);
     const [loading, setLoading] = (0, import_react11.useState)(false);
     const [proxyMode, setProxyMode] = (0, import_react11.useState)(pageData.proxyMode || "");
     const [setupMode, setSetupMode] = (0, import_react11.useState)("bungeecord");
