@@ -59,6 +59,11 @@ export function ServerMinecraftAdminPage({ pageData = data }) {
             return;
         }
 
+        // Avoid re-fetching if we already have the data for this specific player
+        if (inspectedData?.profile?.uuid === selectedPlayer.uuid && !isInspecting) {
+            return;
+        }
+
         let active = true;
         async function fetchDetails() {
             setIsInspecting(true);
@@ -77,7 +82,7 @@ export function ServerMinecraftAdminPage({ pageData = data }) {
 
         fetchDetails();
         return () => { active = false; };
-    }, [selectedPlayer, server.containerId]);
+    }, [selectedPlayer?.uuid, server.containerId]);
 
     const profile = inspectedData?.profile || {};
     const vitals = profile.vitals || {};
