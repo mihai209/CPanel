@@ -8927,10 +8927,9 @@
     ] });
   }
   function ServerMinecraftProxyPage({ pageData = data }) {
-    const server = pageData.server || {};
-    const [snapshot, setSnapshot] = (0, import_react11.useState)(pageData.proxySnapshot || {});
-    const [linkableServers, setLinkableServers] = (0, import_react11.useState)(pageData.proxyLinkableServers || []);
     const [loading, setLoading] = (0, import_react11.useState)(false);
+    const [proxyMode, setProxyMode] = (0, import_react11.useState)(pageData.proxyMode || "");
+    const [setupMode, setSetupMode] = (0, import_react11.useState)("bungeecord");
     const [newBackendServer, setNewBackendServer] = (0, import_react11.useState)("");
     const [newBackendGroup, setNewBackendGroup] = (0, import_react11.useState)("");
     const [newGroupName, setNewGroupName] = (0, import_react11.useState)("");
@@ -8949,7 +8948,7 @@
     const handleAction = (type, id, val) => {
       const post = (url, body) => {
         setLoading(true);
-        fetch(`/server/${server.containerId}/minecraft/proxy${url}`, {
+        return fetch(`/server/${server.containerId}/minecraft/proxy${url}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body)
@@ -8959,36 +8958,92 @@
             return;
           }
           return res.json();
-        }).then(() => setLoading(false)).catch(() => setLoading(false));
+        });
       };
+      if (type === "configure") {
+        post("/configure", { mode: id }).then((payload) => {
+          setLoading(false);
+          if (payload.success) {
+            setProxyMode(payload.mode);
+            window.location.reload();
+          } else {
+            alert("Failed to configure proxy: " + (payload.error || "Unknown error"));
+          }
+        }).catch((err) => {
+          setLoading(false);
+          alert("Error: " + err.message);
+        });
+        return;
+      }
       if (type === "add-backend") {
-        post("/backends/add", { linkedContainerId: newBackendServer, groupId: newBackendGroup });
+        post("/backends/add", { linkedContainerId: newBackendServer, groupId: newBackendGroup }).then(() => setLoading(false)).catch(() => setLoading(false));
       } else if (type === "delete") {
         if (confirm("Remove this backend from proxy?")) {
-          post(`/backends/${id}/delete`, {});
+          post(`/backends/${id}/delete`, {}).then(() => setLoading(false)).catch(() => setLoading(false));
         }
       } else if (type === "group") {
-        post(`/backends/${id}/group`, { groupId: val });
+        post(`/backends/${id}/group`, { groupId: val }).then(() => setLoading(false)).catch(() => setLoading(false));
       } else if (type === "power") {
-        post(`/backends/${id}/power`, { action: val });
+        post(`/backends/${id}/power`, { action: val }).then(() => setLoading(false)).catch(() => setLoading(false));
       } else if (type === "sync") {
-        post("/sync-config", {});
+        post("/sync-config", {}).then(() => setLoading(false)).catch(() => setLoading(false));
       } else if (type === "add-group") {
-        post("/groups/add", { name: newGroupName });
-        setNewGroupName("");
+        post("/groups/add", { name: newGroupName }).then(() => {
+          setLoading(false);
+          setNewGroupName("");
+        }).catch(() => setLoading(false));
       } else if (type === "delete-group") {
         if (confirm("Delete this group?")) {
-          post(`/groups/${id}/delete`, {});
+          post(`/groups/${id}/delete`, {}).then(() => setLoading(false)).catch(() => setLoading(false));
         }
       }
     };
-    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ReactAppShell, { pageData, subtitle: "Proxy Network", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ReactAppShell, { pageData, subtitle: "Proxy Network", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
       PageContentBlock,
       {
         title: "Proxy Network",
-        description: `Dynamic management of the ${pageData.proxyMode || "BungeeCord"} mesh for ${server.name}.`,
+        description: proxyMode ? `Dynamic management of the ${proxyMode} mesh for ${server.name}.` : `Initialize a scalable Minecraft mesh network.`,
         eyebrow: "Network Orchestration",
-        children: [
+        children: !proxyMode ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "max-w-4xl mx-auto py-12", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-900 border border-neutral-800 rounded-[3.5rem] p-12 shadow-2xl shadow-black/40 text-center", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "w-24 h-24 rounded-[2rem] bg-primary-600/10 flex items-center justify-center text-5xl text-primary-500 mx-auto mb-10 shadow-2xl shadow-primary-900/10", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-diagram-3" }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h2", { className: "text-3xl font-black text-white uppercase tracking-tight mb-4", children: "Initialize Proxy Mesh" }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-sm text-neutral-500 font-medium leading-relaxed max-w-lg mx-auto mb-12 uppercase tracking-widest opacity-60", children: "Connect multiple servers under a single IP using a high-performance proxy gateway. Select your preferred engine to begin." }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-6 mb-12", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+              "button",
+              {
+                onClick: () => setSetupMode("bungeecord"),
+                className: `p-8 rounded-[2.5rem] border-2 transition-all text-left ${setupMode === "bungeecord" ? "bg-primary-600/5 border-primary-500/50 shadow-2xl shadow-primary-900/10" : "bg-neutral-950/50 border-neutral-800 hover:border-neutral-700"}`,
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: `w-12 h-12 rounded-2xl flex items-center justify-center text-xl mb-6 ${setupMode === "bungeecord" ? "bg-primary-500 text-white" : "bg-neutral-900 text-neutral-500"}`, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-box" }) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h4", { className: "text-lg font-black text-white uppercase mb-1", children: "BungeeCord" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-[10px] text-neutral-500 font-bold uppercase tracking-widest", children: "Industry standard proxy engine" })
+                ]
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+              "button",
+              {
+                onClick: () => setSetupMode("velocity"),
+                className: `p-8 rounded-[2.5rem] border-2 transition-all text-left ${setupMode === "velocity" ? "bg-sky-600/5 border-sky-500/50 shadow-2xl shadow-sky-900/10" : "bg-neutral-950/50 border-neutral-800 hover:border-neutral-700"}`,
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: `w-12 h-12 rounded-2xl flex items-center justify-center text-xl mb-6 ${setupMode === "velocity" ? "bg-sky-500 text-white" : "bg-neutral-900 text-neutral-500"}`, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-lightning-charge" }) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h4", { className: "text-lg font-black text-white uppercase mb-1", children: "Velocity" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-[10px] text-neutral-500 font-bold uppercase tracking-widest", children: "High performance modern proxy" })
+                ]
+              }
+            )
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+            "button",
+            {
+              onClick: () => handleAction("configure", setupMode),
+              disabled: loading,
+              className: "w-full py-6 bg-primary-600 hover:bg-primary-500 text-white text-xs font-black uppercase tracking-[0.3em] rounded-3xl shadow-2xl shadow-primary-900/20 transition active:scale-95 disabled:opacity-50",
+              children: loading ? "Initializing Mesh..." : "Begin Provisioning"
+            }
+          )
+        ] }) }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_jsx_runtime11.Fragment, { children: [
           /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12", children: [
             /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(StatCard, { label: "Mesh Players", value: summary.proxyPlayersOnline || 0, colorClass: "bg-primary-600/10 text-primary-500", icon: "bi-people" }),
             /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(StatCard, { label: "Server Load", value: summary.backendPlayersOnline || 0, colorClass: "bg-sky-600/10 text-sky-500", icon: "bi-controller" }),
@@ -9153,7 +9208,7 @@
               ] })
             ] })
           ] })
-        ]
+        ] })
       }
     ) });
   }

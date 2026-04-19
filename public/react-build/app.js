@@ -9906,11 +9906,11 @@
     if (mb >= 1024) return `${(mb / 1024).toFixed(mb % 1024 === 0 ? 0 : 1)} GB`;
     return `${mb} MB`;
   }
-  function ServerRow({ server, isAdminDashboard, showResourcePills = true }) {
-    const rawStatus = String(server.status || "unknown").toLowerCase();
+  function ServerRow({ server: server2, isAdminDashboard, showResourcePills = true }) {
+    const rawStatus = String(server2.status || "unknown").toLowerCase();
     let statusColor = "bg-neutral-600 text-neutral-200";
     let statusLabel = rawStatus;
-    if (server.isSuspended) {
+    if (server2.isSuspended) {
       statusColor = "bg-red-600 text-white";
       statusLabel = "suspended";
     } else if (rawStatus === "running") {
@@ -9923,15 +9923,15 @@
     return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-900/50 backdrop-blur-sm border border-neutral-800/80 rounded-[1.5rem] p-6 hover:border-primary-500/30 hover:bg-neutral-800/40 transition-all duration-300 flex flex-col lg:flex-row lg:items-center justify-between group shadow-lg hover:shadow-primary-900/5", children: [
       /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex-1 min-w-0", children: [
         /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center gap-4 mb-2", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: `w-2.5 h-2.5 rounded-full ${server.isSuspended ? "bg-red-500" : rawStatus === "running" ? "bg-green-500" : "bg-neutral-700"} shadow-[0_0_10px_rgba(34,197,94,0.3)]` }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h3", { className: "text-lg font-black text-neutral-100 truncate group-hover:text-primary-400 transition-colors tracking-tight", children: server.name }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: `w-2.5 h-2.5 rounded-full ${server2.isSuspended ? "bg-red-500" : rawStatus === "running" ? "bg-green-500" : "bg-neutral-700"} shadow-[0_0_10px_rgba(34,197,94,0.3)]` }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h3", { className: "text-lg font-black text-neutral-100 truncate group-hover:text-primary-400 transition-colors tracking-tight", children: server2.name }),
           /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: `text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-[0.1em] ${statusColor} bg-opacity-10 ring-1 ring-inset ring-current`, children: statusLabel })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center gap-3 mt-2", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-[10px] text-neutral-500 font-black uppercase tracking-widest bg-neutral-800/50 px-2 py-0.5 rounded", children: server.containerId?.substring(0, 12) }),
-          isAdminDashboard && server.owner && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center gap-2 pl-3 border-l border-neutral-800", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-[10px] text-neutral-500 font-black uppercase tracking-widest bg-neutral-800/50 px-2 py-0.5 rounded", children: server2.containerId?.substring(0, 12) }),
+          isAdminDashboard && server2.owner && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center gap-2 pl-3 border-l border-neutral-800", children: [
             /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-person-badge text-xs text-primary-500/70" }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-[10px] font-black text-neutral-400 uppercase tracking-widest", children: server.owner.username })
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-[10px] font-black text-neutral-400 uppercase tracking-widest", children: server2.owner.username })
           ] })
         ] })
       ] }),
@@ -9939,20 +9939,20 @@
         showResourcePills && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_jsx_runtime11.Fragment, { children: [
           /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex-1 sm:flex-none", children: [
             /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-[10px] text-neutral-500 uppercase font-black tracking-widest mb-1 opacity-60", children: "CPU Usage" }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-sm font-black text-neutral-200 tabular-nums", children: server.cpu ? `${server.cpu}%` : "0%" })
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-sm font-black text-neutral-200 tabular-nums", children: server2.cpu ? `${server2.cpu}%` : "0%" })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "w-px h-8 bg-neutral-800 hidden sm:block" }),
           /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex-1 sm:flex-none", children: [
             /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-[10px] text-neutral-500 uppercase font-black tracking-widest mb-1 opacity-60", children: "Memory" }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-sm font-black text-neutral-200 tabular-nums", children: formatLimit(server.memory) })
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-sm font-black text-neutral-200 tabular-nums", children: formatLimit(server2.memory) })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "w-px h-8 bg-neutral-800 hidden sm:block" }),
           /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex-1 sm:flex-none", children: [
             /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-[10px] text-neutral-500 uppercase font-black tracking-widest mb-1 opacity-60", children: "Storage" }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-sm font-black text-neutral-200 tabular-nums", children: formatLimit(server.disk) })
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-sm font-black text-neutral-200 tabular-nums", children: formatLimit(server2.disk) })
           ] })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "w-full sm:w-auto mt-4 sm:mt-0 sm:ml-4", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("a", { href: `/server/${server.containerId}`, className: "flex items-center justify-center gap-2 bg-neutral-800 hover:bg-primary-600 text-neutral-100 hover:text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all duration-300 shadow-xl shadow-black/20 hover:shadow-primary-900/20 active:scale-95", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "w-full sm:w-auto mt-4 sm:mt-0 sm:ml-4", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("a", { href: `/server/${server2.containerId}`, className: "flex items-center justify-center gap-2 bg-neutral-800 hover:bg-primary-600 text-neutral-100 hover:text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all duration-300 shadow-xl shadow-black/20 hover:shadow-primary-900/20 active:scale-95", children: [
           "Manage ",
           /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-arrow-right-short text-lg" })
         ] }) })
@@ -10321,14 +10321,14 @@
                 /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("i", { className: "bi bi-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-neutral-600 text-[8px] pointer-events-none" })
               ] }) })
             ] }),
-            !servers ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Spinner, { centered: true, size: "large" }) : filteredServers.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "flex flex-col gap-2", children: filteredServers.map((server) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
+            !servers ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(Spinner, { centered: true, size: "large" }) : filteredServers.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "flex flex-col gap-2", children: filteredServers.map((server2) => /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
               ServerRow,
               {
-                server,
+                server: server2,
                 isAdminDashboard: isViewingAllServers,
                 showResourcePills: layout.resourcePills
               },
-              server.id || server.containerId
+              server2.id || server2.containerId
             )) }) : /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("div", { className: "flex flex-col items-center justify-center py-24 bg-neutral-900/30 border border-neutral-800/50 border-dashed rounded-[3rem]", children: [
               /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("i", { className: "bi bi-search text-5xl text-neutral-800 mb-6" }),
               /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "text-center text-sm font-black text-neutral-500 uppercase tracking-[0.2em]", children: "No results match your criteria." }),
@@ -10553,11 +10553,11 @@
         setIsPopout(new URLSearchParams(window.location.search).get("popout") === "true");
       }
     }, []);
-    const server = pageData.server || {};
-    const limits = server.limits || {};
+    const server2 = pageData.server || {};
+    const limits = server2.limits || {};
     const historyStorageKey = import_react14.default.useMemo(
-      () => `cpanel.react.console.history.${server.containerId || "server"}`,
-      [server.containerId]
+      () => `cpanel.react.console.history.${server2.containerId || "server"}`,
+      [server2.containerId]
     );
     const isMinecraft = Boolean(pageData.isMinecraftServer);
     const macros = Array.isArray(pageData.commandMacros) ? pageData.commandMacros : [];
@@ -10571,7 +10571,7 @@
     const disposedRef = import_react14.default.useRef(false);
     const followOutputRef = import_react14.default.useRef(true);
     const historyIndexRef = import_react14.default.useRef(-1);
-    const [status, setStatus] = import_react14.default.useState(normalizeStatus(server.status));
+    const [status, setStatus] = import_react14.default.useState(normalizeStatus(server2.status));
     const [connectorOnline, setConnectorOnline] = import_react14.default.useState(Boolean(pageData.connectorOnline));
     const [commandValue, setCommandValue] = import_react14.default.useState("");
     const [history, setHistory] = import_react14.default.useState(() => {
@@ -10620,7 +10620,7 @@
         if (!active) return;
         try {
           const bedrockMode = pageData.minecraftBedrockMode ? "1" : "0";
-          const response = await fetch(`/server/${server.containerId}/minecraft/configs/status?bedrock=${bedrockMode}`);
+          const response = await fetch(`/server/${server2.containerId}/minecraft/configs/status?bedrock=${bedrockMode}`);
           const payload = await response.json();
           if (!response.ok || !payload.success) throw new Error(payload.error || "Failed to sync players");
           if (active) {
@@ -10638,7 +10638,7 @@
         active = false;
         clearInterval(interval);
       };
-    }, [isMinecraft, server.containerId]);
+    }, [isMinecraft, server2.containerId]);
     const handleMcAction = async (action, player) => {
       const requiresReason = ["kick", "ban", "tempban"].includes(action);
       const requiresDuration = action === "tempban";
@@ -10667,7 +10667,7 @@
       if (extra.duration) formData.append("duration", extra.duration);
       if (extra.destination) formData.append("destination", extra.destination);
       try {
-        await fetch(`/server/${server.containerId}/minecraft/configs`, {
+        await fetch(`/server/${server2.containerId}/minecraft/configs`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: formData.toString()
@@ -10769,7 +10769,7 @@
         const connect = () => {
           if (disposedRef.current) return;
           setConnectionState("Connecting...");
-          const ws = new WebSocket(buildWsUrl(pageData.wsToken, server.containerId));
+          const ws = new WebSocket(buildWsUrl(pageData.wsToken, server2.containerId));
           wsRef.current = ws;
           ws.onopen = () => {
             reconnectDelay = 1e3;
@@ -10909,7 +10909,7 @@
         fitAddonRef.current = null;
         wsRef.current = null;
       };
-    }, [pageData.initialConsoleBuffer, pageData.wsToken, server.containerId]);
+    }, [pageData.initialConsoleBuffer, pageData.wsToken, server2.containerId]);
     const sendPayload = import_react14.default.useCallback((payload) => {
       const socket = wsRef.current;
       if (!socket || socket.readyState !== WebSocket.OPEN) return false;
@@ -10998,8 +10998,8 @@
             /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "flex items-center gap-4", children: [
               /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("div", { className: `w-3 h-3 rounded-full shrink-0 ${getToneColorClass(statusTone(status))}` }),
               /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("h1", { className: "text-xl font-bold text-white tracking-wide", children: server.name || "Server Console" }),
-                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { className: "text-sm text-neutral-400 mt-1", children: server.description || "Live runtime output and power controls." })
+                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("h1", { className: "text-xl font-bold text-white tracking-wide", children: server2.name || "Server Console" }),
+                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("p", { className: "text-sm text-neutral-400 mt-1", children: server2.description || "Live runtime output and power controls." })
               ] })
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "flex bg-neutral-800 rounded-lg border border-neutral-700/50 overflow-hidden shadow-sm shrink-0", children: [
@@ -11215,7 +11215,7 @@
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime14.jsxs)("div", { className: "grid grid-cols-2 gap-2", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime14.jsx)(Link, { to: ReactRoutes.changeView, className: "bg-neutral-900 border border-neutral-700 hover:border-neutral-500 text-neutral-300 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl text-center transition-all", children: "View Mode" }),
-                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("a", { href: `/server/${server.containerId}?popout=true`, target: "_blank", rel: "noopener noreferrer", className: "bg-neutral-900 border border-neutral-700 hover:border-neutral-500 text-neutral-300 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl text-center transition-all", children: "Popout" })
+                /* @__PURE__ */ (0, import_jsx_runtime14.jsx)("a", { href: `/server/${server2.containerId}?popout=true`, target: "_blank", rel: "noopener noreferrer", className: "bg-neutral-900 border border-neutral-700 hover:border-neutral-500 text-neutral-300 text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl text-center transition-all", children: "Popout" })
               ] })
             ] })
           ] }),
@@ -12569,7 +12569,7 @@
     return "bg-red-600/20 text-red-400 border border-red-600/30";
   }
   function ServerBackupsPage({ pageData = data4 }) {
-    const server = pageData.server || {};
+    const server2 = pageData.server || {};
     const backups = Array.isArray(pageData.backups) ? pageData.backups : [];
     const driveState = pageData.googleDriveState || {};
     const permissions = pageData.permissions || {};
@@ -12584,7 +12584,7 @@
       }
       setIsClearing(true);
       try {
-        const response = await fetch(`/server/${server.containerId}/backups/clear`, {
+        const response = await fetch(`/server/${server2.containerId}/backups/clear`, {
           method: "POST",
           headers: { "Accept": "application/json" }
         });
@@ -12642,7 +12642,7 @@
               /* @__PURE__ */ (0, import_jsx_runtime16.jsxs)("div", { className: "flex flex-col gap-4 mb-4", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime16.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-3", children: [
                   /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Server" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("strong", { className: "text-neutral-200", children: server.name || "Server" })
+                  /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("strong", { className: "text-neutral-200", children: server2.name || "Server" })
                 ] }),
                 /* @__PURE__ */ (0, import_jsx_runtime16.jsxs)("div", { className: "flex justify-between items-center border-b border-neutral-700/50 pb-3", children: [
                   /* @__PURE__ */ (0, import_jsx_runtime16.jsx)("span", { className: "text-sm font-semibold text-neutral-400", children: "Drive Ready" }),
@@ -12993,7 +12993,7 @@
   var standaloneEntry7 = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-databases";
   var root7 = standaloneEntry7 ? (0, import_client7.createRoot)(document.getElementById("reactRoot")) : null;
   function ServerDatabasesPage({ pageData = data7 }) {
-    const server = pageData.server || {};
+    const server2 = pageData.server || {};
     const hostsList = Array.isArray(pageData.hosts) ? pageData.hosts : [];
     const dbList = Array.isArray(pageData.databases) ? pageData.databases : [];
     const limit = Math.max(0, Number.parseInt(pageData.databaseLimit, 10) || 0);
@@ -13044,7 +13044,7 @@
           /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("h2", { className: "text-lg font-bold text-neutral-100", children: "Create Database" }),
           !canManage && /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("span", { className: "text-xs px-2 py-1 bg-neutral-800 border border-neutral-700 rounded text-neutral-400", children: "Read Only" })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("form", { method: "POST", action: `/server/${server.containerId}/databases/create`, className: "flex flex-col md:flex-row gap-4", "data-turbo": "false", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("form", { method: "POST", action: `/server/${server2.containerId}/databases/create`, className: "flex flex-col md:flex-row gap-4", "data-turbo": "false", children: [
           /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("div", { className: "flex-1 md:max-w-xs", children: [
             /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("label", { className: "block text-xs font-bold text-neutral-400 uppercase tracking-widest mb-2", children: "Host" }),
             /* @__PURE__ */ (0, import_jsx_runtime19.jsx)(
@@ -13141,10 +13141,10 @@
             ] }) }),
             /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("td", { className: "px-5 py-4 text-xs text-neutral-500 whitespace-nowrap", children: new Date(entry.createdAt).toLocaleString() }),
             /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)("td", { className: "px-5 py-4 flex items-center justify-end gap-2", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("a", { href: `/server/${server.containerId}/database/${encodeURIComponent(entry.name)}`, className: "text-neutral-400 hover:text-primary-400 transition", title: "Open Database Manager", children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("i", { className: "bi bi-box-arrow-up-right" }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("a", { href: `/server/${server2.containerId}/database/${encodeURIComponent(entry.name)}`, className: "text-neutral-400 hover:text-primary-400 transition", title: "Open Database Manager", children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("i", { className: "bi bi-box-arrow-up-right" }) }),
               canManage && /* @__PURE__ */ (0, import_jsx_runtime19.jsxs)(import_jsx_runtime19.Fragment, { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("form", { method: "POST", action: `/server/${server.containerId}/databases/${entry.id}/password`, "data-turbo": "false", children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("button", { type: "submit", className: "text-yellow-500 hover:text-yellow-400 transition", title: "Rotate Password", children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("i", { className: "bi bi-key" }) }) }),
-                /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("form", { method: "POST", action: `/server/${server.containerId}/databases/${entry.id}/delete`, onClick: (e) => deleteDatabase(entry.id, e), "data-turbo": "false", children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("button", { type: "submit", className: "text-red-500 hover:text-red-400 transition", title: "Delete Database", children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("i", { className: "bi bi-trash" }) }) })
+                /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("form", { method: "POST", action: `/server/${server2.containerId}/databases/${entry.id}/password`, "data-turbo": "false", children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("button", { type: "submit", className: "text-yellow-500 hover:text-yellow-400 transition", title: "Rotate Password", children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("i", { className: "bi bi-key" }) }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("form", { method: "POST", action: `/server/${server2.containerId}/databases/${entry.id}/delete`, onClick: (e) => deleteDatabase(entry.id, e), "data-turbo": "false", children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("button", { type: "submit", className: "text-red-500 hover:text-red-400 transition", title: "Delete Database", children: /* @__PURE__ */ (0, import_jsx_runtime19.jsx)("i", { className: "bi bi-trash" }) }) })
               ] })
             ] })
           ] }, entry.id)) })
@@ -13242,7 +13242,7 @@
     );
   }
   function ServerUsersPage({ pageData = data8 }) {
-    const server = pageData.server || {};
+    const server2 = pageData.server || {};
     const memberships = Array.isArray(pageData.memberships) ? pageData.memberships : [];
     const owner = pageData.owner || null;
     const canManageUsers = Boolean(pageData.canManageUsers);
@@ -13346,7 +13346,7 @@
           /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("h3", { className: "text-lg font-bold text-white", children: editingMembership ? `Manage ${editingMembership.user?.username || "Subuser"}` : "Invite Subuser" }),
           /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("button", { onClick: () => setIsModalOpen(false), className: "text-neutral-400 hover:text-white transition", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("i", { className: "bi bi-x-lg" }) })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { className: "p-5 overflow-y-auto max-h-[70vh]", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("form", { id: "subuserForm", method: "POST", action: `/server/${server.containerId}/users`, "data-turbo": "false", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", { className: "p-5 overflow-y-auto max-h-[70vh]", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("form", { id: "subuserForm", method: "POST", action: `/server/${server2.containerId}/users`, "data-turbo": "false", children: [
           /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("input", { type: "hidden", name: "membershipId", value: editingMembership ? editingMembership.id : "" }),
           /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { className: "mb-6", children: [
             /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("label", { className: "block text-xs font-bold text-neutral-400 uppercase tracking-widest mb-2", children: "User Identifier" }),
@@ -13409,7 +13409,7 @@
           ] })
         ] }) }),
         /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { className: "flex items-center justify-between p-5 border-t border-neutral-700 bg-neutral-900 rounded-b-xl", children: [
-          editingMembership ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("form", { method: "POST", action: `/server/${server.containerId}/users/${editingMembership.id}/delete`, "data-turbo": "false", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("button", { type: "submit", className: "text-red-500 hover:text-red-400 text-sm font-bold transition", children: "Remove Subuser" }) }) : /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", {}),
+          editingMembership ? /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("form", { method: "POST", action: `/server/${server2.containerId}/users/${editingMembership.id}/delete`, "data-turbo": "false", children: /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("button", { type: "submit", className: "text-red-500 hover:text-red-400 text-sm font-bold transition", children: "Remove Subuser" }) }) : /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("div", {}),
           /* @__PURE__ */ (0, import_jsx_runtime20.jsxs)("div", { className: "flex gap-3", children: [
             /* @__PURE__ */ (0, import_jsx_runtime20.jsx)("button", { onClick: () => setIsModalOpen(false), className: "px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded text-sm font-bold", children: "Cancel" }),
             /* @__PURE__ */ (0, import_jsx_runtime20.jsx)(
@@ -13442,7 +13442,7 @@
   var standaloneEntry9 = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-schedules";
   var root9 = standaloneEntry9 ? (0, import_client9.createRoot)(document.getElementById("reactRoot")) : null;
   function ServerSchedulesPage({ pageData = data9 }) {
-    const server = pageData.server || {};
+    const server2 = pageData.server || {};
     const schedules = Array.isArray(pageData.schedules) ? pageData.schedules : [];
     const canManageSchedules = Boolean(pageData.canManageSchedules);
     const timezone = pageData.settings?.timezone || "system default";
@@ -13464,7 +13464,7 @@
         ) }),
         canManageSchedules && /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 rounded-lg p-5 mb-8 shadow-sm", children: [
           /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("h2", { className: "text-lg font-bold text-neutral-100 mb-4", children: "Create Schedule" }),
-          /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("form", { method: "POST", action: `/server/${server.containerId}/schedules`, className: "flex flex-col gap-4", "data-turbo": "false", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("form", { method: "POST", action: `/server/${server2.containerId}/schedules`, className: "flex flex-col gap-4", "data-turbo": "false", children: [
             /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-12 gap-4 items-end", children: [
               /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "md:col-span-3", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("label", { className: "block text-xs font-bold text-neutral-400 uppercase tracking-widest mb-1.5", children: "Name" }),
@@ -13528,8 +13528,8 @@
               ] }) }),
               /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("td", { className: "px-5 py-4 text-xs text-neutral-400", children: entry.lastRunAt ? new Date(entry.lastRunAt).toLocaleString() : "Never" }),
               /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("td", { className: "px-5 py-4 text-right", children: canManageSchedules ? /* @__PURE__ */ (0, import_jsx_runtime21.jsxs)("div", { className: "flex justify-end gap-2", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("form", { method: "POST", action: `/server/${server.containerId}/schedules/${entry.id}/run`, "data-turbo": "false", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("button", { type: "submit", className: "text-green-500 hover:text-green-400 bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 p-1.5 rounded transition", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("i", { className: "bi bi-play-fill text-sm" }) }) }),
-                /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("form", { method: "POST", action: `/server/${server.containerId}/schedules/${entry.id}/delete`, "data-turbo": "false", onSubmit: (e) => {
+                /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("form", { method: "POST", action: `/server/${server2.containerId}/schedules/${entry.id}/run`, "data-turbo": "false", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("button", { type: "submit", className: "text-green-500 hover:text-green-400 bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 p-1.5 rounded transition", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("i", { className: "bi bi-play-fill text-sm" }) }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("form", { method: "POST", action: `/server/${server2.containerId}/schedules/${entry.id}/delete`, "data-turbo": "false", onSubmit: (e) => {
                   if (!window.confirm("Delete this schedule?")) e.preventDefault();
                 }, children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("button", { type: "submit", className: "text-red-500 hover:text-red-400 bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 p-1.5 rounded transition", children: /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("i", { className: "bi bi-trash text-sm" }) }) })
               ] }) : /* @__PURE__ */ (0, import_jsx_runtime21.jsx)("span", { className: "text-neutral-500", children: "-" }) })
@@ -13630,7 +13630,7 @@
   var standaloneEntry10 = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-startup";
   var root10 = standaloneEntry10 ? (0, import_client10.createRoot)(document.getElementById("reactRoot")) : null;
   function ServerStartupPage({ pageData = data10 }) {
-    const server = pageData.server || {};
+    const server2 = pageData.server || {};
     const image = pageData.image || {};
     const resolvedStartup = pageData.resolvedStartup || "";
     const startupWriteLocked = Boolean(pageData.startupWriteLocked);
@@ -13686,7 +13686,7 @@
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("p", { className: "text-sm opacity-90", children: "Edits are locked for this server. Only admins can change runtime variables, startup commands, or reinstall right now." })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("form", { id: "startupForm", method: "POST", action: `/server/${server.containerId}/startup`, "data-turbo": "false", children: /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("fieldset", { disabled: startupWriteLocked, className: "space-y-6", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("form", { id: "startupForm", method: "POST", action: `/server/${server2.containerId}/startup`, "data-turbo": "false", children: /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("fieldset", { disabled: startupWriteLocked, className: "space-y-6", children: [
         /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 rounded-lg shadow-sm overflow-hidden", children: [
           /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { className: "bg-neutral-800/50 px-5 py-4 border-b border-neutral-700", children: /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("h6", { className: "m-0 font-bold text-neutral-100", children: "Startup Command" }) }),
           /* @__PURE__ */ (0, import_jsx_runtime22.jsxs)("div", { className: "p-5", children: [
@@ -13698,7 +13698,7 @@
                 className: "w-full bg-neutral-800/80 border border-neutral-700 rounded px-4 py-3 text-sm text-neutral-200 focus:outline-none focus:border-primary-500 font-mono mb-2",
                 rows: "3",
                 placeholder: "Leave blank to use image default...",
-                defaultValue: server.startup || image.startup
+                defaultValue: server2.startup || image.startup
               }
             ),
             /* @__PURE__ */ (0, import_jsx_runtime22.jsx)("div", { className: "text-xs text-neutral-500 mb-5", children: "Optional override. Clear the field to use the image default template." }),
@@ -13998,7 +13998,7 @@
     ] });
   }
   function ServerFileEditorPage({ pageData = data11 }) {
-    const server = pageData.server || {};
+    const server2 = pageData.server || {};
     const urlParams = new URLSearchParams(window.location.search);
     const filePath = urlParams.get("path") || pageData.filePath || "/";
     const fileName = filePath.split("/").pop() || "file";
@@ -14025,7 +14025,7 @@
       let cancelled = false;
       setLoading(true);
       setStatus({ type: "idle", message: "" });
-      fetch(`/api/client/servers/${server.containerId}/files/content?path=${encodeURIComponent(filePath)}`, {
+      fetch(`/api/client/servers/${server2.containerId}/files/content?path=${encodeURIComponent(filePath)}`, {
         headers: { Accept: "application/json" },
         credentials: "same-origin"
       }).then((r) => r.json()).then((payload) => {
@@ -14040,7 +14040,7 @@
         setLoading(false);
       });
       setRootLoading(true);
-      fetch(`/api/client/servers/${server.containerId}/files/list?path=/`, {
+      fetch(`/api/client/servers/${server2.containerId}/files/list?path=/`, {
         headers: { Accept: "application/json" },
         credentials: "same-origin"
       }).then((r) => r.json()).then((payload) => {
@@ -14059,7 +14059,7 @@
       return () => {
         cancelled = true;
       };
-    }, [server.containerId, filePath]);
+    }, [server2.containerId, filePath]);
     (0, import_react23.useEffect)(() => {
       if (editorMode !== "monaco" || loading) return;
       if (!editorContainerRef.current) return;
@@ -14125,7 +14125,7 @@
       setSaving(true);
       setStatus({ type: "idle", message: "" });
       try {
-        const response = await fetch(`/api/client/servers/${server.containerId}/files/write`, {
+        const response = await fetch(`/api/client/servers/${server2.containerId}/files/write`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -14144,13 +14144,13 @@
       } finally {
         setSaving(false);
       }
-    }, [saving, loading, pageData.editWriteLocked, server.containerId, filePath]);
+    }, [saving, loading, pageData.editWriteLocked, server2.containerId, filePath]);
     const handleSaveRef = (0, import_react23.useRef)(handleSave);
     handleSaveRef.current = handleSave;
     const handleFileSwitch = (newPath) => {
       if (newPath === filePath) return;
       if (isUnsaved && !window.confirm("You have unsaved changes. Switch files anyway?")) return;
-      window.location.href = `/server/${server.containerId}/files/edit?path=${encodeURIComponent(newPath)}`;
+      window.location.href = `/server/${server2.containerId}/files/edit?path=${encodeURIComponent(newPath)}`;
     };
     const switchMode = (mode) => {
       if (mode === editorMode) return;
@@ -14195,7 +14195,7 @@
               /* @__PURE__ */ (0, import_jsx_runtime23.jsxs)(
                 "a",
                 {
-                  href: `/server/${server.containerId}/files?path=${encodeURIComponent(parentPath)}`,
+                  href: `/server/${server2.containerId}/files?path=${encodeURIComponent(parentPath)}`,
                   className: "flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-neutral-500 hover:text-white transition-colors shrink-0",
                   children: [
                     /* @__PURE__ */ (0, import_jsx_runtime23.jsx)("i", { className: "bi bi-arrow-left" }),
@@ -14281,7 +14281,7 @@
                     item: { ...file, directory: "/" },
                     currentPath: filePath,
                     onFileSwitch: handleFileSwitch,
-                    serverId: server.containerId
+                    serverId: server2.containerId
                   },
                   file.name
                 )),
@@ -14376,27 +14376,27 @@
     );
   }
   function ServerMinecraftCenterPage({ pageData = data12 }) {
-    const server = pageData.server || {};
+    const server2 = pageData.server || {};
     const tools = [
       {
         title: "Addons",
         description: "Browse and install thousands of Mods and Plugins from Modrinth.",
         icon: "bi-box",
-        href: `/server/${server.containerId}/minecraft/addons`,
+        href: `/server/${server2.containerId}/minecraft/addons`,
         colorClass: "bg-blue-600/10 text-blue-500"
       },
       {
         title: "Proxy Network",
         description: "Configuration for BungeeCord and Velocity proxy environments.",
         icon: "bi-diagram-3",
-        href: `/server/${server.containerId}/minecraft/proxy`,
+        href: `/server/${server2.containerId}/minecraft/proxy`,
         colorClass: "bg-purple-600/10 text-purple-500"
       },
       {
         title: "Version Installer",
         description: "Easily switch versions or platforms like Arclight and Waterfall.",
         icon: "bi-cloud-download",
-        href: `/server/${server.containerId}/minecraft/installer`,
+        href: `/server/${server2.containerId}/minecraft/installer`,
         colorClass: "bg-emerald-600/10 text-emerald-500"
       }
     ];
@@ -14404,7 +14404,7 @@
       PageContentBlock,
       {
         title: "Minecraft Center",
-        description: `Specialized tools and management for ${server.name}.`,
+        description: `Specialized tools and management for ${server2.name}.`,
         eyebrow: "Game Management",
         children: [
           /* @__PURE__ */ (0, import_jsx_runtime24.jsx)("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6", children: tools.map((tool, idx) => /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(MinecraftToolCard, { ...tool }, idx)) }),
@@ -14419,7 +14419,7 @@
             /* @__PURE__ */ (0, import_jsx_runtime24.jsx)(
               "a",
               {
-                href: `/server/${server.containerId}/minecraft/installer`,
+                href: `/server/${server2.containerId}/minecraft/installer`,
                 className: "px-8 py-3 bg-neutral-100 hover:bg-white text-neutral-950 font-black uppercase tracking-widest rounded-xl transition-all shadow-xl shadow-white/5 active:scale-95 text-sm",
                 children: "Open Installer"
               }
@@ -14527,7 +14527,7 @@
     ] }) });
   }
   function ServerMinecraftAddonsPage({ pageData = data13 }) {
-    const server = pageData.server || {};
+    const server2 = pageData.server || {};
     const defaults = pageData.minecraftDefaults || {};
     const catalog = pageData.minecraftCatalog || {};
     const [search, setSearch] = (0, import_react25.useState)("");
@@ -14566,7 +14566,7 @@
           version: mcVersion,
           limit: 12
         });
-        fetch(`/server/${server.containerId}/minecraft/addons/search?${params.toString()}`).then((res) => res.json()).then((payload) => {
+        fetch(`/server/${server2.containerId}/minecraft/addons/search?${params.toString()}`).then((res) => res.json()).then((payload) => {
           if (cancelled) return;
           if (payload.success) {
             setResults(payload.results || []);
@@ -14585,10 +14585,10 @@
         cancelled = true;
         clearTimeout(timer);
       };
-    }, [search, kind, loader, mcVersion, view, server.containerId]);
+    }, [search, kind, loader, mcVersion, view, server2.containerId]);
     const fetchInstalled = () => {
       setLoadingInstalled(true);
-      fetch(`/server/${server.containerId}/minecraft/addons/installed?directory=${encodeURIComponent(targetDir)}`).then((res) => res.json()).then((payload) => {
+      fetch(`/server/${server2.containerId}/minecraft/addons/installed?directory=${encodeURIComponent(targetDir)}`).then((res) => res.json()).then((payload) => {
         if (payload.success) {
           setInstalled(payload.installed || []);
         }
@@ -14603,7 +14603,7 @@
     const handleInstall = (project) => {
       if (confirm(`Install ${project.title}?`)) {
         setInstalling(true);
-        fetch(`/server/${server.containerId}/minecraft/addons/install`, {
+        fetch(`/server/${server2.containerId}/minecraft/addons/install`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -14632,7 +14632,7 @@
       e.preventDefault();
       if (!installUrl.trim()) return;
       setInstalling(true);
-      fetch(`/server/${server.containerId}/minecraft/addons/install-url`, {
+      fetch(`/server/${server2.containerId}/minecraft/addons/install-url`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -14657,7 +14657,7 @@
     const handleAction = (action, item) => {
       if (action === "delete") {
         if (confirm(`Are you sure you want to delete ${item.name}?`)) {
-          fetch(`/server/${server.containerId}/minecraft/addons/delete`, {
+          fetch(`/server/${server2.containerId}/minecraft/addons/delete`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ path: item.path })
@@ -14670,7 +14670,7 @@
       PageContentBlock,
       {
         title: "Addons Center",
-        description: `Manage mods, plugins, and resource packs for your ${server.name} server.`,
+        description: `Manage mods, plugins, and resource packs for your ${server2.name} server.`,
         eyebrow: "Minecraft Management",
         children: [
           /* @__PURE__ */ (0, import_jsx_runtime25.jsxs)("div", { className: "flex bg-neutral-900 border border-neutral-800 rounded-3xl p-1 gap-1 mb-8 w-fit shadow-2xl shadow-black/20", children: [
@@ -14900,7 +14900,7 @@
     { id: "waterfall", name: "Waterfall", icon: "bi-water", description: "High-performance BungeeCord fork for proxy networks.", color: "bg-sky-600/10 text-sky-500" }
   ];
   function ServerMinecraftInstallerPage({ pageData = data14 }) {
-    const server = pageData.server || {};
+    const server2 = pageData.server || {};
     const catalog = pageData.installerCatalog || {};
     const archlight = catalog.archlight || {};
     const waterfall = catalog.waterfall || {};
@@ -14961,7 +14961,7 @@
       if (!build || installing) return;
       const form = document.createElement("form");
       form.method = "POST";
-      form.action = `/server/${server.containerId}/minecraft/installer`;
+      form.action = `/server/${server2.containerId}/minecraft/installer`;
       const fields = {
         distribution,
         loader,
@@ -14986,7 +14986,7 @@
       PageContentBlock,
       {
         title: "Version Installer",
-        description: `Deploy specialized distributions directly to your ${server.name} instance.`,
+        description: `Deploy specialized distributions directly to your ${server2.name} instance.`,
         eyebrow: "Provisioning",
         children: /* @__PURE__ */ (0, import_jsx_runtime26.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-12 gap-12", children: [
           /* @__PURE__ */ (0, import_jsx_runtime26.jsxs)("div", { className: "lg:col-span-12 xl:col-span-8", children: [
@@ -15128,7 +15128,7 @@
               /* @__PURE__ */ (0, import_jsx_runtime26.jsx)("i", { className: "bi bi-shield-exclamation text-amber-500 text-3xl mb-4 block" }),
               /* @__PURE__ */ (0, import_jsx_runtime26.jsx)("h4", { className: "text-sm font-black text-amber-500 uppercase tracking-[0.2em] mb-3", children: "Pre-Flight Warning" }),
               /* @__PURE__ */ (0, import_jsx_runtime26.jsx)("p", { className: "text-[11px] text-neutral-500 font-bold uppercase tracking-widest leading-relaxed mb-6", children: "Version installation is a destructive process for your startup JAR. Current world data and generic configs are safe, but it is highly recommended to take a snapshot first." }),
-              /* @__PURE__ */ (0, import_jsx_runtime26.jsxs)("a", { href: `/server/${server.containerId}/backups`, className: "text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] hover:text-amber-400 flex items-center gap-2", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime26.jsxs)("a", { href: `/server/${server2.containerId}/backups`, className: "text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] hover:text-amber-400 flex items-center gap-2", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime26.jsx)("i", { className: "bi bi-plus-circle" }),
                 " Create Backup Now"
               ] })
@@ -15237,10 +15237,9 @@
     ] });
   }
   function ServerMinecraftProxyPage({ pageData = data15 }) {
-    const server = pageData.server || {};
-    const [snapshot, setSnapshot] = (0, import_react27.useState)(pageData.proxySnapshot || {});
-    const [linkableServers, setLinkableServers] = (0, import_react27.useState)(pageData.proxyLinkableServers || []);
     const [loading, setLoading] = (0, import_react27.useState)(false);
+    const [proxyMode, setProxyMode] = (0, import_react27.useState)(pageData.proxyMode || "");
+    const [setupMode, setSetupMode] = (0, import_react27.useState)("bungeecord");
     const [newBackendServer, setNewBackendServer] = (0, import_react27.useState)("");
     const [newBackendGroup, setNewBackendGroup] = (0, import_react27.useState)("");
     const [newGroupName, setNewGroupName] = (0, import_react27.useState)("");
@@ -15259,7 +15258,7 @@
     const handleAction = (type, id, val) => {
       const post = (url, body) => {
         setLoading(true);
-        fetch(`/server/${server.containerId}/minecraft/proxy${url}`, {
+        return fetch(`/server/${server.containerId}/minecraft/proxy${url}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body)
@@ -15269,36 +15268,92 @@
             return;
           }
           return res.json();
-        }).then(() => setLoading(false)).catch(() => setLoading(false));
+        });
       };
+      if (type === "configure") {
+        post("/configure", { mode: id }).then((payload) => {
+          setLoading(false);
+          if (payload.success) {
+            setProxyMode(payload.mode);
+            window.location.reload();
+          } else {
+            alert("Failed to configure proxy: " + (payload.error || "Unknown error"));
+          }
+        }).catch((err) => {
+          setLoading(false);
+          alert("Error: " + err.message);
+        });
+        return;
+      }
       if (type === "add-backend") {
-        post("/backends/add", { linkedContainerId: newBackendServer, groupId: newBackendGroup });
+        post("/backends/add", { linkedContainerId: newBackendServer, groupId: newBackendGroup }).then(() => setLoading(false)).catch(() => setLoading(false));
       } else if (type === "delete") {
         if (confirm("Remove this backend from proxy?")) {
-          post(`/backends/${id}/delete`, {});
+          post(`/backends/${id}/delete`, {}).then(() => setLoading(false)).catch(() => setLoading(false));
         }
       } else if (type === "group") {
-        post(`/backends/${id}/group`, { groupId: val });
+        post(`/backends/${id}/group`, { groupId: val }).then(() => setLoading(false)).catch(() => setLoading(false));
       } else if (type === "power") {
-        post(`/backends/${id}/power`, { action: val });
+        post(`/backends/${id}/power`, { action: val }).then(() => setLoading(false)).catch(() => setLoading(false));
       } else if (type === "sync") {
-        post("/sync-config", {});
+        post("/sync-config", {}).then(() => setLoading(false)).catch(() => setLoading(false));
       } else if (type === "add-group") {
-        post("/groups/add", { name: newGroupName });
-        setNewGroupName("");
+        post("/groups/add", { name: newGroupName }).then(() => {
+          setLoading(false);
+          setNewGroupName("");
+        }).catch(() => setLoading(false));
       } else if (type === "delete-group") {
         if (confirm("Delete this group?")) {
-          post(`/groups/${id}/delete`, {});
+          post(`/groups/${id}/delete`, {}).then(() => setLoading(false)).catch(() => setLoading(false));
         }
       }
     };
-    return /* @__PURE__ */ (0, import_jsx_runtime27.jsx)(ReactAppShell, { pageData, subtitle: "Proxy Network", children: /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)(
+    return /* @__PURE__ */ (0, import_jsx_runtime27.jsx)(ReactAppShell, { pageData, subtitle: "Proxy Network", children: /* @__PURE__ */ (0, import_jsx_runtime27.jsx)(
       PageContentBlock,
       {
         title: "Proxy Network",
-        description: `Dynamic management of the ${pageData.proxyMode || "BungeeCord"} mesh for ${server.name}.`,
+        description: proxyMode ? `Dynamic management of the ${proxyMode} mesh for ${server.name}.` : `Initialize a scalable Minecraft mesh network.`,
         eyebrow: "Network Orchestration",
-        children: [
+        children: !proxyMode ? /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("div", { className: "max-w-4xl mx-auto py-12", children: /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)("div", { className: "bg-neutral-900 border border-neutral-800 rounded-[3.5rem] p-12 shadow-2xl shadow-black/40 text-center", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("div", { className: "w-24 h-24 rounded-[2rem] bg-primary-600/10 flex items-center justify-center text-5xl text-primary-500 mx-auto mb-10 shadow-2xl shadow-primary-900/10", children: /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("i", { className: "bi bi-diagram-3" }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("h2", { className: "text-3xl font-black text-white uppercase tracking-tight mb-4", children: "Initialize Proxy Mesh" }),
+          /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("p", { className: "text-sm text-neutral-500 font-medium leading-relaxed max-w-lg mx-auto mb-12 uppercase tracking-widest opacity-60", children: "Connect multiple servers under a single IP using a high-performance proxy gateway. Select your preferred engine to begin." }),
+          /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-6 mb-12", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)(
+              "button",
+              {
+                onClick: () => setSetupMode("bungeecord"),
+                className: `p-8 rounded-[2.5rem] border-2 transition-all text-left ${setupMode === "bungeecord" ? "bg-primary-600/5 border-primary-500/50 shadow-2xl shadow-primary-900/10" : "bg-neutral-950/50 border-neutral-800 hover:border-neutral-700"}`,
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("div", { className: `w-12 h-12 rounded-2xl flex items-center justify-center text-xl mb-6 ${setupMode === "bungeecord" ? "bg-primary-500 text-white" : "bg-neutral-900 text-neutral-500"}`, children: /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("i", { className: "bi bi-box" }) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("h4", { className: "text-lg font-black text-white uppercase mb-1", children: "BungeeCord" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("p", { className: "text-[10px] text-neutral-500 font-bold uppercase tracking-widest", children: "Industry standard proxy engine" })
+                ]
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)(
+              "button",
+              {
+                onClick: () => setSetupMode("velocity"),
+                className: `p-8 rounded-[2.5rem] border-2 transition-all text-left ${setupMode === "velocity" ? "bg-sky-600/5 border-sky-500/50 shadow-2xl shadow-sky-900/10" : "bg-neutral-950/50 border-neutral-800 hover:border-neutral-700"}`,
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("div", { className: `w-12 h-12 rounded-2xl flex items-center justify-center text-xl mb-6 ${setupMode === "velocity" ? "bg-sky-500 text-white" : "bg-neutral-900 text-neutral-500"}`, children: /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("i", { className: "bi bi-lightning-charge" }) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("h4", { className: "text-lg font-black text-white uppercase mb-1", children: "Velocity" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime27.jsx)("p", { className: "text-[10px] text-neutral-500 font-bold uppercase tracking-widest", children: "High performance modern proxy" })
+                ]
+              }
+            )
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime27.jsx)(
+            "button",
+            {
+              onClick: () => handleAction("configure", setupMode),
+              disabled: loading,
+              className: "w-full py-6 bg-primary-600 hover:bg-primary-500 text-white text-xs font-black uppercase tracking-[0.3em] rounded-3xl shadow-2xl shadow-primary-900/20 transition active:scale-95 disabled:opacity-50",
+              children: loading ? "Initializing Mesh..." : "Begin Provisioning"
+            }
+          )
+        ] }) }) : /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)(import_jsx_runtime27.Fragment, { children: [
           /* @__PURE__ */ (0, import_jsx_runtime27.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12", children: [
             /* @__PURE__ */ (0, import_jsx_runtime27.jsx)(StatCard, { label: "Mesh Players", value: summary.proxyPlayersOnline || 0, colorClass: "bg-primary-600/10 text-primary-500", icon: "bi-people" }),
             /* @__PURE__ */ (0, import_jsx_runtime27.jsx)(StatCard, { label: "Server Load", value: summary.backendPlayersOnline || 0, colorClass: "bg-sky-600/10 text-sky-500", icon: "bi-controller" }),
@@ -15463,7 +15518,7 @@
               ] })
             ] })
           ] })
-        ]
+        ] })
       }
     ) });
   }
@@ -15500,16 +15555,16 @@
     ] });
   }
   function ServerOverviewPage({ pageData = data16 }) {
-    const server = pageData.server || {};
-    const [stats, setStats] = (0, import_react28.useState)({ cpu: 0, memory: 0, disk: 0, status: server.status || "unknown" });
+    const server2 = pageData.server || {};
+    const [stats, setStats] = (0, import_react28.useState)({ cpu: 0, memory: 0, disk: 0, status: server2.status || "unknown" });
     const wsRef = (0, import_react28.useRef)(null);
-    const memoryLimit = Number(server.memory) || 1;
-    const diskLimit = Number(server.disk) || 1;
+    const memoryLimit = Number(server2.memory) || 1;
+    const diskLimit = Number(server2.disk) || 1;
     (0, import_react28.useEffect)(() => {
       const wsToken = pageData.wsToken;
       if (!wsToken) return;
       const protocol = window.location.protocol.replace("http", "ws");
-      const url = `${protocol}//${window.location.host}/ws/server/${server.containerId}?token=${encodeURIComponent(wsToken)}`;
+      const url = `${protocol}//${window.location.host}/ws/server/${server2.containerId}?token=${encodeURIComponent(wsToken)}`;
       let reconnectTimer = null;
       let reconnectInterval = 1e3;
       const connect = () => {
@@ -15546,7 +15601,7 @@
         if (wsRef.current) wsRef.current.close();
         if (reconnectTimer) clearTimeout(reconnectTimer);
       };
-    }, [server.containerId, pageData.wsToken]);
+    }, [server2.containerId, pageData.wsToken]);
     const memPercent = stats.memory / memoryLimit * 100;
     const diskPercent = stats.disk / diskLimit * 100;
     const getStatusColor = (status) => {
@@ -15564,7 +15619,7 @@
     const handleCopy = (text) => {
       navigator.clipboard.writeText(text);
     };
-    return /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(ReactAppShell, { pageData, subtitle: "Overview", children: /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)(PageContentBlock, { title: server.name, description: server.description || "No description provided.", children: [
+    return /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(ReactAppShell, { pageData, subtitle: "Overview", children: /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)(PageContentBlock, { title: server2.name, description: server2.description || "No description provided.", children: [
       /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-6 mb-8", children: [
         /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(
           StatCard2,
@@ -15613,14 +15668,14 @@
                   /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("label", { className: "block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2", children: "Primary IP / Port" }),
                   /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "flex items-center gap-2", children: [
                     /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("code", { className: "bg-neutral-800 px-3 py-2 rounded text-primary-400 font-mono text-sm flex-1", children: [
-                      server.allocation?.ip || "0.0.0.0",
+                      server2.allocation?.ip || "0.0.0.0",
                       ":",
-                      server.allocation?.port || "0"
+                      server2.allocation?.port || "0"
                     ] }),
                     /* @__PURE__ */ (0, import_jsx_runtime28.jsx)(
                       "button",
                       {
-                        onClick: () => handleCopy(`${server.allocation?.ip}:${server.allocation?.port}`),
+                        onClick: () => handleCopy(`${server2.allocation?.ip}:${server2.allocation?.port}`),
                         className: "p-2 bg-neutral-800 hover:bg-neutral-700 rounded text-neutral-400 transition",
                         title: "Copy",
                         children: /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("i", { className: "bi bi-clipboard" })
@@ -15630,7 +15685,7 @@
                 ] }),
                 /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { children: [
                   /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("label", { className: "block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-2", children: "Container Identifier" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("code", { className: "block bg-neutral-800 px-3 py-2 rounded text-neutral-300 font-mono text-sm", children: server.containerId })
+                  /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("code", { className: "block bg-neutral-800 px-3 py-2 rounded text-neutral-300 font-mono text-sm", children: server2.containerId })
                 ] })
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "mt-6 pt-6 border-t border-neutral-800", children: [
@@ -15644,24 +15699,24 @@
               /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("i", { className: "bi bi-pencil-square" }),
               " General Settings"
             ] }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("div", { className: "p-6", children: /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("form", { method: "POST", action: `/server/${server.containerId}/overview/meta`, className: "space-y-6", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("div", { className: "p-6", children: /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("form", { method: "POST", action: `/server/${server2.containerId}/overview/meta`, className: "space-y-6", children: [
               /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-6", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { children: [
                   /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("label", { className: "block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5", children: "Server Name" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("input", { type: "text", name: "name", defaultValue: server.name, className: "w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:border-primary-500" })
+                  /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("input", { type: "text", name: "name", defaultValue: server2.name, className: "w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:border-primary-500" })
                 ] }),
                 /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { children: [
                   /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("label", { className: "block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5", children: "Folder" }),
-                  /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("input", { type: "text", name: "folder", defaultValue: server.folder, className: "w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:border-primary-500" })
+                  /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("input", { type: "text", name: "folder", defaultValue: server2.folder, className: "w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:border-primary-500" })
                 ] })
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { children: [
                 /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("label", { className: "block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5", children: "Description" }),
-                /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("textarea", { name: "description", defaultValue: server.description, rows: "2", className: "w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:border-primary-500" })
+                /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("textarea", { name: "description", defaultValue: server2.description, rows: "2", className: "w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:border-primary-500" })
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { children: [
                 /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("label", { className: "block text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1.5", children: "Tags (comma separated)" }),
-                /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("input", { type: "text", name: "tags", defaultValue: (server.tags || []).join(", "), className: "w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:border-primary-500" })
+                /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("input", { type: "text", name: "tags", defaultValue: (server2.tags || []).join(", "), className: "w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-200 focus:outline-none focus:border-primary-500" })
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("div", { className: "flex justify-end pt-2", children: /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("button", { className: "bg-primary-600 hover:bg-primary-500 text-white font-bold py-2 px-6 rounded-lg transition shadow-md text-sm", children: "Update Information" }) })
             ] }) })
@@ -15673,13 +15728,13 @@
             /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "p-4 space-y-4", children: [
               /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "flex justify-between items-center text-sm", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("span", { className: "text-neutral-500", children: "Node" }),
-                /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("span", { className: "text-neutral-200 font-semibold", children: server.allocation?.connector?.name || "Local" })
+                /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("span", { className: "text-neutral-200 font-semibold", children: server2.allocation?.connector?.name || "Local" })
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "flex justify-between items-center text-sm", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("span", { className: "text-neutral-500", children: "Location" }),
                 /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("span", { className: "text-neutral-200 font-semibold", children: [
                   /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("i", { className: `bi bi-geo-alt-fill text-primary-500 me-2` }),
-                  server.allocation?.connector?.location?.name || "Central"
+                  server2.allocation?.connector?.location?.name || "Central"
                 ] })
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("div", { className: "flex justify-between items-center text-sm pt-4 border-t border-neutral-800", children: /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "flex items-center gap-2", children: [
@@ -15728,31 +15783,31 @@
               ] })
             ] })
           ] }),
-          pageData.user?.isAdmin && server.owner && /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 rounded-xl overflow-hidden shadow-sm mb-6", children: [
+          pageData.user?.isAdmin && server2.owner && /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 rounded-xl overflow-hidden shadow-sm mb-6", children: [
             /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("div", { className: "bg-primary-900/10 px-5 py-4 border-b border-primary-900/20", children: /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("h3", { className: "font-black text-primary-500 text-[10px] uppercase tracking-[0.2em] flex items-center gap-2", children: [
               /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("i", { className: "bi bi-person-badge" }),
               " Owner Information"
             ] }) }),
             /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "p-5 flex items-center gap-4", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("div", { className: "w-12 h-12 rounded-full bg-neutral-800 flex items-center justify-center text-xl font-bold text-neutral-400 border border-neutral-700", children: server.owner.username?.charAt(0).toUpperCase() || "U" }),
+              /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("div", { className: "w-12 h-12 rounded-full bg-neutral-800 flex items-center justify-center text-xl font-bold text-neutral-400 border border-neutral-700", children: server2.owner.username?.charAt(0).toUpperCase() || "U" }),
               /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "flex-1", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("div", { className: "text-sm font-bold text-white", children: server.owner.username }),
+                /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("div", { className: "text-sm font-bold text-white", children: server2.owner.username }),
                 /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "text-[10px] text-neutral-500 font-mono", children: [
                   "UID: ",
-                  server.ownerId
+                  server2.ownerId
                 ] })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("a", { href: `/admin/users/view/${server.ownerId}`, className: "px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold uppercase tracking-widest rounded border border-neutral-700 transition", children: "View Profile" })
+              /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("a", { href: `/admin/users/view/${server2.ownerId}`, className: "px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-[10px] font-bold uppercase tracking-widest rounded border border-neutral-700 transition", children: "View Profile" })
             ] })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "p-5 border border-dashed border-neutral-800 rounded-xl", children: [
             /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("h5", { className: "text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3", children: "Quick Navigation" }),
             /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("div", { className: "grid grid-cols-2 gap-2", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("a", { href: `/server/${server.containerId}/files`, className: "p-3 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-lg text-center transition group", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("a", { href: `/server/${server2.containerId}/files`, className: "p-3 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-lg text-center transition group", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("i", { className: "bi bi-folder2-open block text-lg text-neutral-500 group-hover:text-primary-400 mb-1" }),
                 /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("span", { className: "text-[10px] font-bold text-neutral-400 uppercase", children: "Files" })
               ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("a", { href: `/server/${server.containerId}/backups`, className: "p-3 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-lg text-center transition group", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime28.jsxs)("a", { href: `/server/${server2.containerId}/backups`, className: "p-3 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-lg text-center transition group", children: [
                 /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("i", { className: "bi bi-safe block text-lg text-neutral-500 group-hover:text-primary-400 mb-1" }),
                 /* @__PURE__ */ (0, import_jsx_runtime28.jsx)("span", { className: "text-[10px] font-bold text-neutral-400 uppercase", children: "Backups" })
               ] })
@@ -15811,7 +15866,7 @@
     return /* @__PURE__ */ (0, import_jsx_runtime29.jsx)("span", { className: `px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${colors[tone] || colors.neutral}`, children });
   }
   function ServerActivityPage({ pageData = data17 }) {
-    const server = pageData.server || {};
+    const server2 = pageData.server || {};
     const logs = pageData.logs || [];
     const changeLogs = pageData.changeLogs || [];
     const [isClearing, setIsClearing] = import_react29.default.useState(false);
@@ -15821,7 +15876,7 @@
       }
       setIsClearing(true);
       try {
-        const response = await fetch(`/server/${server.containerId}/activity/clear`, {
+        const response = await fetch(`/server/${server2.containerId}/activity/clear`, {
           method: "POST",
           headers: { "Accept": "application/json" }
         });
@@ -15928,12 +15983,12 @@
   var root18 = standaloneEntry18 ? (0, import_client18.createRoot)(document.getElementById("reactRoot")) : null;
   var MAX_POINTS = 180;
   function ServerTimelinePage({ pageData = data18 }) {
-    const server = pageData.server || {};
+    const server2 = pageData.server || {};
     const canvasRef = (0, import_react30.useRef)(null);
     const [history, setHistory] = (0, import_react30.useState)([]);
     const [stats, setStats] = (0, import_react30.useState)({ cpu: 0, memory: 0, disk: 0, lastUpdate: null });
-    const memoryLimit = Math.max(1, Number(server.memory) || 1);
-    const diskLimit = Math.max(1, Number(server.disk) || 1);
+    const memoryLimit = Math.max(1, Number(server2.memory) || 1);
+    const diskLimit = Math.max(1, Number(server2.disk) || 1);
     (0, import_react30.useEffect)(() => {
       if (pageData.samples && Array.isArray(pageData.samples)) {
         const initial = pageData.samples.map((row) => ({
@@ -15953,7 +16008,7 @@
       const wsToken = pageData.wsToken;
       if (!wsToken) return;
       const protocol = window.location.protocol.replace("http", "ws");
-      const url = `${protocol}//${window.location.host}/ws/server/${server.containerId}?token=${encodeURIComponent(wsToken)}`;
+      const url = `${protocol}//${window.location.host}/ws/server/${server2.containerId}?token=${encodeURIComponent(wsToken)}`;
       let ws = null;
       const connect = () => {
         ws = new WebSocket(url);
@@ -15980,7 +16035,7 @@
       };
       connect();
       return () => ws && ws.close();
-    }, [server.containerId, pageData.wsToken]);
+    }, [server2.containerId, pageData.wsToken]);
     (0, import_react30.useEffect)(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -16211,8 +16266,8 @@
   var root21 = standaloneEntry21 ? (0, import_client21.createRoot)(document.getElementById("reactRoot")) : null;
   function ServerSuspendedPage({ pageData = data21 }) {
     const brandName = pageData.settings?.brandName || "CPanel";
-    const server = pageData.server || {};
-    const suspendReason = server.suspendReason || null;
+    const server2 = pageData.server || {};
+    const suspendReason = server2.suspendReason || null;
     return /* @__PURE__ */ (0, import_jsx_runtime33.jsx)("div", { className: "min-h-screen bg-neutral-950 flex items-center justify-center p-6 font-sans text-neutral-200", children: /* @__PURE__ */ (0, import_jsx_runtime33.jsxs)("div", { className: "max-w-lg w-full bg-neutral-900 border border-yellow-900/20 rounded-2xl p-10 text-center shadow-2xl relative overflow-hidden", children: [
       /* @__PURE__ */ (0, import_jsx_runtime33.jsx)("div", { className: "absolute -top-24 -right-24 w-48 h-48 bg-yellow-600/10 rounded-full blur-3xl" }),
       /* @__PURE__ */ (0, import_jsx_runtime33.jsxs)("div", { className: "relative z-10", children: [
@@ -16228,7 +16283,7 @@
         /* @__PURE__ */ (0, import_jsx_runtime33.jsx)("h1", { className: "text-3xl font-extrabold text-white mb-2", children: "Server Suspended" }),
         /* @__PURE__ */ (0, import_jsx_runtime33.jsxs)("div", { className: "inline-block px-3 py-1 bg-neutral-800 border border-neutral-700 rounded text-xs font-mono text-neutral-400 mb-6", children: [
           /* @__PURE__ */ (0, import_jsx_runtime33.jsx)("i", { className: "bi bi-server me-2" }),
-          server.name || "Unknown Server"
+          server2.name || "Unknown Server"
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime33.jsx)("p", { className: "text-neutral-400 text-sm mb-6 leading-relaxed", children: "This server has been suspended by an administrator and is temporarily unavailable. All runtime resources have been halted." }),
         /* @__PURE__ */ (0, import_jsx_runtime33.jsxs)("div", { className: "bg-yellow-500/5 border border-yellow-500/10 rounded-xl p-5 mb-8 text-left", children: [

@@ -18170,24 +18170,26 @@ return res.render('server/users', {
             }
 
             const proxyMode = await getServerProxyMode(server.id);
-            if (!proxyMode) {
-                return res.redirect(`/server/${server.containerId}/minecraft/configs?error=${encodeURIComponent('Proxy mode is not enabled for this server. Enable it first in Minecraft Control.')}`);
-            }
+            let networkConfig = null;
+            let snapshot = { backends: [], groups: [] };
+            let groupedBackends = [];
+            let ungroupedBackends = [];
 
-            let networkConfig = await getServerProxyNetworkConfig(server.id);
-            const importedFromConfig = await mergeProxyBackendsFromConfigFile(server, proxyMode, networkConfig).catch(() => ({ changed: false, config: networkConfig, importedCount: 0 }));
-            if (importedFromConfig && importedFromConfig.changed && importedFromConfig.config) {
-                networkConfig = importedFromConfig.config;
+            if (proxyMode) {
+                networkConfig = await getServerProxyNetworkConfig(server.id);
+                const importedFromConfig = await mergeProxyBackendsFromConfigFile(server, proxyMode, networkConfig).catch(() => ({ changed: false, config: networkConfig, importedCount: 0 }));
+                if (importedFromConfig && importedFromConfig.changed && importedFromConfig.config) {
+                    networkConfig = importedFromConfig.config;
+                }
+                snapshot = await buildProxyNetworkStatusSnapshot(server, proxyMode, networkConfig, res.locals.settings || {});
+                const groupMap = new Map((Array.isArray(snapshot.groups) ? snapshot.groups : []).map((entry) => [entry.id, entry.name]));
+                groupedBackends = Array.from(groupMap.entries()).map(([groupId, groupName]) => ({
+                    id: groupId,
+                    name: groupName,
+                    backends: snapshot.backends.filter((entry) => String(entry.groupId || '') === String(groupId))
+                }));
+                ungroupedBackends = snapshot.backends.filter((entry) => !entry.groupId);
             }
-
-            const snapshot = await buildProxyNetworkStatusSnapshot(server, proxyMode, networkConfig, res.locals.settings || {});
-            const groupMap = new Map((Array.isArray(snapshot.groups) ? snapshot.groups : []).map((entry) => [entry.id, entry.name]));
-            const groupedBackends = Array.from(groupMap.entries()).map(([groupId, groupName]) => ({
-                id: groupId,
-                name: groupName,
-                backends: snapshot.backends.filter((entry) => String(entry.groupId || '') === String(groupId))
-            }));
-            const ungroupedBackends = snapshot.backends.filter((entry) => !entry.groupId);
 
             const linkWhere = access.isAdmin ? { id: { [Op.ne]: server.id } } : { ownerId: req.session.user.id, id: { [Op.ne]: server.id } };
             const linkableServers = await Server.findAll({
@@ -18241,6 +18243,32 @@ return res.render('server/users', {
         } catch (error) {
             console.error('Error loading proxy network panel:', error);
             return res.redirect('/?error=' + encodeURIComponent('Failed to load proxy network panel.'));
+        }
+    });
+
+    app.post(['/server/:containerId/minecraft/proxy/configure'], requireAuth, async (req, res) => {
+        try {
+            const server = await Server.findOne({
+                where: { containerId: req.params.containerId },
+                include: [{ model: Allocation, as: 'allocation' }]
+            });
+
+            if (!server) return res.status(404).json({ success: false, error: 'Server not found.' });
+            const access = await resolveServerAccess(server, req.session.user);
+            if (!hasServerPermission(access, 'server.proxy.manage') && !access.isOwner && !access.isAdmin) {
+                return res.status(403).json({ success: false, error: 'Forbidden.' });
+            }
+
+            const mode = String(req.body.mode || '').trim().toLowerCase();
+            if (!['bungeecord', 'velocity', ''].includes(mode)) {
+                return res.status(400).json({ success: false, error: 'Invalid proxy mode.' });
+            }
+
+            await setServerProxyMode(server.id, mode);
+            return res.json({ success: true, mode });
+        } catch (err) {
+            console.error('Error configuring proxy mode:', err);
+            return res.status(500).json({ success: false, error: 'Failed to configure proxy mode.' });
         }
     });
 
