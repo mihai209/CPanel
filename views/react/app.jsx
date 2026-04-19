@@ -14,11 +14,10 @@ import { ServerSchedulesPage } from './server-schedules.jsx';
 import { ServerStartupPage } from './server-startup.jsx';
 import { ServerFileEditorPage } from './server-file-editor.jsx';
 import { ServerMinecraftCenterPage } from './server-minecraft-center.jsx';
-import { ServerMinecraftWorldCenterPage } from './server-minecraft-world-center.jsx';
 import { ServerMinecraftAddonsPage } from './server-minecraft-addons.jsx';
 import { ServerMinecraftInstallerPage } from './server-minecraft-installer.jsx';
-import { ServerMinecraftAdminPage } from './server-minecraft-admin.jsx';
 import { ServerMinecraftConfigsPage } from './server-minecraft-configs.jsx';
+import { ServerMinecraftProxyPage } from './server-minecraft-proxy.jsx';
 import { ServerOverviewPage } from './server-overview.jsx';
 import { ServerActivityPage } from './server-activity.jsx';
 import { ServerTimelinePage } from './server-timeline.jsx';
@@ -62,11 +61,10 @@ function resolveComponentForPath(pathname) {
         if (serverRoute.page === 'startup') return ServerStartupPage;
         if (serverRoute.page === 'files/edit') return ServerFileEditorPage;
         if (serverRoute.page === 'minecraft-center') return ServerMinecraftCenterPage;
-        if (serverRoute.page === 'minecraft/world-center') return ServerMinecraftWorldCenterPage;
         if (serverRoute.page === 'minecraft/addons') return ServerMinecraftAddonsPage;
         if (serverRoute.page === 'minecraft/installer') return ServerMinecraftInstallerPage;
-        if (serverRoute.page === 'minecraft/admin') return ServerMinecraftAdminPage;
         if (serverRoute.page === 'minecraft/configs') return ServerMinecraftConfigsPage;
+        if (serverRoute.page === 'minecraft/proxy') return ServerMinecraftProxyPage;
         if (serverRoute.page === 'overview') return ServerOverviewPage;
         if (serverRoute.page === 'activity') return ServerActivityPage;
         if (serverRoute.page === 'timeline') return ServerTimelinePage;
@@ -280,11 +278,10 @@ function AppRouter() {
                 <Route path={ReactRoutes.serverStartupPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverFilesEditPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverMinecraftCenterPattern} element={<RoutedPage />} />
-                <Route path={ReactRoutes.serverMinecraftWorldCenterPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverMinecraftAddonsPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverMinecraftInstallerPattern} element={<RoutedPage />} />
-                <Route path={ReactRoutes.serverMinecraftAdminPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverMinecraftConfigsPattern} element={<RoutedPage />} />
+                <Route path={ReactRoutes.serverMinecraftProxyPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverOverviewPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverActivityPattern} element={<RoutedPage />} />
                 <Route path={ReactRoutes.serverTimelinePattern} element={<RoutedPage />} />
