@@ -21849,7 +21849,7 @@ return res.render('server/users', {
                 serverId: server.id
             }));
 
-            await writeServerAuditLog({
+            await writeServerAuditSafe({
                 actorUserId: req.user.id,
                 serverId: server.id,
                 action: 'minecraft.admin:reset_throttle',
