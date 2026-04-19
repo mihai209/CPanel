@@ -41,13 +41,6 @@ export function ServerMinecraftCenterPage({ pageData = data }) {
             colorClass: "bg-blue-600/10 text-blue-500"
         },
         {
-            title: "World Center",
-            description: "Advanced world management: Swap, clone, backup, or prune dimensions.",
-            icon: "bi-globe-americas",
-            href: `/server/${server.containerId}/minecraft/world-center`,
-            colorClass: "bg-emerald-600/10 text-emerald-500"
-        },
-        {
             title: "Minecraft Control",
             description: "Manage server.properties, MOTD, whitelist, and essential rules.",
             icon: "bi-controller",
@@ -62,11 +55,11 @@ export function ServerMinecraftCenterPage({ pageData = data }) {
             colorClass: "bg-purple-600/10 text-purple-500"
         },
         {
-            title: "Advanced Metrics",
-            description: "TPS, MSPT, and real-time performance analytics for your Minecraft instance.",
-            icon: "bi-bar-chart",
-            href: `/server/${server.containerId}/minecraft/metrics`,
-            colorClass: "bg-sky-600/10 text-sky-500"
+            title: "Version Installer",
+            description: "Easily switch versions or platforms like Arclight and Waterfall.",
+            icon: "bi-cloud-download",
+            href: `/server/${server.containerId}/minecraft/installer`,
+            colorClass: "bg-emerald-600/10 text-emerald-500"
         }
     ];
 

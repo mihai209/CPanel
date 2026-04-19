@@ -11,11 +11,10 @@ export const ReactRoutes = {
     serverStartupPattern: '/server/:containerId/startup',
     serverFilesEditPattern: '/server/:containerId/files/edit',
     serverMinecraftCenterPattern: '/server/:containerId/minecraft-center',
-    serverMinecraftWorldCenterPattern: '/server/:containerId/minecraft/world-center',
     serverMinecraftAddonsPattern: '/server/:containerId/minecraft/addons',
     serverMinecraftInstallerPattern: '/server/:containerId/minecraft/installer',
-    serverMinecraftAdminPattern: '/server/:containerId/minecraft/admin',
     serverMinecraftConfigsPattern: '/server/:containerId/minecraft/configs',
+    serverMinecraftProxyPattern: '/server/:containerId/minecraft/proxy',
     serverOverviewPattern: '/server/:containerId/overview',
     serverActivityPattern: '/server/:containerId/activity',
     serverTimelinePattern: '/server/:containerId/timeline',
@@ -72,7 +71,7 @@ export function buildServerApiRoute(containerId = '') {
 
 function parseServerRoute(pathname = '') {
     const normalized = String(pathname || '').trim().replace(/\/+$/, '') || '/';
-    const match = normalized.match(/^\/server\/([^/]+)(?:\/(minecraft-center|minecraft\/world-center|minecraft\/addons|minecraft\/installer|minecraft\/configs|files\/edit|files|backups|network|api|databases|users|schedules|startup|overview|activity|timeline|notfound|no-permissions|suspended))?$/);
+    const match = normalized.match(/^\/server\/([^/]+)(?:\/(minecraft-center|minecraft\/addons|minecraft\/installer|minecraft\/configs|minecraft\/proxy|files\/edit|files|backups|network|api|databases|users|schedules|startup|overview|activity|timeline|notfound|no-permissions|suspended))?$/);
     if (!match) return null;
     let containerId = '';
     try {
