@@ -1374,10 +1374,6 @@ body {
   width: 20rem;
 }
 
-.w-\[45\%\] {
-  width: 45%;
-}
-
 .w-full {
   width: 100%;
 }
@@ -2062,6 +2058,10 @@ body {
 
 .border-green-900\/30 {
   border-color: rgb(20 83 45 / 0.3);
+}
+
+.border-neutral-500 {
+  border-color: var(--neutral-500, #52525b);
 }
 
 .border-neutral-600 {

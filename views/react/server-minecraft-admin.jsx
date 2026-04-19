@@ -164,7 +164,6 @@ export function ServerMinecraftAdminPage({ pageData = data }) {
                             )}
                         </div>
                     </div>
-                    </div>
 
                     {/* Right Panel - Player Inspector */}
                     <div className="xl:col-span-8 flex flex-col h-[800px]">
