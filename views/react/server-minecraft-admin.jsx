@@ -18,14 +18,91 @@ export function ServerMinecraftAdminPage({ pageData = data }) {
 
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedPlayer, setSelectedPlayer] = useState(null);
+    const [players, setPlayers] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [inspectedData, setInspectedData] = useState(null);
+    const [isInspecting, setIsInspecting] = useState(false);
+    const [isResetting, setIsResetting] = useState(false);
+    const [resetMessage, setResetMessage] = useState('');
 
-    // Mock player for visual representation until hooked to socket
-    const players = [
-        { name: 'Notch', uuid: '069a79f4-44e9-4726-a5be-fca90e38aaf5', isOnline: true },
-        { name: 'Jeb_', uuid: '853c80ef-3c37-49fd-aa49-938b674adae6', isOnline: false }
-    ];
+    useEffect(() => {
+        let active = true;
+        async function fetchPlayers() {
+            try {
+                const response = await fetch(`/server/${server.containerId}/minecraft/admin/players`);
+                const payload = await response.json();
+                if (!response.ok || !payload.success) throw new Error(payload.error || 'Failed to fetch players.');
+                if (active) {
+                    setPlayers(payload.players || []);
+                    setError(null);
+                }
+            } catch (err) {
+                if (active) setError(err.message || 'Player sync failed');
+            } finally {
+                if (active) setIsLoading(false);
+            }
+        }
+        
+        fetchPlayers();
+        const interval = setInterval(fetchPlayers, 30000); // Polling every 30 seconds
+        
+        return () => {
+            active = false;
+            clearInterval(interval);
+        };
+    }, [server.containerId]);
 
-    const filteredPlayers = players.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    useEffect(() => {
+        if (!selectedPlayer) {
+            setInspectedData(null);
+            return;
+        }
+
+        let active = true;
+        async function fetchDetails() {
+            setIsInspecting(true);
+            try {
+                const response = await fetch(`/server/${server.containerId}/minecraft/admin/inspect?username=${encodeURIComponent(selectedPlayer.name)}&refresh=true`);
+                const payload = await response.json();
+                if (active && payload.success) {
+                    setInspectedData(payload);
+                }
+            } catch (err) {
+                console.error("Failed to fetch player details", err);
+            } finally {
+                if (active) setIsInspecting(false);
+            }
+        }
+
+        fetchDetails();
+        return () => { active = false; };
+    }, [selectedPlayer, server.containerId]);
+
+    const profile = inspectedData?.profile || {};
+    const vitals = profile.vitals || {};
+    const location = profile.location || {};
+
+    const filteredPlayers = players.filter(p => String(p.name || '').toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const handleResetThrottle = async () => {
+        setIsResetting(true);
+        setResetMessage('');
+        try {
+            const response = await fetch(`/server/${server.containerId}/minecraft/admin/reset-throttle`, { method: 'POST' });
+            const payload = await response.json();
+            if (payload.success) {
+                setResetMessage('Success: Command budget reset.');
+                setTimeout(() => setResetMessage(''), 5000);
+            } else {
+                setResetMessage(`Error: ${payload.error || 'Failed to reset budget'}`);
+            }
+        } catch (err) {
+            setResetMessage('Error: Failed to reach backend');
+        } finally {
+            setIsResetting(false);
+        }
+    };
 
     return (
         <ReactAppShell pageData={pageData} subtitle="Admin & Control">
@@ -62,10 +139,31 @@ export function ServerMinecraftAdminPage({ pageData = data }) {
                                         <div className="font-bold text-sm text-white truncate">{p.name}</div>
                                         <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest truncate">{p.uuid}</div>
                                     </div>
-                                    <div className={`w-2 h-2 rounded-full ${p.isOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-neutral-600'}`}></div>
+                                    <div className={`w-2 h-2 rounded-full ${p.online ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-neutral-600'}`}></div>
                                 </button>
                             ))}
                         </div>
+
+                        {/* Troubleshooting Section */}
+                        <div className="p-6 border-t border-neutral-800 bg-neutral-900/40">
+                            <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <i className="bi bi-cpu"></i> Troubleshooting
+                            </h4>
+                            <button 
+                                onClick={handleResetThrottle}
+                                disabled={isResetting}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 disabled:opacity-50 text-neutral-300 rounded-xl text-xs font-bold transition-all border border-neutral-700/50"
+                            >
+                                {isResetting ? <div className="w-3 h-3 border-2 border-neutral-500 border-t-white rounded-full animate-spin"></div> : <i className="bi bi-clock-history"></i>}
+                                Reset Command Budget
+                            </button>
+                            {resetMessage && (
+                                <div className={`mt-3 text-[10px] font-bold text-center ${resetMessage.startsWith('Error') ? 'text-rose-400' : 'text-green-400'}`}>
+                                    {resetMessage}
+                                </div>
+                            )}
+                        </div>
+                    </div>
                     </div>
 
                     {/* Right Panel - Player Inspector */}
@@ -96,8 +194,13 @@ export function ServerMinecraftAdminPage({ pageData = data }) {
                                             )}
                                         </div>
                                     </div>
-                                    <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${selectedPlayer.isOnline ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-neutral-800 text-neutral-400 border-neutral-700'}`}>
-                                        {selectedPlayer.isOnline ? 'Online Now' : 'Offline'}
+                                    <div className="flex flex-col items-end gap-2">
+                                        <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${selectedPlayer.online ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-neutral-800 text-neutral-400 border-neutral-700'}`}>
+                                            {selectedPlayer.online ? 'Online Now' : 'Offline'}
+                                        </div>
+                                        <div className="text-[9px] font-black uppercase tracking-tighter text-neutral-500 bg-neutral-800/50 px-2 py-0.5 rounded border border-neutral-700/30">
+                                            Source: {selectedPlayer.source === 'live_status' ? 'Live Query' : 'Registry Files'}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -106,32 +209,32 @@ export function ServerMinecraftAdminPage({ pageData = data }) {
                                         <h4 className="text-xs font-black text-neutral-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
                                             <i className="bi bi-heart-pulse"></i> Vitals
                                         </h4>
-                                        <div className="space-y-4">
+                                        <div className={`space-y-4 transition-opacity ${isInspecting ? 'opacity-50' : 'opacity-100'}`}>
                                             <div>
                                                 <div className="flex justify-between text-xs font-bold mb-1">
                                                     <span className="text-rose-400">Health</span>
-                                                    <span className="text-white">20/20</span>
+                                                    <span className="text-white">{vitals.health !== undefined ? `${parseFloat(vitals.health).toFixed(1)}/20` : '--/--'}</span>
                                                 </div>
                                                 <div className="h-2 rounded-full bg-neutral-900 border border-neutral-800 overflow-hidden">
-                                                    <div className="h-full bg-rose-500 w-full"></div>
+                                                    <div className="h-full bg-rose-500 transition-all duration-500" style={{ width: `${Math.min(100, (parseFloat(vitals.health) || 0) * 5)}%` }}></div>
                                                 </div>
                                             </div>
                                             <div>
                                                 <div className="flex justify-between text-xs font-bold mb-1">
                                                     <span className="text-amber-400">Food</span>
-                                                    <span className="text-white">20/20</span>
+                                                    <span className="text-white">{vitals.food !== undefined ? `${vitals.food}/20` : '--/--'}</span>
                                                 </div>
                                                 <div className="h-2 rounded-full bg-neutral-900 border border-neutral-800 overflow-hidden">
-                                                    <div className="h-full bg-amber-500 w-full"></div>
+                                                    <div className="h-full bg-amber-500 transition-all duration-500" style={{ width: `${Math.min(100, (parseFloat(vitals.food) || 0) * 5)}%` }}></div>
                                                 </div>
                                             </div>
                                             <div>
                                                 <div className="flex justify-between text-xs font-bold mb-1">
                                                     <span className="text-green-400">Experience Level</span>
-                                                    <span className="text-white">12</span>
+                                                    <span className="text-white">{vitals.xpLevel !== undefined ? vitals.xpLevel : '--'}</span>
                                                 </div>
                                                 <div className="h-2 rounded-full bg-neutral-900 border border-neutral-800 overflow-hidden">
-                                                    <div className="h-full bg-green-500 w-[45%]"></div>
+                                                    <div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${Math.min(100, (parseFloat(vitals.xpLevel) || 0) * 2)}%` }}></div>
                                                 </div>
                                             </div>
                                         </div>
@@ -141,14 +244,14 @@ export function ServerMinecraftAdminPage({ pageData = data }) {
                                         <h4 className="text-xs font-black text-neutral-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
                                             <i className="bi bi-geo-alt"></i> Location
                                         </h4>
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className={`grid grid-cols-2 gap-4 transition-opacity ${isInspecting ? 'opacity-50' : 'opacity-100'}`}>
                                             <div>
                                                 <div className="text-[10px] uppercase font-black text-neutral-500 mb-1">World</div>
-                                                <div className="text-sm font-bold text-white bg-neutral-900 px-3 py-2 rounded-lg border border-neutral-800">world</div>
+                                                <div className="text-sm font-bold text-white bg-neutral-900 px-3 py-2 rounded-lg border border-neutral-800 truncate">{location.dimension || 'unknown'}</div>
                                             </div>
                                             <div>
                                                 <div className="text-[10px] uppercase font-black text-neutral-500 mb-1">Coordinates</div>
-                                                <div className="text-sm font-bold text-white bg-neutral-900 px-3 py-2 rounded-lg border border-neutral-800 font-mono">142, 64, -89</div>
+                                                <div className="text-sm font-bold text-white bg-neutral-900 px-3 py-2 rounded-lg border border-neutral-800 font-mono truncate">{location.coordinates || 'N/A'}</div>
                                             </div>
                                         </div>
                                     </div>

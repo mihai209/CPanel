@@ -4466,6 +4466,7 @@ function registerServerPagesRoutes(ctx) {
         const safeCommand = String(command || '').trim();
         if (!safeCommand) return { success: false, error: 'Command is required.' };
         const requestId = `mc_admin_${Date.now()}_${nodeCrypto.randomBytes(3).toString('hex')}`;
+        console.log(`[MC_AUDIT] Server ${serverId}: Dispatching command "${safeCommand}" (ReqID: ${requestId})`);
         connectorWs.send(JSON.stringify({
             type: 'server_command',
             serverId,
@@ -4891,7 +4892,8 @@ function registerServerPagesRoutes(ctx) {
                 const resolvedName = runtime.usercacheMap.get(uuidRaw.toLowerCase()) || runtime.usercacheMap.get(normalizeMinecraftUuid(uuidRaw)) || '';
                 registerPlayer(resolvedName || uuidRaw, {
                     uuid: uuidRaw,
-                    [propName]: true
+                    [propName]: true,
+                    source: 'file_system'
                 });
             });
         };
@@ -4913,7 +4915,8 @@ function registerServerPagesRoutes(ctx) {
                     whitelisted: entry.whitelisted || whitelistNames.has(String(name).toLowerCase()),
                     op: entry.op || opNames.has(String(name).toLowerCase()),
                     banned: entry.banned || bannedNames.has(String(name).toLowerCase()),
-                    headUrl: buildMinecraftPlayerHeadUrl(name, uuid)
+                    headUrl: buildMinecraftPlayerHeadUrl(name, uuid),
+                    source: entry.source || (onlineMatch ? 'live_status' : 'file_system')
                 };
             })
             .filter((entry) => {
@@ -4948,23 +4951,29 @@ function registerServerPagesRoutes(ctx) {
         const offlineUuid = computeOfflinePlayerUuid(normalizedName);
         const candidateUuids = buildMinecraftCandidateUuids(normalizedName, runtime.onlineMode, usercacheUuid, offlineUuid, explicitUuid || (onlineEntry && onlineEntry.uuid));
 
-        const commands = [
-            { key: 'health', command: `data get entity ${target} Health` },
-            { key: 'food', command: `data get entity ${target} foodLevel` },
-            { key: 'xpLevel', command: `data get entity ${target} XpLevel` },
-            { key: 'location', command: `data get entity ${target} Pos` },
-            { key: 'rotation', command: `data get entity ${target} Rotation` },
-            { key: 'gamemode', command: `data get entity ${target} playerGameType` },
-            { key: 'dimension', command: `data get entity ${target} Dimension` },
-            { key: 'inventory', command: `data get entity ${target} Inventory` },
-            { key: 'enderChest', command: `data get entity ${target} EnderItems` }
-        ];
-
         const liveData = {};
-        for (const entry of commands) {
-            const output = await captureMinecraftCommandOutput(server.id, connectorWs, entry.command, 2500);
-            const rawValue = output.success ? parseMinecraftDataGetOutput(output.output) : '';
-            liveData[entry.key] = rawValue;
+        const consolidatedOutput = await captureMinecraftCommandOutput(server.id, connectorWs, `data get entity ${target}`, 3000);
+        if (consolidatedOutput.success) {
+            const rawNbt = parseMinecraftDataGetOutput(consolidatedOutput.output);
+            if (rawNbt) {
+                // Regex-based extraction for common fields to avoid full SNBT parser complexity
+                const extractField = (pattern) => {
+                    const match = rawNbt.match(pattern);
+                    return match ? match[1] : '';
+                };
+
+                liveData.health = extractField(/Health:\s*([0-9.]+)f?/i);
+                liveData.food = extractField(/foodLevel:\s*([0-9]+)/i);
+                liveData.xpLevel = extractField(/XpLevel:\s*([0-9]+)/i);
+                liveData.gamemode = mapMinecraftGameType(extractField(/playerGameType:\s*([0-9]+)/i));
+                liveData.dimension = extractField(/Dimension:\s*"([^"]+)"/i) || extractField(/Dimension:\s*([^,}]+)/i);
+                
+                // Position extraction
+                const posMatch = rawNbt.match(/Pos:\s*\[\s*([0-9.-]+)d\s*,\s*([0-9.-]+)d\s*,\s*([0-9.-]+)d\s*\]/i);
+                if (posMatch) {
+                    liveData.location = `[${Math.round(posMatch[1])}, ${Math.round(posMatch[2])}, ${Math.round(posMatch[3])}]`;
+                }
+            }
         }
 
         const [statsResult, advancementsResult, playerdataResult, whitelistResult, opsResult, bannedPlayersResult] = await Promise.all([
@@ -21824,6 +21833,37 @@ return res.render('server/users', {
         } catch (error) {
             console.error('Error clearing minecraft player world data:', error);
             return res.status(500).json({ success: false, error: 'Failed to clear player world data.' });
+        }
+    });
+
+    app.post('/server/:containerId/minecraft/admin/reset-throttle', requireAuth, async (req, res) => {
+        try {
+            const ctx = await resolveMinecraftAdminApiContext(req, res, ['minecraft.admin']);
+            if (!ctx) return;
+            const { server, connectorWs } = ctx;
+            
+            console.log(`[MC_ADMIN] Resetting command budget for Server ${server.id} by User ${req.user.id}`);
+            
+            connectorWs.send(JSON.stringify({
+                type: 'reset_throttle',
+                serverId: server.id
+            }));
+
+            await writeServerAuditLog({
+                actorUserId: req.user.id,
+                serverId: server.id,
+                action: 'minecraft.admin:reset_throttle',
+                ip: req.ip,
+                userAgent: req.get('User-Agent'),
+                metadata: {
+                    actor: req.user.username
+                }
+            });
+
+            return res.json({ success: true, message: 'Command budget reset signal sent to connector.' });
+        } catch (error) {
+            console.error('Error resetting command budget:', error);
+            return res.status(500).json({ success: false, error: 'Failed to reset command budget.' });
         }
     });
 
