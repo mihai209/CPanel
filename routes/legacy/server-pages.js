@@ -4956,6 +4956,7 @@ function registerServerPagesRoutes(ctx) {
         if (consolidatedOutput.success) {
             const rawNbt = parseMinecraftDataGetOutput(consolidatedOutput.output);
             if (rawNbt) {
+                console.log(`[MC_INSPECT] Captured raw NBT data for ${username}: ${rawNbt.substring(0, 200)}...`);
                 // Regex-based extraction for common fields to avoid full SNBT parser complexity
                 const extractField = (pattern) => {
                     const match = rawNbt.match(pattern);

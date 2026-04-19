@@ -55,13 +55,6 @@ export function ServerMinecraftCenterPage({ pageData = data }) {
             colorClass: "bg-amber-600/10 text-amber-500"
         },
         {
-            title: "Admin & Players",
-            description: "Inspect players, manage bans, chat, and server security permissions.",
-            icon: "bi-shield-check",
-            href: `/server/${server.containerId}/minecraft/admin`,
-            colorClass: "bg-rose-600/10 text-rose-500"
-        },
-        {
             title: "Proxy Network",
             description: "Configuration for BungeeCord and Velocity proxy environments.",
             icon: "bi-diagram-3",

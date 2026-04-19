@@ -72,7 +72,7 @@ export function buildServerApiRoute(containerId = '') {
 
 function parseServerRoute(pathname = '') {
     const normalized = String(pathname || '').trim().replace(/\/+$/, '') || '/';
-    const match = normalized.match(/^\/server\/([^/]+)(?:\/(minecraft-center|minecraft\/world-center|minecraft\/addons|minecraft\/installer|minecraft\/admin|minecraft\/configs|files\/edit|files|backups|network|api|databases|users|schedules|startup|overview|activity|timeline|notfound|no-permissions|suspended))?$/);
+    const match = normalized.match(/^\/server\/([^/]+)(?:\/(minecraft-center|minecraft\/world-center|minecraft\/addons|minecraft\/installer|minecraft\/configs|files\/edit|files|backups|network|api|databases|users|schedules|startup|overview|activity|timeline|notfound|no-permissions|suspended))?$/);
     if (!match) return null;
     let containerId = '';
     try {
