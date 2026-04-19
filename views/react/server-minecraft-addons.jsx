@@ -101,10 +101,13 @@ export function ServerMinecraftAddonsPage({ pageData = data }) {
     
     const [search, setSearch] = useState('');
     const [kind, setKind] = useState(defaults.kind || 'plugin');
+    const [view, setView] = useState('browse');
+    const [installing, setInstalling] = useState(false);
+    const [installUrl, setInstallUrl] = useState('');
+    const [installTarget, setInstallTarget] = useState(defaults.targetDirectory || (kind === 'plugin' ? 'plugins' : 'mods'));
+    const [error, setError] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [view, setView] = useState('browse'); // 'browse' or 'installed'
     const [installed, setInstalled] = useState([]);
     const [loadingInstalled, setLoadingInstalled] = useState(false);
 
@@ -117,6 +120,12 @@ export function ServerMinecraftAddonsPage({ pageData = data }) {
         const key = kind === 'plugin' ? 'plugins' : (kind === 'mod' ? 'mods' : (kind === 'datapack' ? 'datapacks' : (kind === 'resourcepack' ? 'resourcepacks' : 'worlds')));
         return catalog[key] || [];
     }, [kind, catalog]);
+
+    useEffect(() => {
+        const defaultDir = kind === 'plugin' ? 'plugins' : (kind === 'mod' ? 'mods' : (kind === 'datapack' ? 'datapacks' : (kind === 'resourcepack' ? 'resourcepacks' : '.')));
+        setTargetDir(defaultDir);
+        setInstallTarget(defaultDir);
+    }, [kind]);
 
     useEffect(() => {
         if (view !== 'browse') return;
@@ -179,15 +188,65 @@ export function ServerMinecraftAddonsPage({ pageData = data }) {
 
     const handleInstall = (project) => {
         if (confirm(`Install ${project.title}?`)) {
-            const params = new URLSearchParams({
-                projectId: project.id,
-                kind,
-                loader,
-                gameVersion: mcVersion,
-                targetDirectory: targetDir
+            setInstalling(true);
+            fetch(`/server/${server.containerId}/minecraft/addons/install`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    projectId: project.project_id,
+                    kind,
+                    loader,
+                    version: mcVersion,
+                    targetDirectory: targetDir,
+                    projectTitle: project.title
+                })
+            })
+            .then(res => res.json())
+            .then(payload => {
+                setInstalling(false);
+                if (payload.success) {
+                    alert('Installation started! Check the file manager or console for progress.');
+                    setView('installed');
+                } else {
+                    alert('Installation failed: ' + (payload.error || 'Unknown error'));
+                }
+            })
+            .catch(err => {
+                setInstalling(false);
+                alert('Connection error: ' + err.message);
             });
-            window.location.href = `/server/${server.containerId}/minecraft/addons/install?${params.toString()}`;
         }
+    };
+
+    const handleDirectInstall = (e) => {
+        e.preventDefault();
+        if (!installUrl.trim()) return;
+        
+        setInstalling(true);
+        fetch(`/server/${server.containerId}/minecraft/addons/install-url`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                url: installUrl,
+                kind,
+                targetDirectory: installTarget
+            })
+        })
+        .then(res => res.json())
+        .then(payload => {
+            setInstalling(false);
+            if (payload.success) {
+                alert('Download started!');
+                setInstallUrl('');
+                setView('installed');
+            } else {
+                alert('Download failed: ' + (payload.error || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            setInstalling(false);
+            alert('Connection error: ' + err.message);
+        });
     };
 
 
@@ -229,6 +288,47 @@ export function ServerMinecraftAddonsPage({ pageData = data }) {
 
                 {view === 'browse' ? (
                     <>
+                        {/* Direct URL Download Section */}
+                        <div className="bg-neutral-900 border border-neutral-800 rounded-[2.5rem] p-8 mb-8 shadow-2xl shadow-black/40">
+                            <div className="flex items-center gap-4 mb-6">
+                                <div className="p-3 bg-primary-600/10 rounded-2xl">
+                                    <i className="bi bi-link-45deg text-primary-500 text-xl"></i>
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-black text-white uppercase tracking-tight">Direct URL Installation</h4>
+                                    <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">Install project via direct .zip or .jar link</p>
+                                </div>
+                            </div>
+                            <form onSubmit={handleDirectInstall} className="flex flex-col xl:flex-row gap-4">
+                                <input 
+                                    type="text" 
+                                    placeholder="Paste download URL (e.g. https://example.com/mod.jar)" 
+                                    className="flex-1 bg-neutral-950/50 border border-neutral-800 rounded-2xl px-6 py-4 text-sm text-white focus:outline-none focus:border-primary-500/50 transition-all font-medium"
+                                    value={installUrl}
+                                    onChange={(e) => setInstallUrl(e.target.value)}
+                                />
+                                <div className="flex gap-2">
+                                    <select 
+                                        className="bg-neutral-950/50 border border-neutral-800 rounded-2xl px-6 py-4 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus:border-primary-500/50"
+                                        value={installTarget}
+                                        onChange={(e) => setInstallTarget(e.target.value)}
+                                    >
+                                        <option value="plugins">To /plugins</option>
+                                        <option value="mods">To /mods</option>
+                                        <option value="datapacks">To /datapacks</option>
+                                        <option value="resourcepacks">To /resourcepacks</option>
+                                        <option value=".">To Root (/)</option>
+                                    </select>
+                                    <button 
+                                        type="submit"
+                                        disabled={!installUrl.trim() || installing}
+                                        className="px-8 py-4 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl transition active:scale-95 shadow-lg shadow-primary-900/20 whitespace-nowrap"
+                                    >
+                                        {installing ? 'Downloading...' : 'Download & Install'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                         <div className="bg-neutral-900 border border-neutral-800 rounded-[2.5rem] p-8 mb-12 shadow-2xl shadow-black/40">
                             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-end">
                                 <div className="xl:col-span-4">
@@ -358,6 +458,17 @@ export function ServerMinecraftAddonsPage({ pageData = data }) {
                                 )}
                             </div>
                         )}
+                    </div>
+                )}
+                {installing && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center animate-in fade-in duration-300">
+                        <div className="bg-neutral-900 border border-neutral-800 p-12 rounded-[3.5rem] flex flex-col items-center gap-8 shadow-2xl scale-in-center">
+                            <div className="w-20 h-20 border-4 border-neutral-800 border-t-primary-500 rounded-full animate-spin"></div>
+                            <div className="text-center">
+                                <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">Processing Action</h3>
+                                <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-[0.2em] animate-pulse">Communicating with connector...</p>
+                            </div>
+                        </div>
                     </div>
                 )}
             </PageContentBlock>

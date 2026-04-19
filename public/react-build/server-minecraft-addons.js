@@ -7790,11 +7790,9 @@
     serverStartupPattern: "/server/:containerId/startup",
     serverFilesEditPattern: "/server/:containerId/files/edit",
     serverMinecraftCenterPattern: "/server/:containerId/minecraft-center",
-    serverMinecraftWorldCenterPattern: "/server/:containerId/minecraft/world-center",
     serverMinecraftAddonsPattern: "/server/:containerId/minecraft/addons",
     serverMinecraftInstallerPattern: "/server/:containerId/minecraft/installer",
-    serverMinecraftAdminPattern: "/server/:containerId/minecraft/admin",
-    serverMinecraftConfigsPattern: "/server/:containerId/minecraft/configs",
+    serverMinecraftProxyPattern: "/server/:containerId/minecraft/proxy",
     serverOverviewPattern: "/server/:containerId/overview",
     serverActivityPattern: "/server/:containerId/activity",
     serverTimelinePattern: "/server/:containerId/timeline",
@@ -8868,6 +8866,13 @@
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
   var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-minecraft-addons";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
+  function formatBytes(bytes) {
+    if (!bytes) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  }
   function AddonCard({ project, onInstall }) {
     return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden group hover:border-primary-500/50 transition-all duration-300 flex flex-col hover:shadow-2xl hover:shadow-primary-900/10 hover:translate-y-[-2px]", children: [
       /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "relative aspect-video overflow-hidden bg-neutral-950", children: [
@@ -8883,8 +8888,8 @@
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "p-6 flex-1 flex flex-col", children: [
         /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h3", { className: "text-lg font-black text-white mb-2 line-clamp-1", children: project.title }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-xs text-neutral-500 leading-relaxed line-clamp-3 mb-6 flex-1", children: project.description }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center justify-between mt-auto", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-xs text-neutral-500 leading-relaxed line-clamp-2 mb-6 flex-1 font-medium", children: project.description }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center justify-between mt-auto pt-4 border-t border-neutral-800", children: [
           /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center gap-2", children: [
             /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-download text-neutral-600" }),
             /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: "text-[10px] font-bold text-neutral-500 uppercase tracking-widest", children: [
@@ -8896,31 +8901,96 @@
             "button",
             {
               onClick: () => onInstall(project),
-              className: "px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl border border-neutral-700 transition",
-              children: "View Details"
+              className: "px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white text-[10px] font-black uppercase tracking-widest rounded-xl border border-neutral-700 transition active:scale-95",
+              children: "Install"
             }
           )
         ] })
       ] })
     ] });
   }
+  function InstalledItem({ item, onAction }) {
+    const isDirectory = Boolean(item.isDirectory);
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "bg-neutral-900 border border-neutral-800 rounded-3xl p-5 mb-4 group hover:border-neutral-700 transition-all shadow-xl shadow-black/10", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-start justify-between gap-4", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex-1 min-width-0", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center gap-2 mb-1", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: `bi ${isDirectory ? "bi-folder2-open" : "bi-file-earmark-zip"} text-primary-400 text-lg` }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h4", { className: "text-sm font-black text-white uppercase tracking-tight truncate", children: item.name })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-[10px] text-neutral-500 font-mono truncate opacity-60 mb-3", children: item.path }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-wrap gap-2 mb-4", children: [
+          item.tracked && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "px-2 py-0.5 rounded-lg bg-emerald-600/10 text-emerald-500 text-[9px] font-black uppercase border border-emerald-900/30", children: "Tracked" }),
+          item.updateAvailable && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "px-2 py-0.5 rounded-lg bg-amber-600/10 text-amber-500 text-[9px] font-black uppercase border border-amber-900/30", children: "Update Available" }),
+          item.drifted && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "px-2 py-0.5 rounded-lg bg-rose-600/10 text-rose-500 text-[9px] font-black uppercase border border-rose-900/30", children: "Drifted" }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "px-2 py-0.5 rounded-lg bg-neutral-800 text-neutral-400 text-[9px] font-black uppercase", children: formatBytes(item.size) })
+        ] })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex gap-2", children: [
+        !isDirectory && item.canUpdate && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          "button",
+          {
+            onClick: () => onAction("update", item),
+            className: "w-10 h-10 flex items-center justify-center bg-blue-600/10 text-blue-500 rounded-xl hover:bg-blue-600 hover:text-white transition active:scale-95 shadow-lg shadow-blue-900/10",
+            title: "Update to latest",
+            children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-arrow-repeat" })
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          "button",
+          {
+            onClick: () => onAction("delete", item),
+            className: "w-10 h-10 flex items-center justify-center bg-rose-600/10 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition active:scale-95 shadow-lg shadow-rose-900/10",
+            title: "Delete addon",
+            children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-trash3" })
+          }
+        )
+      ] })
+    ] }) });
+  }
   function ServerMinecraftAddonsPage({ pageData = data }) {
     const server = pageData.server || {};
     const defaults = pageData.minecraftDefaults || {};
+    const catalog = pageData.minecraftCatalog || {};
     const [search, setSearch] = (0, import_react11.useState)("");
-    const [kind, setKind] = (0, import_react11.useState)(defaults.kind || "mod");
+    const [kind, setKind] = (0, import_react11.useState)(defaults.kind || "plugin");
+    const [view, setView] = (0, import_react11.useState)("browse");
+    const [installing, setInstalling] = (0, import_react11.useState)(false);
+    const [installUrl, setInstallUrl] = (0, import_react11.useState)("");
+    const [installTarget, setInstallTarget] = (0, import_react11.useState)(defaults.targetDirectory || (kind === "plugin" ? "plugins" : "mods"));
+    const [error, setError] = (0, import_react11.useState)("");
     const [results, setResults] = (0, import_react11.useState)([]);
     const [loading, setLoading] = (0, import_react11.useState)(false);
-    const [error, setError] = (0, import_react11.useState)("");
+    const [installed, setInstalled] = (0, import_react11.useState)([]);
+    const [loadingInstalled, setLoadingInstalled] = (0, import_react11.useState)(false);
+    const [loader, setLoader] = (0, import_react11.useState)(defaults.loader || "");
+    const [mcVersion, setMcVersion] = (0, import_react11.useState)(defaults.version || "");
+    const [targetDir, setTargetDir] = (0, import_react11.useState)(defaults.targetDirectory || (kind === "plugin" ? "plugins" : "mods"));
+    const loaderOptions = (0, import_react11.useMemo)(() => {
+      const key = kind === "plugin" ? "plugins" : kind === "mod" ? "mods" : kind === "datapack" ? "datapacks" : kind === "resourcepack" ? "resourcepacks" : "worlds";
+      return catalog[key] || [];
+    }, [kind, catalog]);
     (0, import_react11.useEffect)(() => {
+      const defaultDir = kind === "plugin" ? "plugins" : kind === "mod" ? "mods" : kind === "datapack" ? "datapacks" : kind === "resourcepack" ? "resourcepacks" : ".";
+      setTargetDir(defaultDir);
+      setInstallTarget(defaultDir);
+    }, [kind]);
+    (0, import_react11.useEffect)(() => {
+      if (view !== "browse") return;
       let cancelled = false;
       const timer = setTimeout(() => {
         setLoading(true);
         setError("");
-        fetch(`/server/${server.containerId}/minecraft/addons/search?q=${encodeURIComponent(search)}&kind=${kind}&limit=12`).then((res) => res.json()).then((payload) => {
+        const params = new URLSearchParams({
+          q: search,
+          kind,
+          loader,
+          version: mcVersion,
+          limit: 12
+        });
+        fetch(`/server/${server.containerId}/minecraft/addons/search?${params.toString()}`).then((res) => res.json()).then((payload) => {
           if (cancelled) return;
           if (payload.success) {
-            setResults(payload.projects || []);
+            setResults(payload.results || []);
           } else {
             throw new Error(payload.error || "Failed to search modrinth");
           }
@@ -8936,58 +9006,295 @@
         cancelled = true;
         clearTimeout(timer);
       };
-    }, [search, kind, server.containerId]);
-    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ReactAppShell, { pageData, subtitle: "Addons", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+    }, [search, kind, loader, mcVersion, view, server.containerId]);
+    const fetchInstalled = () => {
+      setLoadingInstalled(true);
+      fetch(`/server/${server.containerId}/minecraft/addons/installed?directory=${encodeURIComponent(targetDir)}`).then((res) => res.json()).then((payload) => {
+        if (payload.success) {
+          setInstalled(payload.installed || []);
+        }
+        setLoadingInstalled(false);
+      }).catch(() => setLoadingInstalled(false));
+    };
+    (0, import_react11.useEffect)(() => {
+      if (view === "installed") {
+        fetchInstalled();
+      }
+    }, [view, targetDir]);
+    const handleInstall = (project) => {
+      if (confirm(`Install ${project.title}?`)) {
+        setInstalling(true);
+        fetch(`/server/${server.containerId}/minecraft/addons/install`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: project.project_id,
+            kind,
+            loader,
+            version: mcVersion,
+            targetDirectory: targetDir,
+            projectTitle: project.title
+          })
+        }).then((res) => res.json()).then((payload) => {
+          setInstalling(false);
+          if (payload.success) {
+            alert("Installation started! Check the file manager or console for progress.");
+            setView("installed");
+          } else {
+            alert("Installation failed: " + (payload.error || "Unknown error"));
+          }
+        }).catch((err) => {
+          setInstalling(false);
+          alert("Connection error: " + err.message);
+        });
+      }
+    };
+    const handleDirectInstall = (e) => {
+      e.preventDefault();
+      if (!installUrl.trim()) return;
+      setInstalling(true);
+      fetch(`/server/${server.containerId}/minecraft/addons/install-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: installUrl,
+          kind,
+          targetDirectory: installTarget
+        })
+      }).then((res) => res.json()).then((payload) => {
+        setInstalling(false);
+        if (payload.success) {
+          alert("Download started!");
+          setInstallUrl("");
+          setView("installed");
+        } else {
+          alert("Download failed: " + (payload.error || "Unknown error"));
+        }
+      }).catch((err) => {
+        setInstalling(false);
+        alert("Connection error: " + err.message);
+      });
+    };
+    const handleAction = (action, item) => {
+      if (action === "delete") {
+        if (confirm(`Are you sure you want to delete ${item.name}?`)) {
+          fetch(`/server/${server.containerId}/minecraft/addons/delete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: item.path })
+          }).then(() => fetchInstalled());
+        }
+      } else if (action === "update") {
+      }
+    };
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ReactAppShell, { pageData, subtitle: "Minecraft Addons", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
       PageContentBlock,
       {
-        title: "Addons Hub",
-        description: `Browse and install thousands of mods and plugins for your ${server.name} instance.`,
-        eyebrow: "Resource Catalog",
+        title: "Addons Center",
+        description: `Manage mods, plugins, and resource packs for your ${server.name} server.`,
+        eyebrow: "Minecraft Management",
         children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col md:flex-row gap-6 mb-12", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex-1 relative", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-search absolute left-5 top-1/2 -translate-y-1/2 text-neutral-600 text-lg" }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-                "input",
-                {
-                  type: "text",
-                  value: search,
-                  onChange: (e) => setSearch(e.target.value),
-                  placeholder: "Search Modrinth (e.g. WorldEdit, Essentials, Sodium)...",
-                  className: "w-full bg-neutral-900 border border-neutral-800 rounded-3xl py-5 pl-14 pr-6 text-white text-sm focus:outline-none focus:border-primary-500/50 shadow-2xl shadow-black/20"
-                }
-              )
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex bg-neutral-900 border border-neutral-800 rounded-3xl p-1 gap-1 mb-8 w-fit shadow-2xl shadow-black/20", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+              "button",
+              {
+                onClick: () => setView("browse"),
+                className: `px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${view === "browse" ? "bg-primary-600 text-white shadow-lg shadow-primary-900/20" : "text-neutral-500 hover:text-neutral-300"}`,
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-search" }),
+                  " Browse"
+                ]
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+              "button",
+              {
+                onClick: () => setView("installed"),
+                className: `px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${view === "installed" ? "bg-primary-600 text-white shadow-lg shadow-primary-900/20" : "text-neutral-500 hover:text-neutral-300"}`,
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-archive" }),
+                  " Installed"
+                ]
+              }
+            )
+          ] }),
+          view === "browse" ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(import_jsx_runtime11.Fragment, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-900 border border-neutral-800 rounded-[2.5rem] p-8 mb-8 shadow-2xl shadow-black/40", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center gap-4 mb-6", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "p-3 bg-primary-600/10 rounded-2xl", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-link-45deg text-primary-500 text-xl" }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h4", { className: "text-sm font-black text-white uppercase tracking-tight", children: "Direct URL Installation" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-[10px] text-neutral-500 font-bold uppercase tracking-widest", children: "Install project via direct .zip or .jar link" })
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("form", { onSubmit: handleDirectInstall, className: "flex flex-col xl:flex-row gap-4", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+                  "input",
+                  {
+                    type: "text",
+                    placeholder: "Paste download URL (e.g. https://example.com/mod.jar)",
+                    className: "flex-1 bg-neutral-950/50 border border-neutral-800 rounded-2xl px-6 py-4 text-sm text-white focus:outline-none focus:border-primary-500/50 transition-all font-medium",
+                    value: installUrl,
+                    onChange: (e) => setInstallUrl(e.target.value)
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex gap-2", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+                    "select",
+                    {
+                      className: "bg-neutral-950/50 border border-neutral-800 rounded-2xl px-6 py-4 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none focus:border-primary-500/50",
+                      value: installTarget,
+                      onChange: (e) => setInstallTarget(e.target.value),
+                      children: [
+                        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "plugins", children: "To /plugins" }),
+                        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "mods", children: "To /mods" }),
+                        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "datapacks", children: "To /datapacks" }),
+                        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "resourcepacks", children: "To /resourcepacks" }),
+                        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: ".", children: "To Root (/)" })
+                      ]
+                    }
+                  ),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+                    "button",
+                    {
+                      type: "submit",
+                      disabled: !installUrl.trim() || installing,
+                      className: "px-8 py-4 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl transition active:scale-95 shadow-lg shadow-primary-900/20 whitespace-nowrap",
+                      children: installing ? "Downloading..." : "Download & Install"
+                    }
+                  )
+                ] })
+              ] })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex bg-neutral-900 border border-neutral-800 rounded-3xl p-1 gap-1", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-                "button",
-                {
-                  onClick: () => setKind("mod"),
-                  className: `px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${kind === "mod" ? "bg-primary-600 text-white shadow-lg shadow-primary-900/20" : "text-neutral-500 hover:text-neutral-300"}`,
-                  children: "Mods"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-                "button",
-                {
-                  onClick: () => setKind("plugin"),
-                  className: `px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${kind === "plugin" ? "bg-primary-600 text-white shadow-lg shadow-primary-900/20" : "text-neutral-500 hover:text-neutral-300"}`,
-                  children: "Plugins"
-                }
-              )
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "bg-neutral-900 border border-neutral-800 rounded-[2.5rem] p-8 mb-12 shadow-2xl shadow-black/40", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "grid grid-cols-1 xl:grid-cols-12 gap-6 items-end", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "xl:col-span-4", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { className: "block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3 ml-1", children: "Type" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "flex bg-neutral-950/50 border border-neutral-800 rounded-2xl p-1 gap-1", children: ["plugin", "mod", "datapack"].map((k) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+                  "button",
+                  {
+                    onClick: () => setKind(k),
+                    className: `flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${kind === k ? "bg-neutral-800 text-white shadow-inner shadow-black/50" : "text-neutral-600 hover:text-neutral-400"}`,
+                    children: [
+                      k,
+                      "s"
+                    ]
+                  },
+                  k
+                )) })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "xl:col-span-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { className: "block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3 ml-1", children: "Loader" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+                  "select",
+                  {
+                    value: loader,
+                    onChange: (e) => setLoader(e.target.value),
+                    className: "w-full bg-neutral-950/50 border border-neutral-800 rounded-2xl px-4 py-3 text-[11px] font-bold text-white focus:outline-none focus:border-primary-500/50 transition-colors uppercase tracking-widest",
+                    children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "", children: "Any Loader" }),
+                      loaderOptions.map((opt) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: opt, children: opt }, opt))
+                    ]
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "xl:col-span-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { className: "block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3 ml-1", children: "Minecraft" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+                  "input",
+                  {
+                    type: "text",
+                    placeholder: "1.20.1",
+                    value: mcVersion,
+                    onChange: (e) => setMcVersion(e.target.value),
+                    className: "w-full bg-neutral-950/50 border border-neutral-800 rounded-2xl px-4 py-3 text-[11px] font-bold text-white focus:outline-none focus:border-primary-500/50 transition-colors placeholder:text-neutral-700 font-mono"
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "xl:col-span-4", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { className: "block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3 ml-1", children: "Live Search" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "relative", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-neutral-600" }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+                    "input",
+                    {
+                      type: "text",
+                      placeholder: "Find projects on Modrinth...",
+                      value: search,
+                      onChange: (e) => setSearch(e.target.value),
+                      className: "w-full bg-neutral-950 border border-neutral-800 rounded-2xl py-3 pl-11 pr-4 text-sm text-white focus:outline-none focus:border-primary-500/50 transition-all font-medium"
+                    }
+                  )
+                ] })
+              ] })
+            ] }) }),
+            error && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-rose-600/10 border border-rose-600/20 text-rose-500 p-6 rounded-3xl mb-12 flex items-center gap-4 animate-in fade-in slide-in-from-top-4", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-exclamation-octagon text-2xl" }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "font-bold uppercase tracking-widest text-xs", children: error })
+            ] }),
+            loading ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col items-center justify-center py-32 gap-6", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "w-16 h-16 border-4 border-neutral-800 border-t-primary-500 rounded-full animate-spin shadow-2xl shadow-primary-900/20" }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-[10px] font-black text-neutral-500 uppercase tracking-[0.4em] animate-pulse", children: "Querying Catalog" })
+            ] }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6", children: results.length > 0 ? results.map((project) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(AddonCard, { project, onInstall: handleInstall }, project.project_id)) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "col-span-full py-32 text-center opacity-40", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-cloud-slash text-6xl mb-6 block" }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h3", { className: "text-xl font-black uppercase tracking-widest text-neutral-500", children: "No results" }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-xs font-bold text-neutral-600 uppercase mt-2 tracking-widest", children: "Adjust filters or search terms" })
+            ] }) })
+          ] }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "animate-in fade-in slide-in-from-left-4 duration-500", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col md:flex-row items-center justify-between gap-6 mb-12", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h3", { className: "text-xl font-black text-white uppercase tracking-tight mb-1", children: "Installed Inventory" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("p", { className: "text-xs text-neutral-500 font-bold uppercase tracking-widest", children: [
+                  "Scanning folder: ",
+                  targetDir
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex gap-3", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+                  "button",
+                  {
+                    onClick: fetchInstalled,
+                    className: "px-6 py-3 bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl transition active:scale-95 flex items-center gap-2",
+                    children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-arrow-clockwise text-primary-500" }),
+                      " Rescan"
+                    ]
+                  }
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+                  "select",
+                  {
+                    className: "bg-neutral-900 border border-neutral-800 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl px-6 py-3 focus:outline-none focus:border-primary-500/50",
+                    value: targetDir,
+                    onChange: (e) => setTargetDir(e.target.value),
+                    children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "plugins", children: "/plugins" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "mods", children: "/mods" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "datapacks", children: "/datapacks" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "resourcepacks", children: "/resourcepacks" }),
+                      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: ".", children: "Root (/) " })
+                    ]
+                  }
+                )
+              ] })
+            ] }),
+            loadingInstalled ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col items-center justify-center py-32 gap-6 opacity-40", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "w-12 h-12 border-4 border-neutral-800 border-t-primary-500 rounded-full animate-spin" }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-[10px] font-black uppercase tracking-[0.3em]", children: "Browsing Filesystem..." })
+            ] }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "max-w-4xl mx-auto", children: installed.length > 0 ? installed.map((item, idx) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(InstalledItem, { item, onAction: handleAction }, idx)) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "py-32 text-center opacity-40 bg-neutral-950/50 border-2 border-dashed border-neutral-900 rounded-[3rem]", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-archive text-6xl mb-6 block" }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h3", { className: "text-xl font-black uppercase tracking-widest text-neutral-600", children: "Empty Directory" }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("p", { className: "text-[10px] font-bold text-neutral-700 uppercase mt-2 tracking-widest", children: [
+                "No matching assets found in ",
+                targetDir
+              ] })
+            ] }) })
+          ] }),
+          installing && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center animate-in fade-in duration-300", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-900 border border-neutral-800 p-12 rounded-[3.5rem] flex flex-col items-center gap-8 shadow-2xl scale-in-center", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "w-20 h-20 border-4 border-neutral-800 border-t-primary-500 rounded-full animate-spin" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "text-center", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h3", { className: "text-xl font-black text-white uppercase tracking-tight mb-2", children: "Processing Action" }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-[10px] text-neutral-500 font-bold uppercase tracking-[0.2em] animate-pulse", children: "Communicating with connector..." })
             ] })
-          ] }),
-          error && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-rose-600/10 border border-rose-600/30 text-rose-400 p-6 rounded-3xl mb-8 flex items-center gap-4", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-exclamation-triangle text-2xl" }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "font-bold uppercase tracking-widest text-sm", children: error })
-          ] }),
-          loading ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col items-center justify-center py-24 gap-6", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "w-16 h-16 border-4 border-neutral-800 border-t-primary-500 rounded-full animate-spin" }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-xs font-black text-neutral-500 uppercase tracking-[0.3em] pulse", children: "Indexing Modrinth..." })
-          ] }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6", children: results.length > 0 ? results.map((project) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(AddonCard, { project, onInstall: (p) => window.location.href = `/server/${server.containerId}/minecraft/addons/project/${p.project_id}` }, project.project_id)) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "col-span-full py-24 text-center", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-search text-6xl text-neutral-800 mb-6 block" }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-lg font-bold text-neutral-600 uppercase tracking-widest", children: "No addons found" }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-sm text-neutral-700 mt-2", children: "Try adjusting your search terms or filters." })
           ] }) })
         ]
       }

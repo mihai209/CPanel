@@ -7790,11 +7790,9 @@
     serverStartupPattern: "/server/:containerId/startup",
     serverFilesEditPattern: "/server/:containerId/files/edit",
     serverMinecraftCenterPattern: "/server/:containerId/minecraft-center",
-    serverMinecraftWorldCenterPattern: "/server/:containerId/minecraft/world-center",
     serverMinecraftAddonsPattern: "/server/:containerId/minecraft/addons",
     serverMinecraftInstallerPattern: "/server/:containerId/minecraft/installer",
-    serverMinecraftAdminPattern: "/server/:containerId/minecraft/admin",
-    serverMinecraftConfigsPattern: "/server/:containerId/minecraft/configs",
+    serverMinecraftProxyPattern: "/server/:containerId/minecraft/proxy",
     serverOverviewPattern: "/server/:containerId/overview",
     serverActivityPattern: "/server/:containerId/activity",
     serverTimelinePattern: "/server/:containerId/timeline",
@@ -8896,27 +8894,6 @@
         colorClass: "bg-blue-600/10 text-blue-500"
       },
       {
-        title: "World Center",
-        description: "Advanced world management: Swap, clone, backup, or prune dimensions.",
-        icon: "bi-globe-americas",
-        href: `/server/${server.containerId}/minecraft/world-center`,
-        colorClass: "bg-emerald-600/10 text-emerald-500"
-      },
-      {
-        title: "Minecraft Control",
-        description: "Manage server.properties, MOTD, whitelist, and essential rules.",
-        icon: "bi-controller",
-        href: `/server/${server.containerId}/minecraft/configs`,
-        colorClass: "bg-amber-600/10 text-amber-500"
-      },
-      {
-        title: "Admin & Players",
-        description: "Inspect players, manage bans, chat, and server security permissions.",
-        icon: "bi-shield-check",
-        href: `/server/${server.containerId}/minecraft/admin`,
-        colorClass: "bg-rose-600/10 text-rose-500"
-      },
-      {
         title: "Proxy Network",
         description: "Configuration for BungeeCord and Velocity proxy environments.",
         icon: "bi-diagram-3",
@@ -8924,11 +8901,11 @@
         colorClass: "bg-purple-600/10 text-purple-500"
       },
       {
-        title: "Advanced Metrics",
-        description: "TPS, MSPT, and real-time performance analytics for your Minecraft instance.",
-        icon: "bi-bar-chart",
-        href: `/server/${server.containerId}/minecraft/metrics`,
-        colorClass: "bg-sky-600/10 text-sky-500"
+        title: "Version Installer",
+        description: "Easily switch versions or platforms like Arclight and Waterfall.",
+        icon: "bi-cloud-download",
+        href: `/server/${server.containerId}/minecraft/installer`,
+        colorClass: "bg-emerald-600/10 text-emerald-500"
       }
     ];
     return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ReactAppShell, { pageData, subtitle: "Minecraft Center", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(

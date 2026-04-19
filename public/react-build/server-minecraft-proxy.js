@@ -7279,12 +7279,9 @@
     }
   });
 
-  // views/react/server-users.jsx
+  // views/react/server-minecraft-proxy.jsx
   var import_react11 = __toESM(require_react());
   var import_client = __toESM(require_client());
-
-  // views/react/components/ReactAppShell.jsx
-  var import_react8 = __toESM(require_react());
 
   // node_modules/react-router-dom/dist/index.js
   var React2 = __toESM(require_react());
@@ -7294,16 +7291,236 @@
   var React = __toESM(require_react());
 
   // node_modules/@remix-run/router/dist/router.js
+  function _extends() {
+    _extends = Object.assign ? Object.assign.bind() : function(target) {
+      for (var i = 1; i < arguments.length; i++) {
+        var source = arguments[i];
+        for (var key in source) {
+          if (Object.prototype.hasOwnProperty.call(source, key)) {
+            target[key] = source[key];
+          }
+        }
+      }
+      return target;
+    };
+    return _extends.apply(this, arguments);
+  }
   var Action;
   (function(Action2) {
     Action2["Pop"] = "POP";
     Action2["Push"] = "PUSH";
     Action2["Replace"] = "REPLACE";
   })(Action || (Action = {}));
+  var PopStateEventType = "popstate";
+  function createBrowserHistory(options) {
+    if (options === void 0) {
+      options = {};
+    }
+    function createBrowserLocation(window2, globalHistory) {
+      let {
+        pathname,
+        search,
+        hash
+      } = window2.location;
+      return createLocation(
+        "",
+        {
+          pathname,
+          search,
+          hash
+        },
+        // state defaults to `null` because `window.history.state` does
+        globalHistory.state && globalHistory.state.usr || null,
+        globalHistory.state && globalHistory.state.key || "default"
+      );
+    }
+    function createBrowserHref(window2, to) {
+      return typeof to === "string" ? to : createPath(to);
+    }
+    return getUrlBasedHistory(createBrowserLocation, createBrowserHref, null, options);
+  }
   function invariant(value, message) {
     if (value === false || value === null || typeof value === "undefined") {
       throw new Error(message);
     }
+  }
+  function createKey() {
+    return Math.random().toString(36).substr(2, 8);
+  }
+  function getHistoryState(location, index) {
+    return {
+      usr: location.state,
+      key: location.key,
+      idx: index
+    };
+  }
+  function createLocation(current, to, state, key) {
+    if (state === void 0) {
+      state = null;
+    }
+    let location = _extends({
+      pathname: typeof current === "string" ? current : current.pathname,
+      search: "",
+      hash: ""
+    }, typeof to === "string" ? parsePath(to) : to, {
+      state,
+      // TODO: This could be cleaned up.  push/replace should probably just take
+      // full Locations now and avoid the need to run through this flow at all
+      // But that's a pretty big refactor to the current test suite so going to
+      // keep as is for the time being and just let any incoming keys take precedence
+      key: to && to.key || key || createKey()
+    });
+    return location;
+  }
+  function createPath(_ref) {
+    let {
+      pathname = "/",
+      search = "",
+      hash = ""
+    } = _ref;
+    if (search && search !== "?") pathname += search.charAt(0) === "?" ? search : "?" + search;
+    if (hash && hash !== "#") pathname += hash.charAt(0) === "#" ? hash : "#" + hash;
+    return pathname;
+  }
+  function parsePath(path) {
+    let parsedPath = {};
+    if (path) {
+      let hashIndex = path.indexOf("#");
+      if (hashIndex >= 0) {
+        parsedPath.hash = path.substr(hashIndex);
+        path = path.substr(0, hashIndex);
+      }
+      let searchIndex = path.indexOf("?");
+      if (searchIndex >= 0) {
+        parsedPath.search = path.substr(searchIndex);
+        path = path.substr(0, searchIndex);
+      }
+      if (path) {
+        parsedPath.pathname = path;
+      }
+    }
+    return parsedPath;
+  }
+  function getUrlBasedHistory(getLocation, createHref, validateLocation, options) {
+    if (options === void 0) {
+      options = {};
+    }
+    let {
+      window: window2 = document.defaultView,
+      v5Compat = false
+    } = options;
+    let globalHistory = window2.history;
+    let action = Action.Pop;
+    let listener = null;
+    let index = getIndex();
+    if (index == null) {
+      index = 0;
+      globalHistory.replaceState(_extends({}, globalHistory.state, {
+        idx: index
+      }), "");
+    }
+    function getIndex() {
+      let state = globalHistory.state || {
+        idx: null
+      };
+      return state.idx;
+    }
+    function handlePop() {
+      action = Action.Pop;
+      let nextIndex = getIndex();
+      let delta = nextIndex == null ? null : nextIndex - index;
+      index = nextIndex;
+      if (listener) {
+        listener({
+          action,
+          location: history.location,
+          delta
+        });
+      }
+    }
+    function push(to, state) {
+      action = Action.Push;
+      let location = createLocation(history.location, to, state);
+      if (validateLocation) validateLocation(location, to);
+      index = getIndex() + 1;
+      let historyState = getHistoryState(location, index);
+      let url = history.createHref(location);
+      try {
+        globalHistory.pushState(historyState, "", url);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "DataCloneError") {
+          throw error;
+        }
+        window2.location.assign(url);
+      }
+      if (v5Compat && listener) {
+        listener({
+          action,
+          location: history.location,
+          delta: 1
+        });
+      }
+    }
+    function replace2(to, state) {
+      action = Action.Replace;
+      let location = createLocation(history.location, to, state);
+      if (validateLocation) validateLocation(location, to);
+      index = getIndex();
+      let historyState = getHistoryState(location, index);
+      let url = history.createHref(location);
+      globalHistory.replaceState(historyState, "", url);
+      if (v5Compat && listener) {
+        listener({
+          action,
+          location: history.location,
+          delta: 0
+        });
+      }
+    }
+    function createURL(to) {
+      let base = window2.location.origin !== "null" ? window2.location.origin : window2.location.href;
+      let href = typeof to === "string" ? to : createPath(to);
+      href = href.replace(/ $/, "%20");
+      invariant(base, "No window.location.(origin|href) available to create URL for href: " + href);
+      return new URL(href, base);
+    }
+    let history = {
+      get action() {
+        return action;
+      },
+      get location() {
+        return getLocation(window2, globalHistory);
+      },
+      listen(fn) {
+        if (listener) {
+          throw new Error("A history only accepts one active listener");
+        }
+        window2.addEventListener(PopStateEventType, handlePop);
+        listener = fn;
+        return () => {
+          window2.removeEventListener(PopStateEventType, handlePop);
+          listener = null;
+        };
+      },
+      createHref(to) {
+        return createHref(window2, to);
+      },
+      createURL,
+      encodeLocation(to) {
+        let url = createURL(to);
+        return {
+          pathname: url.pathname,
+          search: url.search,
+          hash: url.hash
+        };
+      },
+      push,
+      replace: replace2,
+      go(n) {
+        return globalHistory.go(n);
+      }
+    };
+    return history;
   }
   var ResultType;
   (function(ResultType2) {
@@ -7312,6 +7529,18 @@
     ResultType2["redirect"] = "redirect";
     ResultType2["error"] = "error";
   })(ResultType || (ResultType = {}));
+  function stripBasename(pathname, basename) {
+    if (basename === "/") return pathname;
+    if (!pathname.toLowerCase().startsWith(basename.toLowerCase())) {
+      return null;
+    }
+    let startIndex = basename.endsWith("/") ? basename.length - 1 : basename.length;
+    let nextChar = pathname.charAt(startIndex);
+    if (nextChar && nextChar !== "/") {
+      return null;
+    }
+    return pathname.slice(startIndex) || "/";
+  }
   var validMutationMethodsArr = ["post", "put", "patch", "delete"];
   var validMutationMethods = new Set(validMutationMethodsArr);
   var validRequestMethodsArr = ["get", ...validMutationMethodsArr];
@@ -7319,6 +7548,20 @@
   var UNSAFE_DEFERRED_SYMBOL = Symbol("deferred");
 
   // node_modules/react-router/dist/index.js
+  function _extends2() {
+    _extends2 = Object.assign ? Object.assign.bind() : function(target) {
+      for (var i = 1; i < arguments.length; i++) {
+        var source = arguments[i];
+        for (var key in source) {
+          if (Object.prototype.hasOwnProperty.call(source, key)) {
+            target[key] = source[key];
+          }
+        }
+      }
+      return target;
+    };
+    return _extends2.apply(this, arguments);
+  }
   if (false) {
     DataRouterContext.displayName = "DataRouter";
   }
@@ -7328,6 +7571,7 @@
   if (false) {
     AwaitContext.displayName = "Await";
   }
+  var NavigationContext = /* @__PURE__ */ React.createContext(null);
   if (false) {
     NavigationContext.displayName = "Navigation";
   }
@@ -7353,8 +7597,94 @@
     ) : invariant(false) : void 0;
     return React.useContext(LocationContext).location;
   }
+  function warnOnce(key, message) {
+    if (false) {
+      alreadyWarned[message] = true;
+      console.warn(message);
+    }
+  }
+  var logDeprecation = (flag, msg, link) => warnOnce(flag, "\u26A0\uFE0F React Router Future Flag Warning: " + msg + ". " + ("You can use the `" + flag + "` future flag to opt-in early. ") + ("For more information, see " + link + "."));
+  function logV6DeprecationWarnings(renderFuture, routerFuture) {
+    if ((renderFuture == null ? void 0 : renderFuture.v7_startTransition) === void 0) {
+      logDeprecation("v7_startTransition", "React Router will begin wrapping state updates in `React.startTransition` in v7", "https://reactrouter.com/v6/upgrading/future#v7_starttransition");
+    }
+    if ((renderFuture == null ? void 0 : renderFuture.v7_relativeSplatPath) === void 0 && (!routerFuture || routerFuture.v7_relativeSplatPath === void 0)) {
+      logDeprecation("v7_relativeSplatPath", "Relative route resolution within Splat routes is changing in v7", "https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath");
+    }
+    if (routerFuture) {
+      if (routerFuture.v7_fetcherPersist === void 0) {
+        logDeprecation("v7_fetcherPersist", "The persistence behavior of fetchers is changing in v7", "https://reactrouter.com/v6/upgrading/future#v7_fetcherpersist");
+      }
+      if (routerFuture.v7_normalizeFormMethod === void 0) {
+        logDeprecation("v7_normalizeFormMethod", "Casing of `formMethod` fields is being normalized to uppercase in v7", "https://reactrouter.com/v6/upgrading/future#v7_normalizeformmethod");
+      }
+      if (routerFuture.v7_partialHydration === void 0) {
+        logDeprecation("v7_partialHydration", "`RouterProvider` hydration behavior is changing in v7", "https://reactrouter.com/v6/upgrading/future#v7_partialhydration");
+      }
+      if (routerFuture.v7_skipActionErrorRevalidation === void 0) {
+        logDeprecation("v7_skipActionErrorRevalidation", "The revalidation behavior after 4xx/5xx `action` responses is changing in v7", "https://reactrouter.com/v6/upgrading/future#v7_skipactionerrorrevalidation");
+      }
+    }
+  }
   var START_TRANSITION = "startTransition";
   var startTransitionImpl = React[START_TRANSITION];
+  function Router(_ref5) {
+    let {
+      basename: basenameProp = "/",
+      children = null,
+      location: locationProp,
+      navigationType = Action.Pop,
+      navigator: navigator2,
+      static: staticProp = false,
+      future
+    } = _ref5;
+    !!useInRouterContext() ? false ? invariant(false, "You cannot render a <Router> inside another <Router>. You should never have more than one in your app.") : invariant(false) : void 0;
+    let basename = basenameProp.replace(/^\/*/, "/");
+    let navigationContext = React.useMemo(() => ({
+      basename,
+      navigator: navigator2,
+      static: staticProp,
+      future: _extends2({
+        v7_relativeSplatPath: false
+      }, future)
+    }), [basename, future, navigator2, staticProp]);
+    if (typeof locationProp === "string") {
+      locationProp = parsePath(locationProp);
+    }
+    let {
+      pathname = "/",
+      search = "",
+      hash = "",
+      state = null,
+      key = "default"
+    } = locationProp;
+    let locationContext = React.useMemo(() => {
+      let trailingPathname = stripBasename(pathname, basename);
+      if (trailingPathname == null) {
+        return null;
+      }
+      return {
+        location: {
+          pathname: trailingPathname,
+          search,
+          hash,
+          state,
+          key
+        },
+        navigationType
+      };
+    }, [basename, pathname, search, hash, state, key, navigationType]);
+    false ? warning(locationContext != null, '<Router basename="' + basename + '"> is not able to match the URL ' + ('"' + pathname + search + hash + '" because it does not start with the ') + "basename, so the <Router> won't render anything.") : void 0;
+    if (locationContext == null) {
+      return null;
+    }
+    return /* @__PURE__ */ React.createElement(NavigationContext.Provider, {
+      value: navigationContext
+    }, /* @__PURE__ */ React.createElement(LocationContext.Provider, {
+      children,
+      value: locationContext
+    }));
+  }
   var neverSettledPromise = new Promise(() => {
   });
 
@@ -7376,6 +7706,42 @@
   var flushSyncImpl = ReactDOM[FLUSH_SYNC];
   var USE_ID = "useId";
   var useIdImpl = React2[USE_ID];
+  function BrowserRouter(_ref4) {
+    let {
+      basename,
+      children,
+      future,
+      window: window2
+    } = _ref4;
+    let historyRef = React2.useRef();
+    if (historyRef.current == null) {
+      historyRef.current = createBrowserHistory({
+        window: window2,
+        v5Compat: true
+      });
+    }
+    let history = historyRef.current;
+    let [state, setStateImpl] = React2.useState({
+      action: history.action,
+      location: history.location
+    });
+    let {
+      v7_startTransition
+    } = future || {};
+    let setState = React2.useCallback((newState) => {
+      v7_startTransition && startTransitionImpl2 ? startTransitionImpl2(() => setStateImpl(newState)) : setStateImpl(newState);
+    }, [setStateImpl, v7_startTransition]);
+    React2.useLayoutEffect(() => history.listen(setState), [history, setState]);
+    React2.useEffect(() => logV6DeprecationWarnings(future), [future]);
+    return /* @__PURE__ */ React2.createElement(Router, {
+      basename,
+      children,
+      location: state.location,
+      navigationType: state.action,
+      navigator: history,
+      future
+    });
+  }
   if (false) {
     HistoryRouter.displayName = "unstable_HistoryRouter";
   }
@@ -7406,6 +7772,9 @@
     DataRouterStateHook2["UseFetchers"] = "useFetchers";
     DataRouterStateHook2["UseScrollRestoration"] = "useScrollRestoration";
   })(DataRouterStateHook || (DataRouterStateHook = {}));
+
+  // views/react/components/ReactAppShell.jsx
+  var import_react8 = __toESM(require_react());
 
   // views/react/ReactRoutes.js
   var ReactRoutes = {
@@ -8492,272 +8861,306 @@
   }
   var ThemeContext_default = ThemeProvider;
 
-  // views/react/server-users.jsx
+  // views/react/server-minecraft-proxy.jsx
   var import_jsx_runtime11 = __toESM(require_jsx_runtime());
   var data = window.__CPANEL_REACT_PAGE_DATA__ || {};
-  var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-users";
+  var standaloneEntry = ((window.__CPANEL_REACT_PAGE_META__ || {}).entry || "").trim() === "server-minecraft-proxy";
   var root = standaloneEntry ? (0, import_client.createRoot)(document.getElementById("reactRoot")) : null;
-  var userPermissionDescriptions = {
-    "server.view": "Access the server overview and basic details.",
-    "server.tags.manage": "Edit server folder and tags on overview.",
-    "server.console": "View the console and send commands.",
-    "server.power": "Start, stop, restart, or kill the server.",
-    "server.files": "View and edit server files.",
-    "server.startup": "Change startup command and variables.",
-    "server.minecraft": "Access Minecraft tools (mods/plugins).",
-    "server.proxy.manage": "Manage proxy network panel, backends, groups, and sync.",
-    "server.ai.use": "Use Rocky AI assistant in console.",
-    "server.ai.manage": "Manage Rocky AI permissions for this server.",
-    "minecraft.inspect": "Inspect player inventory, health, gamemode, location.",
-    "minecraft.freeze": "Freeze/unfreeze players using effects.",
-    "minecraft.kick": "Kick players from the Minecraft server.",
-    "minecraft.ban": "Ban players from the Minecraft server.",
-    "minecraft.banlist": "View banlist and unban players.",
-    "minecraft.op": "Grant operator rights with /op.",
-    "minecraft.deop": "Remove operator rights with /deop.",
-    "minecraft.tempban": "Temporarily ban players from the Minecraft server.",
-    "minecraft.teleport": "Teleport players with /tp.",
-    "minecraft.chat": "Control slow chat or mute chat server-wide.",
-    "minecraft.whitelist": "Manage server whitelist (add/remove/import).",
-    "server.backups.view": "View backups list.",
-    "server.backups.manage": "Create/delete backups (if enabled).",
-    "server.gdrive": "Use Google Drive backup actions (manual/auto policy).",
-    "server.databases.view": "View databases linked to the server.",
-    "server.databases.manage": "Create/update/delete databases.",
-    "server.schedules.view": "View schedules.",
-    "server.schedules.manage": "Create/update/delete schedules.",
-    "server.network.view": "View allocations and ports.",
-    "server.network.manage": "Manage allocations/ports.",
-    "server.mounts": "Attach/detach mounts.",
-    "server.users.view": "View subusers list.",
-    "server.users.manage": "Invite/remove subusers and edit permissions.",
-    "server.activity.view": "View activity logs.",
-    "server.audit.read": "Read audit console events (read-only).",
-    "server.timeline.view": "View live resource timeline.",
-    "server.performance.view": "View performance insights (plugins/mods).",
-    "server.macros": "Manage and run command macros.",
-    "server.recovery": "Use recovery assistant actions.",
-    "server.smartalerts": "Configure smart alerts.",
-    "server.policy": "Configure policy engine."
-  };
-  function PermissionBadge({ permissions }) {
-    const [isHovered, setIsHovered] = import_react11.default.useState(false);
-    if (!Array.isArray(permissions)) return null;
-    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
-      "div",
-      {
-        className: "relative inline-block",
-        onMouseEnter: () => setIsHovered(true),
-        onMouseLeave: () => setIsHovered(false),
-        children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-primary-900/30 text-primary-400 border border-primary-500/30 px-3 py-1 rounded-full text-[11px] font-bold tracking-tight cursor-help shadow-sm hover:bg-primary-900/50 transition-colors flex items-center gap-2", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-shield-check" }),
-            permissions.length,
-            " Permissions"
-          ] }),
-          isHovered && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "absolute z-50 left-0 mt-2 p-4 bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl w-72 animate-in fade-in zoom-in-95 duration-200 pointer-events-none", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-3 border-b border-neutral-800 pb-2 flex justify-between", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { children: "Permission Bundle" }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: "text-primary-500", children: [
-                permissions.length,
-                " items"
-              ] })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "flex flex-wrap gap-1.5 max-h-64 overflow-y-auto no-scrollbar", children: permissions.map((p) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-[10px] font-semibold bg-neutral-800 text-neutral-200 px-2 py-0.5 rounded border border-neutral-700", children: p }, p)) }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "mt-3 text-[10px] text-neutral-500 italic", children: "Move mouse away to close list" })
-          ] })
-        ]
-      }
-    );
-  }
-  function ServerUsersPage({ pageData = data }) {
-    const server = pageData.server || {};
-    const memberships = Array.isArray(pageData.memberships) ? pageData.memberships : [];
-    const owner = pageData.owner || null;
-    const canManageUsers = Boolean(pageData.canManageUsers);
-    const [isModalOpen, setIsModalOpen] = (0, import_react11.useState)(false);
-    const [editingMembership, setEditingMembership] = (0, import_react11.useState)(null);
-    const [identifier, setIdentifier] = (0, import_react11.useState)("");
-    const [selectedPermissions, setSelectedPermissions] = (0, import_react11.useState)(["server.view"]);
-    const [selectedPreset, setSelectedPreset] = (0, import_react11.useState)("");
-    const presets = pageData.permissionPresets || [];
-    const catalog = pageData.permissionCatalog || [];
-    const handleOpenCreate = () => {
-      setEditingMembership(null);
-      setIdentifier("");
-      setSelectedPermissions(["server.view"]);
-      setSelectedPreset("");
-      setIsModalOpen(true);
-    };
-    const handleOpenEdit = (membership) => {
-      setEditingMembership(membership);
-      setIdentifier(membership.user?.email || membership.user?.username || "");
-      const perms = Array.isArray(membership.permissions) && membership.permissions.length > 0 ? membership.permissions : ["server.view"];
-      setSelectedPermissions(perms);
-      const sortedSelected = [...perms].sort();
-      const matchedPreset = presets.find((p) => {
-        const presetPerms = [...p.permissions].sort();
-        return presetPerms.length === sortedSelected.length && presetPerms.every((v, i) => v === sortedSelected[i]);
-      });
-      setSelectedPreset(matchedPreset ? matchedPreset.id : "");
-      setIsModalOpen(true);
-    };
-    const handleTogglePerm = (perm) => {
-      if (perm === "server.view") return;
-      setSelectedPermissions(
-        (current) => current.includes(perm) ? current.filter((p) => p !== perm) : [...current, perm]
-      );
-      setSelectedPreset("");
-    };
-    const applyPreset = () => {
-      if (!selectedPreset) return;
-      const preset = presets.find((p) => String(p.id) === String(selectedPreset));
-      if (preset) {
-        setSelectedPermissions(Array.from(/* @__PURE__ */ new Set([...preset.permissions, "server.view"])));
-      }
-    };
-    const resetPermissions = () => {
-      setSelectedPermissions(["server.view"]);
-      setSelectedPreset("");
-    };
-    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(ReactAppShell, { pageData, subtitle: "Users", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(PageContentBlock, { title: "Users", description: "Manage subusers and configure access control lists.", children: [
-        pageData.success && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "bg-green-600/20 border-l-4 border-green-600 text-green-100 p-4 rounded-r-lg mb-6 shadow-sm", children: pageData.success }),
-        pageData.error && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "bg-red-600/20 border-l-4 border-red-600 text-red-100 p-4 rounded-r-lg mb-6 shadow-sm", children: pageData.error }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-6 mb-8", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 rounded-lg p-5 shadow-sm col-span-1 border-t-2 border-t-primary-500", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-xs font-bold text-neutral-500 uppercase tracking-widest mb-3", children: "Owner" }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "font-bold text-white text-lg", children: owner ? owner.username : "Unknown" }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-sm text-neutral-400 mt-1", children: owner ? owner.email : "-" })
-        ] }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 rounded-lg overflow-hidden shadow-sm", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-800/50 px-5 py-4 border-b border-neutral-700 flex justify-between items-center", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h2", { className: "text-base font-bold text-neutral-100", children: "Subusers" }),
-            canManageUsers && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
-              "button",
-              {
-                onClick: handleOpenCreate,
-                className: "bg-primary-600 hover:bg-primary-500 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors shadow-sm",
-                children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-person-plus me-1" }),
-                  " Invite"
-                ]
-              }
-            )
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "overflow-x-auto", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("table", { className: "w-full text-left border-collapse", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("tr", { className: "bg-neutral-800 border-b border-neutral-700", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("th", { className: "px-5 py-3 text-xs font-bold text-neutral-400 uppercase tracking-widest", children: "User" }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("th", { className: "px-5 py-3 text-xs font-bold text-neutral-400 uppercase tracking-widest", children: "Permissions" }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("th", { className: "px-5 py-3 text-xs font-bold text-neutral-400 uppercase tracking-widest", children: "Invited By" }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("th", { className: "px-5 py-3 text-xs font-bold text-neutral-400 uppercase tracking-widest text-right", children: "Actions" })
-            ] }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("tbody", { children: !memberships.length ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("tr", { children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("td", { colSpan: "4", className: "text-center py-8 text-neutral-500 text-sm", children: "No subusers yet." }) }) : memberships.map((entry) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("tr", { className: "border-b border-neutral-700/50 hover:bg-neutral-800/30 transition-colors", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("td", { className: "px-5 py-4", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "font-bold text-neutral-200 text-sm", children: entry.user ? entry.user.username : `#${entry.userId}` }),
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-xs text-neutral-500", children: entry.user?.email || "" })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("td", { className: "px-5 py-4", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(PermissionBadge, { permissions: entry.permissions }) }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("td", { className: "px-5 py-4 text-sm text-neutral-400", children: entry.invitedBy ? entry.invitedBy.username : "-" }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("td", { className: "px-5 py-4 text-right", children: canManageUsers ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-                "button",
-                {
-                  onClick: () => handleOpenEdit(entry),
-                  className: "bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-white text-xs font-bold px-3 py-1.5 rounded transition-colors shadow-sm",
-                  children: "Manage"
-                }
-              ) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-neutral-500", children: "-" }) })
-            ] }, entry.id)) })
-          ] }) })
-        ] })
+  function StatCard({ label, value, colorClass, icon }) {
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-900 border border-neutral-800 rounded-3xl p-6 shadow-xl shadow-black/20", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center gap-4 mb-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: `w-10 h-10 rounded-xl flex items-center justify-center text-lg ${colorClass}`, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: `bi ${icon}` }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-[10px] font-black text-neutral-500 uppercase tracking-widest", children: label })
       ] }),
-      isModalOpen && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/80 backdrop-blur-sm overflow-y-auto", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl w-full max-w-3xl my-8", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex justify-between items-center p-5 border-b border-neutral-700", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h3", { className: "text-lg font-bold text-white", children: editingMembership ? `Manage ${editingMembership.user?.username || "Subuser"}` : "Invite Subuser" }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { onClick: () => setIsModalOpen(false), className: "text-neutral-400 hover:text-white transition", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-x-lg" }) })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "p-5 overflow-y-auto max-h-[70vh]", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("form", { id: "subuserForm", method: "POST", action: `/server/${server.containerId}/users`, "data-turbo": "false", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("input", { type: "hidden", name: "membershipId", value: editingMembership ? editingMembership.id : "" }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "mb-6", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { className: "block text-xs font-bold text-neutral-400 uppercase tracking-widest mb-2", children: "User Identifier" }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-              "input",
-              {
-                name: "identifier",
-                className: `w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-primary-500 ${editingMembership ? "opacity-50 cursor-not-allowed" : ""}`,
-                placeholder: "Username or email",
-                value: identifier,
-                onChange: (e) => setIdentifier(e.target.value),
-                readOnly: !!editingMembership
-              }
-            )
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "mb-4", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { className: "block text-xs font-bold text-neutral-400 uppercase tracking-widest mb-2", children: "Permissions" }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-800 border border-neutral-700 rounded-lg p-3 mb-4 flex flex-col md:flex-row gap-3 items-end", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex-1 w-full", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { className: "block text-xs font-bold text-neutral-500 uppercase tracking-widest mb-1", children: "Preset Bundle" }),
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
-                  "select",
-                  {
-                    className: "w-full bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm text-white focus:outline-none",
-                    value: selectedPreset,
-                    onChange: (e) => setSelectedPreset(e.target.value),
-                    children: [
-                      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "", children: "Custom Selection" }),
-                      presets.map((p) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: p.id, children: p.label }, p.id))
-                    ]
-                  }
-                )
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex gap-2 w-full md:w-auto", children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("button", { type: "button", onClick: applyPreset, className: "bg-primary-600/20 text-primary-400 border border-primary-600/30 hover:bg-primary-600/30 rounded px-4 py-2 text-sm font-bold transition flex-1 md:flex-none", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-magic me-1" }),
-                  " Apply Preset"
-                ] }),
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "button", onClick: resetPermissions, className: "bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded px-4 py-2 text-sm font-bold text-white transition flex-1 md:flex-none", children: "Reset" })
-              ] })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-3", children: catalog.map((perm) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("label", { className: "flex items-start gap-3 p-3 bg-neutral-800/50 border border-neutral-700 rounded-lg cursor-pointer hover:bg-neutral-800 transition-colors", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-                "input",
-                {
-                  type: "checkbox",
-                  name: "permissions",
-                  value: perm,
-                  checked: selectedPermissions.includes(perm),
-                  onChange: () => handleTogglePerm(perm),
-                  disabled: perm === "server.view",
-                  className: "mt-0.5 bg-neutral-900 border-neutral-600 text-primary-500 focus:ring-0 rounded"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-sm font-bold text-white", children: perm }),
-                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-xs text-neutral-500 mt-0.5 whitespace-normal break-words", children: userPermissionDescriptions[perm] || "Access standard endpoints" })
-              ] })
-            ] }, perm)) })
-          ] })
-        ] }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center justify-between p-5 border-t border-neutral-700 bg-neutral-900 rounded-b-xl", children: [
-          editingMembership ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("form", { method: "POST", action: `/server/${server.containerId}/users/${editingMembership.id}/delete`, "data-turbo": "false", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { type: "submit", className: "text-red-500 hover:text-red-400 text-sm font-bold transition", children: "Remove Subuser" }) }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", {}),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex gap-3", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("button", { onClick: () => setIsModalOpen(false), className: "px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded text-sm font-bold", children: "Cancel" }),
-            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
-              "button",
-              {
-                onClick: () => document.getElementById("subuserForm").submit(),
-                className: "px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded text-sm font-bold shadow-sm",
-                children: editingMembership ? "Update Subuser" : "Save Subuser"
-              }
-            )
-          ] })
-        ] })
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-3xl font-black text-white px-1", children: value })
+    ] });
+  }
+  function BackendRow({ backend, groups, serverId, onAction }) {
+    const status = backend.status || {};
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("tr", { className: "group hover:bg-neutral-800/10 transition-colors", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("td", { className: "py-6 pl-2", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "font-mono text-sm text-white font-bold", children: backend.name }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "font-mono text-[10px] text-neutral-600 uppercase tracking-tighter", children: backend.address })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("td", { children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+        "select",
+        {
+          value: backend.groupId || "",
+          onChange: (e) => onAction("group", backend.id, e.target.value),
+          className: "bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2 text-[10px] font-black text-neutral-400 uppercase tracking-widest focus:outline-none focus:border-primary-500/50",
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "", children: "No Group" }),
+            groups.map((g) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: g.id, children: g.name }, g.id))
+          ]
+        }
+      ) }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("td", { children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "text-sm font-black text-neutral-300", children: [
+        status.playersOnline || 0,
+        " / ",
+        status.playersMax || 0
+      ] }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("td", { children: status.online ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "px-3 py-1 bg-emerald-600/10 text-emerald-500 text-[9px] font-black uppercase rounded-lg border border-emerald-900/30", children: "Online" }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "px-3 py-1 bg-rose-600/10 text-rose-500 text-[9px] font-black uppercase rounded-lg border border-rose-900/30", children: "Offline" }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("td", { children: backend.linkedServer ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-col", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-xs font-black text-primary-400 uppercase tracking-tight", children: backend.linkedServer.name }),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-[9px] text-neutral-600 font-bold uppercase tracking-widest", children: backend.linkedServer.status })
+      ] }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-neutral-700", children: "---" }) }),
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("td", { className: "pr-2", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity", children: [
+        backend.linkedContainerId && /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          "button",
+          {
+            onClick: () => onAction("power", backend.id, "restart"),
+            className: "p-2 bg-amber-600/10 text-amber-500 rounded-lg hover:bg-amber-600 hover:text-white transition",
+            title: "Restart Server",
+            children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-arrow-repeat" })
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          "button",
+          {
+            onClick: () => onAction("delete", backend.id),
+            className: "p-2 bg-rose-600/10 text-rose-500 rounded-lg hover:bg-rose-600 hover:text-white transition",
+            title: "Remove from Proxy",
+            children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-trash3" })
+          }
+        )
       ] }) })
     ] });
   }
-  var server_users_default = ServerUsersPage;
+  function ServerMinecraftProxyPage({ pageData = data }) {
+    const server = pageData.server || {};
+    const [snapshot, setSnapshot] = (0, import_react11.useState)(pageData.proxySnapshot || {});
+    const [linkableServers, setLinkableServers] = (0, import_react11.useState)(pageData.proxyLinkableServers || []);
+    const [loading, setLoading] = (0, import_react11.useState)(false);
+    const [newBackendServer, setNewBackendServer] = (0, import_react11.useState)("");
+    const [newBackendGroup, setNewBackendGroup] = (0, import_react11.useState)("");
+    const [newGroupName, setNewGroupName] = (0, import_react11.useState)("");
+    const summary = snapshot.summary || {};
+    const backends = (0, import_react11.useMemo)(() => snapshot.backends || [], [snapshot]);
+    const groups = (0, import_react11.useMemo)(() => snapshot.groups || [], [snapshot]);
+    (0, import_react11.useEffect)(() => {
+      const poll = () => {
+        fetch(`/server/${server.containerId}/minecraft/proxy/status`).then((res) => res.json()).then((payload) => {
+          if (payload.success) setSnapshot(payload.snapshot || {});
+        }).catch(console.error);
+      };
+      const interval = setInterval(poll, 1e4);
+      return () => clearInterval(interval);
+    }, [server.containerId]);
+    const handleAction = (type, id, val) => {
+      const post = (url, body) => {
+        setLoading(true);
+        fetch(`/server/${server.containerId}/minecraft/proxy${url}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        }).then((res) => {
+          if (res.redirected) {
+            window.location.href = res.url;
+            return;
+          }
+          return res.json();
+        }).then(() => setLoading(false)).catch(() => setLoading(false));
+      };
+      if (type === "add-backend") {
+        post("/backends/add", { linkedContainerId: newBackendServer, groupId: newBackendGroup });
+      } else if (type === "delete") {
+        if (confirm("Remove this backend from proxy?")) {
+          post(`/backends/${id}/delete`, {});
+        }
+      } else if (type === "group") {
+        post(`/backends/${id}/group`, { groupId: val });
+      } else if (type === "power") {
+        post(`/backends/${id}/power`, { action: val });
+      } else if (type === "sync") {
+        post("/sync-config", {});
+      } else if (type === "add-group") {
+        post("/groups/add", { name: newGroupName });
+        setNewGroupName("");
+      } else if (type === "delete-group") {
+        if (confirm("Delete this group?")) {
+          post(`/groups/${id}/delete`, {});
+        }
+      }
+    };
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ReactAppShell, { pageData, subtitle: "Proxy Network", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+      PageContentBlock,
+      {
+        title: "Proxy Network",
+        description: `Dynamic management of the ${pageData.proxyMode || "BungeeCord"} mesh for ${server.name}.`,
+        eyebrow: "Network Orchestration",
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(StatCard, { label: "Mesh Players", value: summary.proxyPlayersOnline || 0, colorClass: "bg-primary-600/10 text-primary-500", icon: "bi-people" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(StatCard, { label: "Server Load", value: summary.backendPlayersOnline || 0, colorClass: "bg-sky-600/10 text-sky-500", icon: "bi-controller" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(StatCard, { label: "Live Nodes", value: summary.backendOnline || 0, colorClass: "bg-emerald-600/10 text-emerald-500", icon: "bi-check-circle" }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(StatCard, { label: "Offline", value: summary.backendOffline || 0, colorClass: "bg-rose-600/10 text-rose-500", icon: "bi-exclamation-triangle" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex flex-wrap gap-4 mb-12 bg-neutral-900 border border-neutral-800 rounded-[2.5rem] p-8 shadow-2xl shadow-black/40", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex-1 min-w-[300px]", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex items-center gap-4 mb-2", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-[10px] font-black text-neutral-500 uppercase tracking-widest", children: "Global Endpoint" }),
+                snapshot.proxyStatus?.online ? /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: "text-[9px] font-black text-emerald-500 uppercase flex items-center gap-1", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-circle-fill text-[6px]" }),
+                  " Online"
+                ] }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: "text-[9px] font-black text-rose-500 uppercase flex items-center gap-1", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-circle-fill text-[6px]" }),
+                  " Gateway Error"
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "font-mono text-xl text-white font-bold", children: snapshot.proxyAddress || "Mesh Initializing..." })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "flex gap-4 items-center", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+              "button",
+              {
+                onClick: () => handleAction("sync"),
+                className: "px-8 py-3 bg-neutral-800 hover:bg-neutral-700 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl transition shadow-xl active:scale-95 border border-neutral-700",
+                children: "Sync Config"
+              }
+            ) })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "grid grid-cols-1 xl:grid-cols-12 gap-12", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "xl:col-span-8", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "mb-12", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "flex items-center justify-between mb-8", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("h3", { className: "text-sm font-black text-white uppercase tracking-[0.2em] flex items-center gap-3", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "w-8 h-8 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-[10px] shadow-2xl", children: "1" }),
+                  "Provision Backend"
+                ] }) }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-900/40 border border-neutral-800 rounded-[3rem] p-10 flex flex-col md:flex-row items-end gap-6 shadow-2xl shadow-black/20", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex-1 w-full", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { className: "block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-4 ml-1", children: "Connect Panel Server" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+                      "select",
+                      {
+                        value: newBackendServer,
+                        onChange: (e) => setNewBackendServer(e.target.value),
+                        className: "w-full bg-neutral-950 border border-neutral-800 rounded-2xl px-5 py-4 text-xs font-black text-white focus:outline-none focus:border-primary-500/50 transition-all uppercase tracking-widest",
+                        children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "", children: "Select Target..." }),
+                          linkableServers.map((s) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("option", { value: s.containerId, children: [
+                            s.name,
+                            " (",
+                            s.allocation?.ip,
+                            ":",
+                            s.allocation?.port,
+                            ")"
+                          ] }, s.containerId))
+                        ]
+                      }
+                    )
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex-1 w-full", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("label", { className: "block text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-4 ml-1", children: "Network Group" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)(
+                      "select",
+                      {
+                        value: newBackendGroup,
+                        onChange: (e) => setNewBackendGroup(e.target.value),
+                        className: "w-full bg-neutral-950 border border-neutral-800 rounded-2xl px-5 py-4 text-xs font-black text-white focus:outline-none focus:border-primary-500/50 transition-all uppercase tracking-widest",
+                        children: [
+                          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: "", children: "No Group" }),
+                          groups.map((g) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("option", { value: g.id, children: g.name }, g.id))
+                        ]
+                      }
+                    )
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+                    "button",
+                    {
+                      onClick: () => handleAction("add-backend"),
+                      disabled: !newBackendServer || loading,
+                      className: "px-10 py-5 bg-primary-600 hover:bg-primary-500 text-white text-[11px] font-black uppercase tracking-[0.25em] rounded-2xl transition shadow-2xl shadow-primary-900/20 active:scale-95",
+                      children: "Attach"
+                    }
+                  )
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("h3", { className: "text-sm font-black text-white uppercase tracking-[0.2em] mb-8 flex items-center gap-3", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "w-8 h-8 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-[10px] shadow-2xl", children: "2" }),
+                  "Network Topography"
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "bg-neutral-900 border border-neutral-800 rounded-[3rem] overflow-hidden shadow-2xl shadow-black/40", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "overflow-x-auto", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("table", { className: "w-full text-left", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("tr", { className: "border-b border-neutral-800 bg-neutral-950/20", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("th", { className: "py-5 px-6 text-[10px] font-black text-neutral-500 uppercase tracking-widest", children: "Backend Identity" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("th", { className: "py-5 px-2 text-[10px] font-black text-neutral-500 uppercase tracking-widest", children: "Routing Group" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("th", { className: "py-5 px-2 text-[10px] font-black text-neutral-500 uppercase tracking-widest", children: "Population" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("th", { className: "py-5 px-2 text-[10px] font-black text-neutral-500 uppercase tracking-widest", children: "Status" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("th", { className: "py-5 px-2 text-[10px] font-black text-neutral-500 uppercase tracking-widest", children: "Linked Control" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("th", { className: "py-5 px-6 text-[10px] font-black text-neutral-500 uppercase tracking-widest text-right", children: "Actions" })
+                  ] }) }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("tbody", { className: "divide-y divide-neutral-800/50", children: backends.length > 0 ? backends.map((b) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(BackendRow, { backend: b, groups, serverId: server.containerId, onAction: handleAction }, b.id)) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("tr", { children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("td", { colSpan: "6", className: "py-20 text-center opacity-30", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-diagram-2 text-6xl mb-4 block" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("span", { className: "text-sm font-black uppercase tracking-[0.3em]", children: "Isolated Proxy - No Backends" })
+                  ] }) }) })
+                ] }) }) })
+              ] })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "xl:col-span-4 flex flex-col gap-12", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h3", { className: "text-sm font-black text-white uppercase tracking-[0.2em] mb-8 flex items-center gap-3", children: "Clusters" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-900 border border-neutral-800 rounded-[3rem] p-8 shadow-2xl shadow-black/40", children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "flex gap-2 mb-8", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+                      "input",
+                      {
+                        type: "text",
+                        placeholder: "Group Name...",
+                        value: newGroupName,
+                        onChange: (e) => setNewGroupName(e.target.value),
+                        className: "flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-xs font-bold text-white focus:outline-none focus:border-primary-500/50 transition-all uppercase tracking-widest"
+                      }
+                    ),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+                      "button",
+                      {
+                        onClick: () => handleAction("add-group"),
+                        className: "px-6 bg-emerald-600/10 text-emerald-500 rounded-xl hover:bg-emerald-600 hover:text-white transition active:scale-95",
+                        children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-plus-lg" })
+                      }
+                    )
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "space-y-4", children: groups.length > 0 ? groups.map((g) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-neutral-950 border border-neutral-800 rounded-2xl p-5 group flex items-center justify-between gap-4", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h5", { className: "text-sm font-black text-white uppercase tracking-tight mb-1", children: g.name }),
+                      /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("span", { className: "text-[10px] font-bold text-neutral-600 uppercase tracking-widest", children: [
+                        backends.filter((b) => b.groupId === g.id).length,
+                        " Nodes Connected"
+                      ] })
+                    ] }),
+                    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+                      "button",
+                      {
+                        onClick: () => handleAction("delete-group", g.id),
+                        className: "p-2 text-rose-600 opacity-0 group-hover:opacity-100 transition",
+                        children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-trash3" })
+                      }
+                    )
+                  ] }, g.id)) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "text-center py-8 opacity-20 text-[10px] font-black uppercase tracking-widest", children: "No Network Groups" }) })
+                ] })
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-primary-600/5 border border-primary-600/10 rounded-[3rem] p-10 mt-auto", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("i", { className: "bi bi-lightning-charge text-primary-500 text-3xl mb-6 block" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h4", { className: "text-lg font-black text-white uppercase tracking-tight mb-3", children: "Live Provisioning" }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-[11px] text-neutral-500 font-bold uppercase leading-relaxed tracking-widest mb-8", children: "Use Sync Config to instantly broadcast changes to the proxy engine without a full restart." }),
+                /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+                  "button",
+                  {
+                    onClick: () => handleAction("sync"),
+                    className: "w-full py-4 bg-white text-neutral-950 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl shadow-2xl transition hover:bg-primary-50 active:scale-95",
+                    children: "Re-broadcast Config"
+                  }
+                )
+              ] })
+            ] })
+          ] })
+        ]
+      }
+    ) });
+  }
+  var server_minecraft_proxy_default = ServerMinecraftProxyPage;
   if (root) {
     root.render(
-      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ThemeContext_default, { pageData: data, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ServerUsersPage, { pageData: data }) })
+      /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ThemeContext_default, { pageData: data, children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(BrowserRouter, { children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ServerMinecraftProxyPage, { pageData: data }) }) })
     );
     if (typeof window.__CPANEL_REACT_BOOTED__ === "function") {
       window.__CPANEL_REACT_BOOTED__();
