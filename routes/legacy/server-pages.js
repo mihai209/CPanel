@@ -18174,6 +18174,7 @@ return res.render('server/users', {
             let snapshot = { backends: [], groups: [] };
             let groupedBackends = [];
             let ungroupedBackends = [];
+            let importedFromConfig = { changed: false, config: null, importedCount: 0 };
 
             if (proxyMode) {
                 networkConfig = await getServerProxyNetworkConfig(server.id);
