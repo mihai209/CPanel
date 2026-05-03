@@ -2342,12 +2342,15 @@ app.post('/admin/servers/delete/:containerId', requireAuth, requireAdmin, async 
 });
 
 app.post('/admin/servers/edit/:containerId', requireAuth, requireAdmin, async (req, res) => {
-    const { name, description, ownerId, imageId, allocationId, memory, cpu, disk, dockerImage, startup } = req.body;
+    const { name, description, ownerId, imageId, allocationId, memory, cpu, disk, dockerImage, startup, databaseLimit } = req.body;
     try {
         const safeDescriptionRaw = String(description || '').trim();
         const safeDescription = safeDescriptionRaw.length > 0 ? safeDescriptionRaw : null;
         const server = await Server.findOne({ where: { containerId: req.params.containerId } });
         if (!server) return res.redirect('/admin/servers?error=Server not found.');
+
+        const parsedDatabaseLimit = Math.max(0, Number.parseInt(databaseLimit, 10) || 0);
+
         const previousServerState = {
             name: server.name,
             description: server.description,
@@ -2356,6 +2359,7 @@ app.post('/admin/servers/edit/:containerId', requireAuth, requireAdmin, async (r
             memory: server.memory,
             cpu: server.cpu,
             disk: server.disk,
+            databaseLimit: server.databaseLimit,
             swapLimit: server.swapLimit,
             ioWeight: server.ioWeight,
             pidsLimit: server.pidsLimit,
@@ -2422,6 +2426,7 @@ app.post('/admin/servers/edit/:containerId', requireAuth, requireAdmin, async (r
             memory: parsedMemory,
             cpu: parsedCpu,
             disk: parsedDisk,
+            databaseLimit: parsedDatabaseLimit,
             swapLimit: advancedLimits.values.swapLimit,
             ioWeight: advancedLimits.values.ioWeight,
             pidsLimit: advancedLimits.values.pidsLimit,
@@ -2444,6 +2449,7 @@ app.post('/admin/servers/edit/:containerId', requireAuth, requireAdmin, async (r
                 memory: server.memory,
                 cpu: server.cpu,
                 disk: server.disk,
+                databaseLimit: server.databaseLimit,
                 swapLimit: server.swapLimit,
                 ioWeight: server.ioWeight,
                 pidsLimit: server.pidsLimit,

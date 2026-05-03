@@ -31,6 +31,12 @@ const serverConsoleBuffers = new Map(); // serverId -> { lines: string[], bytes:
 const SERVER_CONSOLE_BUFFER_MAX_LINES = 1200;
 const SERVER_CONSOLE_BUFFER_MAX_BYTES = 1024 * 1024;
 const SERVER_DEBUG_LOG_TAIL_MAX_CHARS = 32 * 1024;
+const CONNECTOR_PANEL_TYPE_ROCKY = 'rocky';
+
+function normalizeConnectorPanelType(panelType) {
+    const value = String(panelType || '').trim().toLowerCase();
+    return value || CONNECTOR_PANEL_TYPE_ROCKY;
+}
 
 function getUserUiConnectionCount(userId) {
     const parsedUserId = Number.parseInt(userId, 10);
@@ -2165,6 +2171,12 @@ wss.on('connection', (ws, request) => {
             if (data.type === 'auth') {
                 const connector = await Connector.findOne({ where: { id: data.id, token: data.token } });
                 if (connector) {
+                    const panelType = normalizeConnectorPanelType(data.panelType || data.typeName || data.panel_type);
+                    if (panelType !== CONNECTOR_PANEL_TYPE_ROCKY) {
+                        ws.send(JSON.stringify({ type: 'auth_fail', error: `Unsupported panel type for CPanel: ${panelType}` }));
+                        ws.close(4003, 'Unsupported panel type');
+                        return;
+                    }
                     const requestOrigin = normalizeOriginCandidate(request.headers.origin || '');
                     if (requestOrigin) {
                         const panelOrigin = extractOriginFromUrl(resolvePanelBaseUrl(request));
@@ -2188,15 +2200,23 @@ wss.on('connection', (ws, request) => {
                     authenticated = true;
                     connectorId = data.id;
                     authenticatedToken = String(data.token || '');
+                    ws.panelType = panelType;
+                    ws.connectorIdentity = {
+                        connectorId,
+                        panelType,
+                        sessionConnectorId: Number.parseInt(data.connectorId, 10) || connectorId
+                    };
                     connectorConnections.set(connectorId, ws);
                     if (!global.connectorStatus) global.connectorStatus = {};
                     global.connectorStatus[connectorId] = {
                         status: 'online',
                         lastSeen: new Date(),
                         usage: null,
-                        diagnostics: null
+                        diagnostics: null,
+                        panelType,
+                        connectorId
                     };
-                    ws.send(JSON.stringify({ type: 'auth_success' }));
+                    ws.send(JSON.stringify({ type: 'auth_success', panelType }));
                     try {
                         const limitMb = await getConnectorWSReadLimitMbFromSettings();
                         pushConnectorWSReadLimitToSocket(ws, connectorId, limitMb, 'auth_sync');
@@ -2249,17 +2269,21 @@ wss.on('connection', (ws, request) => {
 
             // Heartbeat/Status Update
             if (data.type === 'heartbeat') {
+                const panelType = normalizeConnectorPanelType(data.panelType || ws.panelType);
                 if (!global.connectorStatus) global.connectorStatus = {};
                 global.connectorStatus[connectorId] = {
                     status: 'online',
                     lastSeen: new Date(),
                     usage: data.usage,
-                    diagnostics: data.diagnostics || null
+                    diagnostics: data.diagnostics || null,
+                    panelType,
+                    connectorId
                 };
 
                 broadcastToUI({
                     type: 'status_update',
                     connectorId: connectorId,
+                    panelType,
                     status: 'online',
                     lastSeen: new Date(),
                     usage: data.usage,
@@ -2268,18 +2292,22 @@ wss.on('connection', (ws, request) => {
             }
 
             if (data.type === 'diagnostics_result') {
+                const panelType = normalizeConnectorPanelType(data.panelType || ws.panelType);
                 if (!global.connectorStatus) global.connectorStatus = {};
                 const existingStatus = global.connectorStatus[connectorId] || {};
                 global.connectorStatus[connectorId] = {
                     ...existingStatus,
                     status: 'online',
                     lastSeen: new Date(),
-                    diagnostics: data.diagnostics || null
+                    diagnostics: data.diagnostics || null,
+                    panelType,
+                    connectorId
                 };
 
                 broadcastToUI({
                     type: 'status_update',
                     connectorId: connectorId,
+                    panelType,
                     status: 'online',
                     lastSeen: new Date(),
                     usage: existingStatus.usage || null,

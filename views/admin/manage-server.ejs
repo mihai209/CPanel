@@ -150,6 +150,14 @@
                                                 </div>
                                                 <div class="col-md-4">
                                                     <label
+                                                        class="form-label text-muted small text-uppercase fw-bold">Database
+                                                        Slots</label>
+                                                    <input type="number" name="databaseLimit" class="form-control"
+                                                        style="background-color: #1a1a20; border-color: #2d2d35; color: white;"
+                                                        value="<%= server.databaseLimit %>" min="0" required>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label
                                                         class="form-label text-muted small text-uppercase fw-bold">Swap
                                                         (MB)</label>
                                                     <input type="number" id="swapLimitInput" name="swapLimit" class="form-control"

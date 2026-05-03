@@ -364,17 +364,39 @@
                                                     <!-- Configuration File -->
                                                     <div class="mb-4">
                                                         <div
-                                                            class="d-flex justify-content-between align-items-center mb-2">
+                                                            class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                                                             <label
                                                                 class="form-label text-muted small text-uppercase fw-bold mb-0">Configuration
                                                                 File (config.json)</label>
-                                                            <button class="btn btn-sm btn-outline-primary" type="button"
-                                                                id="copyConfig">
-                                                                <i class="bi bi-clipboard me-2"></i>Copy Config
-                                                            </button>
+                                                            <div class="d-flex align-items-center gap-3">
+                                                                <div class="form-check form-switch m-0">
+                                                                    <input class="form-check-input" type="checkbox" role="switch" id="multiPanelToggle" <%= sharedConnectorModeEnabled ? 'checked' : '' %>>
+                                                                    <label class="form-check-label text-muted small fw-bold" for="multiPanelToggle">MultiPanel</label>
+                                                                </div>
+                                                                <button class="btn btn-sm btn-outline-primary" type="button"
+                                                                    id="copyConfig">
+                                                                    <i class="bi bi-clipboard me-2"></i>Copy Config
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div class="text-muted small mb-2" id="configModeHint">
+                                                            <% if (sharedConnectorModeEnabled) { %>
+                                                                MultiPanel enabled. This box currently shows the shared Rocky + Rex config.
+                                                            <% } else { %>
+                                                                MultiPanel disabled. This box currently shows the single-panel Rocky config.
+                                                            <% } %>
                                                         </div>
                                                         <pre id="configDisplay" class="p-3 rounded mb-0"
                                                             style="background-color: #141419; border: 1px solid #2d2d35; color: #a5acff; font-family: monospace; font-size: 0.85rem; max-height: 400px; overflow-y: auto;"><%= configJson %></pre>
+                                                        <script type="application/json" id="singlePanelConfigData"><%- singlePanelConfigJson %></script>
+                                                        <script type="application/json" id="multiPanelConfigData"><%- multiPanelConfigJson %></script>
+                                                        <small class="text-muted d-block mt-2">
+                                                            <% if (sharedConnectorModeEnabled) { %>
+                                                                Shared connector mode is active. This config already includes <strong><%= configPanelCount %></strong> panel entries and can be copied directly for Rocky + Rex.
+                                                            <% } else { %>
+                                                                Single-panel Rocky config. Set <code>CONNECTOR_SHARED_REX_URL</code>, <code>CONNECTOR_SHARED_REX_ID</code>, and <code>CONNECTOR_SHARED_REX_TOKEN</code> on CPanel if you want this box to auto-include the RA-panel entry too.
+                                                            <% } %>
+                                                        </small>
                                                     </div>
 
                                                     <div class="mb-4">
@@ -934,6 +956,28 @@
                 // Configuration tab - Copy config to clipboard
                 const copyConfig = document.getElementById('copyConfig');
                 const configDisplay = document.getElementById('configDisplay');
+                const multiPanelToggle = document.getElementById('multiPanelToggle');
+                const configModeHint = document.getElementById('configModeHint');
+                const singlePanelConfigData = document.getElementById('singlePanelConfigData');
+                const multiPanelConfigData = document.getElementById('multiPanelConfigData');
+                const singlePanelConfig = singlePanelConfigData ? singlePanelConfigData.textContent : '';
+                const multiPanelConfig = multiPanelConfigData ? multiPanelConfigData.textContent : '';
+
+                const updateConfigDisplay = () => {
+                    if (!configDisplay) return;
+                    const multiPanelEnabled = multiPanelToggle ? multiPanelToggle.checked : false;
+                    configDisplay.textContent = multiPanelEnabled ? multiPanelConfig : singlePanelConfig;
+                    if (configModeHint) {
+                        configModeHint.textContent = multiPanelEnabled
+                            ? 'MultiPanel enabled. This box currently shows the shared Rocky + Rex config.'
+                            : 'MultiPanel disabled. This box currently shows the single-panel Rocky config.';
+                    }
+                };
+
+                if (multiPanelToggle) {
+                    multiPanelToggle.addEventListener('change', updateConfigDisplay);
+                    updateConfigDisplay();
+                }
 
                 if (copyConfig && configDisplay) {
                     copyConfig.addEventListener('click', async function () {

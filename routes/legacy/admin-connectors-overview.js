@@ -10,6 +10,8 @@ const WEB_SERVER_TEMPLATE_FILES = Object.freeze({
     standalone: 'standalone.conf'
 });
 const DEFAULT_WEB_SERVER_TEMPLATE = 'standalone';
+const CONNECTOR_PANEL_TYPE_ROCKY = 'rocky';
+const CONNECTOR_PANEL_TYPE_REX = 'rex';
 
 function resolveWebServerTemplateType(rawType) {
     const type = String(rawType || '').trim().toLowerCase();
@@ -43,6 +45,19 @@ function renderWebServerTemplate(type, panelUrl) {
     }
 
     return content;
+}
+
+function resolvePanelWebsocketUrl(panelUrl) {
+    try {
+        const parsed = new URL(panelUrl);
+        parsed.protocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
+        parsed.pathname = '/ws/connector';
+        parsed.search = '';
+        parsed.hash = '';
+        return parsed.toString();
+    } catch {
+        return '';
+    }
 }
 
 function normalizeAllocationNotes(raw) {
@@ -129,6 +144,82 @@ function parseLinesInput(value) {
         .split(/\r?\n|,/g)
         .map((entry) => entry.trim())
         .filter(Boolean);
+}
+
+function normalizeSharedPanelType(value, fallback) {
+    const normalized = String(value || '').trim().toLowerCase();
+    return normalized || fallback;
+}
+
+function parseSharedAllowedOrigins(primaryUrl, rawValue) {
+    const candidates = parseLinesInput(rawValue);
+    if (candidates.length > 0) return candidates;
+    const fallback = String(primaryUrl || '').trim();
+    return fallback ? [fallback] : [];
+}
+
+function buildConnectorPanelsConfig({
+    panelType,
+    namespace,
+    panelUrl,
+    panelWsUrl = '',
+    allowedOrigins,
+    connectorId,
+    connectorToken,
+    connectorName,
+    peerPanel = null
+}) {
+    const panels = [
+        {
+            type: panelType,
+            namespace,
+            panel: {
+                url: panelUrl,
+                ...(panelWsUrl ? { ws_url: panelWsUrl } : {}),
+                allowedUrls: allowedOrigins
+            },
+            connector: {
+                id: connectorId,
+                token: connectorToken,
+                name: connectorName
+            }
+        }
+    ];
+
+    if (peerPanel && peerPanel.panel && peerPanel.connector) {
+        panels.push(peerPanel);
+    }
+
+    return panels;
+}
+
+function readSharedRexPanelConfigFromEnv() {
+    const url = String(process.env.CONNECTOR_SHARED_REX_URL || '').trim();
+    const connectorId = Number.parseInt(process.env.CONNECTOR_SHARED_REX_ID || '', 10);
+    const token = String(process.env.CONNECTOR_SHARED_REX_TOKEN || '').trim();
+
+    if (!url || !Number.isInteger(connectorId) || connectorId <= 0 || !token) {
+        return null;
+    }
+
+    const wsUrl = String(process.env.CONNECTOR_SHARED_REX_WS_URL || '').trim();
+    const name = String(process.env.CONNECTOR_SHARED_REX_NAME || 'RA-panel').trim() || 'RA-panel';
+    const allowedUrls = parseSharedAllowedOrigins(url, process.env.CONNECTOR_SHARED_REX_ALLOWED_URLS || '');
+
+    return {
+        type: normalizeSharedPanelType(process.env.CONNECTOR_SHARED_REX_TYPE, CONNECTOR_PANEL_TYPE_REX),
+        namespace: String(process.env.CONNECTOR_SHARED_REX_NAMESPACE || CONNECTOR_PANEL_TYPE_REX).trim() || CONNECTOR_PANEL_TYPE_REX,
+        panel: {
+            url,
+            ...(wsUrl ? { ws_url: wsUrl } : {}),
+            allowedUrls
+        },
+        connector: {
+            id: connectorId,
+            token,
+            name
+        }
+    };
 }
 
 function normalizeConnectorHealthFilter(raw) {
@@ -643,6 +734,7 @@ app.get('/admin/connectors/:id/configuration', requireAuth, requireAdmin, async 
         const allocatedUsage = await getConnectorAllocatedUsage(req.params.id);
 
         const panelUrl = resolvePanelBaseUrl(req);
+        const panelWsUrl = resolvePanelWebsocketUrl(panelUrl);
         const panelOrigin = extractOriginFromUrl(panelUrl);
         const allowedOrigins = await getConnectorAllowedOrigins(connector.id, panelOrigin);
         const settingsMap = res.locals.settings || {};
@@ -660,12 +752,26 @@ app.get('/admin/connectors/:id/configuration', requireAuth, requireAdmin, async 
         const rootlessEnabled = normalizeBooleanInput(settingsMap.connectorRootlessEnabled, false);
         const rootlessUid = normalizeNumberInput(settingsMap.connectorRootlessContainerUid, 0, 0, 65535);
         const rootlessGid = normalizeNumberInput(settingsMap.connectorRootlessContainerGid, 0, 0, 65535);
+        const sharedRexPanel = readSharedRexPanelConfigFromEnv();
+        const panelsConfig = buildConnectorPanelsConfig({
+            panelType: CONNECTOR_PANEL_TYPE_ROCKY,
+            namespace: CONNECTOR_PANEL_TYPE_ROCKY,
+            panelUrl,
+            panelWsUrl,
+            allowedOrigins,
+            connectorId: connector.id,
+            connectorToken: connector.token,
+            connectorName: connector.name,
+            peerPanel: sharedRexPanel
+        });
         const configJson = {
             panel: {
                 url: panelUrl,
+                ...(panelWsUrl ? { ws_url: panelWsUrl } : {}),
                 ssl: connector.ssl,
                 allowedUrls: allowedOrigins
             },
+            panels: panelsConfig,
             api: {
                 host: apiHost,
                 port: connector.port,
@@ -706,6 +812,10 @@ app.get('/admin/connectors/:id/configuration', requireAuth, requireAdmin, async 
                 lineResetInterval: throttleInterval
             }
         };
+        const singlePanelConfigJson = {
+            ...configJson,
+            panels: panelsConfig.length > 0 ? [panelsConfig[0]] : []
+        };
         const webServerTemplateType = resolveWebServerTemplateType(req.query.webServerTemplate);
         let webServerTemplateContent = '';
         try {
@@ -719,9 +829,13 @@ app.get('/admin/connectors/:id/configuration', requireAuth, requireAdmin, async 
             connector,
             currentTab: 'configuration',
             configJson: JSON.stringify(configJson, null, 4),
+            singlePanelConfigJson: JSON.stringify(singlePanelConfigJson, null, 4),
+            multiPanelConfigJson: JSON.stringify(configJson, null, 4),
             webServerTemplateType,
             webServerTemplateContent,
             allowedOrigins,
+            sharedConnectorModeEnabled: panelsConfig.length > 1,
+            configPanelCount: panelsConfig.length,
             allocations: [],
             statusData,
             allocatedUsage,
@@ -1125,14 +1239,29 @@ app.get('/admin/connectors/:id/config', requireAuth, requireAdmin, async (req, r
         }
 
         const panelUrl = resolvePanelBaseUrl(req);
+        const panelWsUrl = resolvePanelWebsocketUrl(panelUrl);
         const panelOrigin = extractOriginFromUrl(panelUrl);
         const allowedOrigins = await getConnectorAllowedOrigins(connector.id, panelOrigin);
+        const sharedRexPanel = readSharedRexPanelConfigFromEnv();
+        const panelsConfig = buildConnectorPanelsConfig({
+            panelType: CONNECTOR_PANEL_TYPE_ROCKY,
+            namespace: CONNECTOR_PANEL_TYPE_ROCKY,
+            panelUrl,
+            panelWsUrl,
+            allowedOrigins,
+            connectorId: connector.id,
+            connectorToken: connector.token,
+            connectorName: connector.name,
+            peerPanel: sharedRexPanel
+        });
         const config = {
             panel: {
                 url: panelUrl,
+                ...(panelWsUrl ? { ws_url: panelWsUrl } : {}),
                 ssl: connector.ssl,
                 allowedUrls: allowedOrigins
             },
+            panels: panelsConfig,
             api: {
                 allowedOrigins
             },
@@ -1196,6 +1325,7 @@ app.post('/admin/connectors/:id/regenerate-token', requireAuth, requireAdmin, as
 app.post('/api/connector/heartbeat', async (req, res) => {
     try {
         const { id, token, status, usage, diagnostics } = req.body;
+        const panelType = String(req.body.panelType || req.body.panel_type || 'rocky').trim().toLowerCase() || 'rocky';
 
         if (!id || !token) {
             return res.status(400).json({ error: 'Missing ID or Token' });
@@ -1221,7 +1351,9 @@ app.post('/api/connector/heartbeat', async (req, res) => {
             status,
             usage,
             diagnostics: diagnostics || null,
-            lastSeen: new Date()
+            lastSeen: new Date(),
+            panelType,
+            connectorId: Number.parseInt(id, 10) || id
         };
 
         res.json({ success: true });
